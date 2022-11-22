@@ -101,16 +101,19 @@ void _ret(SLOTH* s) { if (s->RP == 0) s->ctx.Lx = 0; else s->ctx.Lx = RPOP(s); }
 
 #define BINOP(s, op)		{ CELL x = POP(s); CELL y = POP(s); PUSH(s, y op x); }
 
+// Arithmetics
 void _add(SLOTH* s) { BINOP(s, +); }
 void _sub(SLOTH* s) { BINOP(s, -); }
 void _mul(SLOTH* s) { BINOP(s, *); }
 void _div(SLOTH* s) { BINOP(s, /); }
 void _mod(SLOTH* s) { BINOP(s, %); }
 
+// Logic
 void _and(SLOTH* s) { BINOP(s, &); }
 void _or(SLOTH* s) { BINOP(s, |); }
-void _not(SLOTH* s) { PUSH(s, !POP(s)); }
+void _not(SLOTH* s) { PUSH(s, ~POP(s)); }
 
+// Stack manipulation
 void _drop(SLOTH* s) { POP(s); }
 void _dup(SLOTH* s) { CELL x = POP(s); PUSH(s, x); PUSH(s, x); }
 void _swap(SLOTH *s) { CELL x = POP(s); CELL y = POP(s); PUSH(s, x); PUSH(s, y); }
@@ -122,6 +125,9 @@ void _store(SLOTH *s) { CELL* addr = (CELL*)POP(s); *addr = POP(s); }
 
 void _here(SLOTH *s) { PUSH(s, (CELL)s->ctx.dhere); }
 void _state(SLOTH *s) { PUSH(s, (CELL)(&s->state)); }
+
+void _allot(SLOTH* s) { allot((CTX*)s, POP(s)); }
+void _align(SLOTH* s) { align((CTX*)s); }
 
 // INPUT/OUTPUT
 
@@ -149,7 +155,10 @@ int _getch()
 }
 #endif
 
+// key ( -- char )
 void _key(SLOTH* s) { PUSH(s, _getch()); }
+
+// emit ( x -- )
 void _emit(SLOTH *s) {	
 	CELL K = POP(s);
 	if (K == 127) printf ("\b \b"); 
@@ -276,6 +285,30 @@ CELL compile_ret(CTX* ctx) {
 	bytes += compile_byte(ctx, offsetof(CTX, Lx));
 	bytes += compile_byte(ctx, 0xC3);
 	return bytes;
+}
+
+void _create(SLOTH* s) {
+	_parse_name(s);	
+	_to_counted_string(s);
+	_drop(s);
+	BYTE* dhere = s->ctx.dhere;
+	ENTRY* w = create(s, s->TSB, "");
+	_align(s);
+	BYTE* chere = unprotect((CTX*)s);
+	if (chere) {
+		CELL bytes = compile_push((CTX*)s, (CELL)(s->ctx.dhere));
+		bytes += compile_cfunc((CTX*)s, (FUNC)&_lit);
+		bytes += compile_next((CTX*)s);
+		bytes += compile_ret((CTX*)s);
+		if (protect((CTX*)s, chere)) {
+			w->clen = bytes;
+			w->code = chere;
+			w->next = s->dict;
+			s->dict = w;
+			return;
+		}
+	}
+	s->ctx.dhere = dhere;
 }
 
 ENTRY* add_cfunc(SLOTH* sloth, BYTE* name, FUNC func) {
