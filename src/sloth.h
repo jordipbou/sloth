@@ -11,6 +11,7 @@
 #include "capybara.h"
 
 #define TIB_SIZE			10*sizeof(CELL)
+#define TSB_SIZE			10*sizeof(CELL)
 #define DSTACK_SIZE		256*sizeof(CELL)
 #define RSTACK_SIZE		256*sizeof(CELL)
 
@@ -36,6 +37,9 @@ typedef struct {
 	CELL state;
 	CELL flags;
 	BYTE TIB[TIB_SIZE];				// Terminal input buffer
+	CELL IN;
+	CELL CTSB;								// Counted value of string in temporal string buffer
+	BYTE TSB[TSB_SIZE];				// Temporal string buffer
 	CELL DSTACK[DSTACK_SIZE];		// Data stack
 	CELL RSTACK[RSTACK_SIZE];		// Return stack
 	CELL PP, DP, RP;	// Parse pointer, data stack pointer, return stack pointer
@@ -62,6 +66,7 @@ SLOTH* init_sloth() {
 	sloth->ctx.dhere += TIB_SIZE + DSTACK_SIZE + RSTACK_SIZE;
 	sloth->ctx.bottom = sloth->ctx.dhere;
 
+	sloth->IN = 0;
 	sloth->DP = sloth->RP = 0;
 
 	sloth->dict = NULL;
@@ -106,8 +111,11 @@ void _and(SLOTH* s) { BINOP(s, &); }
 void _or(SLOTH* s) { BINOP(s, |); }
 void _not(SLOTH* s) { PUSH(s, !POP(s)); }
 
+void _drop(SLOTH* s) { POP(s); }
 void _dup(SLOTH* s) { CELL x = POP(s); PUSH(s, x); PUSH(s, x); }
 void _swap(SLOTH *s) { CELL x = POP(s); CELL y = POP(s); PUSH(s, x); PUSH(s, y); }
+
+void _2dup(SLOTH *s) { CELL x = POP(s); CELL y = POP(s); PUSH(s, y); PUSH(s, x); PUSH(s, y); PUSH(s, x); }
 
 void _fetch(SLOTH *s) { CELL addr = POP(s); PUSH(s, *((CELL*)addr)); }
 void _store(SLOTH *s) { CELL* addr = (CELL*)POP(s); *addr = POP(s); }
@@ -122,9 +130,9 @@ void _state(SLOTH *s) { PUSH(s, (CELL)(&s->state)); }
 // It's a fantastic readline cross-platform replacement, but only getch was
 // needed and there's no need to include everything else.
 #ifdef _WIN32	// Windows
-int _getch (void) {	fflush (stdout); return _getch(); }
+int _getch(void) {	fflush (stdout); return _getch(); }
 #else
-int _getch ()
+int _getch()
 {
 	char ch = 0;
 	struct termios old_term, cur_term;
@@ -141,11 +149,89 @@ int _getch ()
 }
 #endif
 
-void _key (SLOTH* s) { PUSH(s, _getch()); }
-void _emit (SLOTH *s) {	
+void _key(SLOTH* s) { PUSH(s, _getch()); }
+void _emit(SLOTH *s) {	
 	CELL K = POP(s);
 	if (K == 127) printf ("\b \b"); 
 	else printf ("%c", (char)K); 
+}
+
+// . ( n -- )
+void _dot(SLOTH* s) {
+	CELL x = POP(s);	
+	printf("%ld ", x);
+}
+
+void _type(SLOTH* s) {
+	CELL len = POP(s);
+	BYTE* addr = (BYTE*)POP(s);
+	for (CELL i = 0; i < len; i++) {
+		PUSH(s, *(addr + i));
+		_emit(s);
+	}
+}
+
+void _accept(SLOTH* s) {
+	CELL max = POP(s);
+	BYTE* addr = (BYTE*)POP(s);
+	for (CELL count = 0; count < max; count++) {
+		_key(s);
+		CELL k = POP(s);
+		if (k == '\n' || k == '\r') {
+			*(addr + count) = 0;
+			PUSH(s, count);
+			printf(" ");
+			return;
+		} else {
+			PUSH(s, k);
+			_emit(s);
+			if (k == 127) {
+				count-=2;
+			} else {
+				*(addr + count) = k;
+			}
+		}
+	}
+}
+
+void _in(SLOTH* s) {
+	PUSH(s, (CELL)(&s->IN));
+}
+
+void _source(SLOTH *s) {
+	PUSH(s, (CELL)(s->TIB));
+	PUSH(s, strlen(s->TIB));
+}
+
+// REFILL ( -- flag )
+void _refill(SLOTH *s) {
+	_source(s);	_drop(s);
+	PUSH(s, TIB_SIZE);
+	_accept(s); _drop(s);
+	PUSH(s, 0);
+	_in(s); _store(s);
+	PUSH(s, -1);
+}
+
+// PARSE-NAME ( "<spaces>name<space>" -- c-addr u )
+void _parse_name(SLOTH* s) {
+	while(s->TIB[s->IN] == ' ') { s->IN++; }
+	CELL c_addr = (CELL)(s->TIB + s->IN);
+	CELL u = 0;
+	while(s->TIB[s->IN] != ' ' && s->TIB[s->IN] != 0) { u++; s->IN++; }
+	PUSH(s, c_addr); PUSH(s, u);
+}
+
+// STR>CSTR ( c-addr u -- c-addr )
+void _to_counted_string(SLOTH* s) {
+	CELL len = POP(s);
+	BYTE* caddr = (BYTE*)POP(s);
+	s->CTSB = len;
+	for (CELL i = 0; i < len; i++) {
+		s->TSB[i] = *(caddr + i);
+	}
+	s->TSB[len] = 0;
+	PUSH(s, (CELL)(&s->CTSB));
 }
 
 #define sC								sizeof(CELL)
@@ -223,10 +309,9 @@ void dump_words(SLOTH* s) {
 	printf("\n");
 }
 
-void dump_stack(SLOTH* s) {
-	printf("<%ld> ", s->DP);
+void _dump_stack(SLOTH* s) {
+	printf(" <%ld> ", s->DP);
 	for (CELL i = 0; i < s->DP; i++) printf("%ld ", s->DSTACK[i]);
-	printf("\n");
 }
 
 ENTRY* find(SLOTH* sloth, BYTE* name) {
@@ -235,6 +320,22 @@ ENTRY* find(SLOTH* sloth, BYTE* name) {
 		w = w->next;
 	}
 	return w;
+}
+
+// FIND ( c-addr -- c-addr 0 | xt 1 | xt -1 )
+void _find(SLOTH* s) {
+	STR* str = (STR*)POP(s);	
+	ENTRY* w = find(s, str->str);
+	if (w == NULL) {
+		PUSH(s, (CELL)str);
+		PUSH(s, 0);
+	} else if (w->flags & F_IMMEDIATE) {
+		PUSH(s, (CELL)w);
+		PUSH(s, 1);
+	} else {
+		PUSH(s, (CELL)w);
+		PUSH(s, -1);
+	}
 }
 
 void eval_word(SLOTH* sloth, BYTE* name) {
@@ -249,5 +350,16 @@ void eval_word(SLOTH* sloth, BYTE* name) {
 		}
 	} else {
 		sloth->flags |= ERR_UNDEFINED_WORD;
+	}
+}
+
+// EXECUTE ( i*x xt -- j*x )
+void _execute(SLOTH* sloth) {
+	BYTE* NEXT = ((ENTRY*)POP(sloth))->code;
+	while (NEXT != 0) {
+		NEXT = CALL(NEXT, ((CTX*)sloth));
+		if (NEXT != 0) {
+			((void (*)(CTX*))(((CTX*)sloth)->Fx))((CTX*)sloth);
+		}
 	}
 }

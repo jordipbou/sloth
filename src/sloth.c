@@ -5,6 +5,7 @@
 #include "sloth.h"
 
 void bye(SLOTH* sloth) {
+	printf("\n");
 	deinit_sloth(sloth);
 	exit(0);
 }
@@ -22,10 +23,15 @@ void main() {
 	add_cfunc(sloth, "dup", (FUNC)&_dup);
 	add_cfunc(sloth, "swap", (FUNC)&_swap);
 	add_cfunc(sloth, "+", (FUNC)&_add);
+	add_cfunc(sloth, "*", (FUNC)&_mul);
+	add_cfunc(sloth, "-", (FUNC)&_sub);
+	add_cfunc(sloth, "/", (FUNC)&_div);
 	add_cfunc(sloth, "@", (FUNC)&_fetch);
 	add_cfunc(sloth, "!", (FUNC)&_store);
 	add_cfunc(sloth, "here", (FUNC)&_here);
 	add_cfunc(sloth, "state", (FUNC)&_state);
+	add_cfunc(sloth, ".s", (FUNC)&_dump_stack);
+	add_cfunc(sloth, ".", (FUNC)&_dot);
 
 	char buf[80];
 	CELL literal;
@@ -37,25 +43,26 @@ void main() {
 	
 	// Basic outer interpreter
 	while(1) {
-		fgets(buf, 80, stdin);
-		// Interpret...
-		token = strtok(buf, delim);
-		while(token != NULL) {
-			eval_word(sloth, token);
-			switch(sloth->flags) {
-				case ERR_UNDEFINED_WORD:
-					// Maybe its a number?
-					if (sscanf(token, "%ld", &literal)) {
-						PUSH(sloth, literal);
-						sloth->flags = ERR_OK;
-					} else {
-						printf(" Undefined word.\n");
-						sloth->DP = sloth->RP = 0;
-					}
-					break;
+		_refill(sloth); _drop(sloth);
+		_parse_name(sloth);
+		_dup(sloth);
+		while(POP(sloth) != 0) {
+			_to_counted_string(sloth);
+			_find(sloth);
+			if (POP(sloth) != 0) {
+				_execute(sloth);
+			} else {
+				_drop(sloth);
+				if (sscanf(sloth->TSB, "%ld", &literal)) {
+					PUSH(sloth, literal);
+				} else {
+					sloth->DP = sloth->RP = 0;
+				}
 			}
-			token = strtok(NULL, delim);
+			_parse_name(sloth);
+			_dup(sloth);
 		}
-		printf(" ok "); dump_stack(sloth);
+		_drop(sloth); _drop(sloth);
+		printf(" ok\n");
 	}
 }
