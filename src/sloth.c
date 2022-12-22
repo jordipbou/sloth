@@ -75,13 +75,25 @@ void main() {
 		while(POP(sloth) != 0) {
 			_to_counted_string(sloth);
 			_find(sloth);
+			_dup(sloth);
 			if (POP(sloth) != 0) {
-				_execute(sloth);
+				if (sloth->state == ST_INTERPRETING) {
+					_drop(sloth);
+					_execute(sloth);
+				} else {
+					if (POP(sloth) == 1) {
+						// Immediate word
+						_execute(sloth);
+					} else {
+						_compile(sloth);
+					}
+				}
 			} else {
-				_drop(sloth);
+				_drop(sloth); _drop(sloth);
 				if (sscanf(sloth->TSB, "%ld", &literal)) {
 					PUSH(sloth, literal);
 				} else {
+					// ERROR: Undefined word !!
 					sloth->DP = sloth->RP = 0;
 				}
 			}

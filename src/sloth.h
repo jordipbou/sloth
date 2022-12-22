@@ -97,6 +97,16 @@ void deinit_sloth(SLOTH* sloth) {
 
 void _lit(SLOTH* s) { PUSH(s, s->ctx.Lx); }
 
+void _call(SLOTH* s) { 
+	// Get from Lx address of code of word to be called
+	BYTE* NEXT = (BYTE*)s->ctx.Ax;
+	while (NEXT != 0) {
+		NEXT = CALL(NEXT, ((CTX*)s));
+		if (NEXT != 0) {
+			((void (*)(CTX*))(((CTX*)s)->Fx))((CTX*)s);
+		}
+	}
+}
 void _ret(SLOTH* s) { if (s->RP == 0) s->ctx.Lx = 0; else s->ctx.Lx = RPOP(s); }
 
 #define BINOP(s, op)		{ CELL x = POP(s); CELL y = POP(s); PUSH(s, y op x); }
@@ -296,7 +306,7 @@ void _create(SLOTH* s) {
 	_align(s);
 	BYTE* chere = unprotect((CTX*)s);
 	if (chere) {
-		CELL bytes = compile_push((CTX*)s, (CELL)(s->ctx.dhere));
+		CELL bytes = compile_Lx((CTX*)s, (CELL)(s->ctx.dhere));
 		bytes += compile_cfunc((CTX*)s, (FUNC)&_lit);
 		bytes += compile_next((CTX*)s);
 		bytes += compile_ret((CTX*)s);
@@ -309,6 +319,24 @@ void _create(SLOTH* s) {
 		}
 	}
 	s->ctx.dhere = dhere;
+}
+
+void _colon(SLOTH* s) {
+	_parse_name(s);
+	_to_counted_string(s);
+	_drop(s);
+	ENTRY* w = create(s, s->TSB, "");
+	PUSH(s, (CELL)w);
+	w->code = s->ctx.chere;
+	s->state = ST_COMPILING;
+}
+
+void _semicolon(SLOTH* s) {
+	s->state = ST_INTERPRETING;
+	ENTRY* w = (ENTRY*)POP(s);
+	w->clen = s->ctx.chere - w->code;
+	w->next = s->dict;
+	s->dict = w;
 }
 
 ENTRY* add_cfunc(SLOTH* sloth, BYTE* name, FUNC func) {
@@ -393,6 +421,28 @@ void _execute(SLOTH* sloth) {
 		NEXT = CALL(NEXT, ((CTX*)sloth));
 		if (NEXT != 0) {
 			((void (*)(CTX*))(((CTX*)sloth)->Fx))((CTX*)sloth);
+		}
+	}
+}
+
+// TODO: Call C function _call to push address to return stack and the rest
+void _compile(SLOTH* s) {
+	_parse_name(s);
+	_to_counted_string(s);
+	_drop(s);
+	ENTRY* w = find(s, s->TSB);
+	BYTE* chere = unprotect((CTX*)s);
+	if (chere) {
+		CELL bytes = compile_cfunc((CTX*)s, (FUNC)&_call);
+		bytes += compile_Ax((CTX*)s, (CELL)w->code);
+		bytes += compile_next((CTX*)s);
+		bytes += compile_ret((CTX*)s);
+		if (protect((CTX*)s, chere)) {
+			w->clen = bytes;
+			w->code = chere;
+
+			w->next = s->dict;
+			s->dict = w;
 		}
 	}
 }
