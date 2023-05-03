@@ -1,3 +1,0 @@
-[submodule "deps/capybara"]
-	path = deps/capybara
-	url = https://github.com/jordipbou/capybara.git
