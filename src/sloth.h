@@ -1,7 +1,6 @@
 /*
-TODO: Add key/emit as primitives (k e)
-TODO: Add register navigation (GPn load registers in G, execute native function in P)
 TODO: Add error management and "condition" system
+TODO: Add register navigation (GPn load registers in G, execute native function in P)
 TODO: Check how to use multiple stacks
 TODO: Check how to use registers as stacks/locals
 TODO: Check how to incorporate types for typed stacks/multiple interpreters?
@@ -13,21 +12,31 @@ TODO: Check how to incorporate types for typed stacks/multiple interpreters?
 #include<stdlib.h>
 #include<stdio.h>
 
+#ifdef _WIN32
+  #include <conio.h>
+#else
+	#include <unistd.h>
+	#include <termios.h>
+#endif
+
 typedef int8_t BYTE;
 typedef intptr_t CELL;
 
 typedef struct { CELL type, size, length; CELL data[1]; } VECTOR;
 
-typedef struct {
+struct CONTEXT_S;
+
+typedef void (*FUNC)(struct CONTEXT_S*);
+
+typedef struct CONTEXT_S {
 	VECTOR* mstack;
 	VECTOR* rstack;
 	VECTOR** dstack;
 	VECTOR* mregisters;
 	VECTOR** registers;
+	FUNC* inner;
 	BYTE* ip;
 } CONTEXT;
-
-typedef void (*FUNC)(CONTEXT*);
 
 #define S(x)				(*x->dstack)
 
@@ -76,6 +85,32 @@ CONTEXT* init() {
 
 void dump(CONTEXT*);
 
+/*
+ Source code for getch is taken from:
+ Crossline readline (https://github.com/jcwangxp/Crossline).
+ It's a fantastic readline cross-platform replacement, but only getch was
+ needed and there's no need to include everything else.
+*/
+#ifdef _WIN32
+int _getch (void) {	fflush (stdout); return _getch(); }
+#else
+int _getch ()
+{
+	char ch = 0;
+	struct termios old_term, cur_term;
+	fflush (stdout);
+	if (tcgetattr(STDIN_FILENO, &old_term) < 0)	{ perror("tcsetattr"); }
+	cur_term = old_term;
+	cur_term.c_lflag &= ~(ICANON | ECHO | ISIG); /* echoing off, canonical off, no signal chars */
+	cur_term.c_cc[VMIN] = 1;
+	cur_term.c_cc[VTIME] = 0;
+	if (tcsetattr(STDIN_FILENO, TCSANOW, &cur_term) < 0)	{ perror("tcsetattr"); }
+	if (read(STDIN_FILENO, &ch, 1) < 0)	{ /* perror("read()"); */ } /* signal will interrupt */
+	if (tcsetattr(STDIN_FILENO, TCSADRAIN, &old_term) < 0)	{ perror("tcsetattr"); }
+	return ch;
+}
+#endif
+
 void inner(CONTEXT* x) {
 	CELL t;
 	CELL* a;
@@ -109,6 +144,9 @@ void inner(CONTEXT* x) {
 			case 'o': PUSH(x, NOS(x)); break;
 			case 'r': t = NNOS(x); NNOS(x) = NOS(x); NOS(x) = TOS(x); TOS(x) = t; break;
 			case '\\': DROP(x); break;
+
+			case 'k': PUSH(x, _getch()); break;
+			case 'e': printf("%c", (char)POP(x)); break;
 
 			case '?': t = 1; if (!POP(x)) { while (t) { x->ip++; if (*x->ip == '(') { t--; } else if (*x->ip == '?') { t++; } } } break;
 			case '(': t = 1; while (t) { x->ip++; if (*x->ip == '(') t++; else if (*x->ip == ')') t--; }; break;
