@@ -1,3 +1,11 @@
+/*
+TODO: Add key/emit as primitives (k e)
+TODO: Add register navigation (GPn load registers in G, execute native function in P)
+TODO: Add error management and "condition" system
+TODO: Check how to use multiple stacks
+TODO: Check how to use registers as stacks/locals
+TODO: Check how to incorporate types for typed stacks/multiple interpreters?
+*/
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -37,6 +45,8 @@ typedef void (*FUNC)(CONTEXT*);
 #define PUSHR(x, v)	(R(x)->data[R(x)->length++] = (CELL)v)
 #define POPR(x)			(R(x)->data[--R(x)->length])
 
+/* TODO: This should use an external allocator. This would allow not accessing out of bounds
+memory if using a memory block, for example */
 VECTOR* newV(CELL size) {
 	VECTOR* vector;
 
@@ -69,7 +79,7 @@ void dump(CONTEXT*);
 void inner(CONTEXT* x) {
 	CELL t;
 	CELL* a;
-	BYTE opcode;
+	BYTE opcode, opcode2;
 
 	dump(x);
 	while (x->ip != 0) {
@@ -100,33 +110,42 @@ void inner(CONTEXT* x) {
 			case 'r': t = NNOS(x); NNOS(x) = NOS(x); NOS(x) = TOS(x); TOS(x) = t; break;
 			case '\\': DROP(x); break;
 
-			case '?': 
-				t = 1; 
-				if (!POP(x)) { 
-					while (t) { 
-						x->ip++; 
-						if (*x->ip == '(') { t--; } 
-						else if (*x->ip == '?') { t++; } 
-					} 
-				}
-				break;
+			case '?': t = 1; if (!POP(x)) { while (t) { x->ip++; if (*x->ip == '(') { t--; } else if (*x->ip == '?') { t++; } } } break;
 			case '(': t = 1; while (t) { x->ip++; if (*x->ip == '(') t++; else if (*x->ip == ')') t--; }; break;
 			case ')': /* NOOP */ break;
 
 			case '[': /* NOOP */ break;
 			case ']': t = 1; while (t) { x->ip--; if (*x->ip == ']') t++; else if (*x->ip == '[') t--; }; break;
 
+			case '{': PUSH(x, x->ip + 1); t = 1; while (t) { x->ip++; if (*x->ip == '{') t++; else if (*x->ip == '}') t--; }; break;
+			case '}':
+			case ';': if (x->rstack->length > 0) x->ip = (BYTE*)POPR(x); else return; break;
+
 			/* Should nested definitions be allowed here? */
 			case ':': /* NOOP */ break;
 			case '`': PUSHR(x, x->ip); while (*x->ip != ':') { x->ip--; }; break;
-			case ';': if (x->rstack->length > 0) x->ip = (BYTE*)POPR(x); else return; break;
 
 			case '!': a = (CELL*)POP(x); t = POP(x); *a = t; break;
 			case '@': TOS(x) = *((CELL*)TOS(x)); break;
 
 			default:
 				if (opcode >= 'A' && opcode <= 'Z') {
-					PUSH(x, &((*(x->registers))->data[opcode - 'A']));
+					/*PUSH(x, &((*(x->registers))->data[opcode - 'A']));*/
+					printf("Here!\n");
+					opcode2 = *(++x->ip);
+					printf("opcode: '%c' opcode2: '%c' \n", opcode, opcode2);
+					if (opcode2 == '!') {
+						(*(x->registers))->data[opcode - 'A'] = POP(x);
+					} else if (opcode2 == '@') {
+						PUSH(x, (*(x->registers))->data[opcode - 'A']);
+					} else if (opcode2 == 'c') {
+						PUSHR(x, x->ip); 
+						x->ip = ((BYTE*)((*(x->registers))->data[opcode - 'A'])) - 1;
+					} else if (opcode2 == 'n') {
+						((FUNC)((*(x->registers))->data[opcode - 'A']))(x);
+					} else if (opcode2 >= 'A' && opcode2 <= 'Z') {
+						/* TODO */
+					}
 				}
 				break;
 		}

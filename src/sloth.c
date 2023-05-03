@@ -1,6 +1,10 @@
 #include<stdio.h>
 #include "sloth.h"
 
+void hello(CONTEXT* x) {
+	printf("Hello world!\n");
+}
+
 int main() {
 	CONTEXT* x = init();
 	char buf[255];
@@ -15,6 +19,8 @@ int main() {
 	inner(x);
 	printf("%ld\n", S(x)->data[0]);
 	*/
+
+	(*(x->registers))->data['H' - 'A'] = (CELL)&hello;
 
 	do {
 		for (i = 0; i < 255; i++) { buf[i] = ';'; }
