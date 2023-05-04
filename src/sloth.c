@@ -36,32 +36,32 @@ int _getch ()
 
 /* TODO: This should use an external allocator. This would allow not accessing out of bounds
 memory if using a memory block, for example */
-ARRAY* newV(CELL size) {
-	ARRAY* vector;
+ARRAY newV(CELL size) {
+	ARRAY array;
 
-	vector = calloc(size + 3, sizeof(CELL));
+	array = calloc(size + 3, sizeof(CELL));
 
-	vector->type = 0;
-	vector->size = size;
-	vector->length = 0;
+	array->tp = 0;
+	array->sz = size;
+	array->len = 0;
 
-	return vector;
+	return array;
 }
 
 CONTEXT* init() {
-	CONTEXT* x = malloc(sizeof(CONTEXT));
+	CONTEXT* ctx = malloc(sizeof(CONTEXT));
 
-	x->data_stack = newV(64);
-	x->call_stack = newV(64);
+	ctx->s = newV(64);
+	ctx->r = newV(64);
 
-	x->extensions = newV(26);
+	ctx->x = newV(26);
 
-	x->code = 0;
-	x->data = 0;
+	ctx->c = 0;
+	ctx->d = 0;
 
-	x->ip = 0;
+	IP = 0;
 
-	return x;
+	return ctx;
 }
 
 void hello(CONTEXT* x) {
@@ -69,29 +69,24 @@ void hello(CONTEXT* x) {
 }
 
 int main() {
-	CONTEXT* x = init();
-	char buf[255];
 	char* str;
 	CELL i;
 
-	/*
-	BYTE* a = (BYTE*)":d1>?1-d1-`s`+();";
+	ARRAY code = newV(32);
+	CONTEXT* ctx = init();
 
-	x->ip = a;
-	PUSH(x, 15);
-	inner(x);
-	printf("%ld\n", S(x)->data[0]);
-	*/
+	code->len = 32*sizeof(CELL);
+	ctx->c = code;
 
-	E(x)->data['H' - 'A'] = (CELL)&hello;
+	ctx->x->dt['H' - 'A'] = (CELL)&hello;
 
 	do {
-		for (i = 0; i < 255; i++) { buf[i] = 0; }
+		for (i = 0; i < 255; i++) { C[i] = 0; }
 		printf("IN: ");
-		str = fgets(buf, 255, stdin);
-		for (i = 0; i < 255; i++) { if (buf[i] < 32) { buf[i] = 0; } }
-		x->ip = (BYTE*)buf;
+		str = fgets((char*)C, 255, stdin);
+		IP = 0;
 		/*inner(x);*/
-		trace(x);
+		i = trace(ctx);
+		if (i != ERR_OK) { printf("ERROR: %ld\n", i); }
 	} while(1);
 }

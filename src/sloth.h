@@ -1,3 +1,14 @@
+/******************************************************************************
+
+	SLOTH								Dual stack virtual machine with human readable bytecode
+																																(c) jordipbou
+
+	Inspired on:
+		STABLE Forth (https://w3group.de/stable.html)
+		RetroForth/ILO	(http://ilo.retroforth.org/)
+	
+******************************************************************************/
+
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -8,139 +19,117 @@
 typedef int8_t BYTE;
 typedef intptr_t CELL;
 
-typedef struct { CELL type, size, length; CELL data[1]; } ARRAY;
+typedef struct { CELL tp, sz, len; CELL dt[1]; } *ARRAY;
 
 typedef struct CONTEXT_S {
-	ARRAY* data_stack;
-	ARRAY* call_stack;
-	/* TODO: Make extensions optional, will save pointer size bytes */
-	ARRAY* extensions;
-	/* DOUBT: Can code be optional? */
-	ARRAY* code;
-	/* Make contiguous data region optional, will save pointer size bytes */
-	ARRAY* data;
-	BYTE err;
-	BYTE* ip;
+	ARRAY s;			/* Data stack */
+	ARRAY r;			/* Return stack */
+	ARRAY x;			/* Extensions */
+	ARRAY c;			/* Code */
+	ARRAY d;			/* Data */
+	CELL e;				/* Error code */
+	CELL i;				/* Instruction pointer */
 } CONTEXT;
 
 typedef void (*FUNC)(CONTEXT*);
 
-#define S(x)				(x->data_stack)
+#define TOS				(ctx->s->dt[ctx->s->len - 1])
+#define NOS				(ctx->s->dt[ctx->s->len - 2])
+#define NNOS			(ctx->s->dt[ctx->s->len - 3])
 
-#define TOS(x)			(S(x)->data[S(x)->length - 1])
-#define NOS(x)			(S(x)->data[S(x)->length - 2])
-#define NNOS(x)			(S(x)->data[S(x)->length - 3])
+#define PUSH(v)		(ctx->s->dt[ctx->s->len++] = (CELL)v)
+#define POP				(ctx->s->dt[--ctx->s->len])
+#define DROP			(ctx->s->len--)
 
-#define PUSH(x, v)	(S(x)->data[S(x)->length++] = (CELL)v)
-#define POP(x)			(S(x)->data[--S(x)->length])
-#define DROP(x)			(S(x)->length--)
+#define PUSHR(v)	(ctx->r->dt[ctx->r->len++] = (CELL)v)
+#define POPR			(ctx->r->dt[--ctx->r->len])
 
-#define C(x)				(x->call_stack)
+#define C					(((BYTE*)(ctx->c->dt)))
 
-#define TORS(x)			(C(x)->data[C(x)->length - 1])
-#define PUSHR(x, v)	(C(x)->data[C(x)->length++] = (CELL)v)
-#define POPR(x)			(C(x)->data[--R(x)->length])
-
-#define E(x)				(x->extensions)
-
-void dump(CONTEXT* x) {
-	CELL i;
-	BYTE* j;
-	char buf[50];
-
-	buf[0] = 0;
-	for (i = 0; i < S(x)->length; i++) {
-		sprintf(buf, "%.47s%ld ", buf, S(x)->data[i]);
-	}
-	printf("%40s||| ", buf);
-	for (j = x->ip; *(j-1) != ';' && *j != 0; j++) {
-		printf("%c", *(j));
-	}
-	printf("\n");
-}
+#define IP			(ctx->i)
+#define OP			(C[IP])
 
 #define ERR_OK									0
 #define ERR_STACK_OVERFLOW			-1
 #define ERR_STACK_UNDERFLOW			-2
 #define ERR_DIVISION_BY_ZERO		-3
-#define ERR_EXIT								-4
+#define ERR_IP_OUT_OF_BOUNDS		-4
+#define ERR_EXIT								-5
 
-#define ERR(x, c, e)						if (c) { t = error(x, e); if (t) { return t; } }
+#define O1		if (ctx->s->len == ctx->s->sz) { return ERR_STACK_OVERFLOW; }
+#define O2		if (ctx->s->len + 1 == ctx->s->sz) { return ERR_STACK_OVERFLOW; }
+#define U1		if (ctx->s->len == 0) { return ERR_STACK_UNDERFLOW; }
+#define U2		if (ctx->s->len == 1) { return ERR_STACK_UNDERFLOW; }
+#define U3		if (ctx->s->len == 2) { return ERR_STACK_UNDERFLOW; }
+#define ZD		if (TOS == 0) { return ERR_DIVISION_BY_ZERO; }
+#define IOB		if (IP < 0 || IP >= ctx->c->len) { return ERR_IP_OUT_OF_BOUNDS; }
 
-#define OF(x, n)								ERR(x, S(x)->length + n > S(x)->size, ERR_STACK_OVERFLOW)
-#define UF(x, n)								ERR(x, S(x)->length < n, ERR_STACK_UNDERFLOW)
-#define ZD(x)										ERR(x, TOS(x) == 0, ERR_DIVISION_BY_ZERO)
+void dump(CONTEXT* ctx) {
+	CELL i;
+	char buf[50];
 
-/* Errors can be used to end calculations on loops affecting the stack!! */
-CELL error(CONTEXT* x, CELL error) {
-	switch (error) {
-		case ERR_STACK_OVERFLOW: printf("ERROR: Stack overflow\n"); dump(x); break;
-		case ERR_STACK_UNDERFLOW: printf("ERROR: Stack underflow\n"); dump(x); break;
-		case ERR_DIVISION_BY_ZERO: printf("ERROR: Division by zero\n"); dump(x); break;
+	buf[0] = 0;
+	for (i = 0; i < ctx->s->len; i++) {
+		sprintf(buf, "%.47s%ld ", buf, ctx->s->dt[i]);
 	}
-	return error;
+	printf("%40s||| ", buf);
+	for (i = IP; C[i - 1] != ';' && C[i] != 0 && C[i] != 10; i++) {
+		printf("%c", C[i]);
+	}
+	printf("\n");
 }
 
-#define STEP(x) \
-	switch (*x->ip) { \
-		case '0': OF(x, 1); PUSH(x, 0); break; \
-		case '1': OF(x, 1); PUSH(x, 1); break; \
-		/* Arithmetics */ \
-		case '+': UF(x, 2); NOS(x) += TOS(x); DROP(x); break; \
-		case '-': UF(x, 2); NOS(x) -= TOS(x); DROP(x); break; \
-		case '*': UF(x, 2); NOS(x) *= TOS(x); DROP(x); break; \
-		case '/': UF(x, 2); ZD(x); NOS(x) /= TOS(x); DROP(x); break; \
-		case '%': UF(x, 2); NOS(x) %= TOS(x); DROP(x); break; \
-		/* Comparisons */ \
-		case '>': UF(x, 2); NOS(x) = NOS(x) > TOS(x); DROP(x); break; \
-		case '<': UF(x, 2); NOS(x) = NOS(x) < TOS(x); DROP(x); break; \
-		case '=': UF(x, 2); NOS(x) = NOS(x) == TOS(x); DROP(x); break; \
-		/* Bits */ \
-		case '&': UF(x, 2); NOS(x) &= TOS(x); DROP(x); break; \
-		case '|': UF(x, 2); NOS(x) |= TOS(x); DROP(x); break; \
-		case '~': UF(x, 1); TOS(x) = !TOS(x); break; \
-		/* Stack manipulators */ \
-		case 'd': UF(x, 1); PUSH(x, TOS(x)); break; \
-		case 's': UF(x, 2); t = TOS(x); TOS(x) = NOS(x); NOS(x) = t; break; \
-		case 'o': UF(x, 2); OF(x, 1); PUSH(x, NOS(x)); break; \
-		case 'r': UF(x, 3); t = NNOS(x); NNOS(x) = NOS(x); NOS(x) = TOS(x); TOS(x) = t; break; \
-		case '\\': UF(x, 1); DROP(x); break; \
-		/* Calls & jumps */ \
-		case 'c': break; \
-		case 'n': break; \
-		case 'j': break; \
-		/* Control flow helpers */ \
-		case '?': \
-			t = 1; \
-			if (!POP(x)) { \
-				while (t) { \
-					x->ip++; \
-					/* TODO: Add error if x->ip > code+length */ \
-					if (*x->ip == '(') { t--; } \
-					else if (*x->ip == '?') { t++; } \
-				} \
-			} \
-			break; \
-		case '(': \
-			t = 1; \
-			while (t) { \
-				x->ip++; \
-				/* TODO: Add error if x->ip > code+length */ \
-				if (*x->ip == '(') { t++; } \
-				else if (*x->ip == ')') { t--; } \
-			} \
-			break; \
-		case ')': /* NOOP */ break; \
-		case '[': /* NOOP */ break; \
-		case ']': \
-			t = 1; \
-			while (t) { \
-				x->ip--; \
-				/* TODO: Add error if x->ip <= 0 */ \
-				if (*x->ip == ']') { t++; } \
-				else if (*x->ip == '[') { t--; } \
-			} \
-			break; \
+#define STEP																																	\
+	switch (OP) {																																\
+		case '0': O1; PUSH(0); break;																							\
+		case '1': O1; PUSH(1); break;																							\
+		case '#': O1; t = 0;																											\
+			while ((o = C[IP+1] - '0',0 <= o && o <= 9)) { t = 10*t + o; IP++; }		\
+			PUSH(t);																																\
+			break;																																	\
+		/* Arithmetics */																													\
+		case '+': U2; NOS += TOS; DROP; break;																		\
+		case '-': U2; NOS -= TOS; DROP; break;																		\
+		case '*': U2; NOS *= TOS; DROP; break;																		\
+		case '/': U2; ZD; NOS /= TOS; DROP; break;																\
+		case '%': U2; NOS %= TOS; DROP; break;																		\
+		/* Comparisons */																													\
+		case '>': U2; NOS = NOS > TOS; DROP; break;																\
+		case '<': U2; NOS = NOS < TOS; DROP; break;																\
+		case '=': U2; NOS = NOS == TOS; DROP; break;															\
+		/* Bits */																																\
+		case '&': U2; NOS &= TOS; DROP; break;																		\
+		case '|': U2; NOS |= TOS; DROP; break;																		\
+		case '!': U1; TOS = !TOS; break;																					\
+		case '~': U1; TOS = ~TOS; break;																					\
+		/* Stack manipulators */																									\
+		case 'd': U1; PUSH(TOS); break;																						\
+		case 's': U2; t = TOS; TOS = NOS; NOS = t; break;													\
+		case 'o': U2; O1; PUSH(NOS); break;																				\
+		case 't': U3; t = NNOS; NNOS = NOS; NOS = TOS; TOS = t; break;						\
+		case '\\': U1; DROP; break;																								\
+		/* Calls & jumps */																												\
+		case 'c': U1; IP = POP - 1; break;																				\
+		case 'n': break; 																													\
+		case 'j': break; 																													\
+		/* Memory */																															\
+		case 'r': break;																													\
+		case 'w': break;																													\
+		/* Control flow helpers */																								\
+		case '?':	U1; t = 1; if (!POP) {																					\
+			while (t) { IP++; IOB; if (OP == '(') t--; if (OP == '?') t++; }				\
+		} break;																																	\
+		case '(': t = 1;																													\
+			while (t) { IP++; IOB; if (OP == '(') t++; if (OP == ')') t--; }				\
+			break;																																	\
+		case ')': /* NOOP */ break;																								\
+		case '[': /* NOOP */ break;																								\
+		case ']': t = 1;																													\
+			while (t) { IP--; IOB; if (OP == ']') t++; if (OP == '[') t--; }				\
+			break;																																	\
+		case '`': PUSHR(IP); while (OP != ':') IP--; break;												\
+		case ':': PUSH(IP + 1); while (OP != ';') IP++; break;										\
+		case ';': if (ctx->r->len > 0) IP = POPR; else return; break;							\
 		/* TODO: Add as optional: key/emit, fetch/store */ \
 		/* TODO: Add as optional: extensions */ \
 		/* TODO: Add as optional: stack based local variables (uvwxyz)*/ \
@@ -148,28 +137,18 @@ CELL error(CONTEXT* x, CELL error) {
 		/* Maybe use extensions to make it easier to get rid of it */ \
 	}
 
-CELL inner(CONTEXT* x) {
-	CELL t;
+CELL inner(CONTEXT* ctx) {
+	CELL t, o;
 
-	while (x->ip != 0 && *(x->ip) != 0) {
-		/* TODO: Add error if x->ip > code+length */ \
-		STEP(x);
-		x->ip++;
-	}
+	IOB; while (OP != 0) { STEP; IP++; IOB;	}
 
 	return ERR_OK;
 }
 
-CELL trace(CONTEXT* x) {
-	CELL t;
+CELL trace(CONTEXT* ctx) {
+	CELL t, o;
 
-	dump(x);
-	while (x->ip != 0 && *(x->ip) != 0) {
-		/* TODO: Add error if x->ip > code+length */ \
-		STEP(x);
-		x->ip++;
-		dump(x);
-	}
+	IOB; dump(ctx); while (OP != 0) { STEP; IP++; IOB; dump(ctx); }
 
 	return ERR_OK;
 }
