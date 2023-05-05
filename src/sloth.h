@@ -20,15 +20,18 @@ typedef int8_t BYTE;
 typedef intptr_t CELL;
 
 typedef struct { CELL tp, sz, len; CELL dt[1]; } *ARRAY;
+typedef struct { CELL tp, sz, len; BYTE dt[sizeof(CELL)]; } *BYTE_ARRAY;
+
+#define bSZ(a)	(sz*sizeof(CELL))
 
 typedef struct CONTEXT_S {
-	ARRAY s;			/* Data stack */
-	ARRAY r;			/* Return stack */
-	ARRAY x;			/* Extensions */
-	ARRAY c;			/* Code */
-	ARRAY d;			/* Data */
-	CELL e;				/* Error code */
-	CELL i;				/* Instruction pointer */
+	ARRAY s;					/* Data stack */
+	ARRAY r;					/* Return stack */
+	ARRAY x;					/* Extensions */
+	BYTE_ARRAY c;			/* Code */
+	BYTE_ARRAY d;			/* Data */
+	CELL e;						/* Error code */
+	CELL i;						/* Instruction pointer */
 } CONTEXT;
 
 typedef void (*FUNC)(CONTEXT*);
@@ -45,16 +48,20 @@ typedef void (*FUNC)(CONTEXT*);
 #define POPR			(ctx->r->dt[--ctx->r->len])
 
 #define C					(((BYTE*)(ctx->c->dt)))
+#define D					(ctx->d)
+#define BD(i)			(D->dt[i])
+#define CD(i)			(*((CELL*)&(D->dt[i])))
 
-#define IP			(ctx->i)
-#define OP			(C[IP])
+#define IP				(ctx->i)
+#define OP				(C[IP])
 
 #define ERR_OK									0
 #define ERR_STACK_OVERFLOW			-1
 #define ERR_STACK_UNDERFLOW			-2
 #define ERR_DIVISION_BY_ZERO		-3
 #define ERR_IP_OUT_OF_BOUNDS		-4
-#define ERR_EXIT								-5
+#define ERR_MEM_OUT_OF_BOUNDS		-5
+#define ERR_EXIT								-6
 
 #define O1		if (ctx->s->len == ctx->s->sz) { return ERR_STACK_OVERFLOW; }
 #define O2		if (ctx->s->len + 1 == ctx->s->sz) { return ERR_STACK_OVERFLOW; }
@@ -62,7 +69,9 @@ typedef void (*FUNC)(CONTEXT*);
 #define U2		if (ctx->s->len == 1) { return ERR_STACK_UNDERFLOW; }
 #define U3		if (ctx->s->len == 2) { return ERR_STACK_UNDERFLOW; }
 #define ZD		if (TOS == 0) { return ERR_DIVISION_BY_ZERO; }
-#define IOB		if (IP < 0 || IP >= ctx->c->len) { return ERR_IP_OUT_OF_BOUNDS; }
+#define IOB		if (IP < 0 || IP >= ctx->c->sz) { return ERR_IP_OUT_OF_BOUNDS; }
+#define BOB(a)		if (a < 0 || a >= ctx->d->sz) { return ERR_MEM_OUT_OF_BOUNDS; }
+#define COB(a)		if (a < 0 || (a+sizeof(CELL)) >= ctx->d->sz) { return ERR_MEM_OUT_OF_BOUNDS; }
 
 void dump(CONTEXT* ctx) {
 	CELL i;
@@ -83,10 +92,6 @@ void dump(CONTEXT* ctx) {
 	switch (OP) {																																\
 		case '0': O1; PUSH(0); break;																							\
 		case '1': O1; PUSH(1); break;																							\
-		case '#': O1; t = 0;																											\
-			while ((o = C[IP+1] - '0',0 <= o && o <= 9)) { t = 10*t + o; IP++; }		\
-			PUSH(t);																																\
-			break;																																	\
 		/* Arithmetics */																													\
 		case '+': U2; NOS += TOS; DROP; break;																		\
 		case '-': U2; NOS -= TOS; DROP; break;																		\
@@ -112,10 +117,20 @@ void dump(CONTEXT* ctx) {
 		case 'c': U1; IP = POP - 1; break;																				\
 		case 'n': break; 																													\
 		case 'j': break; 																													\
-		/* Memory */																															\
-		case 'r': break;																													\
-		case 'w': break;																													\
-		/* Control flow helpers */																								\
+		/* Safe memory access (data region) */																		\
+		case 'h': O1; PUSH(ctx->d->len); break;																		\
+		case 'a': O1; t = D->len + TOS; BOB(t); D->len += POP; break;							\
+		case 'l': /* TODO: Align here */ break;																		\
+		case 'r': U1; BOB(TOS); PUSH(BD(POP)); break;															\
+		case 'w': U2; BOB(TOS); t = POP; BD(t) = (BYTE)POP; break;								\
+		case 'R': U1; COB(TOS); PUSH(CD(POP)); break;															\
+		case 'W': U2; COB(TOS); t = POP; CD(t) = POP;  break;											\
+																																							\
+		/* Helpers */																															\
+		case '#': O1; t = 0;																											\
+			while ((o = C[IP+1] - '0',0 <= o && o <= 9)) { t = 10*t + o; IP++; }		\
+			PUSH(t);																																\
+			break;																																	\
 		case '?':	U1; t = 1; if (!POP) {																					\
 			while (t) { IP++; IOB; if (OP == '(') t--; if (OP == '?') t++; }				\
 		} break;																																	\
@@ -130,6 +145,7 @@ void dump(CONTEXT* ctx) {
 		case '`': PUSHR(IP); while (OP != ':') IP--; break;												\
 		case ':': PUSH(IP + 1); while (OP != ';') IP++; break;										\
 		case ';': if (ctx->r->len > 0) IP = POPR; else return; break;							\
+																																							\
 		/* TODO: Add as optional: key/emit, fetch/store */ \
 		/* TODO: Add as optional: extensions */ \
 		/* TODO: Add as optional: stack based local variables (uvwxyz)*/ \

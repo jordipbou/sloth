@@ -72,17 +72,22 @@ int main() {
 	char* str;
 	CELL i;
 
-	ARRAY code = newV(32);
+	BYTE_ARRAY code = (BYTE_ARRAY)newV(32);
+	BYTE_ARRAY data = (BYTE_ARRAY)newV(32);
 	CONTEXT* ctx = init();
 
 	code->len = 32*sizeof(CELL);
 	ctx->c = code;
 
+	data->len = 0;
+	ctx->d = data;
+
 	ctx->x->dt['H' - 'A'] = (CELL)&hello;
 
 	do {
 		for (i = 0; i < 255; i++) { C[i] = 0; }
-		printf("IN: ");
+		for (i = 0; i < D->len; i++) { printf("|%x", BD(i)); }
+		printf("\nIN: ");
 		str = fgets((char*)C, 255, stdin);
 		IP = 0;
 		/*inner(x);*/
