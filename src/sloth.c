@@ -85,10 +85,10 @@ int main() {
 	ctx->x->dt['H' - 'A'] = (CELL)&hello;
 
 	do {
-		for (i = 0; i < 255; i++) { C[i] = 0; }
+		for (i = 0; i < 255; i++) { BC(i) = 0; }
 		for (i = 0; i < D->len; i++) { printf("|%x", BD(i)); }
 		printf("\nIN: ");
-		str = fgets((char*)C, 255, stdin);
+		str = fgets((char*)C->dt, 255, stdin);
 		IP = 0;
 		/*inner(x);*/
 		i = trace(ctx);

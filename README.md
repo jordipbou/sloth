@@ -1,9 +1,14 @@
 # SLOTH
 
-Sloth is a very simple, relatively fast, double stack based virtual machine.
+A small, simple, relatively fast, double stack based virtual machine with a human readable/writeable bytecode.
 
-* Very easily embedabble in a C/C++ application
-* Continuation based condition system
-* Human readable bytecode
-* Bytecode helpers for bootstrapping other languages
-* Relatively fast interpreter
+Inspired by STABLE Forth, RetroForth/ilo, XY.
+
+Features:
+
+* One header only. Very easily embedabble in a C/C++ application.
+* Human readable bytecode.
+* Bytecode helpers for easier bootstrapping of higher level languages.
+* Relatively fast interpreter.
+* Safe (unless desired at compile time). Only allows access to assigned memory regions.
+* String based tests and continuations.
