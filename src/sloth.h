@@ -81,18 +81,30 @@ typedef void (*F)(X*);
 #define BCOB(x, a)	if (a < 0 || a >= CODE_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; }
 #define CCOB(x, a)	if (a < 0 || (a + sizeof(C)) >= CODE_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; }
 
+char* dump_stack(char* s, X* x) {
+	C i;
+	for (i = 0; i < DEPTH(x); i++) {
+		sprintf(s, "%s%ld ", s, PEEK(x, i));
+	}
+	return s;
+}
+
+char* dump_rstack(char* s, X* x) {
+	C i;
+	for (i = IP(x); OP(x, i - 1) != ';' && OP(x, i) != 0 && OP(x, i) != 10; i++) {
+		sprintf(s, "%s%c", s, OP(x, i));
+	}
+	return s;
+}
+
 void dump(X* x) {
 	C i;
 	char buf[50];
 
 	buf[0] = 0;
-	for (i = 0; i < DEPTH(x); i++) {
-		sprintf(buf, "%.47s%ld ", buf, PEEK(x, i));
-	}
-	printf("%40s||| ", buf);
-	for (i = IP(x); OP(x, i - 1) != ';' && OP(x, i) != 0 && OP(x, i) != 10; i++) {
-		printf("%c", OP(x, i));
-	}
+	printf("%40s||| ", dump_stack(buf, x));
+	buf[0] = 0;
+	printf("%s ", dump_rstack(buf, x));
 	printf("\n");
 }
 
@@ -185,6 +197,14 @@ void dump(X* x) {
 		case '}': if (DEPTHR(x) > 0) IP(x) = POPR(x); else return; break; \
 		case '`': PUSHR(x, IP(x)); while (OP(x, IP(x)) != '{') IP(x)--; break; \
 	}
+
+C step(X* x) {
+	C t, o;
+
+	IOB(x); STEP(x); IP(x)++; 
+
+	return ERR_OK;
+}
 
 C inner(X* x) {
 	C t, o;
