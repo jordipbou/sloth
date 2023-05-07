@@ -34,64 +34,26 @@ int _getch ()
 }
 #endif
 
-/* TODO: This should use an external allocator. This would allow not accessing out of bounds
-memory if using a memory block, for example */
-ARRAY newV(CELL size) {
-	ARRAY array;
-
-	array = calloc(size + 3, sizeof(CELL));
-
-	array->tp = 0;
-	array->sz = size;
-	array->len = 0;
-
-	return array;
-}
-
-CONTEXT* init() {
-	CONTEXT* ctx = malloc(sizeof(CONTEXT));
-
-	ctx->s = newV(64);
-	ctx->r = newV(64);
-
-	ctx->x = newV(26);
-
-	ctx->c = 0;
-	ctx->d = 0;
-
-	IP = 0;
-
-	return ctx;
-}
-
-void hello(CONTEXT* x) {
+void hello(X* x) {
 	printf("Hello world!\n");
 }
 
 int main() {
 	char* str;
-	CELL i;
+	C i;
 
-	BYTE_ARRAY code = (BYTE_ARRAY)newV(32);
-	BYTE_ARRAY data = (BYTE_ARRAY)newV(32);
-	CONTEXT* ctx = init();
+	X* x = init();
 
-	code->len = 32*sizeof(CELL);
-	ctx->c = code;
-
-	data->len = 0;
-	ctx->d = data;
-
-	ctx->x->dt['H' - 'A'] = (CELL)&hello;
+	x->e->d['H' - 'A'] = (C)&hello;
 
 	do {
-		for (i = 0; i < 255; i++) { BC(i) = 0; }
-		for (i = 0; i < D->len; i++) { printf("|%x", BD(i)); }
+		for (i = 0; i < 255; i++) { OP(x, i) = 0; }
+		for (i = 0; i < HERE(x); i++) { printf("|%x", AT(x, i)); }
 		printf("\nIN: ");
-		str = fgets((char*)C->dt, 255, stdin);
-		IP = 0;
+		str = fgets((char*)x->c->d, 255, stdin);
+		IP(x) = 0;
 		/*inner(x);*/
-		i = trace(ctx);
+		i = trace(x);
 		if (i != ERR_OK) { printf("ERROR: %ld\n", i); }
 	} while(1);
 }

@@ -16,50 +16,50 @@
 #include<stdlib.h>
 #include<stdio.h>
 
-typedef int8_t BYTE;
-typedef intptr_t CELL;
+typedef int8_t B;
+typedef intptr_t C;
 
-typedef struct { CELL tp, sz, len; CELL dt[1]; } *ARRAY;
-/* TODO: Remove byte array */
-typedef struct { CELL tp, sz, len; BYTE dt[sizeof(CELL)]; } *BYTE_ARRAY;
+typedef struct { C s, l; C d[1]; } *A;
+typedef struct { C s, l; B d[1]; } *BA;
 
-#define bSZ(a)	(sz*sizeof(CELL))
+#define SZA		((sizeof(A) / sizeof(C)) + (sizeof(A) % sizeof(C) == 0 ? 0 : 1))
 
-typedef struct CONTEXT_S {
-	ARRAY s;					/* Data stack */
-	ARRAY r;					/* Return stack */
-	ARRAY x;					/* Extensions */
-	BYTE_ARRAY c;			/* Code */
-	BYTE_ARRAY d;			/* Data */
-	CELL i;						/* Instruction pointer */
-} CONTEXT;
+A a_alloc(C n) { A a = calloc(SZA + n - 1, sizeof(C)); a->s = n; a->l = 0; return a; }
+A a_from(B* b, C s) { A a = (A)b; a->s = s - SZA + 1; a->l = 0; return a; }
+BA ba_alloc(C n) { BA a = calloc(sizeof(BA) + n - 1, sizeof(B)); a->s = n; a->l = 0; return a; }
+BA ba_from(B* b, C s) { BA a = (BA)b; a->s = s - sizeof(BA) + 1; a->l = 0; return a; }
 
-typedef void (*FUNC)(CONTEXT*);
+typedef struct { A s, r, e; BA c, d; C i; } X;
 
-#define S					(ctx->s)
-#define R					(ctx->r)
-#define X					(ctx->x)
-#define C					(ctx->c)
-#define D					(ctx->d)
+typedef void (*F)(X*);
 
-#define TOS				(S->dt[S->len - 1])
-#define NOS				(S->dt[S->len - 2])
-#define NNOS			(S->dt[S->len - 3])
+#define DEPTH(x)			(x->s->l)
+#define MAX(x)				(x->s->s)
 
-#define PUSH(v)		(S->dt[S->len++] = (CELL)v)
-#define POP				(S->dt[--S->len])
-#define DROP			(S->len--)
+#define TOS(x)				(x->s->d[x->s->l - 1])
+#define NOS(x)				(x->s->d[x->s->l - 2])
+#define NNOS(x)				(x->s->d[x->s->l - 3])
 
-#define PUSHR(v)	(R->dt[R->len++] = (CELL)v)
-#define POPR			(R->dt[--R->len])
+#define PEEK(x, i)		(x->s->d[i])
+#define DROP(x)				(--x->s->l)
+#define PUSH(x, v)		(x->s->d[x->s->l++] = (C)v)
+#define POP(x)				(x->s->d[--x->s->l])
 
-#define BC(i)			(C->dt[i])
-#define CC(i)			(*((CELL*)&(C->dt[i])))
-#define BD(i)			(D->dt[i])
-#define CD(i)			(*((CELL*)&(D->dt[i])))
+#define DEPTHR(x)			(x->r->l)
 
-#define IP				(ctx->i)
-#define OP				(BC(IP))
+#define PUSHR(x, v)		(x->r->d[x->r->l++] = (C)v)
+#define POPR(x)				(x->r->d[--x->r->l])
+
+#define AS_C(a)				(*((C*)(&a)))
+
+#define HERE(x)				(x->d->l)
+#define AT(x, i)			(x->d->d[i])
+#define DATA_SIZE(x)	(x->d->s)
+
+#define IP(x)					(x->i)
+#define OP(x, i)			(x->c->d[i])
+#define CODE_SIZE(x)	(x->c->s)
+
 
 #define ERR_OK									0
 #define ERR_STACK_OVERFLOW			-1
@@ -69,121 +69,157 @@ typedef void (*FUNC)(CONTEXT*);
 #define ERR_MEM_OUT_OF_BOUNDS		-5
 #define ERR_EXIT								-6
 
-#define O1		if (ctx->s->len == ctx->s->sz) { return ERR_STACK_OVERFLOW; }
-#define O2		if (ctx->s->len + 1 == ctx->s->sz) { return ERR_STACK_OVERFLOW; }
-#define U1		if (ctx->s->len == 0) { return ERR_STACK_UNDERFLOW; }
-#define U2		if (ctx->s->len == 1) { return ERR_STACK_UNDERFLOW; }
-#define U3		if (ctx->s->len == 2) { return ERR_STACK_UNDERFLOW; }
-#define ZD		if (TOS == 0) { return ERR_DIVISION_BY_ZERO; }
-#define IOB		if (IP < 0 || IP >= ctx->c->sz) { return ERR_IP_OUT_OF_BOUNDS; }
-#define BDOB(a)		if (a < 0 || a >= ctx->d->sz) { return ERR_MEM_OUT_OF_BOUNDS; }
-#define CDOB(a)		if (a < 0 || (a+sizeof(CELL)) >= ctx->d->sz) { return ERR_MEM_OUT_OF_BOUNDS; }
-#define BCOB(a)		if (a < 0 || a >= ctx->c->sz) { return ERR_MEM_OUT_OF_BOUNDS; }
-#define CCOB(a)		if (a < 0 || (a+sizeof(CELL)) >= ctx->c->sz) { return ERR_MEM_OUT_OF_BOUNDS; }
+#define O1(x)				if (DEPTH(x) == MAX(x)) { return ERR_STACK_OVERFLOW; }
+#define O2(x)				if (DEPTH(x) + 1 == MAX(x)) { return ERR_STACK_OVERFLOW; }
+#define U1(x)				if (DEPTH(x) == 0) { return ERR_STACK_UNDERFLOW; }
+#define U2(x)				if (DEPTH(x) == 1) { return ERR_STACK_UNDERFLOW; }
+#define U3(x)				if (DEPTH(x) == 2) { return ERR_STACK_UNDERFLOW; }
+#define ZD(x)				if (TOS(x) == 0) { return ERR_DIVISION_BY_ZERO; }
+#define IOB(x)			if (IP(x) < 0 || IP(x) >= CODE_SIZE(x)) { return ERR_IP_OUT_OF_BOUNDS; }
+#define BDOB(x, a)	if (a < 0 || a >= DATA_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; }
+#define CDOB(x, a)	if (a < 0 || (a + sizeof(C)) >= DATA_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; }
+#define BCOB(x, a)	if (a < 0 || a >= CODE_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; }
+#define CCOB(x, a)	if (a < 0 || (a + sizeof(C)) >= CODE_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; }
 
-void dump(CONTEXT* ctx) {
-	CELL i;
+void dump(X* x) {
+	C i;
 	char buf[50];
 
 	buf[0] = 0;
-	for (i = 0; i < ctx->s->len; i++) {
-		sprintf(buf, "%.47s%ld ", buf, ctx->s->dt[i]);
+	for (i = 0; i < DEPTH(x); i++) {
+		sprintf(buf, "%.47s%ld ", buf, PEEK(x, i));
 	}
 	printf("%40s||| ", buf);
-	for (i = IP; BC(i - 1) != ';' && BC(i) != 0 && BC(i) != 10; i++) {
-		printf("%c", BC(i));
+	for (i = IP(x); OP(x, i - 1) != ';' && OP(x, i) != 0 && OP(x, i) != 10; i++) {
+		printf("%c", OP(x, i));
 	}
 	printf("\n");
 }
 
-/* TODO: From this point, only defines should be used to allow modifications on architecture */
-
-#define STEP																																	\
-	switch (OP) {																																\
-		case '0': O1; PUSH(0); break;																							\
-		case '1': O1; PUSH(1); break;																							\
-		case 'l': IP++; PUSH(CC(IP)); break;																			\
-		/* Arithmetics */																													\
-		case '+': U2; NOS += TOS; DROP; break;																		\
-		case '-': U2; NOS -= TOS; DROP; break;																		\
-		case '*': U2; NOS *= TOS; DROP; break;																		\
-		case '/': U2; ZD; NOS /= TOS; DROP; break;																\
-		case '%': U2; NOS %= TOS; DROP; break;																		\
-		/* Comparisons */																													\
-		case '>': U2; NOS = NOS > TOS; DROP; break;																\
-		case '<': U2; NOS = NOS < TOS; DROP; break;																\
-		case '=': U2; NOS = NOS == TOS; DROP; break;															\
-		/* Bits */																																\
-		case '&': U2; NOS &= TOS; DROP; break;																		\
-		case '|': U2; NOS |= TOS; DROP; break;																		\
-		case '!': U1; TOS = !TOS; break;																					\
-		case '~': U1; TOS = ~TOS; break;																					\
-		/* Stack manipulators */																									\
-		case 'd': U1; PUSH(TOS); break;																						\
-		case 's': U2; t = TOS; TOS = NOS; NOS = t; break;													\
-		case 'o': U2; O1; PUSH(NOS); break;																				\
-		case 't': U3; t = NNOS; NNOS = NOS; NOS = TOS; TOS = t; break;						\
-		case '\\': U1; DROP; break;																								\
-		/* Calls & jumps */																												\
-		case 'c': U1; PUSHR(IP); IP = POP - 1; break;															\
-		case 'n': U1; ((FUNC)POP)(ctx); break;																		\
-		case 'j': U1; IP = POP - 1; break; 																				\
-		/* Safe memory access (data region) */																		\
-		case 'h': O1; PUSH(ctx->d->len); break;																		\
-		case 'a': O1; t = D->len + TOS; BDOB(t); D->len += POP; break;						\
-		case 'g': /* TODO: Align here */ break;																		\
-		case 'r': U1; BDOB(TOS); PUSH(BD(POP)); break;														\
-		case 'w': U2; BDOB(TOS); t = POP; BD(t) = (BYTE)POP; break;								\
-		case 'R': U1; CDOB(TOS); PUSH(CD(POP)); break;														\
-		case 'W': U2; CDOB(TOS); t = POP; CD(t) = POP; break;											\
-		/* Memory access (code region) */																					\
-		case '.': U1; BCOB(TOS); PUSH(BC(POP)); break;														\
-		case ',': U2; BCOB(TOS); t = POP; BC(t) = (BYTE)POP; break;								\
-		case ':': U1; CCOB(TOS); PUSH(CC(POP)); break;														\
-		case ';': U2; CCOB(TOS); t = POP; CC(t) = POP; break;											\
-																																							\
-		/* Helpers */																															\
-		case '#': O1; t = 0;																											\
-			while ((o = BC(IP+1) - '0',0 <= o && o <= 9)) { t = 10*t + o; IP++; }		\
-			PUSH(t);																																\
-			break;																																	\
-		case '?':	U1; t = 1; if (!POP) {																					\
-			while (t) { IP++; IOB; if (OP == '(') t--; if (OP == '?') t++; }				\
-		} break;																																	\
-		case '(': t = 1;																													\
-			while (t) { IP++; IOB; if (OP == '(') t++; if (OP == ')') t--; }				\
-			break;																																	\
-		case ')': /* NOOP */ break;																								\
-		case '[': /* NOOP */ break;																								\
-		case ']': t = 1;																													\
-			while (t) { IP--; IOB; if (OP == ']') t++; if (OP == '[') t--; }				\
-			break;																																	\
-		case '{': PUSH(IP + 1); while (OP != '}') IP++; break;										\
-		case '}': if (ctx->r->len > 0) IP = POPR; else return; break;							\
-		case '`': PUSHR(IP); while (OP != '{') IP--; break;												\
-																																							\
-		/* Extensions */																													\
-		/* TODO: Add as optional: key/emit, fetch/store */ \
-		/* TODO: Add as optional: extensions */ \
-		/* TODO: Add as optional: stack based local variables (uvwxyz)*/ \
-		/* Something like: x> x< x@ */ \
-		/* Maybe use extensions to make it easier to get rid of it */ \
+#define STEP \
+	switch (OP(x, IP(x))) {	\
+		case '0': O1(x); PUSH(x, 0); break;	\
+		case '1': O1(x); PUSH(x, 1); break;	\
+		case 'l': IP(x)++; PUSH(x, AS_C(OP(x, IP(x)))); break; \
+		/* Arithmetics */	\
+		case '+': U2(x); NOS(x) += TOS(x); DROP(x); break;	\
+		case '-': U2(x); NOS(x) -= TOS(x); DROP(x); break;	\
+		case '*': U2(x); NOS(x) *= TOS(x); DROP(x); break;	\
+		case '/': U2(x); ZD(x); NOS(x) /= TOS(x); DROP(x); break; \
+		case '%': U2(x); NOS(x) %= TOS(x); DROP(x); break;	\
+		/* Comparisons */	\
+		case '>': U2(x); NOS(x) = NOS(x) > TOS(x); DROP(x); break;	\
+		case '<': U2(x); NOS(x) = NOS(x) < TOS(x); DROP(x); break;	\
+		case '=': U2(x); NOS(x) = NOS(x) == TOS(x); DROP(x); break; \
+		/* Bits */ \
+		case '&': U2(x); NOS(x) &= TOS(x); DROP(x); break; \
+		case '|': U2(x); NOS(x) |= TOS(x); DROP(x); break;	\
+		case '!': U1(x); TOS(x) = !TOS(x); break;	\
+		case '~': U1(x); TOS(x) = ~TOS(x); break;	\
+		/* Stack manipulators */ \
+		case 'd': U1(x); PUSH(x, TOS(x)); break; \
+		case 's': U2(x); t = TOS(x); TOS(x) = NOS(x); NOS(x) = t; break; \
+		case 'o': U2(x); O1(x); PUSH(x, NOS(x)); break; \
+		case 't': U3(x); t = NNOS(x); NNOS(x) = NOS(x); NOS(x) = TOS(x); TOS(x) = t; break; \
+		case '\\': U1(x); DROP(x); break; \
+		/* Calls & jumps */ \
+		case 'c': U1(x); PUSHR(x, IP(x)); IP(x) = POP(x) - 1; break;	\
+		case 'n': U1(x); ((F)POP(x))(x); break; \
+		case 'j': U1(x); IP(x) = POP(x) - 1; break; \
+		/* Safe memory access (data region) */ \
+		case 'h': O1(x); PUSH(x, HERE(x)); break;	\
+		case 'a': O1(x); t = HERE(x) + TOS(x); BDOB(x, t); HERE(x) += POP(x); break;	\
+		case 'g': /* TODO: Align here */ break;	\
+		case 'r': U1(x); BDOB(x, TOS(x)); PUSH(x, AT(x, POP(x))); break;	\
+		case 'w': U2(x); BDOB(x, TOS(x)); t = POP(x); AT(x, t) = (B)POP(x); break;	\
+		case 'R': U1(x); CDOB(x, TOS(x)); PUSH(x, AS_C(AT(x, POP(x)))); break; \
+		case 'W': U2(x); CDOB(x, TOS(x)); t = POP(x); AS_C(AT(x, t)) = POP(x); break; \
+		/* Memory access (code region) */	\
+		case '.': U1(x); BCOB(x, TOS(x)); PUSH(x, OP(x, POP(x))); break;	\
+		case ',': U2(x); BCOB(x, TOS(x)); t = POP(x); OP(x, t) = (B)POP(x); break;	\
+		case ':': U1(x); CCOB(x, TOS(x)); PUSH(x, AS_C(OP(x, POP(x)))); break;	\
+		case ';': U2(x); CCOB(x, TOS(x)); t = POP(x); AS_C(OP(x, t)) = POP(x); break;	\
+		/* Helpers */	\
+		case '#':	\
+			O1(x); \
+			t = 0; \
+			while ((o = OP(x, IP(x) + 1) - '0', 0 <= o && o <= 9)) { \
+				t = 10*t + o; \
+				IP(x)++; \
+			}	\
+			PUSH(x, t); \
+			break; \
+		case '?': \
+			U1(x); \
+			t = 1; \
+			if (!POP(x)) { \
+				while (t) { \
+					IP(x)++; \
+					IOB(x);	\
+					if (OP(x, IP(x)) == '(') t--; \
+					if (OP(x, IP(x)) == '?') t++; \
+				} \
+			} \
+			break; \
+		case '(':	\
+			t = 1; \
+			while (t) { \
+				IP(x)++; \
+				IOB(x); \
+				if (OP(x, IP(x)) == '(') t++; \
+				if (OP(x, IP(x)) == ')') t--; \
+			} \
+			break; \
+		case ')': /* NOOP */ break; \
+		case '[': /* NOOP */ break;	\
+		case ']': \
+			t = 1; \
+			while (t) { \
+				IP(x)--; \
+				IOB(x); \
+				if (OP(x, IP(x)) == ']') t++; \
+				if (OP(x, IP(x)) == '[') t--; \
+			} \
+			break; \
+		case '{': PUSH(x, IP(x) + 1); while (OP(x, IP(x)) != '}') IP(x)++; break; \
+		case '}': if (DEPTHR(x) > 0) IP(x) = POPR(x); else return; break; \
+		case '`': PUSHR(x, IP(x)); while (OP(x, IP(x)) != '{') IP(x)--; break; \
 	}
 
-CELL inner(CONTEXT* ctx) {
-	CELL t, o;
+C inner(X* x) {
+	C t, o;
 
-	IOB; while (OP != 0) { STEP; IP++; IOB;	}
+	IOB(x); while (OP(x, IP(x)) != 0) { STEP(x); IP(x)++; IOB(x); }
 
 	return ERR_OK;
 }
 
-CELL trace(CONTEXT* ctx) {
-	CELL t, o;
+C trace(X* x) {
+	C t, o;
 
-	IOB; dump(ctx); while (OP != 0) { STEP; IP++; IOB; dump(ctx); }
+	IOB(x); 
+	dump(x); 
+	while (OP(x, IP(x)) != 0) { STEP(x); IP(x)++; IOB(x); dump(x); }
 
 	return ERR_OK;
+}
+
+/* API */
+
+X* init() {
+	X* x = malloc(sizeof(X));
+
+	x->s = a_alloc(256);
+	x->r = a_alloc(256);
+
+	x->e = a_alloc(26);
+
+	x->c = ba_alloc(2048);
+	x->d = ba_alloc(2048);
+
+	IP(x) = 0;
+
+	return x;
 }
 
 #endif
