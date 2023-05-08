@@ -40,6 +40,7 @@ void hello(X* x) {
 
 int main() {
 	char* str;
+	char buf[255];
 	C i;
 
 	X* x = init();

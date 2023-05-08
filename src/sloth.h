@@ -90,29 +90,36 @@ char* dump_stack(char* s, X* x) {
 }
 
 char* dump_rstack(char* s, X* x) {
-	C i;
+	C i, j;
 	for (i = IP(x); OP(x, i - 1) != ';' && OP(x, i) != 0 && OP(x, i) != 10; i++) {
-		sprintf(s, "%s%c", s, OP(x, i));
+		if (OP(x, i) == 'l') {
+			#if INTPTR_MAX == INT64_MAX
+			sprintf(s, "%sl %08x ", s, (unsigned int)*((C*)&(OP(x, i + 1))));
+			#elif INTPTR_MAX == INT32_MAX
+			sprintf(s, "%sl %04x ", s, (unsigned int)*((C*)&(OP(x, i + 1))));
+			#elif INTPTR_MAX == INT16_MAX
+			sprintf(s, "%sl %02x ", s, (unsigned int)*((C*)&(OP(x, i + 1))));
+			#endif
+			i += sizeof(C);
+		} else {
+			sprintf(s, "%s%c", s, OP(x, i));
+		}
 	}
 	return s;
 }
 
-void dump(X* x) {
-	C i;
-	char buf[50];
-
-	buf[0] = 0;
-	printf("%40s||| ", dump_stack(buf, x));
-	buf[0] = 0;
-	printf("%s ", dump_rstack(buf, x));
-	printf("\n");
+char* dump(char* s, X* x) {
+	s = dump_stack(s, x);
+	sprintf(s, "%s: ", s);
+	s = dump_rstack(s, x);
+	return s;
 }
 
 #define STEP \
 	switch (OP(x, IP(x))) {	\
 		case '0': O1(x); PUSH(x, 0); break;	\
 		case '1': O1(x); PUSH(x, 1); break;	\
-		case 'l': IP(x)++; PUSH(x, AS_C(OP(x, IP(x)))); break; \
+		case 'l': PUSH(x, AS_C(OP(x, IP(x) + 1))); IP(x) += sizeof(C); break; \
 		/* Arithmetics */	\
 		case '+': U2(x); NOS(x) += TOS(x); DROP(x); break;	\
 		case '-': U2(x); NOS(x) -= TOS(x); DROP(x); break;	\
@@ -135,9 +142,10 @@ void dump(X* x) {
 		case 't': U3(x); t = NNOS(x); NNOS(x) = NOS(x); NOS(x) = TOS(x); TOS(x) = t; break; \
 		case '\\': U1(x); DROP(x); break; \
 		/* Calls & jumps */ \
+		case 'j': U1(x); IP(x) = POP(x) - 1; break; \
 		case 'c': U1(x); PUSHR(x, IP(x)); IP(x) = POP(x) - 1; break;	\
 		case 'n': U1(x); ((F)POP(x))(x); break; \
-		case 'j': U1(x); IP(x) = POP(x) - 1; break; \
+		case 'z': U2(x); if (NOS(x)) { DROP(x); } else { IP(x) = POP(x) - 1; } DROP(x); break; \
 		/* Safe memory access (data region) */ \
 		case 'h': O1(x); PUSH(x, HERE(x)); break;	\
 		case 'a': O1(x); t = HERE(x) + TOS(x); BDOB(x, t); HERE(x) += POP(x); break;	\
@@ -183,19 +191,19 @@ void dump(X* x) {
 			} \
 			break; \
 		case ')': /* NOOP */ break; \
-		case '[': /* NOOP */ break;	\
-		case ']': \
+		case '{': /* NOOP */ break;	\
+		case '}': \
 			t = 1; \
 			while (t) { \
 				IP(x)--; \
 				IOB(x); \
-				if (OP(x, IP(x)) == ']') t++; \
-				if (OP(x, IP(x)) == '[') t--; \
+				if (OP(x, IP(x)) == '}') t++; \
+				if (OP(x, IP(x)) == '{') t--; \
 			} \
 			break; \
-		case '{': PUSH(x, IP(x) + 1); while (OP(x, IP(x)) != '}') IP(x)++; break; \
-		case '}': if (DEPTHR(x) > 0) IP(x) = POPR(x); else return; break; \
-		case '`': PUSHR(x, IP(x)); while (OP(x, IP(x)) != '{') IP(x)--; break; \
+		case '[': PUSH(x, IP(x) + 1); while (OP(x, IP(x)) != '[') IP(x)++; break; \
+		case ']': if (DEPTHR(x) > 0) IP(x) = POPR(x); else return; break; \
+		case '`': PUSHR(x, IP(x)); while (OP(x, IP(x)) != '[') IP(x)--; break; \
 	}
 
 C step(X* x) {
@@ -215,11 +223,17 @@ C inner(X* x) {
 }
 
 C trace(X* x) {
+	char buf[255];
 	C t, o;
 
 	IOB(x); 
-	dump(x); 
-	while (OP(x, IP(x)) != 0) { STEP(x); IP(x)++; IOB(x); dump(x); }
+	buf[0] = 0; printf("%40s: ", dump_stack(buf, x)); buf[0] = 0; printf("%s\n", dump_rstack(buf, x));
+	while (OP(x, IP(x)) != 0) { 
+		STEP(x); 
+		IP(x)++; 
+		IOB(x); 
+		buf[0] = 0; printf("%40s: ", dump_stack(buf, x)); buf[0] = 0; printf("%s\n", dump_rstack(buf, x));
+	}
 
 	return ERR_OK;
 }
