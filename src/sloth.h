@@ -24,9 +24,9 @@ typedef struct { C s, l; B d[1]; } *BA;
 
 #define SZA		((sizeof(A) / sizeof(C)) + (sizeof(A) % sizeof(C) == 0 ? 0 : 1))
 
-A a_alloc(C n) { A a = calloc(SZA + n - 1, sizeof(C)); a->s = n; a->l = 0; return a; }
+A a_alloc(C n) { A a = (A)calloc(SZA + n - 1, sizeof(C)); a->s = n; a->l = 0; return a; }
 A a_from(B* b, C s) { A a = (A)b; a->s = s - SZA + 1; a->l = 0; return a; }
-BA ba_alloc(C n) { BA a = calloc(sizeof(BA) + n - 1, sizeof(B)); a->s = n; a->l = 0; return a; }
+BA ba_alloc(C n) { BA a = (BA)calloc(sizeof(BA) + n - 1, sizeof(B)); a->s = n; a->l = 0; return a; }
 BA ba_from(B* b, C s) { BA a = (BA)b; a->s = s - sizeof(BA) + 1; a->l = 0; return a; }
 
 typedef struct { A s, r, e; BA c, d; C i; } X;
@@ -202,7 +202,7 @@ char* dump(char* s, X* x) {
 			} \
 			break; \
 		case '[': PUSH(x, IP(x) + 1); while (OP(x, IP(x)) != '[') IP(x)++; break; \
-		case ']': if (DEPTHR(x) > 0) IP(x) = POPR(x); else return; break; \
+		case ']': if (DEPTHR(x) > 0) IP(x) = POPR(x); else return ERR_OK; break; \
 		case '`': PUSHR(x, IP(x)); while (OP(x, IP(x)) != '[') IP(x)--; break; \
 	}
 
@@ -241,7 +241,7 @@ C trace(X* x) {
 /* API */
 
 X* init() {
-	X* x = malloc(sizeof(X));
+	X* x = (X*)malloc(sizeof(X));
 
 	x->s = a_alloc(256);
 	x->r = a_alloc(256);
