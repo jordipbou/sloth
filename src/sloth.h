@@ -202,7 +202,7 @@ char* dump(char* s, X* x) {
 				if (OP(x, IP(x)) == '{') t--; \
 			} \
 			break; \
-		case '[': PUSH(x, IP(x) + 1); while (OP(x, IP(x)) != '[') IP(x)++; break; \
+		case '[': PUSH(x, IP(x) + 1); while (OP(x, IP(x)) != ']') IP(x)++; break; \
 		case ']': if (DEPTHR(x) > 0) IP(x) = POPR(x); else return ERR_OK; break; \
 		case '`': PUSHR(x, IP(x)); while (OP(x, IP(x)) != '[') IP(x)--; break; \
 		/* Extensions */ \
