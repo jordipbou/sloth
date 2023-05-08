@@ -60,6 +60,7 @@ typedef void (*F)(X*);
 #define OP(x, i)			(x->c->d[i])
 #define CODE_SIZE(x)	(x->c->s)
 
+#define EX(x, l)			(x->e->d[l - 'A'])
 
 #define ERR_OK									0
 #define ERR_STACK_OVERFLOW			-1
@@ -204,6 +205,8 @@ char* dump(char* s, X* x) {
 		case '[': PUSH(x, IP(x) + 1); while (OP(x, IP(x)) != '[') IP(x)++; break; \
 		case ']': if (DEPTHR(x) > 0) IP(x) = POPR(x); else return ERR_OK; break; \
 		case '`': PUSHR(x, IP(x)); while (OP(x, IP(x)) != '[') IP(x)--; break; \
+		/* Extensions */ \
+		default: o = OP(x, IP(x)); if ('A' <= o && o <= 'Z') { ((F)EX(x, o))(x); } break; \
 	}
 
 C step(X* x) {
