@@ -1,7 +1,8 @@
 /******************************************************************************
 
-	SLOTH								Dual stack virtual machine with human readable bytecode
-																																 by jordipbou
+	SLOTH
+	Dual stack virtual machine with human readable bytecode
+
 	Inspired by:
 		STABLE Forth (https://w3group.de/stable.html)
 		RetroForth/ILO	(http://ilo.retroforth.org/)

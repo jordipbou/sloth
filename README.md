@@ -10,5 +10,4 @@ Features:
 * Human readable bytecode.
 * Bytecode helpers for easier bootstrapping of higher level languages.
 * Relatively fast interpreter.
-* Safe (unless desired at compile time). Only allows access to assigned memory regions.
-* String based tests and continuations.
+* Ability to add extensions (C functions).
