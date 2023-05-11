@@ -21,7 +21,7 @@ void test_CONTEXT_init() {
 	IP(x) = (C)i; \
 	inner(x); \
 	buf[0] = 0; \
-	TEST_ASSERT_EQUAL_STRING(o, dump(buf, x));
+	TEST_ASSERT_EQUAL_STRING(o, dump(buf, x, 0));
 
 void test_STEP_0() { INIT; TEST("0 : ", "0"); }
 void test_STEP_1() { INIT; TEST("1 : ", "1"); }
@@ -60,7 +60,7 @@ void test_STEP_invert() { INIT; TEST("-1 : ", "0~"); TEST("-2 : ", "1~"); TEST("
 void test_STEP_dup() { INIT; TEST("1 1 : ", "1d"); }
 void test_STEP_swap() { INIT; TEST("1 0 : ", "01s"); }
 void test_STEP_over() { INIT; TEST("0 1 0 : ", "01o"); }
-void test_STEP_rot() { INIT; TEST("1 2 0 : ", "0111+t"); }
+void test_STEP_rot() { INIT; TEST("1 2 0 : ", "0111+@"); }
 void test_STEP_drop() { INIT; TEST("0 : ", "01\\"); }
 
 void test_STEP_jump() { INIT; TEST("2 : ]r\372j1+", "r\6j[11+]r\372j1+"); }
@@ -77,7 +77,7 @@ void test_STEP_native() {
 	IP(x) = (C)i;
 	inner(x);
 	buf[0] = 0;
-	TEST_ASSERT_EQUAL_STRING("7 : ", dump(buf, x));
+	TEST_ASSERT_EQUAL_STRING("7 : ", dump(buf, x, 0));
 }
 void test_STEP_zjump_0() { INIT; TEST("2 : ]0r\371z111++", "r\6j[11+]0r\371z111++"); }
 void test_STEP_zjump_1() { INIT; TEST("3 : ", "r\6j[11+]1r\371z111++"); }

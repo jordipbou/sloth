@@ -14,6 +14,7 @@
 
 #include<stdint.h>
 #include<stdlib.h>
+#include<string.h>
 #include<stdio.h>
 
 typedef int8_t B;
@@ -79,11 +80,9 @@ typedef void (*F)(X*);
 #define U2(x)				if (DEPTH(x) == 1) { return ERR_STACK_UNDERFLOW; }
 #define U3(x)				if (DEPTH(x) == 2) { return ERR_STACK_UNDERFLOW; }
 #define ZD(x)				if (TOS(x) == 0) { return ERR_DIVISION_BY_ZERO; }
-#define IOB(x)			/* if (IP(x) < 0 || IP(x) >= CODE_SIZE(x)) { return ERR_IP_OUT_OF_BOUNDS; } */
+#define IOB(x)			if (IP(x) == 0) { return ERR_IP_OUT_OF_BOUNDS; }
 #define BDOB(x, a)	if (a < 0 || a >= DATA_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; }
 #define CDOB(x, a)	if (a < 0 || (a + sizeof(C)) >= DATA_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; }
-#define BCOB(x, a)	/* if (a < 0 || a >= CODE_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; } */
-#define CCOB(x, a)	/* if (a < 0 || (a + sizeof(C)) >= CODE_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; } */
 
 char* dump_stack(char* s, X* x, C b) {
 	C i;
@@ -124,10 +123,18 @@ char* dump_rstack(char* s, X* x) {
 	return s;
 }
 
-char* dump(char* s, X* x) {
-	s = dump_stack(s, x, 0);
-	sprintf(s, "%s: ", s);
+char* dump(char* s, X* x, C f) {
+	char buf[255];
+	char i;
+	if (f) {
+		buf[0] = 0;
+		sprintf(buf, "%s", dump_stack(buf, x, 0));
+		for (i = 0; i < f - strlen(buf); i++) { s[i] = ' '; }
+		s[f - strlen(buf)] = 0;
+	}
+	sprintf(s, "%s: ", dump_stack(s, x, 0));
 	s = dump_rstack(s, x);
+	if (f) sprintf(s, "%s\n", s);
 	return s;
 }
 
@@ -156,7 +163,7 @@ char* dump(char* s, X* x) {
 		case 'd': /* dup */ U1(x); PUSH(x, TOS(x)); break; \
 		case 's': /* swap */ U2(x); t = TOS(x); TOS(x) = NOS(x); NOS(x) = t; break; \
 		case 'o': /* over */ U2(x); O1(x); PUSH(x, NOS(x)); break; \
-		case 't': /* rot */ U3(x); t = NNOS(x); NNOS(x) = NOS(x); NOS(x) = TOS(x); TOS(x) = t; break; \
+		case '@': /* rot */ U3(x); t = NNOS(x); NNOS(x) = NOS(x); NOS(x) = TOS(x); TOS(x) = t; break; \
 		case '\\': U1(x); DROP(x); break; \
 		/* Calls & jumps */ \
 		case 'j': /* Jump (absolute) */ U1(x); IP(x) = POP(x) - 1; break; \
@@ -171,11 +178,12 @@ char* dump(char* s, X* x) {
 		case ';': /* Byte write */ U2(x); BDOB(x, TOS(x)); t = POP(x); AT(x, t) = (B)POP(x); break; \
 		case '.': /* Cell read */ U1(x); CDOB(x, TOS(x)); PUSH(x, AS_C(AT(x, POP(x)))); break; \
 		case ',': /* Cell write */ U2(x); CDOB(x, TOS(x)); t = POP(x); AS_C(AT(x, t)) = POP(x); break; \
-		/* Debugging */ \
+		/* REPL */ \
 		case '$': /* Trace on/off */ U1(x); TRACE(x) = POP(x); break; \
+		case 'q': /* Quit repl */ return ERR_EXIT; break; \
 		/* Helpers */	\
 		case '^': /* Recurse */ PUSHR(x, IP(x)); while (OP(x, IP(x)) != '[') IP(x)--; break; \
-		case '#':	\
+		case '#':	/* Parsed number literal */ \
 			O1(x); \
 			t = 0; \
 			while ((o = OP(x, IP(x) + 1) - '0', 0 <= o && o <= 9)) { \
@@ -184,7 +192,7 @@ char* dump(char* s, X* x) {
 			}	\
 			PUSH(x, t); \
 			break; \
-		case '?': \
+		case '?': /* If */ \
 			U1(x); \
 			t = 1; \
 			if (!POP(x)) { \
@@ -196,7 +204,7 @@ char* dump(char* s, X* x) {
 				} \
 			} \
 			break; \
-		case '(':	\
+		case '(':	/* Else */ \
 			t = 1; \
 			while (t) { \
 				IP(x)++; \
@@ -205,9 +213,9 @@ char* dump(char* s, X* x) {
 				if (OP(x, IP(x)) == ')') t--; \
 			} \
 			break; \
-		case ')': /* NOOP */ break; \
-		case '{': /* NOOP */ break;	\
-		case '}': \
+		case ')': /* Then */ /* NOOP */ break; \
+		case '{': /* Start of loop */ /* NOOP */ break;	\
+		case '}': /* End of loop */ \
 			t = 1; \
 			while (t) { \
 				IP(x)--; \
@@ -216,34 +224,31 @@ char* dump(char* s, X* x) {
 				if (OP(x, IP(x)) == '{') t--; \
 			} \
 			break; \
-		case '[': PUSH(x, IP(x) + 1); while (OP(x, IP(x)) != ']') IP(x)++; break; \
-		case ']': if (DEPTHR(x) > 0) IP(x) = POPR(x); else return ERR_OK; break; \
+		case '[': /* Block */ PUSH(x, IP(x) + 1); while (OP(x, IP(x)) != ']') IP(x)++; break; \
+		case ']': /* End of block */ if (DEPTHR(x) > 0) IP(x) = POPR(x); else return ERR_OK; break; \
 		/* Extensions */ \
 		default: o = OP(x, IP(x)); if ('A' <= o && o <= 'Z') { ((F)EX(x, o))(x); } break; \
 	}
 
-C step(X* x) {
-	C t, o;
+/* Not used right now, but useful for debugging? */
+C step(X* x) { C t, o; IOB(x); STEP(x); IP(x)++; return ERR_OK; }
 
-	IOB(x); STEP(x); IP(x)++; 
-
-	return ERR_OK;
-}
+void print(X* x, char* s) { while (*s != 0) { PUSH(x, *s); ((F)(EX(x, 'E')))(x); s++; } }
 
 C inner(X* x) {
 	char buf[255];
-	C t, o;
+	C t, o, e;
 
 	IOB(x); 
 	if (TRACE(x)) {
 		buf[0] = 0; 
-		/* This printf should depend on key/emit */
-		printf("%40s: ", dump_stack(buf, x, 0)); buf[0] = 0; printf("%s\n", dump_rstack(buf, x));
+		print(x, dump(buf, x, 40));
 		while (OP(x, IP(x)) != 0) { 
 			STEP(x); 
 			IP(x)++; 
 			IOB(x); 
-			buf[0] = 0; printf("%40s: ", dump_stack(buf, x, 0)); buf[0] = 0; printf("%s\n", dump_rstack(buf, x));
+			buf[0] = 0;
+			print(x, dump(buf, x, 40));
 		}
 	} else {
 		while (OP(x, IP(x)) != 0) { 
@@ -256,24 +261,6 @@ C inner(X* x) {
 	return ERR_OK;
 }
 
-/*
-C trace(X* x) {
-	char buf[255];
-	C t, o;
-
-	IOB(x); 
-	buf[0] = 0; printf("%40s: ", dump_stack(buf, x)); buf[0] = 0; printf("%s\n", dump_rstack(buf, x));
-	while (OP(x, IP(x)) != 0) { 
-		STEP(x); 
-		IP(x)++; 
-		IOB(x); 
-		buf[0] = 0; printf("%40s: ", dump_stack(buf, x)); buf[0] = 0; printf("%s\n", dump_rstack(buf, x));
-	}
-
-	return ERR_OK;
-}
-*/ 
-
 /* API */
 
 X* init() {
@@ -284,13 +271,35 @@ X* init() {
 
 	x->e = a_alloc(26);
 
-	/* x->c = ba_alloc(2048); */
 	x->d = ba_alloc(2048);
 
 	IP(x) = 0;
 	TRACE(x) = 0;
 
 	return x;
+}
+
+C repl(X* x) {
+	char buf[255];
+	C i;
+
+	do {
+		print(x, "IN: ");
+		/* TODO: This depends on fget and not on key !!! */
+		IP(x) = (C)fgets(buf, 255, stdin);
+		i = inner(x);
+		if (!TRACE(x) && DEPTH(x) != 0) { 
+			buf[0] = 0; 
+			sprintf(buf, "%s", dump_stack(buf, x, 1));
+			print(x, buf);
+		}
+		if (i == ERR_EXIT) { return ERR_EXIT; }
+		if (i != ERR_OK) { 
+			buf[0] = 0; 
+			sprintf(buf, "ERROR: %ld\n", i);
+			print(x, buf);
+		}
+	} while(1);
 }
 
 #endif

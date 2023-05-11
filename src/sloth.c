@@ -34,33 +34,16 @@ int _getch ()
 }
 #endif
 
+void key(X* x) { PUSH(x, _getch()); }
+void emit(X* x) { printf("%c", (char)POP(x)); }
+
 void hello(X* x) {
 	printf("Hello world!\n");
 }
 
 int main() {
-	char* str;
-	char buf[255];
-	C i;
-
 	X* x = init();
-
-	x->e->d['H' - 'A'] = (C)&hello;
-
-	do {
-		/*
-		for (i = 0; i < 255; i++) { OP(x, i) = 0; }
-		for (i = 0; i < HERE(x); i++) { printf("|%x", AT(x, i)); }
-		*/
-		printf("IN: ");
-		/* str = fgets((char*)x->c->d, 255, stdin); */
-		IP(x) = (C)fgets(buf, 255, stdin);
-		/* IP(x) = 0; */
-		i = inner(x);
-		/*i = trace(x);*/
-		if (!TRACE(x) && DEPTH(x) != 0) { 
-			printf("\n--- Data Stack\n"); buf[0] = 0; printf("%s", dump_stack(buf, x, 1)); 
-		}
-		if (i != ERR_OK) { printf("ERROR: %ld\n", i); }
-	} while(1);
+	EX(x, 'K') = (C)&key;
+	EX(x, 'E') = (C)&emit;
+	repl(x);
 }
