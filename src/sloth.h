@@ -7,6 +7,8 @@
 		STABLE Forth (https://w3group.de/stable.html)
 		RetroForth/ILO	(http://ilo.retroforth.org/)
 		XY (https://nsl.com/k/xy/xy.htm)
+
+	by jordipbou
 	
 ******************************************************************************/
 
@@ -60,8 +62,6 @@ typedef void (*F)(X*);
 
 #define IP(x)					(x->i)
 #define OP(x, a)			(*((B*)a))
-/* #define OP(x, i)			(x->c->d[i]) */
-/* #define CODE_SIZE(x)	(x->c->s) */
 
 #define TRACE(x)			(x->t)
 
@@ -81,7 +81,7 @@ typedef void (*F)(X*);
 #define U2(x)				if (DEPTH(x) == 1) { return ERR_STACK_UNDERFLOW; }
 #define U3(x)				if (DEPTH(x) == 2) { return ERR_STACK_UNDERFLOW; }
 #define ZD(x)				if (TOS(x) == 0) { return ERR_DIVISION_BY_ZERO; }
-#define IOB(x)			if (IP(x) == 0) { return ERR_IP_OUT_OF_BOUNDS; }
+#define IOB(x)			if (OP(x, IP(x)) == 0) { return ERR_IP_OUT_OF_BOUNDS; }
 #define BDOB(x, a)	if (a < 0 || a >= DATA_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; }
 #define CDOB(x, a)	if (a < 0 || (a + sizeof(C)) >= DATA_SIZE(x)) { return ERR_MEM_OUT_OF_BOUNDS; }
 
@@ -232,7 +232,7 @@ char* dump(char* s, X* x, C f) {
 	}
 
 /* Not used right now, but useful for debugging? */
-C step(X* x) { C t, o; IOB(x); STEP(x); IP(x)++; return ERR_OK; }
+C step(X* x) { C t, o; STEP(x); IP(x)++; return ERR_OK; }
 
 void print(X* x, char* s) { while (*s != 0) { PUSH(x, *s); ((F)(EX(x, 'E')))(x); s++; } }
 
@@ -240,14 +240,12 @@ C inner(X* x) {
 	char buf[255];
 	C t, o, e;
 
-	IOB(x); 
 	if (TRACE(x)) {
 		buf[0] = 0; 
 		print(x, dump(buf, x, 40));
 		while (OP(x, IP(x)) != 0) { 
 			STEP(x); 
 			IP(x)++; 
-			IOB(x); 
 			buf[0] = 0;
 			print(x, dump(buf, x, 40));
 		}
@@ -255,7 +253,6 @@ C inner(X* x) {
 		while (OP(x, IP(x)) != 0) { 
 			STEP(x); 
 			IP(x)++; 
-			IOB(x); 
 		}
 	}
 
@@ -283,11 +280,29 @@ X* init() {
 C repl(X* x) {
 	char buf[255];
 	C i;
+	char k;
 
 	do {
 		print(x, "IN: ");
-		/* TODO: This depends on fget and not on key !!! */
-		IP(x) = (C)fgets(buf, 255, stdin);
+		i = 0;
+		do {
+			((F)(EX(x, 'K')))(x); k = TOS(x); 
+			if (k == 127) {
+				TOS(x) = (C)'\b';
+				PUSH(x, ' ');
+				PUSH(x, '\b');
+				((F)(EX(x, 'E')))(x);
+				((F)(EX(x, 'E')))(x);
+				((F)(EX(x, 'E')))(x);
+				i--;
+			} else {
+				((F)(EX(x, 'E')))(x);
+				if (k == 10) { buf[i] = 0; break; }
+				buf[i] = k;
+				i++;
+			}
+		} while (1);
+		IP(x) = (C)buf;
 		i = inner(x);
 		if (!TRACE(x) && DEPTH(x) != 0) { 
 			buf[0] = 0; 
