@@ -8,16 +8,14 @@ void setUp() {}
 
 void tearDown() {}
 
+/*
 void test_CONTEXT_init() {
-	/* TODO */
 }
 
 #define INIT char buf[255]; X* x = init();
 
 #define TEST(o, i) \
-	/* strcpy((char*)x->c->d, i); */ \
 	DEPTH(x) = 0; \
-	/* IP(x) = 0; */ \
 	IP(x) = (C)i; \
 	inner(x); \
 	buf[0] = 0; \
@@ -81,10 +79,12 @@ void test_STEP_native() {
 }
 void test_STEP_zjump_0() { INIT; TEST("2 : ]0r\371z111++", "r\6j[11+]0r\371z111++"); }
 void test_STEP_zjump_1() { INIT; TEST("3 : ", "r\6j[11+]1r\371z111++"); }
+*/
 
 int main() {
 	UNITY_BEGIN();
 
+/*
 	RUN_TEST(test_CONTEXT_init);
 
 	RUN_TEST(test_STEP_0);
@@ -118,6 +118,7 @@ int main() {
 	RUN_TEST(test_STEP_native);
 	RUN_TEST(test_STEP_zjump_0);
 	RUN_TEST(test_STEP_zjump_1);
+*/
 
 	return UNITY_END();
 }

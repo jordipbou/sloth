@@ -11,3 +11,10 @@ Features:
 * Bytecode helpers for easier bootstrapping of higher level languages.
 * Relatively fast interpreter.
 * Ability to add extensions (C functions).
+
+
+##### IDEAS #####
+
+* The fastest thing must be call/return
+	* CALL is a PUSH (or a string copy)
+	* RETURN is a POP (or more if using types)

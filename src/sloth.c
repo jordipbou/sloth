@@ -34,16 +34,34 @@ int _getch ()
 }
 #endif
 
+/*
 void key(X* x) { PUSH(x, _getch()); }
 void emit(X* x) { printf("%c", (char)POP(x)); }
+*/
 
 void hello(X* x) {
 	printf("Hello world!\n");
 }
 
 int main() {
-	X* x = init();
+	B buf[255];
+	I i;
+	B* j;
+	X* x = S_init();
+	/*
 	EX(x, 'K') = (C)&key;
 	EX(x, 'E') = (C)&emit;
 	repl(x);
+	*/
+
+	do {
+		fgets(buf, 255, stdin);
+		S_push_R(x, buf);
+		S_inner(x);
+		/* Tracing */
+		printf("OUT: <%ld> ", x->sp);
+		for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } 
+		for (i = x->rp - 1; i >= 0; i--) { printf(" : "); for (j = x->r[i]; *j != 0 && *j != 10&& *j != ']'; j++) { printf("%c", *j); } }
+		printf(" <%ld>\n", x->rp);
+	} while(1);
 }
