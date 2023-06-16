@@ -1,3 +1,12 @@
+/* TODO: Add i8, i16, i32 and i64 literals */
+/* TODO: Add jumps and calls */
+/* TODO: Add extensions */
+/* TODO: Add error primitives */
+/* TODO: Add memory operations */
+/* TODO: Add dictionary (memory) */
+/* TODO: Add input/output */
+/* TODO: Create languages on top */
+
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
