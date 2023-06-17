@@ -1,10 +1,12 @@
 /* TODO: Add i8, i16, i32 and i64 literals */
+/* TODO: Add dump to string */
+/* TODO: Add input/output */
 /* TODO: Add jumps and calls */
 /* TODO: Add extensions */
 /* TODO: Add error primitives */
 /* TODO: Add memory operations */
 /* TODO: Add dictionary (memory) */
-/* TODO: Add input/output */
+
 /* TODO: Create languages on top */
 
 #ifndef SLOTH_VM
@@ -26,7 +28,7 @@ typedef struct { I s[STACK_SIZE]; I sp; B* r[RSTACK_SIZE]; I rp; } X;
 #define NEXT(x) (x->r[x->rp - 1]++)
 
 B S_peek(X* x) { return IP(x) == 0 ? 0 : *(IP(x)); }
-B S_token(X* x) { B ip = S_peek(x); NEXT(x); return ip; }
+B S_token(X* x) { B tk = S_peek(x); NEXT(x); return tk; }
 I S_is_digit(B c) { return c >= '0' && c <= '9'; }
 
 void S_push_R(X* x, B* a) { x->r[x->rp++] = a; }
@@ -34,11 +36,17 @@ I S_return(X* x, I f) { x->rp--; return x->rp == f; }
 
 void S_inner(X* x);
 
-void S_eval(X* x, B* q) { 
-	if (S_peek(x) && S_peek(x) != ']') { S_push_R(x, IP(x)); } 
+void S_eval(X* x, B* q) {
+	S_push_R(x, IP(x));
 	IP(x) = q;
+  /* TODO: If tracing? trace else inner */
 	S_inner(x);
 }
+
+#define TS(x) (x->s[x->sp - 1])
+#define NS(x) (x->s[x->sp - 2])
+#define NNS(x) (x->s[x->sp - 3])
+#define DROP(x) (x->sp--)
 
 void S_push(X* x, I v) { x->s[x->sp++] = v; }
 I S_pop(X* x) { return x->s[--x->sp]; }
@@ -49,24 +57,26 @@ X* S_init() {
 	return x;
 }
 
-void S_add(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a + b); }
-void S_sub(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a - b); }
-void S_mul(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a * b); }
-void S_div(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a / b); }
-void S_mod(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a % b); }
+#define OP2(x, o) NS(x) = NS(x) o TS(x); DROP(x)
 
-void S_lt(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a < b); }
-void S_eq(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a == b); }
-void S_gt(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a > b); }
+void S_add(X* x) { OP2(x, +); }
+void S_sub(X* x) { OP2(x, -); }
+void S_mul(X* x) { OP2(x, *); }
+void S_div(X* x) { OP2(x, /); }
+void S_mod(X* x) { OP2(x, %); }
 
-void S_and(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a & b); }
-void S_or(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a | b); }
-void S_not(X* x) { I a = S_pop(x); S_push(x, !a); }
+void S_lt(X* x) { OP2(x, <); }
+void S_eq(X* x) { OP2(x, ==); }
+void S_gt(X* x) { OP2(x, >); }
 
-void S_swap(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, b); S_push(x, a); }
-void S_dup(X* x) { I a = S_pop(x); S_push(x, a); S_push(x, a); }
-void S_rot(X* x) { I c = S_pop(x); I b = S_pop(x); I a = S_pop(x); S_push(x, b); S_push(x, a); S_push(x, c); }
-void S_over(X* x) { I b = S_pop(x); I a = S_pop(x); S_push(x, a); S_push(x, b); S_push(x, a); }
+void S_and(X* x) { OP2(x, &); }
+void S_or(X* x) { OP2(x, |); }
+void S_not(X* x) { TS(x) = !TS(x); }
+
+void S_swap(X* x) { I t = TS(x); TS(x) = NS(x); NS(x) = t; }
+void S_dup(X* x) { S_push(x, TS(x)); }
+void S_rot(X* x) { I t = NNS(x); NNS(x) = NS(x); NS(x) = TS(x); TS(x) = t; TS(x); }
+void S_over(X* x) { S_push(x, NS(x)); }
 void S_drop(X* x) { S_pop(x); }
 
 void S_exec_i(X* x) { B* q = (B*)S_pop(x); S_eval(x, q); }
@@ -77,6 +87,9 @@ void S_times(X* x) { B* q = (B*)S_pop(x); I t = S_pop(x); for (;t > 0; t--) { S_
 
 void S_br(X* x, B* c, B* t, B* r1, B* r2) { S_eval(x, c); if (S_pop(x)) { S_eval(x, t); return; } S_eval(x, r1); S_br(x, c, t, r1, r2); S_swap(x); S_br(x, c, t, r1, r2); S_eval(x, r2); }
 void S_bin_rec(X* x) { B* r2 = (B*)S_pop(x); B* r1 = (B*)S_pop(x); B* t = (B*)S_pop(x); B* c = (B*)S_pop(x); S_br(x, c, t, r1, r2); }
+
+void S_i8_lit(X* x) { S_push(x, (I)*((B*)IP(x))); NEXT(x); }
+void S_i64_lit(X* x) { /* TODO */ }
 
 void S_parse_literal(X* x) {
 	I n = 0;
@@ -90,16 +103,18 @@ void S_parse_quotation(X* x) {
 	while (t) { switch (S_token(x)) { case '[': t++; break; case ']': t--; break; } } 
 }
 
+I S_dump_X(B*, X*);
+
+/* TODO: Make STEP(x)? One variable for tracing its easier, isn't it? */
 void S_inner(X* x) {
+  B buf[255];
 	I frame = FRAME(x);
 	I i;
 	B* j;
 	do {
 		/* Tracing */
-		printf("<%ld> ", x->sp);
-		for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } 
-		for (i = x->rp - 1; i >= 0; i--) { printf(" : "); for (j = x->r[i]; *j != 0 && *j != 10&& *j != ']'; j++) { printf("%c", *j); } }
-		printf(" <%ld>\n", x->rp);
+    memset(buf, 0, sizeof(buf));
+		S_dump_X(buf, x);
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': S_parse_literal(x); break;
@@ -107,6 +122,8 @@ void S_inner(X* x) {
 		case 0: case ']': if (S_return(x, frame)) return; break;
 		default:
 			switch (S_token(x)) {
+      case '#': S_i8_lit(x); break;
+      case '$': S_i64_lit(x); break;
 			case '+': S_add(x); break;
 			case '-': S_sub(x); break;
 			case '*': S_mul(x); break;
@@ -117,7 +134,7 @@ void S_inner(X* x) {
 			case '>': S_gt(x); break;
 			case '&': S_and(x); break;
 			case '|': S_or(x); break;
-			case '~': S_not(x); break;
+			case '!': S_not(x); break;
 			case 's': S_swap(x); break;
 			case 'd': S_dup(x); break;
 			case 'r': S_rot(x); break;
@@ -133,6 +150,56 @@ void S_inner(X* x) {
 			}
 		}
 	} while(1);
+}
+
+/*
+void S_inner(X* x) {
+	I i, frame = FRAME(x);
+	do {
+    STEP(x, frame);
+  } while(1);
+}
+
+void S_trace(X* x) {
+  I i, frame = FRAME(x);
+  do {
+    STEP(x, frame);
+  } while(1);
+}
+*/
+
+/* Dump */
+I S_dump_S(B* s, X* x) {
+  I i, t, n = 0;
+  for (i = 0; i < x->sp; i++) {
+    s += t = sprintf(s, "%ld ", x->s[i]); n+= t;
+  }
+  return n;
+}
+
+I S_dump_R(B* s, X* x) {
+  I i, t, n = 0;
+  B* j;
+  for (i = x->rp - 1; i >= 0; i--) {
+    s += sprintf(s, " : "); n += 3;
+    t = 0;
+    j = (i == (x->rp - 1) ? x->r[i] : (x->r[i] - 1));
+    for (; *j != 0 && *j != 10 && t >= 0; j++) {
+      *(s++) = *j; n++;
+      if (*j == '[') t++;
+      if (*j == ']') t--;
+    }
+  }
+  return n;
+}
+
+I S_dump_X(B* s, X* x) {
+  I t, n = 0;
+  s += t = sprintf(s, "<%ld> ", x->sp); n += t;
+  s += t = S_dump_S(s, x); n += t;
+  s += t = S_dump_R(s, x); n += t;
+  s += t = sprintf(s, "<%ld>", x->rp); n += t;
+  return n;
 }
 
 #endif
