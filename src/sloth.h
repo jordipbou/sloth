@@ -14,6 +14,7 @@
 
 #include<stdint.h>
 #include<stdlib.h>
+#include<string.h>
 
 typedef char B;
 typedef intptr_t I;
@@ -195,10 +196,8 @@ I S_dump_R(B* s, X* x) {
 
 I S_dump_X(B* s, X* x) {
   I t, n = 0;
-  s += t = sprintf(s, "<%ld> ", x->sp); n += t;
   s += t = S_dump_S(s, x); n += t;
   s += t = S_dump_R(s, x); n += t;
-  s += t = sprintf(s, "<%ld>", x->rp); n += t;
   return n;
 }
 
