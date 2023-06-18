@@ -5,7 +5,8 @@
 #include "sloth.h"
 
 #define PUSH(v) S_push(x, v)
-#define PUSH2(v1, v2) S_push(x, v1); S_push(x, v2)
+#define PUSH2(v1, v2) PUSH(v1); PUSH(v2)
+#define PUSH3(v1, v2, v3) PUSH2(v1, v2); PUSH(v3)
 
 #define TEST_X(s) memset(buf, 0, sizeof(buf)); S_dump_X(buf, x); TEST_ASSERT_EQUAL_STRING(buf, s)
 
@@ -134,7 +135,79 @@ void test_dup() {
   TEST_X("7 7 ");
 }
 
+void test_rot() {
+  PUSH3(7, 11, 13);
+  S_rot(x);
+  TEST_X("11 13 7 ");
+}
+
+void test_over() {
+  PUSH2(7, 11);
+  S_over(x);
+  TEST_X("7 11 7 ");
+}
+
+void test_drop() {
+  PUSH(7);
+  S_drop(x);
+  TEST_X("");
+}
+
+/* Parsing */
+
+void test_parse_quotation() {
+  B* c = "[1 1+]i";
+  S_push_R(x, c);
+  S_parse_quotation(x);
+  TEST_ASSERT_EQUAL_INT(c + 1, TS(x));
+}
+
+void test_parse_literal() {
+  S_push_R(x, "19");
+  S_parse_literal(x);
+  TEST_X("19  : ");
+}
+
+void test_i8_literal() {
+  S_push_R(x, "0");
+  S_i8_lit(x);
+  TEST_X("48  : ");
+}
+
+/* Execution */
+
+void test_exec_i() {
+  PUSH((I)"1 1+]i");
+  S_exec_i(x);
+  TEST_X("2 ");
+}
+
+void test_exec_x() {
+  /* How to test */
+}
+
+void test_ifthen() {
+  S_push_R(x, "1[7][11]?");
+  S_inner(x);
+  TEST_X("7 ");
+  S_push_R(x, "0[7][11]?");
+  S_inner(x);
+  TEST_X("7 11 ");
+}
+
 /* --- */
+
+void test_itfib() {
+  S_push_R(x, "1 1 6[so+]ts\\");
+  S_inner(x);
+  TEST_X("21 ");
+}
+
+void test_recfib() {
+  S_push_R(x, "8[d2<][][1-d1-][+]b");
+  S_inner(x);
+  TEST_X("21 ");
+}
 
 void test_inner_quotation() {
   S_push_R(x, "[5 4[d1-]t]i");
@@ -161,7 +234,20 @@ int main() {
 
   RUN_TEST(test_swap);
   RUN_TEST(test_dup);
-  
+  RUN_TEST(test_rot);
+  RUN_TEST(test_over);
+  RUN_TEST(test_drop);
+
+  RUN_TEST(test_parse_quotation);
+  RUN_TEST(test_parse_literal);
+  RUN_TEST(test_i8_literal);
+
+  RUN_TEST(test_exec_i);
+  RUN_TEST(test_exec_x);
+  RUN_TEST(test_ifthen);
+
+  RUN_TEST(test_itfib);
+  RUN_TEST(test_recfib);
   RUN_TEST(test_inner_quotation);
 
 	return UNITY_END();
