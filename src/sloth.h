@@ -1,5 +1,4 @@
 /* TODO: Add i8, i16, i32 and i64 literals */
-/* TODO: Add dump to string */
 /* TODO: Add input/output */
 /* TODO: Add jumps and calls */
 /* TODO: Add extensions */
@@ -38,6 +37,7 @@ I S_return(X* x, I f) { x->rp--; return x->rp == f; }
 void S_inner(X* x);
 
 void S_eval(X* x, B* q) {
+  /* TODO: Condition for tail call elimination */
 	S_push_R(x, IP(x));
 	IP(x) = q;
   /* TODO: If tracing? trace else inner */
@@ -79,6 +79,9 @@ void S_dup(X* x) { S_push(x, TS(x)); }
 void S_rot(X* x) { I t = NNS(x); NNS(x) = NS(x); NS(x) = TS(x); TS(x) = t; TS(x); }
 void S_over(X* x) { S_push(x, NS(x)); }
 void S_drop(X* x) { S_pop(x); }
+
+void S_rjump(X* x) { I j = S_pop(x); IP(x) += (j - 1); }
+void S_rcall(X* x) { S_push_R(x, IP(x)); S_rjump(x); }
 
 void S_exec_i(X* x) { B* q = (B*)S_pop(x); S_eval(x, q); }
 void S_exec_x(X* x) { B* q = (B*)S_pop(x); S_push(x, (I)q); S_eval(x, q); }
@@ -141,6 +144,8 @@ void S_inner(X* x) {
 			case 'r': S_rot(x); break;
 			case 'o': S_over(x); break;
 			case '\\': S_drop(x); break;
+      case '^': S_rjump(x); break;
+      case 'c': S_rcall(x); break;
 			case 'i': S_exec_i(x); break;
 			case 'x': S_exec_x(x); break;
 			case '?': S_ifthen(x); break;

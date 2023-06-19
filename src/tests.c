@@ -8,7 +8,7 @@
 #define PUSH2(v1, v2) PUSH(v1); PUSH(v2)
 #define PUSH3(v1, v2, v3) PUSH2(v1, v2); PUSH(v3)
 
-#define TEST_X(s) memset(buf, 0, sizeof(buf)); S_dump_X(buf, x); TEST_ASSERT_EQUAL_STRING(buf, s)
+#define TEST_X(s) memset(buf, 0, sizeof(buf)); S_dump_X(buf, x); TEST_ASSERT_EQUAL_STRING(s, buf)
 
 X* x;
 B buf[255];
@@ -153,6 +153,22 @@ void test_drop() {
   TEST_X("");
 }
 
+/* Jump and call */
+
+void test_rjump() {
+  B c[14] = {'[', '1', ' ', '1', '+', ']', '\\', '[', '#', -9, '^', ']', 'i', 0};
+  S_push_R(x, c);
+  S_inner(x);
+  TEST_X("2 ");
+}
+
+void test_rcall() {
+  B c[18] = {'[', '1', ' ', '1', '+', ']', '\\', '[', '#', -9, 'c', '1', ' ', '2', '+', ']', 'i', 0};
+  S_push_R(x, c);
+  S_inner(x);
+  TEST_X("2 3 ");
+}
+
 /* Parsing */
 
 void test_parse_quotation() {
@@ -237,6 +253,9 @@ int main() {
   RUN_TEST(test_rot);
   RUN_TEST(test_over);
   RUN_TEST(test_drop);
+
+  RUN_TEST(test_rjump);
+  RUN_TEST(test_rcall);
 
   RUN_TEST(test_parse_quotation);
   RUN_TEST(test_parse_literal);
