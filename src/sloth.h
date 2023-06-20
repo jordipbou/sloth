@@ -16,6 +16,8 @@
 #include<string.h>
 
 typedef char B;
+typedef int16_t W;
+typedef int32_t H;
 typedef intptr_t I;
 
 #define STACK_SIZE 64
@@ -25,10 +27,10 @@ typedef struct { I s[STACK_SIZE]; I sp; B* r[RSTACK_SIZE]; I rp; } X;
 
 #define FRAME(x) (x->rp - 1)
 #define IP(x) (x->r[x->rp - 1])
-#define NEXT(x) (x->r[x->rp - 1]++)
+#define NEXT(x, i) (x->r[x->rp - 1] += i)
 
 B S_peek(X* x) { return IP(x) == 0 ? 0 : *(IP(x)); }
-B S_token(X* x) { B tk = S_peek(x); NEXT(x); return tk; }
+B S_token(X* x) { B tk = S_peek(x); NEXT(x, 1); return tk; }
 I S_is_digit(B c) { return c >= '0' && c <= '9'; }
 
 void S_push_R(X* x, B* a) { x->r[x->rp++] = a; }
@@ -80,8 +82,8 @@ void S_rot(X* x) { I t = NNS(x); NNS(x) = NS(x); NS(x) = TS(x); TS(x) = t; TS(x)
 void S_over(X* x) { S_push(x, NS(x)); }
 void S_drop(X* x) { S_pop(x); }
 
-void S_rjump(X* x) { I j = S_pop(x); IP(x) += (j - 1); }
-void S_rcall(X* x) { S_push_R(x, IP(x)); S_rjump(x); }
+void S_jump(X* x) { IP(x) = (B*)S_pop(x); }
+void S_call(X* x) { S_push_R(x, IP(x)); S_jump(x); }
 
 void S_exec_i(X* x) { B* q = (B*)S_pop(x); S_eval(x, q); }
 void S_exec_x(X* x) { B* q = (B*)S_pop(x); S_push(x, (I)q); S_eval(x, q); }
@@ -92,8 +94,27 @@ void S_times(X* x) { B* q = (B*)S_pop(x); I t = S_pop(x); for (;t > 0; t--) { S_
 void S_br(X* x, B* c, B* t, B* r1, B* r2) { S_eval(x, c); if (S_pop(x)) { S_eval(x, t); return; } S_eval(x, r1); S_br(x, c, t, r1, r2); S_swap(x); S_br(x, c, t, r1, r2); S_eval(x, r2); }
 void S_bin_rec(X* x) { B* r2 = (B*)S_pop(x); B* r1 = (B*)S_pop(x); B* t = (B*)S_pop(x); B* c = (B*)S_pop(x); S_br(x, c, t, r1, r2); }
 
-void S_i8_lit(X* x) { S_push(x, (I)*((B*)IP(x))); NEXT(x); }
-void S_i64_lit(X* x) { /* TODO */ }
+void S_lit_i8(X* x) { S_push(x, (I)*((B*)IP(x))); NEXT(x, 1); }
+void S_lit_i16(X* x) { S_push(x, (I)*((W*)IP(x))); NEXT(x, 2); }
+void S_lit_i32(X* x) { S_push(x, (I)*((H*)IP(x))); NEXT(x, 4); }
+void S_lit_i64(X* x) { S_push(x, *((I*)IP(x))); NEXT(x, 8); }
+
+void S_store_i8(X* x) { B* a = (B*)S_pop(x); *a = (B)S_pop(x); }
+void S_store_i16(X* x) { W* a = (W*)S_pop(x); *a = (W)S_pop(x); }
+void S_store_i32(X* x) { H* a = (H*)S_pop(x); *a = (H)S_pop(x); }
+void S_store_i64(X* x) { I* a = (I*)S_pop(x); *a = S_pop(x); }
+
+void S_fetch_i8(X* x) { S_push(x, *((B*)S_pop(x))); }
+void S_fetch_i16(X* x) { S_push(x, *((W*)S_pop(x))); }
+void S_fetch_i32(X* x) { S_push(x, *((H*)S_pop(x))); }
+void S_fetch_i64(X* x) { S_push(x, *((I*)S_pop(x))); }
+
+void S_rel_i8(X* x) { S_push(x, (I)(IP(x) + (I)*((B*)IP(x)))); NEXT(x, 1); }
+void S_rel_i16(X* x) { S_push(x, (I)(IP(x) + (I)*((W*)IP(x)))); NEXT(x, 2); }
+void S_rel_i32(X* x) { S_push(x, (I)(IP(x) + (I)*((H*)IP(x)))); NEXT(x, 4); }
+void S_rel_i64(X* x) { S_push(x, (I)(IP(x) + *((I*)IP(x)))); NEXT(x, 8); }
+
+/* Parsing */
 
 void S_parse_literal(X* x) {
 	I n = 0;
@@ -107,7 +128,54 @@ void S_parse_quotation(X* x) {
 	while (t) { switch (S_token(x)) { case '[': t++; break; case ']': t--; break; } } 
 }
 
-I S_dump_X(B*, X*);
+/* Dump */
+
+I S_dump_S(B* s, X* x) {
+  I i, t, n = 0;
+  for (i = 0; i < x->sp; i++) {
+    s += t = sprintf(s, "%ld ", x->s[i]); n+= t;
+  }
+  return n;
+}
+
+I S_dump_R(B* s, X* x) {
+  I i, t, n = 0;
+  B* j;
+  for (i = x->rp - 1; i >= 0; i--) {
+    s += sprintf(s, " : "); n += 3;
+    t = 0;
+    /* Show caller on return stack */
+    j = (i == (x->rp - 1) ? x->r[i] : (x->r[i] - 1));
+    for (; *j != 0 && *j != 10 && t >= 0; j++) {
+      *(s++) = *j; n++;
+      if (*j == '[') t++;
+      if (*j == ']') t--;
+    }
+  }
+  return n;
+}
+
+I S_dump_X(B* s, X* x) {
+  I t, n = 0;
+  s += t = S_dump_S(s, x); n += t;
+  s += t = S_dump_R(s, x); n += t;
+  return n;
+}
+
+/* Inner interpreter */
+
+#define TYPED_CASE(op, f) \
+case op: \
+  switch (S_token(x)) { \
+  case 'b': f ## _i8(x); break; \
+  case 'w': f ## _i16(x); break; \
+  case 'h': f ## _i32(x); break; \
+  case 'i': f ## _i64(x); break; \
+  case 'c': /* Platform dependent 32/64 bits */ break; \
+  /* case 'f': f ## _f32(x); break; */ \
+  /* case 'd': f ## _f64(x); break; */ \
+} \
+break; \
 
 /* TODO: Make STEP(x)? One variable for tracing its easier, isn't it? */
 void S_inner(X* x) {
@@ -116,9 +184,11 @@ void S_inner(X* x) {
 	I i;
 	B* j;
 	do {
-		/* Tracing */
+		/* Tracing: should use key/emit */
     memset(buf, 0, sizeof(buf));
 		S_dump_X(buf, x);
+    printf("%s\n", buf);
+    /* \Tracing */
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': S_parse_literal(x); break;
@@ -126,8 +196,16 @@ void S_inner(X* x) {
 		case 0: case ']': if (S_return(x, frame)) return; break;
 		default:
 			switch (S_token(x)) {
-      case '#': S_i8_lit(x); break;
-      case '$': S_i64_lit(x); break;
+      TYPED_CASE('#', S_lit);
+      TYPED_CASE('!', S_store);
+      TYPED_CASE('@', S_fetch);
+      TYPED_CASE('~', S_rel);
+      case 'c':
+        switch (S_token(x)) {
+        case 's': S_push(x, (I)(&TS(x))); break;
+        case 't': S_push(x, (I)(&IP(x))); break;
+        }
+        break;
 			case '+': S_add(x); break;
 			case '-': S_sub(x); break;
 			case '*': S_mul(x); break;
@@ -138,14 +216,14 @@ void S_inner(X* x) {
 			case '>': S_gt(x); break;
 			case '&': S_and(x); break;
 			case '|': S_or(x); break;
-			case '!': S_not(x); break;
+			case '_': S_not(x); break;
 			case 's': S_swap(x); break;
 			case 'd': S_dup(x); break;
 			case 'r': S_rot(x); break;
 			case 'o': S_over(x); break;
 			case '\\': S_drop(x); break;
-      case '^': S_rjump(x); break;
-      case 'c': S_rcall(x); break;
+      case '^': S_jump(x); break;
+      case '$': S_call(x); break;
 			case 'i': S_exec_i(x); break;
 			case 'x': S_exec_x(x); break;
 			case '?': S_ifthen(x); break;
@@ -174,36 +252,5 @@ void S_trace(X* x) {
 }
 */
 
-/* Dump */
-I S_dump_S(B* s, X* x) {
-  I i, t, n = 0;
-  for (i = 0; i < x->sp; i++) {
-    s += t = sprintf(s, "%ld ", x->s[i]); n+= t;
-  }
-  return n;
-}
-
-I S_dump_R(B* s, X* x) {
-  I i, t, n = 0;
-  B* j;
-  for (i = x->rp - 1; i >= 0; i--) {
-    s += sprintf(s, " : "); n += 3;
-    t = 0;
-    j = (i == (x->rp - 1) ? x->r[i] : (x->r[i] - 1));
-    for (; *j != 0 && *j != 10 && t >= 0; j++) {
-      *(s++) = *j; n++;
-      if (*j == '[') t++;
-      if (*j == ']') t--;
-    }
-  }
-  return n;
-}
-
-I S_dump_X(B* s, X* x) {
-  I t, n = 0;
-  s += t = S_dump_S(s, x); n += t;
-  s += t = S_dump_R(s, x); n += t;
-  return n;
-}
 
 #endif

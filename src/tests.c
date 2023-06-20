@@ -155,15 +155,15 @@ void test_drop() {
 
 /* Jump and call */
 
-void test_rjump() {
-  B c[14] = {'[', '1', ' ', '1', '+', ']', '\\', '[', '#', -9, '^', ']', 'i', 0};
+void test_jump() {
+  B c[15] = {'[', '1', ' ', '1', '+', ']', '\\', '[', '~', 'b', -9, '^', ']', 'i', 0};
   S_push_R(x, c);
   S_inner(x);
   TEST_X("2 ");
 }
 
-void test_rcall() {
-  B c[18] = {'[', '1', ' ', '1', '+', ']', '\\', '[', '#', -9, 'c', '1', ' ', '2', '+', ']', 'i', 0};
+void test_call() {
+  B c[19] = {'[', '1', ' ', '1', '+', ']', '\\', '[', '~', 'b', -9, '$', '1', ' ', '2', '+', ']', 'i', 0};
   S_push_R(x, c);
   S_inner(x);
   TEST_X("2 3 ");
@@ -186,7 +186,7 @@ void test_parse_literal() {
 
 void test_i8_literal() {
   S_push_R(x, "0");
-  S_i8_lit(x);
+  S_lit_i8(x);
   TEST_X("48  : ");
 }
 
@@ -254,8 +254,8 @@ int main() {
   RUN_TEST(test_over);
   RUN_TEST(test_drop);
 
-  RUN_TEST(test_rjump);
-  RUN_TEST(test_rcall);
+  RUN_TEST(test_jump);
+  RUN_TEST(test_call);
 
   RUN_TEST(test_parse_quotation);
   RUN_TEST(test_parse_literal);
