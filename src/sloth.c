@@ -50,6 +50,8 @@ int main() {
 	KEY(x) = &key;
 	EMIT(x) = &emit;
 
+  EXT(x, 'H') = &hello;
+
 	do {
 		fgets(buf, 255, stdin);
 		S_push_R(x, buf);

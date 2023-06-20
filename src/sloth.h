@@ -1,4 +1,3 @@
-/* TODO: Add input/output */
 /* TODO: Add extensions */
 /* TODO: Add error primitives */
 /* TODO: Add dictionary (memory) ? */
@@ -27,10 +26,13 @@ typedef struct _X {
   I rp;
   void (*k)(struct _X*);
   void (*e)(struct _X*);
+  void (*ext[26])(struct _X*);
 } X;
 
 #define KEY(x) (x->k)
 #define EMIT(x) (x->e)
+
+#define EXT(x, l) (x->ext[l - 'A'])
 
 X* S_init() {
 	X* x = malloc(sizeof(X));
@@ -201,6 +203,17 @@ void S_inner(X* x) {
 		case '5': case '6': case '7': case '8': case '9': S_parse_literal(x); break;
 		case '[': S_parse_quotation(x); break;
 		case 0: case ']': if (S_return(x, frame)) return; break;
+    case 'A': case 'B': case 'C':
+    case 'D': case 'E': case 'F':
+    case 'G': case 'H': case 'I':
+    case 'J': case 'K': case 'L':
+    case 'M': case 'N': case 'O':
+    case 'P': case 'Q': case 'R':
+    case 'S': case 'T': case 'U':
+    case 'V': case 'W': case 'X':
+    case 'Y': case 'Z':
+      EXT(x, S_token(x))(x);
+      break;
 		default:
 			switch (S_token(x)) {
       TYPED_CASE('#', S_lit);
@@ -239,7 +252,7 @@ void S_inner(X* x) {
 			case 't': S_times(x); break;
 			case 'b': S_bin_rec(x); break;
 			case 'q': exit(0); break;
-			default: /* TODO: C extensions */ break;
+      
 			}
 		}
 	} while(1);
