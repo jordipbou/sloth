@@ -1,4 +1,3 @@
-/* TODO: Add extensions */
 /* TODO: Add error primitives */
 /* TODO: Add dictionary (memory) ? */
 
@@ -27,16 +26,17 @@ typedef struct _X {
   void (*k)(struct _X*);
   void (*e)(struct _X*);
   void (*ext[26])(struct _X*);
+  I err;
 } X;
 
 #define KEY(x) (x->k)
 #define EMIT(x) (x->e)
-
 #define EXT(x, l) (x->ext[l - 'A'])
+#define ERROR(x) (x->err)
 
 X* S_init() {
 	X* x = malloc(sizeof(X));
-	x->sp = x->rp = 0;
+	x->sp = x->rp = x->err = 0;
 	return x;
 }
 
@@ -108,6 +108,9 @@ void S_lit_i16(X* x) { S_push(x, (I)*((W*)IP(x))); NEXT(x, 2); }
 void S_lit_i32(X* x) { S_push(x, (I)*((H*)IP(x))); NEXT(x, 4); }
 void S_lit_i64(X* x) { S_push(x, *((I*)IP(x))); NEXT(x, 8); }
 
+void S_allocate(X* x) { S_push(x, (I)malloc(S_pop(x))); }
+void S_free(X* x) { free((void*)S_pop(x)); }
+
 void S_store_i8(X* x) { B* a = (B*)S_pop(x); *a = (B)S_pop(x); }
 void S_store_i16(X* x) { W* a = (W*)S_pop(x); *a = (W)S_pop(x); }
 void S_store_i32(X* x) { H* a = (H*)S_pop(x); *a = (H)S_pop(x); }
@@ -137,7 +140,38 @@ void S_parse_quotation(X* x) {
 	while (t) { switch (S_token(x)) { case '[': t++; break; case ']': t--; break; } } 
 }
 
-/* Dump */
+/* Input/output */
+
+void S_read(X* x) {
+  I n = S_pop(x);
+  B* b = (B*)S_pop(x);
+  B k;
+  I c = 0;
+  for (;n > 0; n--, c++) {
+    KEY(x)(x);
+    k = (B)S_pop(x);
+    if (k == 10) {
+      S_push(x, c); 
+      return;
+    } else if (k == 127) {
+      /* TODO */ 
+    } else {
+      S_push(x, k);
+      EMIT(x)(x);
+      b[c] = k;
+    }
+  }
+}
+
+void S_print(X* x) {
+  I l = S_pop(x);
+  B* b = (B*)S_pop(x);
+  I i;
+  for (i = 0; i < l; i++) {
+    S_push(x, b[i]);
+    EMIT(x)(x);
+  }
+}
 
 I S_dump_S(B* s, X* x) {
   I i, t, n = 0;
@@ -200,9 +234,13 @@ void S_inner(X* x) {
     /* \Tracing */
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
-		case '5': case '6': case '7': case '8': case '9': S_parse_literal(x); break;
-		case '[': S_parse_quotation(x); break;
-		case 0: case ']': if (S_return(x, frame)) return; break;
+		case '5': case '6': case '7': case '8': case '9': 
+      S_parse_literal(x); break;
+		case '[': 
+      S_parse_quotation(x); break;
+		case 0: case ']': 
+      if (S_return(x, frame)) return; 
+      break;
     case 'A': case 'B': case 'C':
     case 'D': case 'E': case 'F':
     case 'G': case 'H': case 'I':
@@ -226,8 +264,12 @@ void S_inner(X* x) {
         case 't': S_push(x, (I)(&IP(x))); break;
         }
         break;
+      case 'm': S_allocate(x); break;
+      case 'f': S_free(x); break;
       case 'k': KEY(x)(x); break;
       case 'e': EMIT(x)(x); break;
+      case 'a': S_read(x); break;
+      case 'p': S_print(x); break;
 			case '+': S_add(x); break;
 			case '-': S_sub(x); break;
 			case '*': S_mul(x); break;
@@ -252,7 +294,6 @@ void S_inner(X* x) {
 			case 't': S_times(x); break;
 			case 'b': S_bin_rec(x); break;
 			case 'q': exit(0); break;
-      
 			}
 		}
 	} while(1);
