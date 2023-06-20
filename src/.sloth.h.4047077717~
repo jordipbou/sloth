@@ -26,11 +26,8 @@ typedef struct _X {
   B* r[RSTACK_SIZE]; 
   I rp;
   void (*k)(struct _X*);
-  void (*e)(struct _X*);
+  void ()
 } X;
-
-#define KEY(x) (x->k)
-#define EMIT(x) (x->e)
 
 X* S_init() {
 	X* x = malloc(sizeof(X));
@@ -213,8 +210,6 @@ void S_inner(X* x) {
         case 't': S_push(x, (I)(&IP(x))); break;
         }
         break;
-      case 'k': KEY(x)(x); break;
-      case 'e': EMIT(x)(x); break;
 			case '+': S_add(x); break;
 			case '-': S_sub(x); break;
 			case '*': S_mul(x); break;

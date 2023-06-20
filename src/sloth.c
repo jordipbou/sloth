@@ -34,10 +34,8 @@ int _getch ()
 }
 #endif
 
-/*
-void key(X* x) { PUSH(x, _getch()); }
-void emit(X* x) { printf("%c", (char)POP(x)); }
-*/
+void key(X* x) { S_push(x, (I)_getch()); }
+void emit(X* x) { printf("%c", (B)S_pop(x)); }
 
 void hello(X* x) {
 	printf("Hello world!\n");
@@ -48,11 +46,9 @@ int main() {
 	I i;
 	B* j;
 	X* x = S_init();
-	/*
-	EX(x, 'K') = (C)&key;
-	EX(x, 'E') = (C)&emit;
-	repl(x);
-	*/
+	
+	KEY(x) = &key;
+	EMIT(x) = &emit;
 
 	do {
 		fgets(buf, 255, stdin);
