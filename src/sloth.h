@@ -1,5 +1,4 @@
 /* TODO: Add error primitives */
-/* TODO: Add dictionary (memory) ? */
 
 /* TODO: Create languages on top */
 
@@ -35,6 +34,8 @@ typedef struct _X {
 #define EXT(x, l) (x->ext[l - 'A'])
 #define ERROR(x) (x->err)
 
+void S_inner(X* x);
+
 X* S_init() {
 	X* x = malloc(sizeof(X));
 	x->sp = x->rp = x->dp = 0;
@@ -57,16 +58,6 @@ I S_is_digit(B c) { return c >= '0' && c <= '9'; }
 void S_push_R(X* x, B* a) { x->r[x->rp++] = a; }
 I S_return(X* x, I f) { x->rp--; return x->rp == f; }
 
-void S_inner(X* x);
-
-void S_eval(X* x, B* q) {
-  /* TODO: Condition for tail call elimination */
-	S_push_R(x, IP(x));
-	IP(x) = q;
-  /* TODO: If tracing? trace else inner */
-	S_inner(x);
-}
-
 #define TS(x) (x->s[x->sp - 1])
 #define NS(x) (x->s[x->sp - 2])
 #define NNS(x) (x->s[x->sp - 3])
@@ -74,6 +65,13 @@ void S_eval(X* x, B* q) {
 
 void S_push(X* x, I v) { x->s[x->sp++] = v; }
 I S_pop(X* x) { return x->s[--x->sp]; }
+
+void S_eval(X* x, B* q) {
+  /* TODO: Condition for tail call elimination */
+	S_push_R(x, IP(x));
+	IP(x) = q;
+	S_inner(x);
+}
 
 #define OP2(x, o) NS(x) = NS(x) o TS(x); DROP(x)
 
@@ -134,10 +132,10 @@ void S_rel_i64(X* x) { S_push(x, (I)(IP(x) + *((I*)IP(x)))); NEXT(x, 8); }
 
 /* Parsing */
 
-void S_parse_literal(X* x) {
-	I n = 0;
-	while (S_is_digit(S_peek(x))) { n = 10*n + (S_token(x) - '0'); }
-	S_push(x, n);
+void S_parse_literal(X* x) { 
+	I n = 0; 
+	while (S_is_digit(S_peek(x))) { n = 10*n + (S_token(x) - '0'); } 
+	S_push(x, n); 
 }
 
 void S_parse_quotation(X* x) { 
@@ -159,14 +157,19 @@ void S_read(X* x) {
     if (k == 10) {
       S_push(x, c); 
       return;
-    } else if (k == 127) {
-      /* TODO */ 
     } else {
       S_push(x, k);
       EMIT(x)(x);
       b[c] = k;
     }
   }
+}
+
+void S_length(X* x) {
+	B* b = (B*)TS(x);
+	I i, t = 1;
+	for (i = 0; b[i] != 0 && b[i] != 10 && t > 0; i++) { if (b[i] == '[') t++; if (b[i] == ']') t--; }
+	S_push(x, i - 1);
 }
 
 void S_print(X* x) {
@@ -227,7 +230,6 @@ case op: \
 } \
 break; \
 
-/* TODO: Make STEP(x)? One variable for tracing its easier, isn't it? */
 void S_inner(X* x) {
   B buf[255];
 	I frame = FRAME(x);
@@ -294,12 +296,14 @@ void S_inner(X* x) {
         case 't': S_push(x, (I)(&x->tr)); break;
         }
         break;
+			case 'g': S_push(x, sizeof(I)); break;
       case 'm': S_allocate(x); break;
       case 'f': S_free(x); break;
       case 'k': KEY(x)(x); break;
       case 'e': EMIT(x)(x); break;
       case 'a': S_read(x); break;
       case 'p': S_print(x); break;
+			case 'l': S_length(x); break;
 			case '+': S_add(x); break;
 			case '-': S_sub(x); break;
 			case '*': S_mul(x); break;

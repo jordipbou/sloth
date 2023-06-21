@@ -41,7 +41,11 @@ void hello(X* x) {
 	printf("Hello world!\n");
 }
 
-int main() {
+B* ROM =
+	"[Hello world!]lp10e";
+
+int main(int argc, char** argv) {
+	FILE* fptr;
 	B buf[255];
 	I i;
 	B* j;
@@ -52,14 +56,30 @@ int main() {
 
   EXT(x, 'H') = &hello;
 
-	do {
-		fgets(buf, 255, stdin);
-		S_push_R(x, buf);
-		S_inner(x);
-		/* Tracing */
-		printf("OUT: <%ld> ", x->sp);
-		for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } 
-		for (i = x->rp - 1; i >= 0; i--) { printf(" : "); for (j = x->r[i]; *j != 0 && *j != 10&& *j != ']'; j++) { printf("%c", *j); } }
-		printf(" <%ld>\n", x->rp);
-	} while(1);
+	if (argc == 2 || argc == 3) {
+		fptr = fopen(argv[1], "r");
+		while (fgets(buf, 255, fptr)) {
+			S_eval(x, buf);
+			if (ERROR(x) != 0) {
+					printf("ERROR: %ld\n", x->err);
+					return;
+			}
+			x->err = 0;
+		}
+	}
+
+	S_eval(x, ROM);
+
+	if (argc == 1 || argc == 3) {
+		do {
+			fgets(buf, 255, stdin);
+			S_push_R(x, buf);
+			S_inner(x);
+			/* Tracing */
+			printf("OUT: <%ld> ", x->sp);
+			for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } 
+			for (i = x->rp - 1; i >= 0; i--) { printf(" : "); for (j = x->r[i]; *j != 0 && *j != 10&& *j != ']'; j++) { printf("%c", *j); } }
+			printf(" <%ld>\n", x->rp);
+		} while(1);
+	}
 }
