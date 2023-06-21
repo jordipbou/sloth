@@ -8,6 +8,6 @@ Features:
 
 * One header only. Very easily embedabble in a C/C++ application.
 * Human readable bytecode.
-* Bytecode helpers for easier bootstrapping of higher level languages.
+* Quotations at bytecode level.
 * Relatively fast interpreter.
-* Ability to add extensions (C functions).
+* Ability to add C function extensions.

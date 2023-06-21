@@ -8,7 +8,7 @@
 #define PUSH2(v1, v2) PUSH(v1); PUSH(v2)
 #define PUSH3(v1, v2, v3) PUSH2(v1, v2); PUSH(v3)
 
-#define TEST_X(s) memset(buf, 0, sizeof(buf)); S_dump_X(buf, x); TEST_ASSERT_EQUAL_STRING(s, buf)
+#define TEST_X(s) memset(buf, 0, sizeof(buf)); S_dump_X(buf, x, 0); TEST_ASSERT_EQUAL_STRING(s, buf)
 
 X* x;
 B buf[255];

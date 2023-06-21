@@ -17,16 +17,17 @@ typedef intptr_t I;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
+#define DICT_SIZE 4096
 
 typedef struct _X { 
-  I s[STACK_SIZE]; 
-  I sp; 
-  B* r[RSTACK_SIZE]; 
-  I rp;
+  I s[STACK_SIZE]; I sp; I ss;
+  B* r[RSTACK_SIZE]; I rp; I rs;
+  B d[DICT_SIZE]; I dp; I ds;
   void (*k)(struct _X*);
   void (*e)(struct _X*);
   void (*ext[26])(struct _X*);
   I err;
+  I tr;
 } X;
 
 #define KEY(x) (x->k)
@@ -36,7 +37,12 @@ typedef struct _X {
 
 X* S_init() {
 	X* x = malloc(sizeof(X));
-	x->sp = x->rp = x->err = 0;
+	x->sp = x->rp = x->dp = 0;
+  x->ss = STACK_SIZE;
+  x->rs = RSTACK_SIZE;
+  x->ds = DICT_SIZE;
+  x->err = 0;
+  x->tr = 0;
 	return x;
 }
 
@@ -198,10 +204,11 @@ I S_dump_R(B* s, X* x) {
   return n;
 }
 
-I S_dump_X(B* s, X* x) {
+I S_dump_X(B* s, X* x, I nl) {
   I t, n = 0;
   s += t = S_dump_S(s, x); n += t;
   s += t = S_dump_R(s, x); n += t;
+  if (nl) { *s++ = '\n'; n++; }
   return n;
 }
 
@@ -224,14 +231,16 @@ break; \
 void S_inner(X* x) {
   B buf[255];
 	I frame = FRAME(x);
-	I i;
+	I l;
 	B* j;
 	do {
-		/* Tracing: should use key/emit */
-    memset(buf, 0, sizeof(buf));
-		S_dump_X(buf, x);
-    printf("%s\n", buf);
-    /* \Tracing */
+    if (x->tr) {
+      memset(buf, 0, sizeof(buf));
+		  l = S_dump_X(buf, x, 1);
+      S_push(x, (I)buf);
+      S_push(x, l);
+      S_print(x);
+    }
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -260,8 +269,29 @@ void S_inner(X* x) {
       TYPED_CASE('~', S_rel);
       case 'c':
         switch (S_token(x)) {
-        case 's': S_push(x, (I)(&TS(x))); break;
-        case 't': S_push(x, (I)(&IP(x))); break;
+        case 's': 
+          switch (S_token(x)) {
+          case 'a': S_push(x, (I)(&x->s)); break;
+          case 'p': S_push(x, (I)(&x->sp)); break;
+          case 'z': S_push(x, (I)(&x->ss)); break;
+          }
+          break;
+        case 'r': 
+          switch (S_token(x)) {
+          case 'a': S_push(x, (I)(&x->r)); break;
+          case 'p': S_push(x, (I)(&x->rp)); break;
+          case 'z': S_push(x, (I)(&x->rs)); break;
+          }
+          break; 
+        case 'd': 
+          switch (S_token(x)) {
+          case 'a': S_push(x, (I)(&x->d)); break;
+          case 'p': S_push(x, (I)(&x->dp)); break;
+          case 'z': S_push(x, (I)(&x->ds)); break;
+          }
+          break;
+        case 'e': S_push(x, (I)(&x->err)); break;
+        case 't': S_push(x, (I)(&x->tr)); break;
         }
         break;
       case 'm': S_allocate(x); break;
@@ -298,22 +328,5 @@ void S_inner(X* x) {
 		}
 	} while(1);
 }
-
-/*
-void S_inner(X* x) {
-	I i, frame = FRAME(x);
-	do {
-    STEP(x, frame);
-  } while(1);
-}
-
-void S_trace(X* x) {
-  I i, frame = FRAME(x);
-  do {
-    STEP(x, frame);
-  } while(1);
-}
-*/
-
 
 #endif
