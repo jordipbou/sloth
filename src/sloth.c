@@ -34,29 +34,30 @@ int _getch ()
 }
 #endif
 
-void key(X* x) { S_push(x, (I)_getch()); }
-void emit(X* x) { printf("%c", (B)S_pop(x)); }
+void key(X* x) { S_lit(x, (I)_getch()); }
+void emit(X* x) { printf("%c", (C)S_drop(x)); }
 
 void hello(X* x) {
 	printf("Hello world!\n");
 }
 
 /* I do need a quotation to define a word and a quotation to find a word. */
-B* ROM =
+C* ROM =
 "[SLOTH]lp10e";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
-	B buf[255];
+	C buf[255];
 	I i;
-	B* j;
+	C* j;
 	X* x = S_init();
 	
-	KEY(x) = &key;
-	EMIT(x) = &emit;
+	x->key = &key;
+	x->emit = &emit;
 
   EXT(x, 'H') = &hello;
 
+	/*
 	if (argc == 2 || argc == 3) {
 		fptr = fopen(argv[1], "r");
 		while (fgets(buf, 255, fptr)) {
@@ -68,19 +69,17 @@ int main(int argc, char** argv) {
 			x->err = 0;
 		}
 	}
-
+	*/
+	/*
 	S_eval(x, ROM);
-
+	*/
 	if (argc == 1 || argc == 3) {
 		do {
 			fgets(buf, 255, stdin);
-			S_push_R(x, buf);
+			x->ip = buf;	
 			S_inner(x);
-			/* Tracing */
-			printf("OUT: <%ld> ", x->sp);
-			for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } 
-			for (i = x->rp - 1; i >= 0; i--) { printf(" : "); for (j = x->r[i]; *j != 0 && *j != 10&& *j != ']'; j++) { printf("%c", *j); } }
-			printf(" <%ld>\n", x->rp);
+			if (x->err != 0) { printf("ERROR: %ld", x->err); return; }
+			printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 		} while(1);
 	}
 }

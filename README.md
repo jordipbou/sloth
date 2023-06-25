@@ -11,3 +11,33 @@ Features:
 * Quotations at bytecode level.
 * Relatively fast interpreter.
 * Ability to add C function extensions.
+
+## Bytecode
+
+a		alloc
+b		
+c		char	
+d		dup
+e		emit
+f		from r
+g		
+h		here
+i		exec
+j		
+k		key
+l		long
+m		
+n		
+o		over
+p		fetch from r
+q		exit
+r		rot
+s		short
+t		to r
+u		
+v		
+w		
+x		
+y		
+z		
+
