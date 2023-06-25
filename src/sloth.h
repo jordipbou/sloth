@@ -1,3 +1,4 @@
+/* TODO: Add symbol stack (names?) */
 /* TODO: Add error primitives */
 
 /* TODO: Create languages on top */
@@ -19,9 +20,10 @@ typedef intptr_t I;
 #define DICT_SIZE 4096
 
 typedef struct _X { 
-  I s[STACK_SIZE]; I sp; I ss;
-  B* r[RSTACK_SIZE]; I rp; I rs;
-  B d[DICT_SIZE]; I dp; I ds;
+  I* s; I sp; I ss;
+  B** r; I rp; I rs;
+  B* d; I dp; I ds;
+  B* l;
   void (*k)(struct _X*);
   void (*e)(struct _X*);
   void (*ext[26])(struct _X*);
@@ -38,6 +40,10 @@ void S_inner(X* x);
 
 X* S_init() {
 	X* x = malloc(sizeof(X));
+  x->s = malloc(STACK_SIZE*sizeof(I));
+  x->r = malloc(RSTACK_SIZE*sizeof(I));
+  x->d = malloc(DICT_SIZE);
+  x->l = 0;
 	x->sp = x->rp = x->dp = 0;
   x->ss = STACK_SIZE;
   x->rs = RSTACK_SIZE;
@@ -296,6 +302,8 @@ void S_inner(X* x) {
         case 't': S_push(x, (I)(&x->tr)); break;
         }
         break;
+      /* case ':': S_header(x); break; */
+      /* case ';': S_ */
 			case 'g': S_push(x, sizeof(I)); break;
       case 'm': S_allocate(x); break;
       case 'f': S_free(x); break;

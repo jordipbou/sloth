@@ -41,8 +41,9 @@ void hello(X* x) {
 	printf("Hello world!\n");
 }
 
+/* I do need a quotation to define a word and a quotation to find a word. */
 B* ROM =
-	"[Hello world!]lp10e";
+"[SLOTH]lp10e";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
