@@ -78,6 +78,9 @@ int main(int argc, char** argv) {
 			fgets(buf, 255, stdin);
 			x->ip = buf;	
 			S_inner(x);
+      memset(buf, 0, 255);
+      dump_X(buf, x);
+      printf("%s\n", buf);
 			if (x->err != 0) { printf("ERROR: %ld", x->err); return; }
 			printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 		} while(1);

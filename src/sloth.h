@@ -28,6 +28,30 @@ typedef struct _X {
 
 #define EXT(x, l) (x->ext[l - 'A'])
 
+I dump_S(C* s, X* x) {
+  I i = 0;
+  I t, n = 0;
+  while (i < x->sp) {
+    s += t = sprintf(s, "%d ", x->s[i++]); 
+    n += t;
+  }
+  return n;
+}
+
+I dump_R(C* s, X* x) {
+  /* dump ip */
+  /* dump r */
+  return 0;
+}
+
+I dump_X(C* s, X* x) {
+  I t, n = 0;
+  s += t = dump_S(s, x); n += t;
+  *s++ = ':'; *s++ = ' '; n += 2;
+  s += t = dump_R(s, x); n += t;
+  return n;
+}
+
 void S_inner(X* x);
 
 X* S_init() {
