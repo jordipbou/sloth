@@ -48,8 +48,11 @@ C* ROM =
 "1024[0c,]t"
 "[Reserve address 1024 for latest word variable]_"
 "0,"
-"[Define quotation for defining words]_"
-"[]";
+"[Define quotation for defining word header]_"
+"[[Set link]_hb1024+@,b1024+!"
+" [Set flags]_0"
+" [Compile name]_dc,[dc,1+]t_]"
+"d[find]4ri";
 
 int main(int argc, char** argv) {
 	FILE* fptr;

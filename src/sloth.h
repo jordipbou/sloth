@@ -19,6 +19,7 @@ typedef struct _X {
   C** r; I rp; I rs;
 	C* ip;
   C* d; I dp; I ds;
+  C* latest;
   void (*key)(struct _X*);
   void (*emit)(struct _X*);
   void (*ext[26])(struct _X*);
@@ -40,13 +41,18 @@ I S_dump_S(C* s, X* x) {
 
 I S_dump_CODE(C* s, C* a) {
 	I i = 0, t = 1;
+  if (a == 0) return 0;
 	while (t && a[i] && a[i] != 10) {
 		switch (a[i++]) {
 		case '[': t++; break;
 		case ']': t--; break;
 		}
 	}
-	return sprintf(s, "%.*s", (unsigned int)i, a);
+  if (i > 10) {
+    return sprintf(s, "%.*s...", 7, a);
+  } else {
+  	return sprintf(s, "%.*s", (unsigned int)i, a);
+  }
 }
 
 I S_dump_R(C* s, X* x) {
@@ -54,7 +60,7 @@ I S_dump_R(C* s, X* x) {
 	s += t = S_dump_CODE(s, x->ip); n += t;
 	for (j = x->rp - 1; j >= 0; j--) {
 		*s++ = ' '; *s++ = ':'; *s++ = ' '; n += 2;
-		s += t = S_dump_CODE(s, x->r[j] - 1); n += t;
+		s += t = S_dump_CODE(s, x->r[j]); n += t;
 	}
   return n;
 }
@@ -74,6 +80,7 @@ X* S_init() {
   x->s = malloc(STACK_SIZE*sizeof(I));
   x->r = malloc(RSTACK_SIZE*sizeof(I));
   x->d = malloc(DICT_SIZE);
+  x->latest = 0;
 	x->sp = x->rp = x->dp = 0;
   x->ss = STACK_SIZE;
   x->rs = RSTACK_SIZE;
@@ -83,7 +90,7 @@ X* S_init() {
 	return x;
 }
 
-C S_peek(X* x) { return x->ip == 0 ? 0 : *x->ip; }
+C S_peek(X* x) { return x->ip == 0 || *x->ip == 0 ? 0 : *x->ip; }
 C S_token(X* x) { C tk = S_peek(x); x->ip++; return tk; }
 I S_is_digit(C c) { return c >= '0' && c <= '9'; }
 
@@ -114,7 +121,7 @@ void S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
 
 void S_push(X* x) { x->r[x->rp++] = x->ip; }
 void S_pop(X* x) { x->ip = x->r[--x->rp]; }
-void S_exec(X* x) { if (S_peek(x) != ']') S_push(x); x->ip = (C*)S_drop(x); }
+void S_exec(X* x) { C t = S_peek(x); if (t && t != ']') S_push(x); x->ip = (C*)S_drop(x); }
 void S_eval(X* x, C* q) { S_lit(x, (I)q); S_exec(x); S_inner(x); }
 void S_to(X* x) { x->r[x->rp++] = (C*)x->s[--x->sp]; }
 void S_from(X* x) { x->s[x->sp++] = (I)x->r[--x->rp]; }
@@ -134,6 +141,10 @@ void S_fetch_i8(X* x) { S_lit(x, *((C*)S_drop(x))); }
 void S_fetch_i16(X* x) { S_lit(x, *((S*)S_drop(x))); }
 void S_fetch_i32(X* x) { S_lit(x, *((L*)S_drop(x))); }
 void S_fetch_i64(X* x) { S_lit(x, *((I*)S_drop(x))); }
+
+void S_header(x) {
+  
+}
 
 void S_print(X* x) { 
 	I l = S_drop(x); 
@@ -158,11 +169,9 @@ void S_inner(X* x) {
 	C buf[255];
 	I frame = x->rp;
 	do {
-	/*
 		memset(buf, 0, 255);
 		S_dump_X(buf, x);
 		printf("%s\n", buf);
-		*/
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -182,6 +191,7 @@ void S_inner(X* x) {
       break;
 		default:
 			switch (S_token(x)) {
+        case '\'': S_lit(x, (I)S_token(x)); break;
 			case 'd': S_dup(x); break;
 			case 'o': S_over(x); break;
 			case 'r': S_rot(x); break;
@@ -205,6 +215,7 @@ void S_inner(X* x) {
 			case '!': S_store_i64(x); break;
 			case ',': S_here(x); S_store_i64(x); S_lit(x, sizeof(I)); S_alloc(x); break;
 			case 'b': S_lit(x, (I)x->d); break;
+      case 'v': S_lit(x, (I)x->ip); break;
 			/* case 't': S_to(x); break; */
 			/* case 'f': S_from(x); break; */
 			/* case 'p': S_copy(x); break; */
