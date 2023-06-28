@@ -43,7 +43,13 @@ void hello(X* x) {
 
 /* I do need a quotation to define a word and a quotation to find a word. */
 C* ROM =
-"[SLOTH]lp10e";
+"[SLOTH]5[dc@e1+]t_10e"
+"[Reserve first 1024 bytes for TIB and initialize to 0]_"
+"1024[0c,]t"
+"[Reserve address 1024 for latest word variable]_"
+"0,"
+"[Define quotation for defining words]_"
+"[]";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -70,17 +76,18 @@ int main(int argc, char** argv) {
 		}
 	}
 	*/
-	/*
 	S_eval(x, ROM);
-	*/
+
 	if (argc == 1 || argc == 3) {
 		do {
 			fgets(buf, 255, stdin);
 			x->ip = buf;	
 			S_inner(x);
+			/*
       memset(buf, 0, 255);
-      dump_X(buf, x);
+      S_dump_X(buf, x);
       printf("%s\n", buf);
+			*/
 			if (x->err != 0) { printf("ERROR: %ld", x->err); return; }
 			printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 		} while(1);

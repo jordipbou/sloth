@@ -28,27 +28,42 @@ typedef struct _X {
 
 #define EXT(x, l) (x->ext[l - 'A'])
 
-I dump_S(C* s, X* x) {
+I S_dump_S(C* s, X* x) {
   I i = 0;
   I t, n = 0;
   while (i < x->sp) {
-    s += t = sprintf(s, "%d ", x->s[i++]); 
+    s += t = sprintf(s, "%ld ", x->s[i++]); 
     n += t;
   }
   return n;
 }
 
-I dump_R(C* s, X* x) {
-  /* dump ip */
-  /* dump r */
-  return 0;
+I S_dump_CODE(C* s, C* a) {
+	I i = 0, t = 1;
+	while (t && a[i] && a[i] != 10) {
+		switch (a[i++]) {
+		case '[': t++; break;
+		case ']': t--; break;
+		}
+	}
+	return sprintf(s, "%.*s", (unsigned int)i, a);
 }
 
-I dump_X(C* s, X* x) {
+I S_dump_R(C* s, X* x) {
+	I j, t = 1, n = 0;
+	s += t = S_dump_CODE(s, x->ip); n += t;
+	for (j = x->rp - 1; j >= 0; j--) {
+		*s++ = ' '; *s++ = ':'; *s++ = ' '; n += 2;
+		s += t = S_dump_CODE(s, x->r[j] - 1); n += t;
+	}
+  return n;
+}
+
+I S_dump_X(C* s, X* x) {
   I t, n = 0;
-  s += t = dump_S(s, x); n += t;
+  s += t = S_dump_S(s, x); n += t;
   *s++ = ':'; *s++ = ' '; n += 2;
-  s += t = dump_R(s, x); n += t;
+  s += t = S_dump_R(s, x); n += t;
   return n;
 }
 
@@ -100,11 +115,12 @@ void S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
 void S_push(X* x) { x->r[x->rp++] = x->ip; }
 void S_pop(X* x) { x->ip = x->r[--x->rp]; }
 void S_exec(X* x) { if (S_peek(x) != ']') S_push(x); x->ip = (C*)S_drop(x); }
+void S_eval(X* x, C* q) { S_lit(x, (I)q); S_exec(x); S_inner(x); }
 void S_to(X* x) { x->r[x->rp++] = (C*)x->s[--x->sp]; }
 void S_from(X* x) { x->s[x->sp++] = (I)x->r[--x->rp]; }
 void S_copy(X* x) { x->s[x->sp++] = (I)x->r[x->rp - 1]; }
 void S_if(X* x) { S_rot(x); if (!S_drop(x)) { S_swap(x); } S_drop(x); S_exec(x); }
-void S_times(X* x) { C* q = (C*)S_drop(x); I n = S_drop(x); for (;n > 0; n--) { S_lit(x, (I)q); S_exec(x); } }
+void S_times(X* x) { C* q = (C*)S_drop(x); I n = S_drop(x); while (n-- > 0) { S_eval(x, q); } }
 
 void S_alloc(X* x) { x->dp += S_drop(x); }
 void S_here(X* x) { S_lit(x, (I)&x->d[x->dp]); }
@@ -118,6 +134,12 @@ void S_fetch_i8(X* x) { S_lit(x, *((C*)S_drop(x))); }
 void S_fetch_i16(X* x) { S_lit(x, *((S*)S_drop(x))); }
 void S_fetch_i32(X* x) { S_lit(x, *((L*)S_drop(x))); }
 void S_fetch_i64(X* x) { S_lit(x, *((I*)S_drop(x))); }
+
+void S_print(X* x) { 
+	I l = S_drop(x); 
+	C* s = (C*)S_drop(x); 
+	I i = 0; while (i < l) { S_lit(x, s[i++]); x->emit(x); } 
+}
 
 void S_parse_literal(X* x) { 
 	I n = 0; 
@@ -133,8 +155,14 @@ void S_parse_quotation(X* x) {
 }
 
 void S_inner(X* x) {
+	C buf[255];
 	I frame = x->rp;
 	do {
+	/*
+		memset(buf, 0, 255);
+		S_dump_X(buf, x);
+		printf("%s\n", buf);
+		*/
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -158,7 +186,7 @@ void S_inner(X* x) {
 			case 'o': S_over(x); break;
 			case 'r': S_rot(x); break;
 			case '$': S_swap(x); break;
-			case '\\': S_drop(x); break;
+			case '_': S_drop(x); break;
 			case '+': S_add(x); break;
 			case '-': S_sub(x); break;
 			case '*': S_mul(x); break;
@@ -166,7 +194,7 @@ void S_inner(X* x) {
 			case '%': S_mod(x); break;
 			case '&': S_and(x); break;
 			case '|': S_or(x); break;
-			case '_': S_not(x); break;
+			case '~': S_not(x); break;
 			case '<': S_lt(x); break;
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
@@ -176,11 +204,14 @@ void S_inner(X* x) {
 			case '@': S_fetch_i64(x); break;
 			case '!': S_store_i64(x); break;
 			case ',': S_here(x); S_store_i64(x); S_lit(x, sizeof(I)); S_alloc(x); break;
-			case 't': S_to(x); break;
-			case 'f': S_from(x); break;
-			case 'p': S_copy(x); break;
+			case 'b': S_lit(x, (I)x->d); break;
+			/* case 't': S_to(x); break; */
+			/* case 'f': S_from(x); break; */
+			/* case 'p': S_copy(x); break; */
+			case 'p': S_print(x); break;
 			case '?': S_if(x); break;
-			case 'n': S_times(x); break;
+			/* case 'n': S_times(x); break; */
+			case 't': S_times(x); break;
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
 			case 'q': exit(0); break;
