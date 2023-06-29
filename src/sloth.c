@@ -34,15 +34,15 @@ int _getch ()
 }
 #endif
 
-void key(X* x) { S_lit(x, (I)_getch()); }
-void emit(X* x) { printf("%c", (C)S_drop(x)); }
+void key(X* x) { S_lit(x, (C)_getch()); }
+void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
 void hello(X* x) {
 	printf("Hello world!\n");
 }
 
 /* I do need a quotation to define a word and a quotation to find a word. */
-C* ROM =
+B* ROM =
 "[SLOTH]5[dc@e1+]t_10e"
 "[Reserve first 1024 bytes for TIB and initialize to 0]_"
 "1024[0c,]t"
@@ -56,14 +56,13 @@ C* ROM =
 
 int main(int argc, char** argv) {
 	FILE* fptr;
-	C buf[255];
-	I i;
-	C* j;
+	B buf[255];
+	C i;
+	B* j;
 	X* x = S_init();
 	
-	x->key = &key;
-	x->emit = &emit;
-
+  EXT(x, 'K') = &key;
+  EXT(x, 'E') = &emit;
   EXT(x, 'H') = &hello;
 
 	/*
@@ -79,7 +78,7 @@ int main(int argc, char** argv) {
 		}
 	}
 	*/
-	S_eval(x, ROM);
+	/* S_eval(x, ROM); */
 
 	if (argc == 1 || argc == 3) {
 		do {
