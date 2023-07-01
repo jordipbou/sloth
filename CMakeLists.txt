@@ -15,6 +15,12 @@ add_executable (
 target_include_directories (sloth PRIVATE src)
 
 add_executable (
+	tsloth 
+	src/tsloth)
+
+target_include_directories (tsloth PRIVATE src)
+
+add_executable (
 	tests
 	src/tests
 	deps/Unity/src/unity.c)
