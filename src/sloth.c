@@ -52,6 +52,7 @@ void memory(X* x) {
 }
 
 /* I do need a quotation to define a word and a quotation to find a word. */
+/*
 B* ROM =
 "[SLOTH]5[{.E1+]#_10E"
 "[Allocate a dictionary of 4096 bytes, and save on d variable]_"
@@ -62,7 +63,6 @@ B* ROM =
 "[d.h.+,h.~+h,]c,"
 "[and compile byte **c,** is saved on b]_"
 "[d.h.+.h.1+h,]b,";
-/*
 "[Latest word pointer will be saved on address 0 of the dictionary]_"
 "0c.$"
 "[Define TIB as next 80 bytes of dictionary]_"
@@ -98,7 +98,9 @@ int main(int argc, char** argv) {
 		}
 	}
 	*/
+	/*
 	S_eval(x, ROM);
+	*/
 
 	if (argc == 1 || argc == 3) {
 		do {

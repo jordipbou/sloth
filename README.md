@@ -15,7 +15,7 @@ Features:
 ## Bytecode
 
     // Literals
-    ' BYTE LITERAL
+    ' BYTE/CHAR LITERAL
     " CELL LITERAL
     0-9 NUMBER LITERAL
     [] QUOTATION LITERAL
@@ -23,7 +23,8 @@ Features:
     + ADD
     - SUB
     * MUL
-    / DIVMOD
+    / DIV
+		% MOD
     // Comparison
     < LT
     = EQ
@@ -33,25 +34,26 @@ Features:
     | OR
     ! NOT
     // Stack
-    $ SWAP
-    { DUP
-    ^ OVER
-    @ ROT
+    s SWAP
+    d DUP
+    o OVER
+    r ROT
     _ DROP
     // Execution
     ] RETURN (POP FROM R TO IP)
-    % CALL (PUSH FROM IP TO R AND SET IP TO S)
-    %] JUMP (SET IP TO S)
+    $ CALL (PUSH FROM IP TO R AND SET IP TO S)
+    $] JUMP (SET IP TO S)
     ? IF (ZCALL)
     ?] IF (ZJUMP)
-    ( SAVE (S to R)
-    ) RESTORE (R to S)
+    t TO R (POP S TO R)
+    f FROM R (POP R TO S)
+		p PEEK R (COPY R TO S)
     # TIMES (LOOP)
+		q EXIT
     // Memory
     : BFETCH
     ; BSTORE
     . CFETCH
     , CSTORE
-    ~ CELL
-    // a-z variables/registers
+    c CELL SIZE IN BYTES
     // A-Z C extensions

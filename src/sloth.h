@@ -15,9 +15,6 @@ typedef struct _X {
   C* s; C sp; C ss;
   B** r; C rp; C rs;
 	B* ip;
-/* I don't really like vars */
-/* I would prefer 4 stacks (1 more array) and use letters on bytecode, it's easier to write */
-  C var[26];
   void (*ext[26])(struct _X*);
   C err;
   C tr;
@@ -37,13 +34,12 @@ X* S_init() {
 	return x;
 }
 
-#define PR(f, a) s += t = sprintf(s, f, a); n += t
-#define PW(c, f, a) while (c) { PR(f, a); } return n
+C S_dump_S(B* s, X* x) {
+	C i = 0, t, n = 0;
+	while (i < x->sp) { s += t = sprintf(s, "%ld ", x->s[i++]); n += t; }
+	return n;
+}
 
-#define DUMP(nm, b) C S_dump_##nm(B* s, X* x) { C i = 0, t = 1, n = 0; b; }
-
-DUMP(S, { PW(i < x->sp, "%ld ", x->s[i++]); })
-  
 C S_dump_CODE(B* s, B* a) {
 	C i = 0, t = 1;
 	if (a == 0) return 0;
@@ -67,23 +63,10 @@ C S_dump_R(B* s, X* x) {
 }
 
 C S_dump_X(B* s, X* x, unsigned int w) {
-	B buf[255];
 	C t, n = 0;
-	memset(buf, 0, 255);
-	t = S_dump_S(buf, x);
-	if (t > w) {
-		s += t = sprintf(s, "...%-.*s", w - 3, buf); n += t;
-	} else {
-		s += t = sprintf(s, "%*s", w, buf); n += t;
-	}
+	s += t = S_dump_S(s, x); n += t;
 	*s++ = ':'; *s++ = ' '; n += 2;
-  memset(buf, 0, 255);
-  t = S_dump_R(buf, x);
-  if (t > w) {
-    s += t = sprintf(s, "%.*s...", w - 3, buf); n += t;
-  } else {
-    s += t = sprintf(s, "%s", buf); n += t;
-  }
+  s += t = S_dump_R(s, x); n += t;
 	return n;
 }
 
@@ -107,7 +90,8 @@ C S_drop(X* x) { return x->s[--x->sp]; }
 void S_add(X* x) { NS(x) = NS(x) + TS(x); --x->sp; }
 void S_sub(X* x) { NS(x) = NS(x) - TS(x); --x->sp; }
 void S_mul(X* x) { NS(x) = NS(x) * TS(x); --x->sp; }
-void S_divmod(X* x) { C a = TS(x); C b = NS(x); NS(x) = b / a; TS(x) = b % a; }
+void S_div(X* x) { NS(x) = NS(x) / TS(x); --x->sp; }
+void S_mod(X* x) { NS(x) = NS(x) % TS(x); --x->sp; }
 
 void S_and(X* x) { NS(x) = NS(x) & TS(x); --x->sp; }
 void S_or(X* x) { NS(x) = NS(x) | TS(x); --x->sp; }
@@ -148,7 +132,7 @@ void S_inner(X* x) {
 	C frame = x->rp;
 	do {
 		memset(buf, 0, 255);
-		S_dump_X(buf, x, 20);
+		S_dump_X(buf, x, 50);
 		printf("%s\n", buf);
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
@@ -160,13 +144,6 @@ void S_inner(X* x) {
       if (x->rp > frame && x->rp > 0) S_pop(x);
 			else return;
       break;
-    case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
-    case 'g': case 'h': case 'i': case 'j': case 'k': case 'l':
-    case 'm': case 'n': case 'o': case 'p': case 'q': case 'r':
-    case 's': case 't': case 'u': case 'v': case 'w': case 'x':
-    case 'y': case 'z':
-      S_lit(x, (C)&x->var[S_token(x) - 'a']);
-      break;
     case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
     case 'G': case 'H': case 'I': case 'J': case 'K': case 'L':
     case 'M': case 'N': case 'O': case 'P': case 'Q': case 'R':
@@ -177,22 +154,23 @@ void S_inner(X* x) {
 		default:
 			switch (S_token(x)) {
       case '\'': S_lit(x, (C)S_token(x)); break;
-			case '$': S_swap(x); break;
-			case '{': S_dup(x); break;
-			case '^': S_over(x); break;
-			case '@': S_rot(x); break;
+			case 's': S_swap(x); break;
+			case 'd': S_dup(x); break;
+			case 'o': S_over(x); break;
+			case 'r': S_rot(x); break;
 			case '_': S_drop(x); break;
 			case '+': S_add(x); break;
 			case '-': S_sub(x); break;
 			case '*': S_mul(x); break;
-			case '/': S_divmod(x); break;
+			case '/': S_div(x); break;
+			case '%': S_mod(x); break;
 			case '&': S_and(x); break;
 			case '|': S_or(x); break;
 			case '!': S_not(x); break;
 			case '<': S_lt(x); break;
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
-			case '%': S_call(x); break;
+			case '$': S_call(x); break;
 			case '?': S_if(x); break;
 			case '#': S_times(x); break;
       case ':': S_bfetch(x); break;
@@ -200,7 +178,7 @@ void S_inner(X* x) {
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
       case '~': S_lit(x, sizeof(C)); break;
-			case '`': exit(0); break;
+			case 'q': /* TODO: Just set error code */ exit(0); break;
 			}
 		}
 	} while(1);
