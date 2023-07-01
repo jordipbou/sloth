@@ -8,8 +8,8 @@
 typedef char B;
 typedef intptr_t C;
 
-#define STACK_SIZE 32 
-#define RSTACK_SIZE 32 
+#define STACK_SIZE 64
+#define RSTACK_SIZE 64
 
 typedef struct _X { 
   C* s; C sp; C ss;
@@ -114,6 +114,31 @@ void S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
 void S_bfetch(X* x) { S_lit(x, *((B*)S_drop(x))); }
 void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 
+/* Just for testing purposes */
+void _bin_rec(X* x, B* c, B* t, B* r1, B* r2) {
+	S_eval(x, c);
+	if (S_drop(x)) {
+		S_eval(x, t);
+		return;
+	} else {
+		S_eval(x, r1);
+		_bin_rec(x, c, t, r1, r2);
+		S_swap(x);
+		_bin_rec(x, c, t, r1, r2);
+		S_eval(x, r2);
+		return;
+	}
+}
+
+void S_bin_rec(X* x) {
+	B* r2 = (B*)S_drop(x);
+	B* r1 = (B*)S_drop(x);
+	B* t = (B*)S_drop(x);
+	B* c = (B*)S_drop(x);
+	_bin_rec(x, c, t, r1, r2);
+}
+/* TESTING END */
+
 void S_parse_literal(X* x) { 
 	C n = 0; 
 	while (S_is_digit(S_peek(x))) { n = 10*n + (S_token(x) - '0'); } 
@@ -131,9 +156,11 @@ void S_inner(X* x) {
 	B buf[255];
 	C frame = x->rp;
 	do {
+		/*
 		memset(buf, 0, 255);
 		S_dump_X(buf, x, 50);
 		printf("%s\n", buf);
+		*/
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -179,6 +206,9 @@ void S_inner(X* x) {
 			case ',': S_cstore(x); break;
       case '~': S_lit(x, sizeof(C)); break;
 			case 'q': /* TODO: Just set error code */ exit(0); break;
+			/* Just for testing purposes */
+			case 'b': S_bin_rec(x); break;
+			/* TESTING END */
 			}
 		}
 	} while(1);

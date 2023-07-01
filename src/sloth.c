@@ -85,19 +85,18 @@ int main(int argc, char** argv) {
   EXT(x, 'H') = &hello;
 	EXT(x, 'M') = &memory;
 
-	/*
 	if (argc == 2 || argc == 3) {
 		fptr = fopen(argv[1], "r");
 		while (fgets(buf, 255, fptr)) {
 			S_eval(x, buf);
-			if (ERROR(x) != 0) {
+			if (x->err != 0) {
 					printf("ERROR: %ld\n", x->err);
 					return;
 			}
 			x->err = 0;
 		}
+		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
-	*/
 	/*
 	S_eval(x, ROM);
 	*/
@@ -109,7 +108,7 @@ int main(int argc, char** argv) {
 			S_inner(x);
 			/*
       memset(buf, 0, 255);
-      S_dump_X(buf, x);
+      S_dump_X(buf, x, 50);
       printf("%s\n", buf);
 			*/
 			if (x->err != 0) { printf("ERROR: %ld", x->err); return; }
