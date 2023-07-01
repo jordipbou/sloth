@@ -41,18 +41,37 @@ void hello(X* x) {
 	printf("Hello world!\n");
 }
 
+void memory(X* x) {
+	C n;
+	B* s;
+	switch (S_token(x)) {
+	case 'a': n = S_drop(x); S_lit(x, (C)malloc(n)); break;
+	case 'f': free((void*)S_drop(x)); break;
+	case 'd': s = (B*)S_drop(x); for (n = 0; n < 16; n++) { printf("%c", s[n]); }; break;
+	}
+}
+
 /* I do need a quotation to define a word and a quotation to find a word. */
 B* ROM =
-"[SLOTH]5[dc@e1+]t_10e"
-"[Reserve first 1024 bytes for TIB and initialize to 0]_"
-"1024[0c,]t"
-"[Reserve address 1024 for latest word variable]_"
-"0,"
-"[Define quotation for defining word header]_"
-"[[Set link]_hb1024+@,b1024+!"
-" [Set flags]_0"
-" [Compile name]_dc,[dc,1+]t_]"
-"d[find]4ri";
+"[SLOTH]5[{.E1+]#_10E"
+"[Allocate a dictionary of 4096 bytes, and save on d variable]_"
+"4096Mad,"
+"[HERE is saved on h]_"
+"0h,"
+"[compile cell **,** is saved on c]_"
+"[d.h.+,h.~+h,]c,"
+"[and compile byte **c,** is saved on b]_"
+"[d.h.+.h.1+h,]b,";
+/*
+"[Latest word pointer will be saved on address 0 of the dictionary]_"
+"0c.$"
+"[Define TIB as next 80 bytes of dictionary]_"
+"80[0b.$]#"
+"[move string **cmove** is saved on s]_"
+"[[^^$:$;$1+$1+]#__]s,"
+"[Define COLON to be able to create words]_"
+"0,[Latest]_0;[Flags]_1;[Name length]_':;[Name]_h.d.,d,[Swap here and latest]_0;[Compile flags]_;[Compile name length]_s.$[Compile name]_";
+*/
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -64,6 +83,7 @@ int main(int argc, char** argv) {
   EXT(x, 'K') = &key;
   EXT(x, 'E') = &emit;
   EXT(x, 'H') = &hello;
+	EXT(x, 'M') = &memory;
 
 	/*
 	if (argc == 2 || argc == 3) {
@@ -78,7 +98,7 @@ int main(int argc, char** argv) {
 		}
 	}
 	*/
-	/* S_eval(x, ROM); */
+	S_eval(x, ROM);
 
 	if (argc == 1 || argc == 3) {
 		do {

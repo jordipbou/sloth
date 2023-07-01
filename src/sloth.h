@@ -35,6 +35,56 @@ X* S_init() {
 	return x;
 }
 
+#define PR(f, a) s += t = sprintf(s, f, a); n += t
+#define PW(c, f, a) while (c) { PR(f, a); } return n
+
+C S_dump_S(B* s, X* x) { C i = 0, t = 0, n = 0;	PW(i < x->sp, "%ld ", x->s[i++]); }
+C S_dump_CODE(B* s, B* a) {
+	C i = 0, t = 1;
+	if (a == 0) return 0;
+	while (t && a[i] && a[i] != 10) {
+		switch (a[i++]) {
+		case '[': t++; break;
+		case ']': t--; break;
+		}
+	}
+	/* TODO: I don't like this here, it should be cut on full string */
+	if (i > 10) {
+		return sprintf(s, "%.*s...", 7, a);
+	} else {
+		return sprintf(s, "%.*s", (unsigned int)i, a);
+	}
+}
+
+C S_dump_R(B* s, X* x) {
+	C j, t = 1, n = 0;
+	s += t = S_dump_CODE(s, x->ip); n += t;
+	for (j = x->rp - 1; j >= 0; j--) {
+		*s++ = ' '; *s++ = ':'; *s++ = ' '; n += 3;
+		s += t = S_dump_CODE(s, x->r[j]); n += t;
+	}
+	return n;
+}
+
+C S_dump_X(B* s, X* x) {
+	B buf[255];
+	C t, n = 0;
+	memset(buf, 0, 255);
+	n = S_dump_S(buf, x);
+	if (n > 40) {
+		/* TOOD: Is this working? */
+		s += t = sprintf(s, "...%37s", 37, buf); n += t;
+	} else {
+		s += t = sprintf(s, "%40s", buf); n += t;
+	}
+	/*
+	s += t = S_dump_S(s, x); n += t;
+	*/
+	*s++ = ':'; *s++ = ' '; n += 2;
+	s += t = S_dump_R(s, x); n += t;
+	return n;
+}
+
 void S_inner(X* x);
 
 B S_peek(X* x) { return x->ip == 0 || *x->ip == 0 ? 0 : *x->ip; }
@@ -95,6 +145,9 @@ void S_inner(X* x) {
 	B buf[255];
 	C frame = x->rp;
 	do {
+		memset(buf, 0, 255);
+		S_dump_X(buf, x);
+		printf("%s\n", buf);
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -145,6 +198,7 @@ void S_inner(X* x) {
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
       case '~': S_lit(x, sizeof(C)); break;
+			case '`': exit(0); break;
 			}
 		}
 	} while(1);
