@@ -15,6 +15,8 @@ typedef struct _X {
   C* s; C sp; C ss;
   B** r; C rp; C rs;
 	B* ip;
+/* I don't really like vars */
+/* I would prefer 4 stacks (1 more array) and use letters on bytecode, it's easier to write */
   C var[26];
   void (*ext[26])(struct _X*);
   C err;
@@ -38,8 +40,10 @@ X* S_init() {
 #define PR(f, a) s += t = sprintf(s, f, a); n += t
 #define PW(c, f, a) while (c) { PR(f, a); } return n
 
-C S_dump_S(B* s, X* x) { C i = 0, t = 0, n = 0;	PW(i < x->sp, "%ld ", x->s[i++]); }
+#define DUMP(nm, b) C S_dump_##nm(B* s, X* x) { C i = 0, t = 1, n = 0; b; }
 
+DUMP(S, { PW(i < x->sp, "%ld ", x->s[i++]); })
+  
 C S_dump_CODE(B* s, B* a) {
 	C i = 0, t = 1;
 	if (a == 0) return 0;
@@ -53,11 +57,11 @@ C S_dump_CODE(B* s, B* a) {
 }
 
 C S_dump_R(B* s, X* x) {
-	C j, t = 1, n = 0;
+	C i, t = 1, n = 0;
 	s += t = S_dump_CODE(s, x->ip); n += t;
-	for (j = x->rp - 1; j >= 0; j--) {
+	for (i = x->rp - 1; i >= 0; i--) {
 		*s++ = ' '; *s++ = ':'; *s++ = ' '; n += 3;
-		s += t = S_dump_CODE(s, x->r[j]); n += t;
+		s += t = S_dump_CODE(s, x->r[i]); n += t;
 	}
 	return n;
 }
