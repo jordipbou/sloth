@@ -80,8 +80,8 @@ int main(int argc, char** argv) {
 	B* j;
 	X* x = S_init();
 	
-  EXT(x, 'K') = &key;
-  EXT(x, 'E') = &emit;
+  x->key = &key;
+  x->emit = &emit;
   EXT(x, 'H') = &hello;
 	EXT(x, 'M') = &memory;
 

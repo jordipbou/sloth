@@ -15,6 +15,8 @@ typedef struct _X {
   C* s; C sp; C ss;
   B** r; C rp; C rs;
 	B* ip;
+	void (*key)(struct _X*);
+	void (*emit)(struct _X*);
   void (*ext[26])(struct _X*);
   C err;
   C tr;
@@ -118,6 +120,29 @@ void S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
 void S_bfetch(X* x) { S_lit(x, *((B*)S_drop(x))); }
 void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 
+void S_accept(X* x) { 
+	C i = 0;
+	C n = S_drop(x); 
+	B* s = (B*)S_drop(x); 
+	do { 
+		x->key(x); 
+		if (TS(x) == 10) {
+			S_drop(x);
+			break;
+		} else {
+			s[i++] = TS(x);
+			x->emit(x);
+		}
+	} while(1);
+	S_lit(x, i);
+}
+void S_type(X* x) {
+	C i = 0;
+	C n = S_drop(x);
+	B* s = (B*)S_drop(x);
+	while (n-- > 0) { S_lit(x, s[i++]); x->emit(x); }
+}
+
 void S_parse_literal(X* x) { 
 	C n = 0; 
 	while (S_is_digit(S_peek(x))) { n = 10*n + (S_token(x) - '0'); } 
@@ -184,9 +209,9 @@ void S_inner(X* x) {
 			case '<': S_lt(x); break;
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
-      case 't': S_to_R(x); break;
-      case 'f': S_from_R(x); break;
-      case 'p': S_peek_R(x); break;
+      case ')': S_to_R(x); break;
+      case '(': S_from_R(x); break;
+      case '~': S_peek_R(x); break;
 			case '$': S_call(x); break;
 			case '?': S_if(x); break;
 			case 'n': S_times(x); break;
@@ -196,6 +221,10 @@ void S_inner(X* x) {
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
       case 'c': S_lit(x, sizeof(C)); break;
+			case 'k': x->key(x); break;
+			case 'e': x->emit(x); break;
+			case 'a': S_accept(x); break;
+			case 't': S_type(x); break;
 			case 'q': /* TODO: Just set error code */ exit(0); break;
 			}
 		}

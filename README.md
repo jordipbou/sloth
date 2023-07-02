@@ -46,11 +46,11 @@ Features:
     $] JUMP (SET IP TO S)
     ? IF (ZCALL)
     ?] IF (ZJUMP)
-    t TO R (POP S TO R)
-    f FROM R (POP R TO S)
-		p PEEK R (COPY R TO S)
+    ) TO R (POP S TO R)
+    ( FROM R (POP R TO S)
+		~ PEEK R (COPY R TO S)
     n TIMES (LOOP)
-    b BINARY RECURSION
+		w WHILE (LOOP)
 		q EXIT
     // Memory
     : BFETCH
@@ -58,4 +58,9 @@ Features:
     . CFETCH
     , CSTORE
     c CELL SIZE IN BYTES
+		// Input/Output
+		k KEY
+		e EMIT
+		a ACCEPT
+		t TYPE
     // A-Z C extensions
