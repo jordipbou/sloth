@@ -101,6 +101,9 @@ void S_lt(X* x) { NS(x) = NS(x) < TS(x); --x->sp; }
 void S_eq(X* x) { NS(x) = NS(x) == TS(x); --x->sp; }
 void S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
 
+void S_to_R(X* x) { x->r[x->rp++] = x->s[--x->sp]; }
+void S_from_R(X* x) { x->s[x->sp++] = x->r[--x->rp]; }
+void S_peek_R(X* x) { x->s[x->sp++] = x->r[x->rp - 1]; }
 void S_push(X* x) { x->r[x->rp++] = x->ip; }
 void S_pop(X* x) { x->ip = x->r[--x->rp]; }
 void S_call(X* x) { B t = S_peek(x); if (t && t != ']') S_push(x); x->ip = (B*)S_drop(x); }
@@ -159,11 +162,9 @@ void S_inner(X* x) {
 	B buf[255];
 	C frame = x->rp;
 	do {
-		/*
 		memset(buf, 0, 255);
 		S_dump_X(buf, x, 50);
-		printf("%s\n", buf);
-		*/
+		printf("%s <%ld>\n", buf, x->rp);
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -203,9 +204,12 @@ void S_inner(X* x) {
 			case '<': S_lt(x); break;
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
+      case 't': S_to_R(x); break;
+      case 'f': S_from_R(x); break;
+      case 'p': S_peek_R(x); break;
 			case '$': S_call(x); break;
 			case '?': S_if(x); break;
-			case 't': S_times(x); break;
+			case 'n': S_times(x); break;
       case 'b': S_bin_rec(x); break;
       case ':': S_bfetch(x); break;
       case ';': S_bstore(x); break;

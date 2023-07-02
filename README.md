@@ -49,7 +49,7 @@ Features:
     t TO R (POP S TO R)
     f FROM R (POP R TO S)
 		p PEEK R (COPY R TO S)
-    t TIMES (LOOP)
+    n TIMES (LOOP)
     b BINARY RECURSION
 		q EXIT
     // Memory
