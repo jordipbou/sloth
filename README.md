@@ -16,9 +16,10 @@ Features:
 
     // Literals
     ' BYTE/CHAR LITERAL
-    " CELL LITERAL
+    # CELL LITERAL
     0-9 NUMBER LITERAL
     [] QUOTATION LITERAL
+    "" STRING LITERAL
     // Arithmetic
     + ADD
     - SUB
@@ -48,7 +49,8 @@ Features:
     t TO R (POP S TO R)
     f FROM R (POP R TO S)
 		p PEEK R (COPY R TO S)
-    # TIMES (LOOP)
+    t TIMES (LOOP)
+    b BINARY RECURSION
 		q EXIT
     // Memory
     : BFETCH

@@ -152,6 +152,13 @@ void S_parse_quotation(X* x) {
 	while (t) { switch (S_token(x)) { case '[': t++; break; case ']': t--; break; } } 
 }
 
+void S_parse_string(X* x) {
+  C i = 0;
+  S_lit(x, (C)(++x->ip));
+  while (S_token(x) != '"') { i++; }
+  S_lit(x, i);
+}
+
 void S_inner(X* x) {
 	B buf[255];
 	C frame = x->rp;
@@ -167,6 +174,8 @@ void S_inner(X* x) {
       S_parse_literal(x); break;
 		case '[': 
       S_parse_quotation(x); break;
+    case '"':
+      S_parse_string(x); break;
 		case 0: case ']': 
       if (x->rp > frame && x->rp > 0) S_pop(x);
 			else return;
@@ -181,6 +190,7 @@ void S_inner(X* x) {
 		default:
 			switch (S_token(x)) {
       case '\'': S_lit(x, (C)S_token(x)); break;
+      /* TODO: # cell literal */
 			case 's': S_swap(x); break;
 			case 'd': S_dup(x); break;
 			case 'o': S_over(x); break;
@@ -199,7 +209,7 @@ void S_inner(X* x) {
 			case '>': S_gt(x); break;
 			case '$': S_call(x); break;
 			case '?': S_if(x); break;
-			case '#': S_times(x); break;
+			case 't': S_times(x); break;
       case ':': S_bfetch(x); break;
       case ';': S_bstore(x); break;
 			case '.': S_cfetch(x); break;
