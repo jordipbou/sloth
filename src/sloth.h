@@ -107,14 +107,6 @@ void S_call(X* x) { B t = S_peek(x); if (t && t != ']') S_push(x); x->ip = (B*)S
 void S_eval(X* x, B* q) { S_lit(x, (C)q); S_call(x); S_inner(x); }
 void S_if(X* x) { S_rot(x); if (!S_drop(x)) { S_swap(x); } S_drop(x); S_call(x); }
 void S_times(X* x) { B* q = (B*)S_drop(x); C n = S_drop(x); while (n-- > 0) { S_eval(x, q); } }
-
-void S_bstore(X* x) { B* a = (B*)S_drop(x); *a = (B)S_drop(x); }
-void S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
-
-void S_bfetch(X* x) { S_lit(x, *((B*)S_drop(x))); }
-void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
-
-/* Just for testing purposes */
 void _bin_rec(X* x, B* c, B* t, B* r1, B* r2) {
 	S_eval(x, c);
 	if (S_drop(x)) {
@@ -129,7 +121,6 @@ void _bin_rec(X* x, B* c, B* t, B* r1, B* r2) {
 		return;
 	}
 }
-
 void S_bin_rec(X* x) {
 	B* r2 = (B*)S_drop(x);
 	B* r1 = (B*)S_drop(x);
@@ -137,7 +128,12 @@ void S_bin_rec(X* x) {
 	B* c = (B*)S_drop(x);
 	_bin_rec(x, c, t, r1, r2);
 }
-/* TESTING END */
+
+void S_bstore(X* x) { B* a = (B*)S_drop(x); *a = (B)S_drop(x); }
+void S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
+
+void S_bfetch(X* x) { S_lit(x, *((B*)S_drop(x))); }
+void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 
 void S_parse_literal(X* x) { 
 	C n = 0; 
@@ -210,15 +206,13 @@ void S_inner(X* x) {
 			case '$': S_call(x); break;
 			case '?': S_if(x); break;
 			case 't': S_times(x); break;
+      case 'b': S_bin_rec(x); break;
       case ':': S_bfetch(x); break;
       case ';': S_bstore(x); break;
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
-      case '~': S_lit(x, sizeof(C)); break;
+      case 'c': S_lit(x, sizeof(C)); break;
 			case 'q': /* TODO: Just set error code */ exit(0); break;
-			/* Just for testing purposes */
-			case 'b': S_bin_rec(x); break;
-			/* TESTING END */
 			}
 		}
 	} while(1);
