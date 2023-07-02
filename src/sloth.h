@@ -15,6 +15,7 @@ typedef struct _X {
   C* s; C sp; C ss;
   B** r; C rp; C rs;
 	B* ip;
+  B* b;
 	void (*key)(struct _X*);
 	void (*emit)(struct _X*);
   void (*ext[26])(struct _X*);
@@ -120,6 +121,9 @@ void S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
 void S_bfetch(X* x) { S_lit(x, *((B*)S_drop(x))); }
 void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 
+void S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
+void S_free(X* x) { free((void*)S_drop(x)); }
+
 void S_accept(X* x) { 
 	C i = 0;
 	C n = S_drop(x); 
@@ -209,8 +213,8 @@ void S_inner(X* x) {
 			case '<': S_lt(x); break;
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
-      case ')': S_to_R(x); break;
-      case '(': S_from_R(x); break;
+      case '(': S_to_R(x); break;
+      case ')': S_from_R(x); break;
       case '~': S_peek_R(x); break;
 			case '$': S_call(x); break;
 			case '?': S_if(x); break;
@@ -221,6 +225,9 @@ void S_inner(X* x) {
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
       case 'c': S_lit(x, sizeof(C)); break;
+      case 'm': S_malloc(x); break;
+      case 'f': S_free(x); break;
+      case 'b': S_lit(x, &x->b); break;
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
 			case 'a': S_accept(x); break;

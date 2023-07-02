@@ -44,10 +44,10 @@ Features:
     ] RETURN (POP FROM R TO IP)
     $ CALL (PUSH FROM IP TO R AND SET IP TO S)
     $] JUMP (SET IP TO S)
-    ? IF (ZCALL)
-    ?] IF (ZJUMP)
-    ) TO R (POP S TO R)
-    ( FROM R (POP R TO S)
+    ? IF (ZCALL?)
+    ?] IF (ZJUMP?)
+    ( TO R (POP S TO R)
+    ) FROM R (POP R TO S)
 		~ PEEK R (COPY R TO S)
     n TIMES (LOOP)
 		w WHILE (LOOP)
@@ -58,6 +58,9 @@ Features:
     . CFETCH
     , CSTORE
     c CELL SIZE IN BYTES
+    m MALLOC
+    f FREE
+    b BLOCK VARIABLE (DICTIONARY)
 		// Input/Output
 		k KEY
 		e EMIT
