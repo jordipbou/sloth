@@ -101,36 +101,16 @@ void S_lt(X* x) { NS(x) = NS(x) < TS(x); --x->sp; }
 void S_eq(X* x) { NS(x) = NS(x) == TS(x); --x->sp; }
 void S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
 
-void S_to_R(X* x) { x->r[x->rp++] = x->s[--x->sp]; }
-void S_from_R(X* x) { x->s[x->sp++] = x->r[--x->rp]; }
-void S_peek_R(X* x) { x->s[x->sp++] = x->r[x->rp - 1]; }
+void S_to_R(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
+void S_from_R(X* x) { x->s[x->sp++] = (C)x->r[--x->rp]; }
+void S_peek_R(X* x) { x->s[x->sp++] = (C)x->r[x->rp - 1]; }
 void S_push(X* x) { x->r[x->rp++] = x->ip; }
 void S_pop(X* x) { x->ip = x->r[--x->rp]; }
 void S_call(X* x) { B t = S_peek(x); if (t && t != ']') S_push(x); x->ip = (B*)S_drop(x); }
 void S_eval(X* x, B* q) { S_lit(x, (C)q); S_call(x); S_inner(x); }
 void S_if(X* x) { S_rot(x); if (!S_drop(x)) { S_swap(x); } S_drop(x); S_call(x); }
 void S_times(X* x) { B* q = (B*)S_drop(x); C n = S_drop(x); while (n-- > 0) { S_eval(x, q); } }
-void _bin_rec(X* x, B* c, B* t, B* r1, B* r2) {
-	S_eval(x, c);
-	if (S_drop(x)) {
-		S_eval(x, t);
-		return;
-	} else {
-		S_eval(x, r1);
-		_bin_rec(x, c, t, r1, r2);
-		S_swap(x);
-		_bin_rec(x, c, t, r1, r2);
-		S_eval(x, r2);
-		return;
-	}
-}
-void S_bin_rec(X* x) {
-	B* r2 = (B*)S_drop(x);
-	B* r1 = (B*)S_drop(x);
-	B* t = (B*)S_drop(x);
-	B* c = (B*)S_drop(x);
-	_bin_rec(x, c, t, r1, r2);
-}
+void S_while(X* x) { B* q = (B*)S_drop(x); B* c = (B*)S_drop(x); do { S_eval(x, c); if (!S_drop(x)) break; S_eval(x, q); } while(1); }
 
 void S_bstore(X* x) { B* a = (B*)S_drop(x); *a = (B)S_drop(x); }
 void S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
@@ -210,7 +190,7 @@ void S_inner(X* x) {
 			case '$': S_call(x); break;
 			case '?': S_if(x); break;
 			case 'n': S_times(x); break;
-      case 'b': S_bin_rec(x); break;
+			case 'w': S_while(x); break;
       case ':': S_bfetch(x); break;
       case ';': S_bstore(x); break;
 			case '.': S_cfetch(x); break;
