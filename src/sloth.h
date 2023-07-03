@@ -140,6 +140,7 @@ void S_inspect(X* x) {
       }
     }
   }
+  printf("\n");
 }
 
 void S_compare(X* x) {
