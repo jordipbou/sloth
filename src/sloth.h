@@ -123,6 +123,24 @@ void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 
 void S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 void S_free(X* x) { free((void*)S_drop(x)); }
+void S_inspect(X* x) {
+  C i = 0, j;
+  C n = S_drop(x);
+  B* a = (B*)S_drop(x);
+  while (i < n) {
+    /* Do with type! */
+    printf("\n%p: ", a + i);
+    for (j = 0; j < 4 && i < n; j++, i++) {
+      printf("%02X ", (unsigned char)a[i]);
+    }
+    if (i < n) {
+      printf("- ");
+      for (j = 0; j < 4 && i < n; j++, i++) {
+        printf("%02X ", (unsigned char)a[i]);
+      }
+    }
+  }
+}
 
 void S_compare(X* x) {
   C n1 = S_drop(x);
@@ -241,6 +259,7 @@ void S_inner(X* x) {
       case 'm': S_malloc(x); break;
       case 'f': S_free(x); break;
       case 'b': S_lit(x, &x->b); break;
+      case 'i': S_inspect(x); break;
       case 'p': S_compare(x); break;
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;

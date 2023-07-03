@@ -9,19 +9,12 @@ Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor.
 Features:
 
 * One C89 header only. Very easily embedabble in a C/C++ application.
-* Human readable bytecode.
+* Human readable bytecode (ASCII 32-126)
+* Cell based data and return stack
 * Quotations at bytecode level.
 * Relatively fast interpreter.
-* Ability to add C function extensions.
+* Ability to add C function extensions (bytecodes A-Z).
 * No dictionary/words/symbols needed at bytecode level.
-
-## Architecture
-
-* Bytecode is represented with normal strings (ASCII 32-127)
-* Data Stack (CELL values)
-* Return Stack (BYTE* values)
-* 26 available bytecodes for extensions (A-Z)
-  * Each bytecode extension can be extended to use more bytecodes as needed
 * Input/output thru 2 user defined key/emit functions
  
 ## Bytecode
@@ -73,6 +66,7 @@ Features:
     m MALLOC
     f FREE
     b BLOCK VARIABLE (DICTIONARY)
+    i INSPECT MEMORY (DUMP)
     p COMPARE STRINGS
 		// Input/Output
 		k KEY
