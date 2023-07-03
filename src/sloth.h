@@ -98,7 +98,9 @@ void S_mod(X* x) { NS(x) = NS(x) % TS(x); --x->sp; }
 
 void S_and(X* x) { NS(x) = NS(x) & TS(x); --x->sp; }
 void S_or(X* x) { NS(x) = NS(x) | TS(x); --x->sp; }
+void S_xor(X* x) { NS(x) = NS(x) ^ TS(x); --x->sp; }
 void S_not(X* x) { TS(x) = !TS(x); }
+void S_invert(X* x) { TS(x) = ~TS(x); }
 
 void S_lt(X* x) { NS(x) = NS(x) < TS(x); --x->sp; }
 void S_eq(X* x) { NS(x) = NS(x) == TS(x); --x->sp; }
@@ -145,9 +147,9 @@ void S_inspect(X* x) {
 
 void S_compare(X* x) {
   C n1 = S_drop(x);
-  B* s1 = S_drop(x);
+  B* s1 = (B*)S_drop(x);
   C n2 = S_drop(x);
-  B* s2 = S_drop(x);
+  B* s2 = (B*)S_drop(x);
   if (n2 == n1) {
     S_lit(x, strncmp(s2, s1, n2));
   } else {
@@ -214,7 +216,7 @@ void S_inner(X* x) {
       S_parse_quotation(x); break;
     case '"':
       S_parse_string(x); break;
-		case 0: case ']': 
+		case 0: case ']': case '}':
       if (x->rp > frame && x->rp > 0) S_pop(x);
 			else return;
       break;
@@ -241,13 +243,15 @@ void S_inner(X* x) {
 			case '%': S_mod(x); break;
 			case '&': S_and(x); break;
 			case '|': S_or(x); break;
+			case '^': S_xor(x); break;
 			case '!': S_not(x); break;
+			case '~': S_invert(x); break;
 			case '<': S_lt(x); break;
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
       case '(': S_to_R(x); break;
       case ')': S_from_R(x); break;
-      case '~': S_peek_R(x); break;
+      /* case '~': S_peek_R(x); break; */
 			case '$': S_call(x); break;
 			case '?': S_if(x); break;
 			case 'n': S_times(x); break;
@@ -259,7 +263,7 @@ void S_inner(X* x) {
       case 'c': S_lit(x, sizeof(C)); break;
       case 'm': S_malloc(x); break;
       case 'f': S_free(x); break;
-      case 'b': S_lit(x, &x->b); break;
+      case 'b': S_lit(x, (C)&x->b); break;
       case 'i': S_inspect(x); break;
       case 'p': S_compare(x); break;
 			case 'k': x->key(x); break;

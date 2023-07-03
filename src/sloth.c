@@ -53,10 +53,69 @@ void memory(X* x) {
 
 /* I do need a quotation to define a word and a quotation to find a word. */
 
+/*
+Base address of dicionary: b.
+Pointer to free space on dictionary: fetch: b.. store: b., (Address 0)
+Compile char: b..'<char>;1b..+b.,
+Compile cell: b..#<cell>,cb..+b.,
+Pointer to latest defined word: fetch: cb.+. store: cb.+, (Address cellsize)
+*/
+
 B* ROM =
-"\"sloth\"t10e"
-"[Allocate a dictionary of 4096 bytes, and save as b variable]_"
-"4096mb,";
+"\"SLOTH\"t10e"
+/* Allocate a dictionary of 4096 bytes, and save as b variable */
+"4096mb,"
+"[DROP]4[_]w"
+"[SWAP]4[s]w"
+"[DUP]3[d]w"
+"[OVER]4[o]w"
+"[ROT]3[r]w"
+"[-ROT]4[rr]w"
+"[2DROP]5[__]w"
+"[2DUP]4[oo]w"
+"[2SWAP]5[r(r)]w"
+"[?DUP]4[d0=[][d]?]w"
+"[1+]2[1+]w"
+"[1-]2[1-]w"
+"[4+]2[4+]w"
+"[4-]2[4-]w"
+"[+]1[+]w"
+"[-]1[-]w"
+"[*]1[*]w"
+"[/MOD]4[oo%rr/]w"
+"[=]1[=]w"
+"[<>]2[=!]w"
+"[<]1[<]w"
+"[>]1[>]w"
+"[<=]2[oo<rr=&]w"
+"[>=]2[oo>rr=&]w"
+"[0=]2[0=]w"
+"[0<>]3[0=!]w"
+"[0<]2[0<]w"
+"[0>]2[0>]w"
+"[0<=]3[d0<s0=&]w"
+"[0>=]3[d0>s0=&]w"
+"[AND]3[&]w"
+"[OR]2[&]w"
+"[XOR]3[^]w"
+"[INVERT]6[~]w"
+"[EXIT]4[}]w"
+/*"[LIT]3[ */
+"[!]1[,]w"
+"[@]1[.]w"
+"[+!]2[d.r+s,]w"
+"[-!]2[d.r-s,]w"
+"[C!]2[;]w"
+"[C@]2[:]w"
+"[C@C!]4[:s;]w"
+"[CMOVE]5[[oo:;1+s1+s]n]w"
+"[";
+
+/* How I imagine this should work:
+
+[1][[[accept input][word][find][compile][interpret]"interpret]"quit"]w
+
+*/
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -83,7 +142,7 @@ int main(int argc, char** argv) {
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
 	
-	S_eval(x, ROM);
+	/* S_eval(x, ROM); */
 
 	if (argc == 1 || argc == 3) {
 		do {
