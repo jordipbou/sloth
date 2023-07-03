@@ -73,6 +73,7 @@ Features:
     m MALLOC
     f FREE
     b BLOCK VARIABLE (DICTIONARY)
+    p COMPARE STRINGS
 		// Input/Output
 		k KEY
 		e EMIT

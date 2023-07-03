@@ -124,6 +124,19 @@ void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 void S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 void S_free(X* x) { free((void*)S_drop(x)); }
 
+void S_compare(X* x) {
+  C n1 = S_drop(x);
+  B* s1 = S_drop(x);
+  C n2 = S_drop(x);
+  B* s2 = S_drop(x);
+  if (n2 == n1) {
+    S_lit(x, strncmp(s2, s1, n2));
+  } else {
+    /* TODO: Check values here */
+    S_lit(x, -1);
+  }
+}
+
 void S_accept(X* x) { 
 	C i = 0;
 	C n = S_drop(x); 
@@ -228,6 +241,7 @@ void S_inner(X* x) {
       case 'm': S_malloc(x); break;
       case 'f': S_free(x); break;
       case 'b': S_lit(x, &x->b); break;
+      case 'p': S_compare(x); break;
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
 			case 'a': S_accept(x); break;
