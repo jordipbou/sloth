@@ -52,26 +52,11 @@ void memory(X* x) {
 }
 
 /* I do need a quotation to define a word and a quotation to find a word. */
-/*
+
 B* ROM =
-"[SLOTH]5[{.E1+]#_10E"
-"[Allocate a dictionary of 4096 bytes, and save on d variable]_"
-"4096Mad,"
-"[HERE is saved on h]_"
-"0h,"
-"[compile cell **,** is saved on c]_"
-"[d.h.+,h.~+h,]c,"
-"[and compile byte **c,** is saved on b]_"
-"[d.h.+.h.1+h,]b,";
-"[Latest word pointer will be saved on address 0 of the dictionary]_"
-"0c.$"
-"[Define TIB as next 80 bytes of dictionary]_"
-"80[0b.$]#"
-"[move string **cmove** is saved on s]_"
-"[[^^$:$;$1+$1+]#__]s,"
-"[Define COLON to be able to create words]_"
-"0,[Latest]_0;[Flags]_1;[Name length]_':;[Name]_h.d.,d,[Swap here and latest]_0;[Compile flags]_;[Compile name length]_s.$[Compile name]_";
-*/
+"\"sloth\"t10e"
+"[Allocate a dictionary of 4096 bytes, and save as b variable]_"
+"4096mb,";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -97,9 +82,8 @@ int main(int argc, char** argv) {
 		}
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
-	/*
+	
 	S_eval(x, ROM);
-	*/
 
 	if (argc == 1 || argc == 3) {
 		do {
