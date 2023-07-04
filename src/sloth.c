@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include "sloth.h"
+#include "forth.h"
 
 #ifdef _WIN32
   #include <conio.h>
@@ -37,41 +38,6 @@ int _getch ()
 void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
-void hello(X* x) {
-	printf("Hello world!\n");
-}
-
-void memory(X* x) {
-	C n;
-	B* s;
-	switch (S_token(x)) {
-	case 'a': n = S_drop(x); S_lit(x, (C)malloc(n)); break;
-	case 'f': free((void*)S_drop(x)); break;
-	case 'd': s = (B*)S_drop(x); for (n = 0; n < 16; n++) { printf("%c", s[n]); }; break;
-	}
-}
-
-/* I do need a quotation to define a word and a quotation to find a word. */
-
-/*
-Base address of dicionary: b.
-Pointer to free space on dictionary: fetch: b.. store: b., (Address 0)
-Compile char: b..'<char>;1b..+b.,
-Compile cell: b..#<cell>,cb..+b.,
-Pointer to latest defined word: fetch: cb.+. store: cb.+, (Address cellsize)
-*/
-
-B* ROM =
-"\"SLOTH\"t10e"
-/* Allocate a dictionary of 4096 bytes, and save as b variable */
-"4096mb,";
-
-/* How I imagine this should work:
-
-[1][[[accept input][word][find][compile][interpret]"interpret]"quit"]w
-
-*/
-
 int main(int argc, char** argv) {
 	FILE* fptr;
 	B buf[255];
@@ -81,8 +47,7 @@ int main(int argc, char** argv) {
 	
   x->key = &key;
   x->emit = &emit;
-  EXT(x, 'H') = &hello;
-	EXT(x, 'M') = &memory;
+  /*EXT(x, 'F') = &F_bytecodes;*/
 
 	if (argc == 2 || argc == 3) {
 		fptr = fopen(argv[1], "r");
@@ -96,8 +61,6 @@ int main(int argc, char** argv) {
 		}
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
-	
-	/* S_eval(x, ROM); */
 
 	if (argc == 1 || argc == 3) {
 		do {
