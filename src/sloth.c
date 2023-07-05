@@ -1,6 +1,6 @@
 #include<stdio.h>
 #include "sloth.h"
-#include "forth.h"
+/* #include "forth.h" */
 
 #ifdef _WIN32
   #include <conio.h>

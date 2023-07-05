@@ -12,8 +12,8 @@ typedef intptr_t C;
 #define RSTACK_SIZE 64
 
 typedef struct _X { 
-  C* s; C sp; C ss;
-  B** r; C rp; C rs;
+  C* s; C sp; C yp; C ss;
+  B** r; C rp; C zp; C rs;
 	B* ip;
   B* b;
 	void (*key)(struct _X*);
@@ -30,8 +30,8 @@ X* S_init() {
   x->s = malloc(STACK_SIZE*sizeof(C));
   x->r = malloc(RSTACK_SIZE*sizeof(C));
 	x->sp = x->rp = 0;
-  x->ss = STACK_SIZE;
-  x->rs = RSTACK_SIZE;
+  x->ss = x->yp = STACK_SIZE;
+  x->rs = x->zp = RSTACK_SIZE;
   x->err = 0;
   x->tr = 0;
 	return x;
@@ -106,9 +106,17 @@ void S_lt(X* x) { NS(x) = NS(x) < TS(x); --x->sp; }
 void S_eq(X* x) { NS(x) = NS(x) == TS(x); --x->sp; }
 void S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
 
+void S_to_Y(X* x) { x->s[--x->yp] = x->s[--x->sp]; }
+void S_from_Y(X* x) { x->s[x->sp++] = x->s[x->yp++]; }
+void S_peek_Y(X* x) { x->s[x->sp++] = x->s[x->yp]; }
+void S_to_Z(X* x) { x->r[--x->zp] = (B*)x->s[--x->sp]; }
+void S_from_Z(X* x) { x->s[x->sp++] = (C)x->r[x->zp++]; }
+void S_peek_E(X* x) { x->s[x->sp++] = x->r[x->zp]; }
+
 void S_to_R(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
 void S_from_R(X* x) { x->s[x->sp++] = (C)x->r[--x->rp]; }
 void S_peek_R(X* x) { x->s[x->sp++] = (C)x->r[x->rp - 1]; }
+
 void S_push(X* x) { x->r[x->rp++] = x->ip; }
 void S_pop(X* x) { x->ip = x->r[--x->rp]; }
 void S_call(X* x) { B t = S_peek(x); if (t && t != ']') S_push(x); x->ip = (B*)S_drop(x); }
@@ -249,9 +257,6 @@ void S_inner(X* x) {
 			case '<': S_lt(x); break;
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
-      case '(': S_to_R(x); break;
-      case ')': S_from_R(x); break;
-      /* case '~': S_peek_R(x); break; */
 			case '$': S_call(x); break;
 			case '?': S_if(x); break;
 			case 'n': S_times(x); break;
@@ -271,8 +276,22 @@ void S_inner(X* x) {
 			case 'a': S_accept(x); break;
 			case 't': S_type(x); break;
 			case 'q': /* TODO: Just set error code */ exit(0); break;
-			}
-		}
+      case 'y':
+        switch (S_token(x)) {
+        case ')': S_from_Y(x); break;
+        case '(': S_to_Y(x); break;
+        case '.': S_peek_Y(x); break;
+        }
+        break;
+      case 'z':
+        switch (S_token(x)) {
+        case ')': S_from_Z(x); break;
+        case '(': S_to_Z(x); break;
+        case '.': S_peek_R(x); break;
+        }
+        break;
+		  }
+    }
 	} while(1);
 }
 

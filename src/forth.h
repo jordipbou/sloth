@@ -21,9 +21,9 @@ void FORTH_compile_byte(X* x, B v) {
 
 void FORTH_add_primitive(X* x, B* n, C nl, B* c, C cl) {
 	B* here = x->b + FORTH_HERE(x);	
-	I i;
-	FORTH_compile_cell(x, LATEST(x));
-	LATEST(x) = here;	
+	C i;
+	FORTH_compile_cell(x, FORTH_LATEST(x));
+	FORTH_LATEST(x) = here;	
 	FORTH_compile_byte(x, 0);
 	FORTH_compile_byte(x, (B)nl);
 	for (i = 0; i < nl; i++) {

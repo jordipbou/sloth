@@ -43,7 +43,7 @@ Features:
     s SWAP
     d DUP
     o OVER
-    r ROT
+    @ ROT
     _ DROP
     // Execution
     ] RETURN (POP FROM R TO IP)
@@ -51,9 +51,6 @@ Features:
     $] JUMP (SET IP TO S)
     ? IF (ZCALL?)
     ?] IF (ZJUMP?)
-    ( TO R (POP S TO R)
-    ) FROM R (POP R TO S)
-		~ PEEK R (COPY R TO S)
     n TIMES (LOOP)
 		w WHILE (LOOP)
 		q EXIT
@@ -73,4 +70,12 @@ Features:
 		e EMIT
 		a ACCEPT
 		t TYPE
+    // Additional stacks/variables
+    rwxyz( PUSH TO NAMED STACK 
+    rwxyz) POP FROM NAMED STACK
+    wxyz+ INCREMENT TOP OF NAMED STACK
+    wxyz- DECREMENT TOP OF NAMED STACK
+    wxyz_ DROP FROM NAMED STACK
+    wxyz. FETCH FROM TOP OF NAMED STACK
+    wxyz, STORE ON TOP OF NAMED STACK
     // A-Z C extensions
