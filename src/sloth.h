@@ -43,7 +43,7 @@ X* S_init() {
 
 C S_dump_S(B* s, X* x) {
 	C i = 0, t, n = 0;
-	while (i < x->sp) { s += t = sprintf(s, "%ld ", x->s[i++]); n += t; }
+	while (i < x->sp) { s += t = sprintf(s, "%ld ", x->s[i]); n += t; i++; }
 	return n;
 }
 
@@ -299,6 +299,11 @@ void S_inner(X* x) {
         case ')': S_from_W(x); break;
         case '(': S_to_W(x); break;
         case '.': S_peek_W(x); break;
+        case '0': S_lit(x, x->w[0]); break;
+        case '1': S_lit(x, x->w[1]); break;
+        case '2': S_lit(x, x->w[2]); break;
+        case '3': S_lit(x, x->w[3]); break;
+        case '4': S_lit(x, x->w[4]); break;
         }
         break;
       case 'x':

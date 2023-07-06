@@ -38,6 +38,21 @@ int _getch ()
 void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
+B* bootForth =
+"4096mb,"
+"cc+b.," /* 0: HERE, 1: LATEST */
+/* Find WORD should be compiled as code on cc+b.+ to not need any
+  variable later on */
+"[b.b..+;1b..+b.,]w(" /* C, : w0 */
+"[b.b..+,cb..+b.,]w(" /* ,  : w1 */
+"[b.b..+ cb.+. w1$ cb.+, 0w0$ dw0$ [d:w0$1+]n_ [d:w0$1+]n_]w(" /* HEADER : w2 */
+"[c+1+1+]w(" /* NFA : w3 */
+"[dc+1+:c+1+1++]w(" /* CFA : w4 */
+"[_]2\"DROP\"w2$"
+"[s]2\"SWAP\"w2$"
+"[o]2\"OVER\"w2$"
+"[@]2\"ROT\"w2$";
+
 int main(int argc, char** argv) {
 	FILE* fptr;
 	B buf[255];
@@ -62,6 +77,8 @@ int main(int argc, char** argv) {
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
 
+  S_eval(x, bootForth);
+  
 	if (argc == 1 || argc == 3) {
 		do {
 			fgets(buf, 255, stdin);
