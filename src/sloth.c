@@ -40,18 +40,17 @@ void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
 B* bootForth =
 "4096mb,"
-"cc+b.," /* 0: HERE, 1: LATEST */
-/* Find WORD should be compiled as code on cc+b.+ to not need any
-  variable later on */
-"[b.b..+;1b..+b.,]w(" /* C, : w0 */
-"[b.b..+,cb..+b.,]w(" /* ,  : w1 */
-"[b.b..+ cb.+. w1$ cb.+, 0w0$ dw0$ [d:w0$1+]n_ [d:w0$1+]n_]w(" /* HEADER : w2 */
-"[c+1+1+]w(" /* NFA : w3 */
-"[dc+1+:c+1+1++]w(" /* CFA : w4 */
-"[_]2\"DROP\"w2$"
-"[s]2\"SWAP\"w2$"
-"[o]2\"OVER\"w2$"
-"[@]2\"ROT\"w2$";
+"cc+b.," /* 0: HERE, c: LATEST */
+"[b.b..+;1b..+b.,]" /* C, : v0 */
+"[b.b..+,cb..+b.,]" /* ,  : v1 */
+"[b.b..+ cb.+. v1$ cb.+, 0v0$ dv0$ [d:v0$1+]n_ [d:v0$1+]n_]" /* HEADER : v2 */
+"[c+1+1+]" /* NFA : v3 */
+"[dc+1+:c+1+1++]" /* CFA : v4 */
+"[z(y(cb.+.[d0=[y)z)@0][dv3$d1-:y.z.p0=!]?][.]w]" /* FIND: v5 */
+"[_]2\"DROP\"v2$"
+"[s]2\"SWAP\"v2$"
+"[o]2\"OVER\"v2$"
+"[@]2\"ROT\"v2$";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -76,6 +75,11 @@ int main(int argc, char** argv) {
 		}
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
+
+  /*
+  FORTH_init(x);
+  FORTH_quit(x);
+   */ 
 
   S_eval(x, bootForth);
   

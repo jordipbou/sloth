@@ -10,17 +10,15 @@ typedef intptr_t C;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
-#define WSTACK_SIZE 64
 
 typedef struct _X { 
   C* s; C sp; C yp; C ss;
-  C* w; C wp; C xp; C ws;
   B** r; C rp; C zp; C rs;
 	B* ip;
   B* b;
 	void (*key)(struct _X*);
 	void (*emit)(struct _X*);
-  void (*ext[26])(struct _X*);
+  void (**ext)(struct _X*);
   C err;
   C tr;
 } X;
@@ -31,11 +29,10 @@ X* S_init() {
 	X* x = malloc(sizeof(X));
   x->s = malloc(STACK_SIZE*sizeof(C));
   x->r = malloc(RSTACK_SIZE*sizeof(C));
-  x->w = malloc(WSTACK_SIZE*sizeof(C));
-	x->sp = x->rp = x->wp = 0;
+	x->sp = x->rp = 0;
   x->ss = x->yp = STACK_SIZE;
   x->rs = x->zp = RSTACK_SIZE;
-  x->ws = x->xp = WSTACK_SIZE;
+  x->ext = malloc(26*sizeof(C));
   x->err = 0;
   x->tr = 0;
 	return x;
@@ -113,16 +110,10 @@ void S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
 void S_to_Y(X* x) { x->s[--x->yp] = x->s[--x->sp]; }
 void S_from_Y(X* x) { x->s[x->sp++] = x->s[x->yp++]; }
 void S_peek_Y(X* x) { x->s[x->sp++] = x->s[x->yp]; }
-void S_to_Z(X* x) { x->r[--x->zp] = (B*)x->s[--x->sp]; }
-void S_from_Z(X* x) { x->s[x->sp++] = (C)x->r[x->zp++]; }
-void S_peek_Z(X* x) { x->s[x->sp++] = x->r[x->zp]; }
 
-void S_to_W(X* x) { x->w[x->wp++] = x->s[--x->sp]; }
-void S_from_W(X* x) { x->s[x->sp++] = x->w[--x->wp]; }
-void S_peek_W(X* x) { x->s[x->sp++] = x->w[x->wp - 1]; }
-void S_to_X(X* x) { x->w[--x->xp] = x->s[--x->sp]; }
-void S_from_X(X* x) { x->s[x->sp++] = x->w[x->xp++]; }
-void S_peek_X(X* x) { x->s[x->sp++] = x->w[x->xp]; }
+void S_to_Z(X* x) { x->r[--x->zp] = x->s[--x->sp]; }
+void S_from_Z(X* x) { x->s[x->sp++] = x->r[x->zp++]; }
+void S_peek_Z(X* x) { x->s[x->sp++] = x->r[x->zp]; }
 
 void S_to_R(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
 void S_from_R(X* x) { x->s[x->sp++] = (C)x->r[--x->rp]; }
@@ -271,7 +262,7 @@ void S_inner(X* x) {
 			case '$': S_call(x); break;
 			case '?': S_if(x); break;
 			case 'n': S_times(x); break;
-			/* case 'w': S_while(x); break; */
+			case 'w': S_while(x); break;
       case ':': S_bfetch(x); break;
       case ';': S_bstore(x); break;
 			case '.': S_cfetch(x); break;
@@ -294,23 +285,18 @@ void S_inner(X* x) {
         case '.': S_peek_R(x); break;
         }
         break;
-      case 'w':
+      case 'v':
         switch (S_token(x)) {
-        case ')': S_from_W(x); break;
-        case '(': S_to_W(x); break;
-        case '.': S_peek_W(x); break;
-        case '0': S_lit(x, x->w[0]); break;
-        case '1': S_lit(x, x->w[1]); break;
-        case '2': S_lit(x, x->w[2]); break;
-        case '3': S_lit(x, x->w[3]); break;
-        case '4': S_lit(x, x->w[4]); break;
-        }
-        break;
-      case 'x':
-        switch (S_token(x)) {
-        case ')': S_from_X(x); break;
-        case '(': S_to_X(x); break;
-        case '.': S_peek_X(x); break;
+        case '0': S_lit(x, x->s[0]); break;
+        case '1': S_lit(x, x->s[1]); break;
+        case '2': S_lit(x, x->s[2]); break;
+        case '3': S_lit(x, x->s[3]); break;
+        case '4': S_lit(x, x->s[4]); break;
+        case '5': S_lit(x, x->s[5]); break;
+        case '6': S_lit(x, x->s[6]); break;
+        case '7': S_lit(x, x->s[7]); break;
+        case '8': S_lit(x, x->s[8]); break;
+        case '9': S_lit(x, x->s[9]); break;
         }
         break;
       case 'y':
@@ -327,7 +313,7 @@ void S_inner(X* x) {
         case '.': S_peek_Z(x); break;
         }
         break;
-		  }
+      }
     }
 	} while(1);
 }
