@@ -6,6 +6,7 @@
 #ifndef FORTH_SLOTH
 #define FORTH_SLOTH
 
+#include<ctype.h>
 #include"sloth.h"
 
 #define FORTH_DICT_SIZE 65536
@@ -108,17 +109,55 @@ void FORTH_execute(X* x) {
   S_call(x);
 }
 
+void FORTH_parse(X* x) {
+  C i = FORTH_IN(x);
+  while (FORTH_TIB(x)[i] != 0 && isspace(FORTH_TIB(x)[i])) { 
+    i++;
+  }
+  FORTH_IN(x) = i;
+  S_lit(x, (C)(FORTH_TIB(x) + FORTH_IN(x)));
+  while (FORTH_TIB(x)[i] != 0 && !isspace(FORTH_TIB(x)[i])) { 
+    i++;
+  }
+  S_lit(x, i - FORTH_IN(x));
+  FORTH_IN(x) = i;
+}
+
+void FORTH_outer(X* x) {
+  C i;
+  /*while (1) {*/
+    FORTH_IN(x) = 0;
+    S_lit(x, (C)FORTH_TIB(x));
+    S_lit(x, FORTH_TIB_SIZE);
+    S_accept(x);
+    for (i = 0; i < TS(x); i++) { 
+      FORTH_TIB(x)[i] = toupper(FORTH_TIB(x)[i]); 
+    } 
+    while (!x->err) {
+      FORTH_parse(x);
+      if (TS(x) == 0) { S_drop(x); S_drop(x); break; }
+      FORTH_find(x);
+      if (S_drop(x)) {
+        FORTH_execute(x);
+      }
+    }
+  /*}*/
+}
+
 void FORTH_extension(X* x) {
   switch (S_token(x)) {
   case 'i': FORTH_init(x); break;
   case 'h': S_lit(x, &(FORTH_HERE(x))); break;
   case 'l': S_lit(x, &(FORTH_LATEST(x))); break;
+  case 't': S_lit(x, (C)FORTH_TIB(x)); break;
   case ',': FORTH_compile_cell(x); break;
   case ';': FORTH_compile_byte(x); break;
   case ':': FORTH_header(x); break;
   case 'f': FORTH_find(x); break;
   case 'q': FORTH_compile_quotation(x); break;
   case 'e': FORTH_execute(x); break;
+  case 'o': FORTH_outer(x); break;
+  case 'p': FORTH_parse(x); break;
   }
 }
 
