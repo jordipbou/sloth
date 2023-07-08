@@ -11,9 +11,21 @@ typedef intptr_t C;
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
 
+typedef struct _S {
+	struct _S *next;
+	B flags;
+	B name_len;
+	B data[1];
+} S;
+
+#define BLOCK_SIZE 65536
+
+#define BLOCK_HERE(x) (((C*)x->b)[0])
+#define BLOCK_LATEST(x) (((C*)x->b)[1])
+
 typedef struct _X { 
-  C* s; C sp; C yp; C ss;
-  B** r; C rp; C zp; C rs;
+  C* s; C sp; C ss;
+  B** r; C rp; C rs;
 	B* ip;
   B* b;
 	void (*key)(struct _X*);
@@ -29,9 +41,11 @@ X* S_init() {
 	X* x = malloc(sizeof(X));
   x->s = malloc(STACK_SIZE*sizeof(C));
   x->r = malloc(RSTACK_SIZE*sizeof(C));
+	x->b = malloc(BLOCK_SIZE);
+	BLOCK_HERE(x) = 2*sizeof(C);
 	x->sp = x->rp = 0;
-  x->ss = x->yp = STACK_SIZE;
-  x->rs = x->zp = RSTACK_SIZE;
+  x->ss = STACK_SIZE;
+  x->rs = RSTACK_SIZE;
   x->ext = malloc(26*sizeof(C));
   x->err = 0;
   x->tr = 0;
@@ -106,14 +120,6 @@ void S_invert(X* x) { TS(x) = ~TS(x); }
 void S_lt(X* x) { NS(x) = NS(x) < TS(x); --x->sp; }
 void S_eq(X* x) { NS(x) = NS(x) == TS(x); --x->sp; }
 void S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
-
-void S_to_Y(X* x) { x->s[--x->yp] = x->s[--x->sp]; }
-void S_from_Y(X* x) { x->s[x->sp++] = x->s[x->yp++]; }
-void S_peek_Y(X* x) { x->s[x->sp++] = x->s[x->yp]; }
-
-void S_to_Z(X* x) { x->r[--x->zp] = x->s[--x->sp]; }
-void S_from_Z(X* x) { x->s[x->sp++] = x->r[x->zp++]; }
-void S_peek_Z(X* x) { x->s[x->sp++] = x->r[x->zp]; }
 
 void S_to_R(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
 void S_from_R(X* x) { x->s[x->sp++] = (C)x->r[--x->rp]; }
@@ -202,13 +208,33 @@ void S_parse_quotation(X* x) {
 	B c; 
 	S_lit(x, (C)(++x->ip)); 
 	while (t) { switch (S_token(x)) { case '[': t++; break; case ']': t--; break; } } 
+	S_lit(x, (C)(x->ip - TS(x) - 1));
 }
 
-void S_parse_string(X* x) {
-  C i = 0;
-  S_lit(x, (C)(++x->ip));
-  while (S_token(x) != '"') { i++; }
-  S_lit(x, i);
+void S_symbol(X* x) {
+  C l = 0;
+	B* s = x->ip;
+	S* w = (S*)BLOCK_LATEST(x);
+	while (!isspace(S_token(x))) { l++; }
+	while (w) {
+		if (w->name_len == l && !strncmp(w->data, s, l)) {
+			/* TODO: This is not working */
+			S_lit(x, (C)w);
+			return;
+		}
+		w = w->next;
+	}
+	if (!w) {
+		w = (S*)(x->b + BLOCK_HERE(x));
+		w->next = (S*)BLOCK_LATEST(x);
+		BLOCK_LATEST(x) = (C)w;
+		w->flags = 0;
+		w->name_len = l;
+		strncmp(w->data, s, l);
+		S_lit(x, (C)w);
+		BLOCK_HERE(x) += sizeof(S) + l - 1;
+		/* TODO: Create NFA and CFA */
+	}
 }
 
 void S_inner(X* x) {
@@ -224,8 +250,6 @@ void S_inner(X* x) {
       S_parse_literal(x); break;
 		case '[': 
       S_parse_quotation(x); break;
-    case '"':
-      S_parse_string(x); break;
 		case 0: case ']': case '}':
       if (x->rp > frame && x->rp > 0) S_pop(x);
 			else return;
@@ -259,6 +283,9 @@ void S_inner(X* x) {
 			case '<': S_lt(x); break;
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
+      case ')': S_from_R(x); break;
+      case '(': S_to_R(x); break;
+      case 'r': S_peek_R(x); break;
 			case '$': S_call(x); break;
 			case '?': S_if(x); break;
 			case 'n': S_times(x); break;
@@ -277,43 +304,9 @@ void S_inner(X* x) {
 			case 'e': x->emit(x); break;
 			case 'a': S_accept(x); break;
 			case 't': S_type(x); break;
+			case '\\': S_symbol(x); break;
 			case 'q': /* TODO: Just set error code? */ exit(0); break;
-      case 'r':
-        switch (S_token(x)) {
-        case ')': S_from_R(x); break;
-        case '(': S_to_R(x); break;
-        case '.': S_peek_R(x); break;
-        }
-        break;
-      case 'v':
-        switch (S_token(x)) {
-        case '0': S_lit(x, x->s[0]); break;
-        case '1': S_lit(x, x->s[1]); break;
-        case '2': S_lit(x, x->s[2]); break;
-        case '3': S_lit(x, x->s[3]); break;
-        case '4': S_lit(x, x->s[4]); break;
-        case '5': S_lit(x, x->s[5]); break;
-        case '6': S_lit(x, x->s[6]); break;
-        case '7': S_lit(x, x->s[7]); break;
-        case '8': S_lit(x, x->s[8]); break;
-        case '9': S_lit(x, x->s[9]); break;
-        }
-        break;
-      case 'y':
-        switch (S_token(x)) {
-        case ')': S_from_Y(x); break;
-        case '(': S_to_Y(x); break;
-        case '.': S_peek_Y(x); break;
-        }
-        break;
-      case 'z':
-        switch (S_token(x)) {
-        case ')': S_from_Z(x); break;
-        case '(': S_to_Z(x); break;
-        case '.': S_peek_Z(x); break;
-        }
-        break;
-      }
+			}
     }
 	} while(1);
 }

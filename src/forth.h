@@ -29,7 +29,7 @@
 /* SLOTH VERSION: NAME ADDRESS [c2++] PUSH NAME STRING [c2++d1-:] */
 #define NFA(w) (w + sizeof(C) + 1 + 1)
 /* SLOTH VERSION: [dc1++;+c2+] */
-#define CFA(w) (w + sizeof(C) + 1 + 1 + *((B*)w + sizeof(C) + 1))
+#define CFA(w) (w + sizeof(C) + 1 + 1 + *((B*)(w + sizeof(C) + 1)))
 
 /* SLOTH VERSION: [65536mb,c4*255+b.,] */
 void FORTH_init(X* x) {
@@ -62,7 +62,7 @@ void FORTH_header(X* x) {
   C h = FORTH_HERE(x);
   S_lit(x, FORTH_LATEST(x));
   FORTH_compile_cell(x);
-  FORTH_LATEST(x) = x->b + h;
+  FORTH_LATEST(x) = (C)(x->b + h);
   S_lit(x, 0);
   FORTH_compile_byte(x);
   S_lit(x, l);
@@ -77,13 +77,13 @@ void FORTH_header(X* x) {
 void FORTH_find(X* x) {
   C l = S_drop(x);
   B* n = (B*)S_drop(x);
-  B* w = FORTH_LATEST(x);
+  B* w = (B*)FORTH_LATEST(x);
   while (w != 0) {
     if (!strncmp(NFA(w), n, l)) {
       S_lit(x, (C)w);
       return;
     } else {
-      w = *w;
+      w = *((B**)w);
     }
   }
   S_lit(x, (C)n);
@@ -105,8 +105,9 @@ void FORTH_compile_quotation(X* x) {
 
 void FORTH_execute(X* x) {
   B* w = (B*)S_drop(x);
-  S_lit(x, CFA(w));
+  S_lit(x, (C)CFA(w));
   S_call(x);
+	S_inner(x);
 }
 
 void FORTH_parse(X* x) {
@@ -124,6 +125,7 @@ void FORTH_parse(X* x) {
 }
 
 void FORTH_outer(X* x) {
+	B buf[255];
   C i;
   /*while (1) {*/
     FORTH_IN(x) = 0;
@@ -133,11 +135,18 @@ void FORTH_outer(X* x) {
     for (i = 0; i < TS(x); i++) { 
       FORTH_TIB(x)[i] = toupper(FORTH_TIB(x)[i]); 
     } 
+		S_drop(x);
     while (!x->err) {
       FORTH_parse(x);
-      if (TS(x) == 0) { S_drop(x); S_drop(x); break; }
+      if (!TS(x)) { S_drop(x); S_drop(x); break; }
+			memset(buf, 0, 155);
+			S_dump_S(buf, x);
+			printf("PRE FIND: %s\n", buf);
       FORTH_find(x);
-      if (S_drop(x)) {
+ 			memset(buf, 0, 155);
+			S_dump_S(buf, x);
+			printf("POST FIND: %s\n", buf);
+     if (TS(x) != 0) {
         FORTH_execute(x);
       }
     }
@@ -147,8 +156,8 @@ void FORTH_outer(X* x) {
 void FORTH_extension(X* x) {
   switch (S_token(x)) {
   case 'i': FORTH_init(x); break;
-  case 'h': S_lit(x, &(FORTH_HERE(x))); break;
-  case 'l': S_lit(x, &(FORTH_LATEST(x))); break;
+  case 'h': S_lit(x, (C)&(FORTH_HERE(x))); break;
+  case 'l': S_lit(x, (C)&(FORTH_LATEST(x))); break;
   case 't': S_lit(x, (C)FORTH_TIB(x)); break;
   case ',': FORTH_compile_cell(x); break;
   case ';': FORTH_compile_byte(x); break;

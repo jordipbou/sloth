@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
 	
   x->key = &key;
   x->emit = &emit;
-  EXT(x, 'F') = &FORTH_extension;
+  /*EXT(x, 'F') = &FORTH_extension;*/
 
 	if (argc == 2 || argc == 3) {
 		fptr = fopen(argv[1], "r");
