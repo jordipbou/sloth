@@ -1,6 +1,6 @@
 #include<stdio.h>
 #include "sloth.h"
-/* #include "forth.h" */
+#include "forth.h"
 
 #ifdef _WIN32
   #include <conio.h>
@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
 	
   x->key = &key;
   x->emit = &emit;
-  /*EXT(x, 'F') = &F_bytecodes;*/
+  EXT(x, 'F') = &FORTH_extension;
 
 	if (argc == 2 || argc == 3) {
 		fptr = fopen(argv[1], "r");
@@ -82,7 +82,9 @@ int main(int argc, char** argv) {
   FORTH_quit(x);
    */ 
 
+  /*
   S_eval(x, bootForth);
+  */
   
 	if (argc == 1 || argc == 3) {
 		do {
