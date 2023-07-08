@@ -43,10 +43,11 @@ B* bootForth =
 "cc+b.," /* 0: HERE, c: LATEST */
 "[b.b..+;1b..+b.,]" /* C, : v0 */
 "[b.b..+,cb..+b.,]" /* ,  : v1 */
-"[b.b..+ cb.+. v1$ cb.+, 0v0$ dv0$ [d:v0$1+]n_ [d:v0$1+]n_]" /* HEADER : v2 */
+"[b.b..+ cb.+. v1$ cb.+, 0v0$ dv0$ [d:v0$1+]n_ [d:v0$1+]n_]" /* ADD_PRIMITIVE : v2 */
 "[c+1+1+]" /* NFA : v3 */
 "[dc+1+:c+1+1++]" /* CFA : v4 */
-"[z(y(cb.+.[d0=[y)z)@0][dv3$d1-:y.z.p0=!]?][.]w]" /* FIND: v5 */
+"[  z(y(cb.+.[d0=[y)z)@0][dv3$d1-:y.z.p0=!]?][.]w]" /* FIND: v5 */
+"49\"FIND\"v2$" /* FIND is now in 4c*b.+ address */
 "[_]2\"DROP\"v2$"
 "[s]2\"SWAP\"v2$"
 "[o]2\"OVER\"v2$"
