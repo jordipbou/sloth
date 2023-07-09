@@ -1,3 +1,6 @@
+/* TODO: Compile quotation needs length, and that makes impossible
+   to just copy the code from another word!! */
+/* I think it would be easier to use "" for strings again */
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -8,20 +11,21 @@
 typedef char B;
 typedef intptr_t C;
 
+#define szC sizeof(C)
+
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
 
-typedef struct _S {
-	struct _S *next;
-	B flags;
-	B name_len;
-	B data[1];
-} S;
-
 #define BLOCK_SIZE 65536
 
-#define BLOCK_HERE(x) (((C*)x->b)[0])
-#define BLOCK_LATEST(x) (((C*)x->b)[1])
+#define HERE(x) (((C*)x->b)[0])
+#define LATEST(x) (((C*)x->b)[1])
+
+/* TODO: Use mask for flags/length */
+#define FLAGS(s) (*(s + szC))
+#define NL(s) (*(s + szC + 1))
+#define NFA(s) (s + szC + 1 + 1)
+#define CFA(s) (NFA(s) + NL(s))
 
 typedef struct _X { 
   C* s; C sp; C ss;
@@ -39,14 +43,14 @@ typedef struct _X {
 
 X* S_init() {
 	X* x = malloc(sizeof(X));
-  x->s = malloc(STACK_SIZE*sizeof(C));
-  x->r = malloc(RSTACK_SIZE*sizeof(C));
+  x->s = malloc(STACK_SIZE*szC);
+  x->r = malloc(RSTACK_SIZE*szC);
 	x->b = malloc(BLOCK_SIZE);
-	BLOCK_HERE(x) = 2*sizeof(C);
+	HERE(x) = 2*szC;
 	x->sp = x->rp = 0;
   x->ss = STACK_SIZE;
   x->rs = RSTACK_SIZE;
-  x->ext = malloc(26*sizeof(C));
+  x->ext = malloc(26*szC);
   x->err = 0;
   x->tr = 0;
 	return x;
@@ -211,30 +215,38 @@ void S_parse_quotation(X* x) {
 	S_lit(x, (C)(x->ip - TS(x) - 1));
 }
 
+#define BCOMP(x, v) *(x->b + HERE(x)) = v; HERE(x)++
+#define CCOMP(x, v) *((C*)(x->b + HERE(x))) = v; HERE(x) += szC
+
+void S_bcompile(X* x) { BCOMP(x, (B)S_drop(x)); }
+void S_ccompile(X* x) { CCOMP(x, S_drop(x)); }
+/* TODO: Compile quotation must check for end of quotation, not
+   use a length */
+void S_qcompile(X* x) { C l = S_drop(x); B* q = (B*)S_drop(x); strncpy(x->b + HERE(x), q, l); HERE(x) += l; }
+void S_scompile(X* x) { BCOMP(x, '['); S_qcompile(x); BCOMP(x, ']'); }
+
+void S_allot(X* x) { HERE(x) += S_drop(x); }
+
 void S_symbol(X* x) {
   C l = 0;
 	B* s = x->ip;
-	S* w = (S*)BLOCK_LATEST(x);
+	B* w = (B*)LATEST(x);
 	while (!isspace(S_token(x))) { l++; }
 	while (w) {
-		if (w->name_len == l && !strncmp(w->data, s, l)) {
-			/* TODO: This is not working */
-			S_lit(x, (C)w);
+		if (NL(w) == l && !strncmp(NFA(w), s, l)) {
+			S_lit(x, (C)CFA(w));
 			return;
 		}
-		w = w->next;
+		w = *((B**)w);
 	}
-	if (!w) {
-		w = (S*)(x->b + BLOCK_HERE(x));
-		w->next = (S*)BLOCK_LATEST(x);
-		BLOCK_LATEST(x) = (C)w;
-		w->flags = 0;
-		w->name_len = l;
-		strncmp(w->data, s, l);
-		S_lit(x, (C)w);
-		BLOCK_HERE(x) += sizeof(S) + l - 1;
-		/* TODO: Create NFA and CFA */
-	}
+  w = x->b + HERE(x);
+	*((B**)w) = (B*)LATEST(x);
+	LATEST(x) = (C)w;
+	FLAGS(w) = 0;
+	NL(w) = l;
+	strncpy(NFA(w), s, l);
+	S_lit(x, (C)CFA(w));
+	HERE(x) += sizeof(B**) + 2 + l;
 }
 
 void S_inner(X* x) {
@@ -294,10 +306,9 @@ void S_inner(X* x) {
       case ';': S_bstore(x); break;
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
-      case 'c': S_lit(x, sizeof(C)); break;
+      case 'c': S_lit(x, szC); break;
       case 'm': S_malloc(x); break;
       case 'f': S_free(x); break;
-      case 'b': S_lit(x, (C)&x->b); break;
       case 'i': S_inspect(x); break;
       case 'p': S_compare(x); break;
 			case 'k': x->key(x); break;
@@ -306,6 +317,17 @@ void S_inner(X* x) {
 			case 't': S_type(x); break;
 			case '\\': S_symbol(x); break;
 			case 'q': /* TODO: Just set error code? */ exit(0); break;
+      /* Dictionary */
+      case 'b':
+        switch (S_token(x)) {
+        case 'a': S_allot(x); break;
+        case 'b': S_lit(x, (C)(x->b)); break;
+        case ';': S_bcompile(x); break;
+        case ',': S_ccompile(x); break;
+        case 'h': S_lit(x, (C)(x->b + HERE(x))); break;
+        case 'q': S_qcompile(x); break;
+        case 's': S_scompile(x); break;
+        }
 			}
     }
 	} while(1);
