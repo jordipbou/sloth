@@ -24,6 +24,10 @@ typedef intptr_t C;
 #define NFA(s) (s + szC + 1 + 1)
 #define CFA(s) (NFA(s) + NL(s))
 
+#define VC(x, n) C n = S_drop(x)
+#define VB(x, n) B* n = (B*)S_drop(x)
+#define VS(x, n) VC(x, l##n); VB(x, s##n)
+
 typedef struct _X { 
   C* s; C sp; C ss;
   B** r; C rp; C rs;
@@ -143,6 +147,8 @@ void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 void S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 void S_free(X* x) { free((void*)S_drop(x)); }
 void S_inspect(X* x) {
+  /* TODO: Show ASCII representation */
+  /* TODO: Use vectored I/O */
   C i = 0, j;
   C n = S_drop(x);
   B* a = (B*)S_drop(x);
@@ -162,35 +168,35 @@ void S_inspect(X* x) {
   printf("\n");
 }
 
-void S_compare(X* x) {
-  C n1 = S_drop(x);
-  B* s1 = (B*)S_drop(x);
-  C n2 = S_drop(x);
-  B* s2 = (B*)S_drop(x);
-  if (n2 == n1) {
-    S_lit(x, strncmp(s2, s1, n2));
-  } else {
-    /* TODO: Check values here */
-    S_lit(x, -1);
-  }
-}
+void S_compare(X* x) { VS(x, 1); VS(x, 2); S_lit(x, l2 == l1 && !strncmp(s2, s1, l2)); }
 
 void S_accept(X* x) { 
 	C i = 0;
-	C n = S_drop(x); 
-	B* s = (B*)S_drop(x); 
+  VS(x, 1);
 	do { 
 		x->key(x); 
 		if (TS(x) == 10) {
 			S_drop(x);
 			break;
-		} else {
-			s[i++] = TS(x);
+		} else if (TS(x) == 127) {
+      S_drop(x);
+      if (i > 0) {
+        S_lit(x, '\b');
+        x->emit(x);
+        S_lit(x, ' ');
+        x->emit(x);
+        S_lit(x, '\b');
+        x->emit(x);
+        i--;
+      }
+    } else {
+			s1[i++] = TS(x);
 			x->emit(x);
 		}
-	} while(1);
+	} while(i < l1);
 	S_lit(x, i);
 }
+
 void S_type(X* x) {
 	C i = 0;
 	C n = S_drop(x);
@@ -237,9 +243,6 @@ void S_qcompile(X* x) {
 void S_scompile(X* x) { C l = S_drop(x); B* s = (B*)S_drop(x); BCOMP(x, '"'); strncpy(x->b + HERE(x), s, l); BCOMP(x, '"'); HERE(x) += l + 2; }
 
 void S_allot(X* x) { HERE(x) += S_drop(x); }
-
-#define VC(x, n) C n = S_drop(x)
-#define VB(x, n) B* n = (B*)S_drop(x)
 
 void S_parse_name(X* x) {
   VC(x, i);
@@ -378,7 +381,7 @@ void S_inner(X* x) {
           S_call(x); break;
         }
         break;
-      case 'z':
+      case '?':
         switch (S_peek(x)) {
         case ']': case '}':
           x->ip++;
@@ -388,7 +391,7 @@ void S_inner(X* x) {
           /*S_zcall(x);*/ break;
         }
         break;
-			case '?': S_if(x); break;
+      case 'q': exit(0); break;
       /* Memory */
       case 'm': S_malloc(x); break;
       case 'f': S_free(x); break;
@@ -404,20 +407,26 @@ void S_inner(X* x) {
       /* Helpers */
       case 'h':
         switch (S_token(x)) {
-        case 'c': S_compare(x);
+        case 'c': S_compare(x); break;
 			  case 'n': S_times(x); break;
+        /*case 'd': S_dip(x); break;*/
+        /*case 's': S_sip(x); break;*/
+        /*case 'b': S_binrec(x); break;*/
+        /*case 'l': S_linrec(x); break;*/
 			  case 'w': S_while(x); break;
 			  case 'a': S_accept(x); break;
 			  case 't': S_type(x); break;
+        /*case '.': S_repr(x); break;*/
+        case '?': S_if(x); break;
         }
         break;
-			case 'q': exit(0); break;
       /* Block */
       case 'b':
         switch (S_token(x)) {
         case 'a': S_allot(x); break;
         case 'b': S_lit(x, (C)(x->b)); break;
         case 'f': S_find(x); break;
+        case 'p': S_parse_name(x); break;
         case 'c': S_create(x); break;
         case ';': S_bcompile(x); break;
         case ',': S_ccompile(x); break;

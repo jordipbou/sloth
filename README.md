@@ -49,11 +49,10 @@ Features:
     
     $ -> call, jump $] or $} or $<0>
     ] -> return, also } and <0>
-    ? -> call if zero
-    t -> to r
-    f -> from r
+    ? -> call if zero, jump ?] or ?} or ?<0>
+    ( -> to r
+    ) -> from r
     p -> peek r
-    z -> call if zero, jump z] or z$ or z<0>
     
     & -> and
     | -> or
@@ -72,13 +71,17 @@ Features:
     . -> fetch byte
     i -> inspect
 
+    ha -> accept
+    ht -> type
+    h. -> display number
     hc -> string comparison
     hd -> dip
     hb -> binary recursion
     hl -> linear recursion
     hs -> sip
-    ht -> times
+    hn -> times
     hw -> while
+    h? -> ifthen
     
     s -> swap
     d -> dup
