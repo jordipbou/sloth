@@ -1,6 +1,3 @@
-/* TODO: Compile quotation needs length, and that makes impossible
-   to just copy the code from another word!! */
-/* I think it would be easier to use "" for strings again */
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -21,7 +18,7 @@ typedef intptr_t C;
 #define HERE(x) (((C*)x->b)[0])
 #define LATEST(x) (((C*)x->b)[1])
 
-/* TODO: Use mask for flags/length */
+/* TODO: Use mask for flags/length? */
 #define FLAGS(s) (*(s + szC))
 #define NL(s) (*(s + szC + 1))
 #define NFA(s) (s + szC + 1 + 1)
@@ -211,8 +208,13 @@ void S_parse_quotation(X* x) {
 	C t = 1; 
 	B c; 
 	S_lit(x, (C)(++x->ip)); 
-	while (t) { switch (S_token(x)) { case '[': t++; break; case ']': t--; break; } } 
-	S_lit(x, (C)(x->ip - TS(x) - 1));
+	while (t) { switch (S_token(x)) { case '[': t++; break; case ']': t--; break; } }
+}
+
+void S_parse_string(X* x) {
+  S_lit(x, (C)(++x->ip));
+  while (S_token(x) != '"') {}
+  S_lit(x, (C)(x->ip - TS(x)) - 1);
 }
 
 #define BCOMP(x, v) *(x->b + HERE(x)) = v; HERE(x)++
@@ -220,14 +222,74 @@ void S_parse_quotation(X* x) {
 
 void S_bcompile(X* x) { BCOMP(x, (B)S_drop(x)); }
 void S_ccompile(X* x) { CCOMP(x, S_drop(x)); }
-/* TODO: Compile quotation must check for end of quotation, not
-   use a length */
-void S_qcompile(X* x) { C l = S_drop(x); B* q = (B*)S_drop(x); strncpy(x->b + HERE(x), q, l); HERE(x) += l; }
-void S_scompile(X* x) { BCOMP(x, '['); S_qcompile(x); BCOMP(x, ']'); }
+/* test */
+void S_qcompile(X* x) { 
+  C l = 0, t = 1; 
+  B* q = (B*)S_drop(x);
+  while (t) {
+    if (q[l] == '[') t++;
+    if (q[l] == ']') t--;
+    l++;
+  }
+  strncpy(x->b + HERE(x), q, l - 1);
+  HERE(x) += l - 1; 
+}
+void S_scompile(X* x) { C l = S_drop(x); B* s = (B*)S_drop(x); BCOMP(x, '"'); strncpy(x->b + HERE(x), s, l); BCOMP(x, '"'); HERE(x) += l + 2; }
 
 void S_allot(X* x) { HERE(x) += S_drop(x); }
 
+#define VC(x, n) C n = S_drop(x)
+#define VB(x, n) B* n = (B*)S_drop(x)
+
+void S_parse_name(X* x) {
+  VC(x, i);
+  VB(x, s);
+  while (s[i] != 0 && isspace(s[i])) { i++; }
+  S_lit(x, (C)(s + i));
+  while (s[i] != 0 && !isspace(s[i])) { i++; }
+  S_lit(x, (C)(s + i - TS(x) - 1));
+}
+
+void S_find(X* x) {
+  VC(x, l);
+  VB(x, s);
+  B* w = (B*)LATEST(x);
+  while (w) {
+    if (NL(w) == l && !strncmp(NFA(w), s, l)) {
+      S_lit(x, (C)CFA(w));
+      return;
+    }
+    w = *((B**)w);
+  }
+  S_lit(x, (C)s);
+  S_lit(x, l);
+  S_lit(x, 0);
+}
+
+void S_create(X* x) {
+  VC(x, l);
+  VC(x, s);
+  B* w = x->b + HERE(x);
+	*((B**)w) = (B*)LATEST(x);
+	LATEST(x) = (C)w;
+	FLAGS(w) = 0;
+	NL(w) = l;
+	strncpy(NFA(w), s, l);
+	S_lit(x, (C)CFA(w));
+	HERE(x) += sizeof(B**) + 2 + l;  
+}
+
 void S_symbol(X* x) {
+  /*
+  S_lit(x, (C)(x->ip));
+  S_lit(x, 0);
+  S_parse_name(x);
+  S_find(x);
+  if (TS(x) == 0) {
+    S_drop(x);
+    S_create(x);
+  }
+  */
   C l = 0;
 	B* s = x->ip;
 	B* w = (B*)LATEST(x);
@@ -262,6 +324,8 @@ void S_inner(X* x) {
       S_parse_literal(x); break;
 		case '[': 
       S_parse_quotation(x); break;
+    case '"':
+      S_parse_string(x); break;
 		case 0: case ']': case '}':
       if (x->rp > frame && x->rp > 0) S_pop(x);
 			else return;
@@ -276,52 +340,85 @@ void S_inner(X* x) {
 		default:
 			switch (S_token(x)) {
       case '\'': S_lit(x, (C)S_token(x)); break;
-      /* TODO: # cell literal */
+      case '#': S_lit(x, *((C*)x->ip)); x->ip += sizeof(C); break;
+      case '\\': S_symbol(x); break;
+      /* Stack */
 			case 's': S_swap(x); break;
 			case 'd': S_dup(x); break;
 			case 'o': S_over(x); break;
-			case '@': S_rot(x); break;
+			case 'r': S_rot(x); break;
 			case '_': S_drop(x); break;
+      /* Arithmetics */
 			case '+': S_add(x); break;
 			case '-': S_sub(x); break;
 			case '*': S_mul(x); break;
 			case '/': S_div(x); break;
 			case '%': S_mod(x); break;
+      /* Bitwise */
 			case '&': S_and(x); break;
 			case '|': S_or(x); break;
 			case '^': S_xor(x); break;
 			case '!': S_not(x); break;
 			case '~': S_invert(x); break;
+      /* Comparison */
 			case '<': S_lt(x); break;
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
+      /* Execution */
       case ')': S_from_R(x); break;
       case '(': S_to_R(x); break;
-      case 'r': S_peek_R(x); break;
-			case '$': S_call(x); break;
+      case 'p': S_peek_R(x); break;
+			case '$': 
+        switch(S_peek(x)) {
+        case ']': case '}':
+          x->ip++;
+        case 0:
+          /*S_jump(x);*/ break;
+        default:
+          S_call(x); break;
+        }
+        break;
+      case 'z':
+        switch (S_peek(x)) {
+        case ']': case '}':
+          x->ip++;
+        case 0:
+          /*S_zjump(x);*/ break;
+        default:
+          /*S_zcall(x);*/ break;
+        }
+        break;
 			case '?': S_if(x); break;
-			case 'n': S_times(x); break;
-			case 'w': S_while(x); break;
+      /* Memory */
+      case 'm': S_malloc(x); break;
+      case 'f': S_free(x); break;
+      case 'c': S_lit(x, szC); break;
       case ':': S_bfetch(x); break;
       case ';': S_bstore(x); break;
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
-      case 'c': S_lit(x, szC); break;
-      case 'm': S_malloc(x); break;
-      case 'f': S_free(x); break;
       case 'i': S_inspect(x); break;
-      case 'p': S_compare(x); break;
+      /* Input/output */
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
-			case 'a': S_accept(x); break;
-			case 't': S_type(x); break;
-			case '\\': S_symbol(x); break;
-			case 'q': /* TODO: Just set error code? */ exit(0); break;
-      /* Dictionary */
+      /* Helpers */
+      case 'h':
+        switch (S_token(x)) {
+        case 'c': S_compare(x);
+			  case 'n': S_times(x); break;
+			  case 'w': S_while(x); break;
+			  case 'a': S_accept(x); break;
+			  case 't': S_type(x); break;
+        }
+        break;
+			case 'q': exit(0); break;
+      /* Block */
       case 'b':
         switch (S_token(x)) {
         case 'a': S_allot(x); break;
         case 'b': S_lit(x, (C)(x->b)); break;
+        case 'f': S_find(x); break;
+        case 'c': S_create(x); break;
         case ';': S_bcompile(x); break;
         case ',': S_ccompile(x); break;
         case 'h': S_lit(x, (C)(x->b + HERE(x))); break;

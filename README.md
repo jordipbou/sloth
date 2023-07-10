@@ -19,63 +19,69 @@ Features:
  
 ## Bytecode
 
-    // Literals
-    ' BYTE/CHAR LITERAL
-    # CELL LITERAL
-    0-9 NUMBER LITERAL
-    [] QUOTATION LITERAL
-    "" STRING LITERAL
-    // Arithmetic
-    + ADD
-    - SUB
-    * MUL
-    / DIV
-		% MOD
-    // Comparison
-    < LT
-    = EQ
-    > GT
-    // Logical
-    & AND
-    | OR
-    ! NOT
-    // Stack
-    s SWAP
-    d DUP
-    o OVER
-    @ ROT
-    _ DROP
-    // Execution
-    ] RETURN (POP FROM R TO IP)
-    $ CALL (PUSH FROM IP TO R AND SET IP TO S)
-    $] JUMP (SET IP TO S)
-    ? IF (ZCALL?)
-    ?] IF (ZJUMP?)
-    n TIMES (LOOP)
-		w WHILE (LOOP)
-		q EXIT
-    // Memory
-    : BFETCH
-    ; BSTORE
-    . CFETCH
-    , CSTORE
-    c CELL SIZE IN BYTES
-    m MALLOC
-    f FREE
-    b BLOCK VARIABLE (DICTIONARY)
-    i INSPECT MEMORY (DUMP)
-    p COMPARE STRINGS
-		// Input/Output
-		k KEY
-		e EMIT
-		a ACCEPT
-		t TYPE
-    // Additional stacks/variables
-    rwxyz( PUSH TO NAMED STACK 
-    rwxyz) POP FROM NAMED STACK
-    wxyz+ INCREMENT TOP OF NAMED STACK
-    wxyz- DECREMENT TOP OF NAMED STACK
-    wxyz_ DROP FROM NAMED STACK
-    wxyz. FETCH FROM TOP OF NAMED STACK
-    wxyz, STORE ON TOP OF NAMED STACK
-    // A-Z C extensions
+    ' -> byte literal
+    "" -> string literal
+    [] -> quotation literal
+    \ -> symbol literal
+    0-9 -> number literal
+    # -> cell literal
+    
+    + -> addition
+    - -> substraction
+    * -> multiplication
+    / -> division
+    % -> modulo
+    
+    ba -> alloc
+    bb -> block base
+    bh -> here
+    b; -> compile byte
+    b, -> compile cell
+    bq -> compile quotation
+    bs -> compile string
+    bl -> block latest
+    bf -> find
+    bc -> create
+    
+    < -> less than
+    = -> equal
+    > -> greater than
+    
+    $ -> call, jump $] or $} or $<0>
+    ] -> return, also } and <0>
+    ? -> call if zero
+    t -> to r
+    f -> from r
+    p -> peek r
+    z -> call if zero, jump z] or z$ or z<0>
+    
+    & -> and
+    | -> or
+    ! -> not
+    ~ -> invert
+
+    k -> key
+    e -> emit
+    
+    m -> malloc
+    f -> free
+    c -> cell size
+    ; -> store byte
+    : -> fetch byte
+    , -> store byte
+    . -> fetch byte
+    i -> inspect
+
+    hc -> string comparison
+    hd -> dip
+    hb -> binary recursion
+    hl -> linear recursion
+    hs -> sip
+    ht -> times
+    hw -> while
+    
+    s -> swap
+    d -> dup
+    o -> over
+    r -> rot
+    _ -> drop
