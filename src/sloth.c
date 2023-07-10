@@ -1,6 +1,5 @@
 #include<stdio.h>
 #include "sloth.h"
-#include "forth.h"
 
 #ifdef _WIN32
   #include <conio.h>
@@ -39,19 +38,13 @@ void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
 B* bootForth =
-"4096mb,"
-"cc+b.," /* 0: HERE, c: LATEST */
-"[b.b..+;1b..+b.,]" /* C, : v0 */
-"[b.b..+,cb..+b.,]" /* ,  : v1 */
-"[b.b..+ cb.+. v1$ cb.+, 0v0$ dv0$ [d:v0$1+]n_ [d:v0$1+]n_]" /* ADD_PRIMITIVE : v2 */
-"[c+1+1+]" /* NFA : v3 */
-"[dc+1+:c+1+1++]" /* CFA : v4 */
-"[  z(y(cb.+.[d0=[y)z)@0][dv3$d1-:y.z.p0=!]?][.]w]" /* FIND: v5 */
-"49\"FIND\"v2$" /* FIND is now in 4c*b.+ address */
-"[_]2\"DROP\"v2$"
-"[s]2\"SWAP\"v2$"
-"[o]2\"OVER\"v2$"
-"[@]2\"ROT\"v2$";
+"\\in 0b,_"
+"\\tib _255ba_"
+"\\refill _[\\tib 255ha0\\in ,1]bq']b;"
+"\\dup _'db;']b;"
+"\\+ _'+b;']b;"
+"\\parse-name _[\\tib \\in .bp\\in ,]bq']b;"
+"\\interpret _[\\parse-name $[d0=!][bf$\\parse-name $]hw]bq']b;";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -82,9 +75,7 @@ int main(int argc, char** argv) {
   FORTH_quit(x);
    */ 
 
-  /*
   S_eval(x, bootForth);
-  */
   
 	if (argc == 1 || argc == 3) {
 		do {

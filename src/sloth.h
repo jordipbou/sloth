@@ -132,11 +132,12 @@ void S_peek_R(X* x) { x->s[x->sp++] = (C)x->r[x->rp - 1]; }
 
 void S_push(X* x) { x->r[x->rp++] = x->ip; }
 void S_pop(X* x) { x->ip = x->r[--x->rp]; }
-void S_call(X* x) { B t = S_peek(x); if (t && t != ']') S_push(x); x->ip = (B*)S_drop(x); }
+void S_call(X* x) { B t = S_peek(x); if (t && t != ']' && t != '}') S_push(x); x->ip = (B*)S_drop(x); }
 void S_eval(X* x, B* q) { S_lit(x, (C)q); S_call(x); S_inner(x); }
 void S_if(X* x) { S_rot(x); if (!S_drop(x)) { S_swap(x); } S_drop(x); S_call(x); }
 void S_times(X* x) { B* q = (B*)S_drop(x); C n = S_drop(x); while (n-- > 0) { S_eval(x, q); } }
-void S_while(X* x) { B* q = (B*)S_drop(x); B* c = (B*)S_drop(x); do { S_eval(x, c); if (!S_drop(x)) break; S_eval(x, q); } while(1); }
+/* TODO: It seems while is not returning after eval to correct ip on several cases */
+void S_while(X* x) { VB(x, q); VB(x, c); do { S_eval(x, c); if (!S_drop(x)) break; S_eval(x, q); } while(1); }
 
 void S_bstore(X* x) { B* a = (B*)S_drop(x); *a = (B)S_drop(x); }
 void S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
@@ -250,7 +251,8 @@ void S_parse_name(X* x) {
   while (s[i] != 0 && isspace(s[i])) { i++; }
   S_lit(x, (C)(s + i));
   while (s[i] != 0 && !isspace(s[i])) { i++; }
-  S_lit(x, (C)(s + i - TS(x) - 1));
+  S_lit(x, (C)(s + i - TS(x)));
+	S_lit(x, i);
 }
 
 void S_find(X* x) {
@@ -270,16 +272,15 @@ void S_find(X* x) {
 }
 
 void S_create(X* x) {
-  VC(x, l);
-  VC(x, s);
+  VS(x, 1);
   B* w = x->b + HERE(x);
 	*((B**)w) = (B*)LATEST(x);
 	LATEST(x) = (C)w;
 	FLAGS(w) = 0;
-	NL(w) = l;
-	strncpy(NFA(w), s, l);
+	NL(w) = l1;
+	strncpy(NFA(w), s1, l1);
 	S_lit(x, (C)CFA(w));
-	HERE(x) += sizeof(B**) + 2 + l;  
+	HERE(x) += sizeof(B**) + 2 + l1;  
 }
 
 void S_symbol(X* x) {
@@ -374,9 +375,10 @@ void S_inner(X* x) {
 			case '$': 
         switch(S_peek(x)) {
         case ']': case '}':
+					/* TODO: This is not correct! a return must be made if necessary !!!! */
           x->ip++;
         case 0:
-          /*S_jump(x);*/ break;
+          /*S_jump(x);*/ S_call(x); break;
         default:
           S_call(x); break;
         }
