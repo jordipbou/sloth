@@ -8,25 +8,8 @@
 typedef char B;
 typedef intptr_t C;
 
-#define szC sizeof(C)
-
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
-
-#define BLOCK_SIZE 65536
-
-#define HERE(x) (((C*)x->b)[0])
-#define LATEST(x) (((C*)x->b)[1])
-
-/* TODO: Use mask for flags/length? */
-#define FLAGS(s) (*(s + szC))
-#define NL(s) (*(s + szC + 1))
-#define NFA(s) (s + szC + 1 + 1)
-#define CFA(s) (NFA(s) + NL(s))
-
-#define VC(x, n) C n = S_drop(x)
-#define VB(x, n) B* n = (B*)S_drop(x)
-#define VS(x, n) VC(x, l##n); VB(x, s##n)
 
 typedef struct _X { 
   C* s; C sp; C ss;
@@ -44,14 +27,12 @@ typedef struct _X {
 
 X* S_init() {
 	X* x = malloc(sizeof(X));
-  x->s = malloc(STACK_SIZE*szC);
-  x->r = malloc(RSTACK_SIZE*szC);
-	x->b = malloc(BLOCK_SIZE);
-	HERE(x) = 2*szC;
+  x->s = malloc(STACK_SIZE*sizeof(C));
+  x->r = malloc(RSTACK_SIZE*sizeof(C));
 	x->sp = x->rp = 0;
   x->ss = STACK_SIZE;
   x->rs = RSTACK_SIZE;
-  x->ext = malloc(26*szC);
+  x->ext = malloc(26*sizeof(C));
   x->err = 0;
   x->tr = 0;
 	return x;
@@ -95,7 +76,7 @@ C S_dump_X(B* s, X* x, unsigned int w) {
 
 void S_inner(X* x);
 
-B S_peek(X* x) { return x->ip == 0 || *x->ip == 0 ? 0 : *x->ip; }
+B S_peek(X* x) { return x->ip == 0 ? 0 : *x->ip; }
 B S_token(X* x) { B tk = S_peek(x); x->ip++; return tk; }
 C S_is_digit(B c) { return c >= '0' && c <= '9'; }
 
@@ -135,7 +116,6 @@ void S_pop(X* x) { x->ip = x->r[--x->rp]; }
 void S_call(X* x) { B t = S_peek(x); if (t && t != ']' && t != '}') S_push(x); x->ip = (B*)S_drop(x); }
 void S_eval(X* x, B* q) { S_lit(x, (C)q); S_call(x); S_inner(x); }
 
-
 void S_bstore(X* x) { B* a = (B*)S_drop(x); *a = (B)S_drop(x); }
 void S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
 
@@ -144,6 +124,7 @@ void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 
 void S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 void S_free(X* x) { free((void*)S_drop(x)); }
+
 void S_inspect(X* x) {
   /* TODO: Show ASCII representation */
   /* TODO: Use vectored I/O */
@@ -166,11 +147,18 @@ void S_inspect(X* x) {
   printf("\n");
 }
 
-void S_compare(X* x) { VS(x, 1); VS(x, 2); S_lit(x, l2 == l1 && !strncmp(s2, s1, l2)); }
+void S_compare(X* x) { 
+  C l1 = S_drop(x);
+  B* s1 = (B*)S_drop(x);
+  C l2 = S_drop(x);
+  B* s2 = (B*)S_drop(x);
+  S_lit(x, l2 == l1 && !strncmp(s2, s1, l2)); 
+}
 
 void S_accept(X* x) { 
 	C i = 0;
-  VS(x, 1);
+  C l1 = S_drop(x);
+  B* s1 = (B*)S_drop(x);
 	do { 
 		x->key(x); 
 		if (TS(x) == 10) {
@@ -221,97 +209,6 @@ void S_parse_string(X* x) {
   S_lit(x, (C)(x->ip - TS(x)) - 1);
 }
 
-#define BCOMP(x, v) *(x->b + HERE(x)) = v; HERE(x)++
-#define CCOMP(x, v) *((C*)(x->b + HERE(x))) = v; HERE(x) += szC
-
-void S_bcompile(X* x) { BCOMP(x, (B)S_drop(x)); }
-void S_ccompile(X* x) { CCOMP(x, S_drop(x)); }
-/* test */
-void S_qcompile(X* x) { 
-  C l = 0, t = 1; 
-  B* q = (B*)S_drop(x);
-  while (t) {
-    if (q[l] == '[') t++;
-    if (q[l] == ']') t--;
-    l++;
-  }
-  strncpy(x->b + HERE(x), q, l - 1);
-  HERE(x) += l - 1; 
-}
-void S_scompile(X* x) { C l = S_drop(x); B* s = (B*)S_drop(x); BCOMP(x, '"'); strncpy(x->b + HERE(x), s, l); BCOMP(x, '"'); HERE(x) += l + 2; }
-
-void S_allot(X* x) { HERE(x) += S_drop(x); }
-
-void S_parse_name(X* x) {
-  VC(x, i);
-  VB(x, s);
-  while (s[i] != 0 && isspace(s[i])) { i++; }
-  S_lit(x, (C)(s + i));
-  while (s[i] != 0 && !isspace(s[i])) { i++; }
-  S_lit(x, (C)(s + i - TS(x)));
-	S_lit(x, i);
-}
-
-void S_find(X* x) {
-  VC(x, l);
-  VB(x, s);
-  B* w = (B*)LATEST(x);
-  while (w) {
-    if (NL(w) == l && !strncmp(NFA(w), s, l)) {
-      S_lit(x, (C)CFA(w));
-      return;
-    }
-    w = *((B**)w);
-  }
-  S_lit(x, (C)s);
-  S_lit(x, l);
-  S_lit(x, 0);
-}
-
-void S_create(X* x) {
-  VS(x, 1);
-  B* w = x->b + HERE(x);
-	*((B**)w) = (B*)LATEST(x);
-	LATEST(x) = (C)w;
-	FLAGS(w) = 0;
-	NL(w) = l1;
-	strncpy(NFA(w), s1, l1);
-	S_lit(x, (C)CFA(w));
-	HERE(x) += sizeof(B**) + 2 + l1;  
-}
-
-void S_symbol(X* x) {
-  /*
-  S_lit(x, (C)(x->ip));
-  S_lit(x, 0);
-  S_parse_name(x);
-  S_find(x);
-  if (TS(x) == 0) {
-    S_drop(x);
-    S_create(x);
-  }
-  */
-  C l = 0;
-	B* s = x->ip;
-	B* w = (B*)LATEST(x);
-	while (!isspace(S_token(x))) { l++; }
-	while (w) {
-		if (NL(w) == l && !strncmp(NFA(w), s, l)) {
-			S_lit(x, (C)CFA(w));
-			return;
-		}
-		w = *((B**)w);
-	}
-  w = x->b + HERE(x);
-	*((B**)w) = (B*)LATEST(x);
-	LATEST(x) = (C)w;
-	FLAGS(w) = 0;
-	NL(w) = l;
-	strncpy(NFA(w), s, l);
-	S_lit(x, (C)CFA(w));
-	HERE(x) += sizeof(B**) + 2 + l;
-}
-
 void S_inner(X* x) {
 	B buf[255];
 	C frame = x->rp;
@@ -342,7 +239,6 @@ void S_inner(X* x) {
 			switch (S_token(x)) {
       case '\'': S_lit(x, (C)S_token(x)); break;
       case '#': S_lit(x, *((C*)x->ip)); x->ip += sizeof(C); break;
-      case '\\': S_symbol(x); break;
       /* Stack */
 			case 's': S_swap(x); break;
 			case 'd': S_dup(x); break;
@@ -369,64 +265,29 @@ void S_inner(X* x) {
       case ')': S_from_R(x); break;
       case '(': S_to_R(x); break;
       case 'p': S_peek_R(x); break;
-			case '$': 
-        switch(S_peek(x)) {
-        case ']': case '}':
-					/* TODO: This is not correct! a return must be made if necessary !!!! */
-          x->ip++;
-        case 0:
-          /*S_jump(x);*/ S_call(x); break;
-        default:
-          S_call(x); break;
-        }
-        break;
-      case '?':
-        switch (S_peek(x)) {
-        case ']': case '}':
-          x->ip++;
-        case 0:
-          /*S_zjump(x);*/ break;
-        default:
-          /*S_zcall(x);*/ break;
-        }
-        break;
+			case '$': S_call(x); break;
+      case '?': /*S_zcall(x);*/ break;
       case 'q': exit(0); break;
       /* Memory */
       case 'm': S_malloc(x); break;
       case 'f': S_free(x); break;
-      case 'c': S_lit(x, szC); break;
+      case 'c': S_lit(x, sizeof(C)); break;
       case ':': S_bfetch(x); break;
       case ';': S_bstore(x); break;
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
       case 'i': S_inspect(x); break;
+      case 'b': S_lit(x, (C)(&x->b)); break;
       /* Input/output */
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
-      /* Helpers */
-      case 'h':
-        switch (S_token(x)) {
-        case 'c': S_compare(x); break;
-			  case 'a': S_accept(x); break;
-			  case 't': S_type(x); break;
-        /*case '.': S_repr(x); break;*/
-        }
-        break;
-      /* Block */
-      case 'b':
-        switch (S_token(x)) {
-        case 'a': S_allot(x); break;
-        case 'b': S_lit(x, (C)(x->b)); break;
-        case 'f': S_find(x); break;
-        case 'p': S_parse_name(x); break;
-        case 'c': S_create(x); break;
-        case ';': S_bcompile(x); break;
-        case ',': S_ccompile(x); break;
-        case 'h': S_lit(x, (C)(x->b + HERE(x))); break;
-        case 'q': S_qcompile(x); break;
-        case 's': S_scompile(x); break;
-        }
-			}
+      /* Strings extension? */
+        /*
+      case 'c': S_compare(x); break;
+			case 'a': S_accept(x); break;
+			case 't': S_type(x); break;
+        */
+      }
     }
 	} while(1);
 }

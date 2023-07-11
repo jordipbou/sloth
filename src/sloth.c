@@ -1,6 +1,7 @@
 #include<stdio.h>
 #include "sloth.h"
 #include "combinators.h"
+#include "dictionary.h"
 
 #ifdef _WIN32
   #include <conio.h>
@@ -56,6 +57,7 @@ int main(int argc, char** argv) {
 	
   x->key = &key;
   x->emit = &emit;
+  EXT(x, 'D') = &SD_ext;
   EXT(x, 'Q') = &SC_ext;
   /*EXT(x, 'F') = &FORTH_extension;*/
 
@@ -71,11 +73,6 @@ int main(int argc, char** argv) {
 		}
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
-
-  /*
-  FORTH_init(x);
-  FORTH_quit(x);
-   */ 
 
   /*
   S_eval(x, bootForth);
