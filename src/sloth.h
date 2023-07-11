@@ -134,10 +134,7 @@ void S_push(X* x) { x->r[x->rp++] = x->ip; }
 void S_pop(X* x) { x->ip = x->r[--x->rp]; }
 void S_call(X* x) { B t = S_peek(x); if (t && t != ']' && t != '}') S_push(x); x->ip = (B*)S_drop(x); }
 void S_eval(X* x, B* q) { S_lit(x, (C)q); S_call(x); S_inner(x); }
-void S_if(X* x) { S_rot(x); if (!S_drop(x)) { S_swap(x); } S_drop(x); S_call(x); }
-void S_times(X* x) { B* q = (B*)S_drop(x); C n = S_drop(x); while (n-- > 0) { S_eval(x, q); } }
-/* TODO: It seems while is not returning after eval to correct ip on several cases */
-void S_while(X* x) { VB(x, q); VB(x, c); do { S_eval(x, c); if (!S_drop(x)) break; S_eval(x, q); } while(1); }
+
 
 void S_bstore(X* x) { B* a = (B*)S_drop(x); *a = (B)S_drop(x); }
 void S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
@@ -410,16 +407,9 @@ void S_inner(X* x) {
       case 'h':
         switch (S_token(x)) {
         case 'c': S_compare(x); break;
-			  case 'n': S_times(x); break;
-        /*case 'd': S_dip(x); break;*/
-        /*case 's': S_sip(x); break;*/
-        /*case 'b': S_binrec(x); break;*/
-        /*case 'l': S_linrec(x); break;*/
-			  case 'w': S_while(x); break;
 			  case 'a': S_accept(x); break;
 			  case 't': S_type(x); break;
         /*case '.': S_repr(x); break;*/
-        case '?': S_if(x); break;
         }
         break;
       /* Block */

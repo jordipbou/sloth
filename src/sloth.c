@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include "sloth.h"
+#include "combinators.h"
 
 #ifdef _WIN32
   #include <conio.h>
@@ -55,6 +56,7 @@ int main(int argc, char** argv) {
 	
   x->key = &key;
   x->emit = &emit;
+  EXT(x, 'Q') = &SC_ext;
   /*EXT(x, 'F') = &FORTH_extension;*/
 
 	if (argc == 2 || argc == 3) {
@@ -75,7 +77,9 @@ int main(int argc, char** argv) {
   FORTH_quit(x);
    */ 
 
+  /*
   S_eval(x, bootForth);
+  */
   
 	if (argc == 1 || argc == 3) {
 		do {
