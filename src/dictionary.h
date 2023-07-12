@@ -28,18 +28,19 @@ void SD_create(X* x) {
 	SD_HERE(x) += sizeof(B**) + 2 + l1; 
 }
 
-#define BCOMP(x, v) *(x->b + SD_HERE(x)) = v; SD_HERE(x)++
-#define CCOMP(x, v) *((C*)(x->b + SD_HERE(x))) = v; SD_HERE(x) += sizeof(C)
-
 void SD_bcompile(X* x) { 
-  BCOMP(x, (B)S_drop(x)); 
+  B v = (B)S_drop(x);
+  *(x->b + SD_HERE(x)) = v;
+  SD_HERE(x)++;
 }
 
-void SD_ccompile(X* x) { 
-  CCOMP(x, S_drop(x)); 
+void SD_ccompile(X* x) {
+  C v = S_drop(x);
+  *((C*)(x->b + SD_HERE(x))) = v;
+  SD_HERE(x) += sizeof(C);
 }
 
-void SD_qcompile(X* x) { 
+void SD_qcompile(X* x, C e) { 
   C l = 0, t = 1; 
   B* q = (B*)S_drop(x);
   while (t) {
@@ -47,13 +48,22 @@ void SD_qcompile(X* x) {
     if (q[l] == ']') t--;
     l++;
   }
-  strncpy(x->b + SD_HERE(x), q, l - 1);
-  SD_HERE(x) += l - 1; 
+  strncpy(x->b + SD_HERE(x), q, l + e);
+  SD_HERE(x) += l + e; 
 }
 
-void SD_scompile(X* x) { C l = S_drop(x); B* s = (B*)S_drop(x); BCOMP(x, '"'); strncpy(x->b + SD_HERE(x), s, l); BCOMP(x, '"'); SD_HERE(x) += l + 2; }
+void SD_scompile(X* x) { 
+  C l = S_drop(x); 
+  B* s = (B*)S_drop(x); 
+  *(x->b + SD_HERE(x)) = '"';
+  strncpy(x->b + SD_HERE(x) + 1, s, l);
+  *(x->b + SD_HERE(x) + 1 + l) = '"';
+  SD_HERE(x) += l + 2;
+}
 
-void S_allot(X* x) { SD_HERE(x) += S_drop(x); }
+void S_allot(X* x) { 
+  SD_HERE(x) += S_drop(x); 
+}
 
 void SD_parse_name(X* x) {
   C i = S_drop(x);
@@ -87,7 +97,6 @@ void SD_find(X* x) {
   S_lit(x, l);
   S_lit(x, 0);
 }
-
 
 void SD_symbol(X* x) {
   /*
@@ -129,8 +138,10 @@ void SD_ext(X* x) {
     case 'f': SD_find(x); break;
     case 'i': SD_init(x); break;
     case ';': SD_bcompile(x); break;
-    case ':': SD_ccompile(x); break;
-    case 'q': SD_qcompile(x); break;
+    case ',': SD_ccompile(x); break;
+    case 'p': SD_parse_name(x); break;
+    case 'q': SD_qcompile(x, -1); break;
+    case 'Q': SD_qcompile(x, 0); break;
     case 's': SD_scompile(x); break;
   }
 }

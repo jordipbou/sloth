@@ -41,13 +41,14 @@ void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
 B* bootForth =
-"\"in\"Dc_0b,_"
-"\"tib\"Dc_255ba_"
-"\"refill\"Dc_[\"tib\"Df255a0\"in\",1]bq']b;"
-"\\dup _'db;']b;"
-"\\+ _'+b;']b;"
-"\\parse-name _[\\tib \\in .bp\\in ,]bq']b;"
-"\\interpret _[\\parse-name $[d0=!][bf$\\parse-name $]hw]bq']b;";
+"Di"
+"\"in\"Dc_0D,"
+"\"tib\"Dc_255Da"
+"\"refill\"Dc_[0\"in\"Df,[\"tib\"Df255]dx0SfxSa]DQ"
+"\"dup\"Dc_[d]DQ"
+"\"+\"Dc_[+]DQ"
+"\"parse-name\"Dc_[\"tib\"Df\"in\"Df.Dp\"in\"Dfd.r+s,]DQ"
+"\"interpret\"Dc_[\"parse-name\"Dfx[d0=!][Dfx\"parse-name\"Dfx]Qw__]DQ";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -75,9 +76,7 @@ int main(int argc, char** argv) {
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
 
-  /*
   S_eval(x, bootForth);
-  */
   
 	if (argc == 1 || argc == 3) {
 		do {

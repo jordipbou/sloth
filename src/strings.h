@@ -39,6 +39,13 @@ void SS_compare(X* x) {
   S_lit(x, l2 == l1 && !strncmp(s2, s1, l2)); 
 }
 
+void SS_fill(X* x) {
+  B c = (B)S_drop(x);
+  C n = S_drop(x);
+  B* s = (B*)S_drop(x);
+  memset(s, c, n);
+}
+
 void SS_type(X* x) {
 	C i = 0;
 	C n = S_drop(x);
@@ -50,6 +57,7 @@ void SS_ext(X* x) {
   switch(S_token(x)) {
     case 'a': SS_accept(x); break;
     case 'c': SS_compare(x); break;
+    case 'f': SS_fill(x); break;
     case 't': SS_type(x); break;
   }
 }

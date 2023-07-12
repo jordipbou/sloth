@@ -222,18 +222,18 @@ void S_inner(X* x) {
       case ')': S_from_R(x); break;
       case '(': S_to_R(x); break;
       case 'p': S_peek_R(x); break;
-			case '$': S_call(x); break;
+			case 'x': S_call(x); break;
       case '?': /*S_zcall(x);*/ break;
       case 'q': exit(0); break;
       /* Memory */
       case 'm': S_malloc(x); break;
       case 'f': S_free(x); break;
       case 'c': S_lit(x, sizeof(C)); break;
+      case 'i': S_inspect(x); break;
       case ':': S_bfetch(x); break;
       case ';': S_bstore(x); break;
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
-      case 'i': S_inspect(x); break;
       case 'b': S_lit(x, (C)(&x->b)); break;
       /* Input/output */
 			case 'k': x->key(x); break;
