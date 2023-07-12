@@ -147,49 +147,6 @@ void S_inspect(X* x) {
   printf("\n");
 }
 
-void S_compare(X* x) { 
-  C l1 = S_drop(x);
-  B* s1 = (B*)S_drop(x);
-  C l2 = S_drop(x);
-  B* s2 = (B*)S_drop(x);
-  S_lit(x, l2 == l1 && !strncmp(s2, s1, l2)); 
-}
-
-void S_accept(X* x) { 
-	C i = 0;
-  C l1 = S_drop(x);
-  B* s1 = (B*)S_drop(x);
-	do { 
-		x->key(x); 
-		if (TS(x) == 10) {
-			S_drop(x);
-			break;
-		} else if (TS(x) == 127) {
-      S_drop(x);
-      if (i > 0) {
-        S_lit(x, '\b');
-        x->emit(x);
-        S_lit(x, ' ');
-        x->emit(x);
-        S_lit(x, '\b');
-        x->emit(x);
-        i--;
-      }
-    } else {
-			s1[i++] = TS(x);
-			x->emit(x);
-		}
-	} while(i < l1);
-	S_lit(x, i);
-}
-
-void S_type(X* x) {
-	C i = 0;
-	C n = S_drop(x);
-	B* s = (B*)S_drop(x);
-	while (n-- > 0) { S_lit(x, s[i++]); x->emit(x); }
-}
-
 void S_parse_literal(X* x) { 
 	C n = 0; 
 	while (S_is_digit(S_peek(x))) { n = 10*n + (S_token(x) - '0'); } 
@@ -281,12 +238,6 @@ void S_inner(X* x) {
       /* Input/output */
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
-      /* Strings extension? */
-        /*
-      case 'c': S_compare(x); break;
-			case 'a': S_accept(x); break;
-			case 't': S_type(x); break;
-        */
       }
     }
 	} while(1);

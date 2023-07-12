@@ -2,6 +2,7 @@
 #include "sloth.h"
 #include "combinators.h"
 #include "dictionary.h"
+#include "strings.h"
 
 #ifdef _WIN32
   #include <conio.h>
@@ -40,9 +41,9 @@ void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
 B* bootForth =
-"\\in 0b,_"
-"\\tib _255ba_"
-"\\refill _[\\tib 255ha0\\in ,1]bq']b;"
+"\"in\"Dc_0b,_"
+"\"tib\"Dc_255ba_"
+"\"refill\"Dc_[\"tib\"Df255a0\"in\",1]bq']b;"
 "\\dup _'db;']b;"
 "\\+ _'+b;']b;"
 "\\parse-name _[\\tib \\in .bp\\in ,]bq']b;"
@@ -59,7 +60,7 @@ int main(int argc, char** argv) {
   x->emit = &emit;
   EXT(x, 'D') = &SD_ext;
   EXT(x, 'Q') = &SC_ext;
-  /*EXT(x, 'F') = &FORTH_extension;*/
+  EXT(x, 'S') = &SS_ext;
 
 	if (argc == 2 || argc == 3) {
 		fptr = fopen(argv[1], "r");
