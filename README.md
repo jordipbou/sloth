@@ -22,7 +22,6 @@ Features:
     ' -> byte literal
     "" -> string literal
     [] -> quotation literal
-    \ -> symbol literal
     0-9 -> number literal
     # -> cell literal
     
@@ -31,17 +30,6 @@ Features:
     * -> multiplication
     / -> division
     % -> modulo
-    
-    ba -> alloc
-    bb -> block base
-    bh -> here
-    b; -> compile byte
-    b, -> compile cell
-    bq -> compile quotation
-    bs -> compile string
-    bl -> block latest
-    bf -> find
-    bc -> create
     
     < -> less than
     = -> equal
@@ -70,21 +58,48 @@ Features:
     , -> store byte
     . -> fetch byte
     i -> inspect
-
-    ha -> accept
-    ht -> type
-    h. -> display number
-    hc -> string comparison
-    hd -> dip
-    hb -> binary recursion
-    hl -> linear recursion
-    hs -> sip
-    hn -> times
-    hw -> while
-    h? -> ifthen
     
     s -> swap
     d -> dup
     o -> over
     r -> rot
     _ -> drop
+
+## Extensions
+
+### Combinators
+
+    ? -> branch
+    1b -> 1bi
+    2b -> 2bi
+    3b -> 3bi
+    1t -> 1tri
+    2t -> 2tri
+    3t -> 3tri
+    b -> binrec
+    d -> dip
+    i -> ifte
+    l -> linrec
+    s -> sip
+    t -> times
+    u -> until
+    w -> while
+
+### Dictionary
+
+    a -> allot
+    h -> here
+    c -> create
+    f -> find
+    i -> init
+    ; -> compile byte
+    , -> compile cell
+    q -> compile quotation
+    Q -> compile quotation and return
+    s -> compile string
+
+### Strings
+
+    a -> accept
+    c -> compare
+    t -> type

@@ -41,14 +41,21 @@ void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
 B* bootForth =
-"Di"
+"Db"
+"\"state\"Dc_0D,"
 "\"in\"Dc_0D,"
 "\"tib\"Dc_255Da"
 "\"refill\"Dc_[0\"in\"Df,[\"tib\"Df255]dx0SfxSa]DQ"
 "\"dup\"Dc_[d]DQ"
 "\"+\"Dc_[+]DQ"
 "\"parse-name\"Dc_[\"tib\"Df\"in\"Df.Dp\"in\"Dfd.r+s,]DQ"
-"\"interpret\"Dc_[\"parse-name\"Dfx[d0=!][Dfx\"parse-name\"Dfx]Qw__]DQ";
+/* "\"]\"Dc_[1\"state\"Df,]DQ" */
+/* "\"[\"Dc_[0\"state\"Df,]DQDi" */
+/* "\":\"Dc_[\"parse-name\"DfxDc\"]\"Dfx]DQ" */
+/* Reveal has to be called on ; */
+/* "\";\"Dc_[\"[\"Dfx']D;]DQ" */
+/* Immediate words! */
+"\"interpret\"Dc_[\"parse-name\"Dfx[d0=!][\"state\"Df.[Dq][Dfx]Q?\"parse-name\"Dfx]Qw__]DQ";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -76,7 +83,9 @@ int main(int argc, char** argv) {
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
 
+  /*
   S_eval(x, bootForth);
+  */
   
 	if (argc == 1 || argc == 3) {
 		do {

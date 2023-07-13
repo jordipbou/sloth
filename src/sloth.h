@@ -223,7 +223,7 @@ void S_inner(X* x) {
       case '(': S_to_R(x); break;
       case 'p': S_peek_R(x); break;
 			case 'x': S_call(x); break;
-      case '?': /*S_zcall(x);*/ break;
+      case '?': /* S_zcall(x); */ break;
       case 'q': exit(0); break;
       /* Memory */
       case 'm': S_malloc(x); break;

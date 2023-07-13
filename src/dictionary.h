@@ -9,11 +9,20 @@
 #define SD_HERE(x) (((C*)x->b)[1])
 #define SD_LATEST(x) (((C*)x->b)[2])
 
+#define SD_IMMEDIATE 1
+
 /* TODO: Use mask for flags/length? */
-#define SD_FLAGS(s) (*(s + sizeof(C)))
-#define SD_NL(s) (*(s + sizeof(C) + 1))
+#define SD_FLAGS(s) (*((C*)(s + sizeof(C))))
+#define SD_NL(s) (*((C*)(s + sizeof(C) + 1)))
 #define SD_NFA(s) (s + sizeof(C) + 1 + 1)
 #define SD_CFA(s) (SD_NFA(s) + SD_NL(s))
+
+void SD_bootstrap(X* x) {
+  x->b = malloc(SD_DICT_SIZE);
+  SD_BLOCK_SIZE(x) = SD_DICT_SIZE;
+  SD_HERE(x) = 3*sizeof(C);
+  SD_LATEST(x) = 0;
+}
 
 void SD_create(X* x) {
   C l1 = S_drop(x);
@@ -75,11 +84,13 @@ void SD_parse_name(X* x) {
 	S_lit(x, i);
 }
 
-void SD_init(X* x) {
-  x->b = malloc(SD_DICT_SIZE);
-  SD_BLOCK_SIZE(x) = SD_DICT_SIZE;
-  SD_HERE(x) = 3*sizeof(C);
-  SD_LATEST(x) = 0;
+void SD_set_immediate(X* x) {
+  SD_FLAGS(SD_LATEST(x)) |= SD_IMMEDIATE;
+}
+
+void SD_is_immediate(X* x) {
+  B* w = (B*)S_drop(x);
+  S_lit(x, (C)(SD_FLAGS(w) & SD_IMMEDIATE));
 }
 
 void SD_find(X* x) {
@@ -133,10 +144,12 @@ void SD_symbol(X* x) {
 void SD_ext(X* x) {
   switch (S_token(x)) {
     case 'a': SD_HERE(x) += S_drop(x); break;
+    case 'b': SD_bootstrap(x); break;
     case 'h': S_lit(x, (C)(x->b + SD_HERE(x))); break;
     case 'c': SD_create(x); break;
     case 'f': SD_find(x); break;
-    case 'i': SD_init(x); break;
+    case 'i': SD_set_immediate(x); break;
+    case 'I': SD_is_immediate(x); break;
     case ';': SD_bcompile(x); break;
     case ',': SD_ccompile(x); break;
     case 'p': SD_parse_name(x); break;
