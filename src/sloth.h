@@ -15,7 +15,7 @@ typedef struct _X {
   C* s; C sp; C ss;
   B** r; C rp; C rs;
 	B* ip;
-  B* b;
+  B* v;
 	void (*key)(struct _X*);
 	void (*emit)(struct _X*);
   void (**ext)(struct _X*);
@@ -25,6 +25,17 @@ typedef struct _X {
 
 #define EXT(x, l) (x->ext[l - 'A'])
 
+#define S_DICT_SIZE 65536
+
+#define S_BLOCK_SIZE(x) (((C*)x->v)[0])
+#define S_HERE(x) (((C*)x->v)[1])
+#define S_LATEST(x) (((C*)x->v)[2])
+
+#define S_FLAGS(s) (*((B*)(s + sizeof(C))))
+#define S_NL(s) (*((B*)(s + sizeof(C) + 1)))
+#define S_NFA(s) (s + sizeof(C) + 1 + 1)
+#define S_CFA(s) (S_NFA(s) + S_NL(s))
+  
 X* S_init() {
 	X* x = malloc(sizeof(X));
   x->s = malloc(STACK_SIZE*sizeof(C));
@@ -33,6 +44,8 @@ X* S_init() {
   x->ss = STACK_SIZE;
   x->rs = RSTACK_SIZE;
   x->ext = malloc(26*sizeof(C));
+  x->ip = 0;
+  x->v = 0;
   x->err = 0;
   x->tr = 0;
 	return x;
@@ -147,6 +160,86 @@ void S_inspect(X* x) {
   printf("\n");
 }
 
+void S_branch(X* x) { 
+  S_rot(x); 
+  if (!S_drop(x)) { S_swap(x); }
+  S_drop(x);
+  S_call(x);
+}
+
+void S_times(X* x) { 
+  B* q = (B*)S_drop(x); 
+  C n = S_drop(x); 
+  while (n-- > 0) { S_eval(x, q); } 
+}
+
+void S_while(X* x) { 
+  B* q = (B*)S_drop(x);
+  B* c = (B*)S_drop(x);
+  do { 
+    S_eval(x, c); 
+    if (!S_drop(x)) break; 
+    S_eval(x, q); 
+  } while(1);
+}
+
+void S_allot(X* x) { 
+  S_HERE(x) += S_drop(x); 
+}
+
+void S_symbol(X* x) {
+  C l = 0;
+	B* s = x->ip;
+	B* w;
+  if (x->v == 0) {
+    x->v = malloc(S_DICT_SIZE);
+    S_BLOCK_SIZE(x) = S_DICT_SIZE;
+    S_HERE(x) = 3*sizeof(C);
+    S_LATEST(x) = 0;
+  }
+  w = (B*)S_LATEST(x);
+	while (!isspace(S_token(x))) { l++; }
+	while (w) {
+		if (S_NL(w) == l && !strncmp(S_NFA(w), s, l)) {
+			S_lit(x, (C)S_CFA(w));
+			return;
+		}
+		w = *((B**)w);
+	}
+  w = x->v + S_HERE(x);
+	*((B**)w) = (B*)S_LATEST(x);
+	S_LATEST(x) = (C)w;
+	S_FLAGS(w) = 0;
+	S_NL(w) = l;
+	strncpy(S_NFA(w), s, l);
+	S_lit(x, (C)S_CFA(w));
+	S_HERE(x) += sizeof(B**) + 2 + l;
+}
+
+void S_bcompile(X* x) { 
+  B v = (B)S_drop(x);
+  *(x->v + S_HERE(x)) = v;
+  S_HERE(x)++;
+}
+
+void S_ccompile(X* x) {
+  C v = S_drop(x);
+  *((C*)(x->v + S_HERE(x))) = v;
+  S_HERE(x) += sizeof(C);
+}
+
+void S_qcompile(X* x, C e) { 
+  C l = 0, t = 1; 
+  B* q = (B*)S_drop(x);
+  while (t) {
+    if (q[l] == '[') t++;
+    if (q[l] == ']') t--;
+    l++;
+  }
+  strncpy(x->v + S_HERE(x), q, l + e);
+  S_HERE(x) += l + e; 
+}
+
 void S_parse_literal(X* x) { 
 	C n = 0; 
 	while (S_is_digit(S_peek(x))) { n = 10*n + (S_token(x) - '0'); } 
@@ -157,7 +250,12 @@ void S_parse_quotation(X* x) {
 	C t = 1; 
 	B c; 
 	S_lit(x, (C)(++x->ip)); 
-	while (t) { switch (S_token(x)) { case '[': t++; break; case ']': t--; break; } }
+	while (t) { 
+    switch (S_token(x)) { 
+    case '[': t++; break; 
+    case ']': t--; break;
+    } 
+  }
 }
 
 void S_parse_string(X* x) {
@@ -172,7 +270,7 @@ void S_inner(X* x) {
 	do {
 		memset(buf, 0, 255);
 		S_dump_X(buf, x, 50);
-		printf("%s <%ld>\n", buf, x->rp);
+		printf("%.40s <%ld>\n", buf, x->rp);
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -223,21 +321,33 @@ void S_inner(X* x) {
       case '(': S_to_R(x); break;
       case 'p': S_peek_R(x); break;
 			case 'x': S_call(x); break;
-      case '?': /* S_zcall(x); */ break;
-      case 'q': exit(0); break;
+      case 'z': /* S_zcall(x); */ break;
+      /*case 'q': exit(0); break;*/
       /* Memory */
       case 'm': S_malloc(x); break;
       case 'f': S_free(x); break;
-      case 'c': S_lit(x, sizeof(C)); break;
-      case 'i': S_inspect(x); break;
+      case 'y': S_lit(x, sizeof(C)); break;
       case ':': S_bfetch(x); break;
       case ';': S_bstore(x); break;
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
-      case 'b': S_lit(x, (C)(&x->b)); break;
+      case 'v': S_lit(x, (C)(&x->v)); break;
       /* Input/output */
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
+      /* Helpers */
+      case '?': S_branch(x); break;
+      case 't': S_times(x); break;
+      case 'w': S_while(x); break;
+      case 'i': S_inspect(x); break;
+      case '\\': S_symbol(x); break;
+      case '$': S_symbol(x); S_call(x); break;
+      case 'a': S_allot(x); break;
+      case 'h': S_lit(x, (C)(x->v + S_HERE(x))); break;
+      case 'b': S_bcompile(x); break;
+      case 'c': S_ccompile(x); break;
+      case 'q': S_qcompile(x, -1); break;
+      case 'j': S_qcompile(x, 0); break;
       }
     }
 	} while(1);

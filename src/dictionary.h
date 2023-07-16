@@ -12,8 +12,8 @@
 #define SD_IMMEDIATE 1
 
 /* TODO: Use mask for flags/length? */
-#define SD_FLAGS(s) (*((C*)(s + sizeof(C))))
-#define SD_NL(s) (*((C*)(s + sizeof(C) + 1)))
+#define SD_FLAGS(s) (*((B*)(s + sizeof(C))))
+#define SD_NL(s) (*((B*)(s + sizeof(C) + 1)))
 #define SD_NFA(s) (s + sizeof(C) + 1 + 1)
 #define SD_CFA(s) (SD_NFA(s) + SD_NL(s))
 
@@ -31,7 +31,7 @@ void SD_create(X* x) {
 	*((B**)w) = (B*)SD_LATEST(x);
 	SD_LATEST(x) = (C)w;
 	SD_FLAGS(w) = 0;
-	SD_NL(w) = l1;
+	SD_NL(w) = (B)l1;
 	strncpy(SD_NFA(w), s1, l1);
 	S_lit(x, (C)SD_CFA(w));
 	SD_HERE(x) += sizeof(B**) + 2 + l1; 
@@ -90,6 +90,7 @@ void SD_set_immediate(X* x) {
 
 void SD_is_immediate(X* x) {
   B* w = (B*)S_drop(x);
+  printf("FLAGS: %ld\n", SD_FLAGS(w));
   S_lit(x, (C)(SD_FLAGS(w) & SD_IMMEDIATE));
 }
 
@@ -100,6 +101,7 @@ void SD_find(X* x) {
   while (w) {
     if (SD_NL(w) == l && !strncmp(SD_NFA(w), s, l)) {
       S_lit(x, (C)SD_CFA(w));
+      S_lit(x, (C)((SD_FLAGS(w) & SD_IMMEDIATE) ? 1 : -1));
       return;
     }
     w = *((B**)w);
@@ -141,6 +143,15 @@ void SD_symbol(X* x) {
 	SD_HERE(x) += sizeof(B**) + 2 + l;
 }
 
+void SD_words(X* x) {
+  B* w = (B*)SD_LATEST(x);
+  while (w) {
+    printf("%.*s ", (unsigned int)SD_NL(w), SD_NFA(w));
+    w = *((B**)w);
+  }
+  printf("\n");
+}
+
 void SD_ext(X* x) {
   switch (S_token(x)) {
     case 'a': SD_HERE(x) += S_drop(x); break;
@@ -156,6 +167,7 @@ void SD_ext(X* x) {
     case 'q': SD_qcompile(x, -1); break;
     case 'Q': SD_qcompile(x, 0); break;
     case 's': SD_scompile(x); break;
+    case 'w': SD_words(x); break;
   }
 }
 

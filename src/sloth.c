@@ -1,8 +1,10 @@
 #include<stdio.h>
 #include "sloth.h"
+/*
 #include "combinators.h"
 #include "dictionary.h"
 #include "strings.h"
+*/
 
 #ifdef _WIN32
   #include <conio.h>
@@ -45,17 +47,36 @@ B* bootForth =
 "\"state\"Dc_0D,"
 "\"in\"Dc_0D,"
 "\"tib\"Dc_255Da"
-"\"refill\"Dc_[0\"in\"Df,[\"tib\"Df255]dx0SfxSa]DQ"
+"\"refill\"Dc_[0\"in\"Df_,[\"tib\"Df_255]dx0SfxSa]DQ"
 "\"dup\"Dc_[d]DQ"
 "\"+\"Dc_[+]DQ"
-"\"parse-name\"Dc_[\"tib\"Df\"in\"Df.Dp\"in\"Dfd.r+s,]DQ"
-/* "\"]\"Dc_[1\"state\"Df,]DQ" */
-/* "\"[\"Dc_[0\"state\"Df,]DQDi" */
-/* "\":\"Dc_[\"parse-name\"DfxDc\"]\"Dfx]DQ" */
+"\"parse-name\"Dc_[\"tib\"Df_\"in\"Df_.Dp\"in\"Df_d.r+s,]DQ"
+"\"]\"Dc_[1\"state\"Df_,]DQ"
+"\"[\"Dc_[0\"state\"Df_,]DQDi"
+"\":\"Dc_[\"parse-name\"DfxDc]Dq'\"D;']D;'\"D;'DD;'fD;'_D;'xD;']D;"
 /* Reveal has to be called on ; */
-/* "\";\"Dc_[\"[\"Dfx']D;]DQ" */
-/* Immediate words! */
-"\"interpret\"Dc_[\"parse-name\"Dfx[d0=!][\"state\"Df.[Dq][Dfx]Q?\"parse-name\"Dfx]Qw__]DQ";
+"\";\"Dc_'\"D;'[D;'_D;'xD;9D;3D;'DD;';D;']D;"
+"\"interpret\"Dc_"
+/*
+"  [\"parse-name\"Df_x"
+"    [d0=!]"
+"    [Df\"state\"Df_.|"
+"      [d1=]"
+"      [[Immediate]_]"
+"      [d0<"
+"        ["
+"    ]Qw__]DQ";
+*/
+
+"    [\"state\"Df_."
+"      [Df1="
+"        [x]"
+"        [Dq]"
+"        Q?]"
+"      [Df_x]"
+"      Q?\"parse-name\"Df_x]"
+"    Qw__]DQ";
+
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -66,9 +87,11 @@ int main(int argc, char** argv) {
 	
   x->key = &key;
   x->emit = &emit;
+  /*
   EXT(x, 'D') = &SD_ext;
   EXT(x, 'Q') = &SC_ext;
   EXT(x, 'S') = &SS_ext;
+  */
 
 	if (argc == 2 || argc == 3) {
 		fptr = fopen(argv[1], "r");

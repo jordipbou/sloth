@@ -19,11 +19,17 @@ Features:
  
 ## Bytecode
 
+I don't think I like strings here....
+
     ' -> byte literal
-    "" -> string literal
-    [] -> quotation literal
-    0-9 -> number literal
     # -> cell literal
+    @ -> relative to IP byte literal
+
+    s -> swap
+    d -> dup
+    o -> over
+    r -> rot
+    _ -> drop
     
     + -> addition
     - -> substraction
@@ -35,9 +41,9 @@ Features:
     = -> equal
     > -> greater than
     
-    $ -> call, jump $] or $} or $<0>
+    x -> call, jump x] or x} or x<0>
     ] -> return, also } and <0>
-    ? -> call if zero, jump ?] or ?} or ?<0>
+    z -> call if zero, jump z] or z} or z<0>
     ( -> to r
     ) -> from r
     p -> peek r
@@ -49,23 +55,45 @@ Features:
 
     k -> key
     e -> emit
+
+    v -> pushes v register address
     
     m -> malloc
     f -> free
-    c -> cell size
+    ^ -> cell size
     ; -> store byte
     : -> fetch byte
     , -> store byte
     . -> fetch byte
+
+    --- Helpers
+
+    "" -> string literal
+    [] -> quotation literal
+    0-9 -> number literal
+
+      -> accept
+      -> type
+
     i -> inspect
     
-    s -> swap
-    d -> dup
-    o -> over
-    r -> rot
-    _ -> drop
+    ? -> branch
+    w -> while
+    t -> times
+
+    \ -> create/find symbol (pushes CFA)
+    $ -> call to symbol CFA
+    a -> allocate
+    h -> here
+    l -> latest
+    b -> compile byte
+    c -> compile cell (clashes with cell size)
+    q -> compile quotation
+    j -> compile quotation and return
 
 ## Extensions
+
+I don't really like this for base.
 
 ### Combinators
 
