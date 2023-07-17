@@ -49,11 +49,12 @@ B* bootForth =
 "\\c, _[$here ; 1 $allot ]j"
 "\\latest _[cc+b.+ .]j"
 "\\nfa _[c1++ d : s 1+ s]j"
+"\\cfa _[c1++ d : s 1++]j"
 "\\in _0$, "
 "\\tib _255$allot "
-"\\compare _[ro=[1s[rroo:s:=(r)&]ts_s_][___0]?]j"
-/* I can't push string to R with (( before quotation !!!! */
-"\\find _[(($latest [d0=!o$nfa vu$compare !&][.]w))__]j";
+"\\compare _[ro=[1s[rroo:s:=(1+s1+sr)&]ts_s_][___0]?]j"
+"\\2over _[((oo)rr)rr]j"
+"\\find _[$latest [d0=[0][(oourr) $nfa $compare [s_s_0][1]?]?][.]w]j";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
