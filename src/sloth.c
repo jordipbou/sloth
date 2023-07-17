@@ -43,40 +43,16 @@ void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
 B* bootForth =
-"Db"
-"\"state\"Dc_0D,"
-"\"in\"Dc_0D,"
-"\"tib\"Dc_255Da"
-"\"refill\"Dc_[0\"in\"Df_,[\"tib\"Df_255]dx0SfxSa]DQ"
-"\"dup\"Dc_[d]DQ"
-"\"+\"Dc_[+]DQ"
-"\"parse-name\"Dc_[\"tib\"Df_\"in\"Df_.Dp\"in\"Df_d.r+s,]DQ"
-"\"]\"Dc_[1\"state\"Df_,]DQ"
-"\"[\"Dc_[0\"state\"Df_,]DQDi"
-"\":\"Dc_[\"parse-name\"DfxDc]Dq'\"D;']D;'\"D;'DD;'fD;'_D;'xD;']D;"
-/* Reveal has to be called on ; */
-"\";\"Dc_'\"D;'[D;'_D;'xD;9D;3D;'DD;';D;']D;"
-"\"interpret\"Dc_"
-/*
-"  [\"parse-name\"Df_x"
-"    [d0=!]"
-"    [Df\"state\"Df_.|"
-"      [d1=]"
-"      [[Immediate]_]"
-"      [d0<"
-"        ["
-"    ]Qw__]DQ";
-*/
-
-"    [\"state\"Df_."
-"      [Df1="
-"        [x]"
-"        [Dq]"
-"        Q?]"
-"      [Df_x]"
-"      Q?\"parse-name\"Df_x]"
-"    Qw__]DQ";
-
+"\\here _[cb.+ . b.+]j"
+"\\allot _[cb.+ . + cb.+ ,]j"
+"\\, _[$here , c $allot ]j"
+"\\c, _[$here ; 1 $allot ]j"
+"\\latest _[cc+b.+ .]j"
+"\\nfa _[c1++ d : s 1+ s]j"
+"\\in _0$, "
+"\\tib _255$allot "
+"\\compare _[ro=[1s[rroo:s:=(r)&]ts_s_][___0]?]j"
+"\\find _[(($latest [d0=!o$nfa pp$compare !&][.]w))__]j";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -106,9 +82,7 @@ int main(int argc, char** argv) {
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
 
-  /*
   S_eval(x, bootForth);
-  */
   
 	if (argc == 1 || argc == 3) {
 		do {

@@ -46,7 +46,8 @@ I don't think I like strings here....
     z -> call if zero, jump z] or z} or z<0>
     ( -> to r
     ) -> from r
-    p -> peek r
+    u -> peek top of r
+    v -> peek next of r
     
     & -> and
     | -> or
@@ -56,11 +57,11 @@ I don't think I like strings here....
     k -> key
     e -> emit
 
-    v -> pushes v register address
+    b -> pushes b register address
     
     m -> malloc
     f -> free
-    ^ -> cell size
+    c -> cell size
     ; -> store byte
     : -> fetch byte
     , -> store byte
@@ -72,8 +73,8 @@ I don't think I like strings here....
     [] -> quotation literal
     0-9 -> number literal
 
-      -> accept
-      -> type
+    u -> accept
+    g -> type
 
     i -> inspect
     
@@ -83,13 +84,9 @@ I don't think I like strings here....
 
     \ -> create/find symbol (pushes CFA)
     $ -> call to symbol CFA
-    a -> allocate
-    h -> here
-    l -> latest
-    b -> compile byte
-    c -> compile cell (clashes with cell size)
-    q -> compile quotation
-    j -> compile quotation and return
+
+    q -> compile quotation without return
+    j -> compile quotation with return
 
 ## Extensions
 
