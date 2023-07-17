@@ -1,5 +1,3 @@
-/* TODO: to R breaks tracing !!! */
-
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -304,12 +302,12 @@ void S_parse_string(X* x) {
 }
 
 void S_inner(X* x) {
-	B buf[255];
+	B buf[512];
 	C frame = x->rp;
 	do {
 		memset(buf, 0, 255);
-		S_dump_X(buf, x, 50);
-		printf("%.40s <%ld>\n", buf, x->rp);
+		S_dump_X(buf, x, 100);
+		printf("%.95s <%ld>\n", buf, x->rp);
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
