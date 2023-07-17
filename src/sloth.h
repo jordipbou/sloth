@@ -241,7 +241,7 @@ void S_qcompile(X* x, C e) {
   strncpy(x->b + S_HERE(x), q, l + e);
   S_HERE(x) += l + e; 
 }
-/*
+
 void S_accept(X* x) { 
 	C i = 0;
   C l1 = S_drop(x);
@@ -269,7 +269,7 @@ void S_accept(X* x) {
 	} while(i < l1);
 	S_lit(x, i);
 }
-*/
+
 void S_type(X* x) {
 	C i = 0;
 	C n = S_drop(x);
@@ -302,7 +302,7 @@ void S_parse_string(X* x) {
 }
 
 void S_inner(X* x) {
-	B buf[512];
+	B buf[1024];
 	C frame = x->rp;
 	do {
 		memset(buf, 0, 255);
@@ -380,14 +380,10 @@ void S_inner(X* x) {
       case 'i': S_inspect(x); break;
       case '\\': S_symbol(x); break;
       case '$': S_symbol(x); S_call(x); break;
-      /*case 'a': S_allot(x); break;*/
-      /*case 'h': S_lit(x, (C)(x->b + S_HERE(x))); break;*/
-      /*case 'b': S_bcompile(x); break;*/
-      /*case 'c': S_ccompile(x); break;*/
-      case 'q': S_qcompile(x, -1); break;
-      case 'j': S_qcompile(x, 0); break;
-      /*case 'u': S_accept(x); break;*/
-      /**/case 'g': S_type(x); break;
+      case 'g': S_qcompile(x, -1); break;
+      case 'q': S_qcompile(x, 0); break;
+      case 'a': S_accept(x); break;
+      case 'p': S_type(x); break;
       }
     }
 	} while(1);

@@ -19,7 +19,7 @@ Features:
  
 ## Bytecode
 
-I don't think I like strings here....
+I don't think I like strings here....but if I have them, there must be also accept/type.
 
     ' -> byte literal
     # -> cell literal
@@ -128,3 +128,67 @@ I don't really like this for base.
     a -> accept
     c -> compare
     t -> type
+
+## ASCII ordered bytecodes
+
+    (SPACE) -> noop
+    ! -> not
+    " -> string literal
+    # -> cell literal
+    $ -> find and call symbol
+    % -> modulo
+    & -> and
+    ' -> byte literal
+    ( -> to r
+    ) -> from r
+    * -> multiplication
+    + -> addition
+    , -> store cell
+    - -> substraction
+    . -> fetch cell
+    / -> division
+    0-9 -> parsed numeric literal
+    : -> fetch byte
+    ; -> store byte
+    < -> less than
+    = -> equal
+    > -> greater than
+    ? -> branch
+    @ -> relative to IP byte literal
+    A-Z -> C extensions
+    [ -> start quotation
+    \ -> define/find symbol
+    ] -> return/end of quotation
+    ^ -> xor
+    _ -> drop
+    ` -> 
+    a -> accept
+    b -> address of b register
+    c -> size of cell
+    d -> drop
+    e -> emit
+    f -> free from heap
+    g ->
+    h ->
+    i -> inspect memory
+    j -> 
+    k -> key
+    l ->
+    m -> allocate on heap
+    n ->
+    o -> over
+    p -> print (type)
+    q -> compile quotation
+    r -> rot
+    s -> swap
+    t -> times
+    u -> top of R
+    v -> second of R
+    w -> while
+    x -> call/jump
+    y ->
+    z -> call/jump if zero
+    { ->
+    | -> or
+    } -> return
+    ~ -> invert

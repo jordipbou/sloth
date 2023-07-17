@@ -43,22 +43,29 @@ void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
 B* bootForth =
-"\\here _[cb.+ . b.+]j"
-"\\allot _[cb.+ . + cb.+ ,]j"
-"\\, _[$here , c $allot ]j"
-"\\c, _[$here ; 1 $allot ]j"
-"\\latest _[cc+b.+ .]j"
-"\\nfa _[c1++ d : s 1+ s]j"
-"\\cfa _[c1++ d : s 1++]j"
+"\\here _[cb.+ . b.+]q"
+"\\allot _[cb.+ . + cb.+ ,]q"
+"\\, _[$here , c $allot ]q"
+"\\c, _[$here ; 1 $allot ]q"
+"\\latest _[cc+b.+ .]q"
+"\\nfa _[c1++ d : s 1+ s]q"
+"\\cfa _[c1++ d : s 1++]q"
 "\\in _0$, "
 "\\tib _255$allot "
-"\\compare _[ro=[1s[rroo:s:=(1+s1+sr)&]ts_s_][___0]?]j"
-"\\2over _[((oo)rr)rr]j"
-"\\find _[$latest [d0=[0][(oourr) $nfa $compare [s_s_0][1]?]?][.]w]j";
+"\\tib-length _0$, "
+"\\source _[\\tib \\tib-length .]q"
+"\\compare _[ro=[1s[rroo:s:=(1+s1+sr)&]ts_s_][___0]?]q"
+"\\2over _[((oo)rr)rr]q"
+"\\find _[$latest [d0=[0][(oourr) $nfa $compare [s_s_0][1]?]?][.]w]q"
+"\\refill _[0\\in ,\\tib 255a\\tib-length ,]q"
+"\\bl _[' ]q"
+"\\is-space? _\\bl g[1+<]q"
+"\\is-not-space? _\\is-space? g[0=]q"
+"\\parse-name _[\\tib \\in .[oo+d$source +<s:$is-space? &][1+]woo+rr[oo+d$source +<s:$is-not-space? &][1+]wd\\in ,r(+u-)s]q";
 
 int main(int argc, char** argv) {
 	FILE* fptr;
-	B buf[255];
+	B buf[1024];
 	C i;
 	B* j;
 	X* x = S_init();
