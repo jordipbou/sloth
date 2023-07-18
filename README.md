@@ -161,15 +161,15 @@ I don't really like this for base.
     ] -> return/end of quotation
     ^ -> xor
     _ -> drop
-    ` -> 
+    ` -> find
     a -> accept
     b -> address of b register
     c -> size of cell
     d -> drop
     e -> emit
     f -> free from heap
-    g ->
-    h ->
+    g -> compile quotation without return
+    h -> header
     i -> inspect memory
     j -> 
     k -> key

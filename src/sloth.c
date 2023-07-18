@@ -48,20 +48,35 @@ B* bootForth =
 "\\, _[$here , c $allot ]q"
 "\\c, _[$here ; 1 $allot ]q"
 "\\latest _[cc+b.+ .]q"
+"\\flags _[c+]q"
 "\\nfa _[c1++ d : s 1+ s]q"
 "\\cfa _[c1++ d : s 1++]q"
+"\\set-immediate _[$flags d:1|s;]q"
+"\\is-immediate? _[$flags :1&]q"
+"\\immediate _[$latest $set-immediate ]q"
 "\\in _0$, "
 "\\tib _255$allot "
 "\\tib-length _0$, "
 "\\source _[\\tib \\tib-length .]q"
 "\\compare _[ro=[1s[rroo:s:=(1+s1+sr)&]ts_s_][___0]?]q"
 "\\2over _[((oo)rr)rr]q"
+/*
 "\\find _[$latest [d0=[0][(oourr) $nfa $compare [s_s_0][1]?]?][.]w]q"
+*/
 "\\refill _[0\\in ,\\tib 255a\\tib-length ,]q"
 "\\bl _[' ]q"
 "\\is-space? _\\bl g[1+<]q"
 "\\is-not-space? _\\is-space? g[0=]q"
-"\\parse-name _[\\tib \\in .[oo+d$source +<s:$is-space? &][1+]woo+rr[oo+d$source +<s:$is-not-space? &][1+]wd\\in ,r(+u-)s]q";
+"\\parse-name _[\\tib \\in .[oo+d$source +<s:$is-space? &][1+]woo+rr[oo+d$source +<s:$is-not-space? &][1+]wd\\in ,r(+u-)s]q"
+/* Interpret needs to transform to number on not found */
+"\\state _0$, "
+"\\[ _[0\\state ,]q"
+"\\] _[1\\state ,]q"
+"\\: _[$parse-name h]g\\] g93$c, "
+"\\; _\\[ g'9$c, '3$c, \\c, g']$c, $immediate "
+"\\interpret _[$parse-name `d[d$cfa s\\state .[$is-immediate? [x][g]?][_x]?][_\"Word not found: \"pp10e]?]q"
+"\\dup _[d]q"
+"\\+ _[+]q";
 
 int main(int argc, char** argv) {
 	FILE* fptr;

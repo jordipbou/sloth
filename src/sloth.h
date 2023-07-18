@@ -189,6 +189,36 @@ void S_allot(X* x) {
   S_HERE(x) += S_drop(x); 
 }
 */
+
+void S_create(X* x) {
+  C l = S_drop(x);
+  B* s = (B*)S_drop(x);
+  B* w = x->b + S_HERE(x);
+	*((B**)w) = (B*)S_LATEST(x);
+	S_LATEST(x) = (C)w;
+	S_FLAGS(w) = 0;
+	S_NL(w) = l;
+	strncpy(S_NFA(w), s, l);
+	S_lit(x, (C)S_CFA(w));
+	S_HERE(x) += sizeof(B**) + 2 + l;
+}
+
+void S_find(X* x) {
+  C l = S_drop(x);
+  B* s = (B*)S_drop(x);
+  B* w = (B*)S_LATEST(x);
+  while (w) {
+		if (S_NL(w) == l && !strncmp(S_NFA(w), s, l)) {
+			S_lit(x, (C)w);
+			return;
+		}
+		w = *((B**)w);
+	}
+  S_lit(x, (C)s);
+  S_lit(x, l);
+  S_lit(x, 0);
+}
+
 void S_symbol(X* x) {
   C l = 0;
 	B* s = x->ip;
@@ -199,24 +229,19 @@ void S_symbol(X* x) {
     S_HERE(x) = 3*sizeof(C);
     S_LATEST(x) = 0;
   }
-  w = (B*)S_LATEST(x);
 	while (!isspace(S_token(x))) { l++; }
-	while (w) {
-		if (S_NL(w) == l && !strncmp(S_NFA(w), s, l)) {
-			S_lit(x, (C)S_CFA(w));
-			return;
-		}
-		w = *((B**)w);
-	}
-  w = x->b + S_HERE(x);
-	*((B**)w) = (B*)S_LATEST(x);
-	S_LATEST(x) = (C)w;
-	S_FLAGS(w) = 0;
-	S_NL(w) = l;
-	strncpy(S_NFA(w), s, l);
-	S_lit(x, (C)S_CFA(w));
-	S_HERE(x) += sizeof(B**) + 2 + l;
+  S_lit(x, (C)s);
+  S_lit(x, l);
+  S_find(x);
+  if (TS(x)) {
+    w = (B*)S_drop(x);
+    S_lit(x, (C)S_CFA(w));
+  } else {
+    S_drop(x);
+    S_create(x);
+  }
 }
+
 /*
 void S_bcompile(X* x) { 
   B v = (B)S_drop(x);
@@ -382,6 +407,8 @@ void S_inner(X* x) {
       case '$': S_symbol(x); S_call(x); break;
       case 'g': S_qcompile(x, -1); break;
       case 'q': S_qcompile(x, 0); break;
+      case 'h': S_create(x); break;
+      case '`': S_find(x); break;
       case 'a': S_accept(x); break;
       case 'p': S_type(x); break;
       }
