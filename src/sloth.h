@@ -9,17 +9,9 @@ typedef char B;
 typedef intptr_t C;
 typedef double F;
 
-typedef struct {
-  C t;
-  C l;
-  union {
-    C i;
-    F f;
-    void *p;
-  } v;
-} O;
+typedef struct { C t; C l; union { C i; F f; void *p; } v; } O;
 
-enum { INT = 2, RETURN = 3 } T;
+enum { INT = 2, FLOAT = 3, RETURN = 5 } T;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
@@ -66,7 +58,10 @@ X* S_init() {
 
 C S_dump_S(B* s, X* x) {
 	C i = 0, t, n = 0;
-	while (i < x->sp) { s += t = sprintf(s, "%ld ", x->s[i].v.i); n += t; i++; 
+	while (i < x->sp) { 
+		if (x->s[i].t % INT == 0) {
+			s += t = sprintf(s, "#%ld ", x->s[i].v.i); n += t; i++;
+		}
   }
 	return n;
 }
