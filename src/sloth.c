@@ -40,7 +40,7 @@ int _getch ()
 #endif
 
 void key(X* x) { S_lit(x, (C)_getch()); }
-void emit(X* x) { printf("%c", (B)S_drop(x)); }
+void emit(X* x) { printf("%c", (B)S_drop(x)->v.i); }
 
 B* bootForth =
 "\\here _[cb.+ . b.+]q"
@@ -120,7 +120,7 @@ int main(int argc, char** argv) {
       printf("%s\n", buf);
 			*/
 			if (x->err != 0) { printf("ERROR: %ld", x->err); return; }
-			printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
+			printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i].v.i); } printf("\n");
 		} while(1);
 	}
 }
