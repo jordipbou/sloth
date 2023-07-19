@@ -175,7 +175,7 @@ I don't really like this for base.
     k -> key
     l ->
     m -> allocate on heap
-    n ->
+    n -> to number
     o -> over
     p -> print (type)
     q -> compile quotation

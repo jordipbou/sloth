@@ -68,15 +68,16 @@ B* bootForth =
 "\\is-space? _\\bl g[1+<]q"
 "\\is-not-space? _\\is-space? g[0=]q"
 "\\parse-name _[\\tib \\in .[oo+d$source +<s:$is-space? &][1+]woo+rr[oo+d$source +<s:$is-not-space? &][1+]wd\\in ,r(+u-)s]q"
-/* Interpret needs to transform to number on not found */
 "\\state _0$, "
 "\\[ _[0\\state ,]q"
 "\\] _[1\\state ,]q"
-"\\: _[$parse-name h]g\\] g93$c, "
+"\\: _[$parse-name h_]g\\] g93$c, "
 "\\; _\\[ g'9$c, '3$c, \\c, g']$c, $immediate "
-"\\interpret _[$parse-name `d[d$cfa s\\state .[$is-immediate? [x][g]?][_x]?][_\"Word not found: \"pp10e]?]q"
+"\\interpret _[$parse-name d0=![`d[d$cfa s\\state .[$is-immediate? [x0][g0]?][_x0]?][_nd0=[__\\state .['#$c, $, 0][0]?][___1~]?]?][__0~]?]q"
+"\\quit _[[1][$refill [$interpret d0=][_]w0~=[\" OK\"p10e][10e\"Word not found\"p10e]?]w]q"
 "\\dup _[d]q"
-"\\+ _[+]q";
+"\\+ _[+]q"
+"\\.s _[y]q";
 
 int main(int argc, char** argv) {
 	FILE* fptr;

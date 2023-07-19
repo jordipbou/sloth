@@ -242,6 +242,16 @@ void S_symbol(X* x) {
   }
 }
 
+void S_to_number(x) {
+  C l = S_drop(x);
+  B* s = (B*)S_drop(x);
+  char *ptr;
+  C n = strtol(s, &ptr, 10);
+  S_lit(x, n);
+  S_lit(x, (C)ptr);
+  S_lit(x, l - (C)(ptr - s));
+}
+
 /*
 void S_bcompile(X* x) { 
   B v = (B)S_drop(x);
@@ -330,9 +340,11 @@ void S_inner(X* x) {
 	B buf[1024];
 	C frame = x->rp;
 	do {
+    /*
 		memset(buf, 0, 255);
 		S_dump_X(buf, x, 100);
 		printf("%.95s <%ld>\n", buf, x->rp);
+  */
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -411,6 +423,8 @@ void S_inner(X* x) {
       case '`': S_find(x); break;
       case 'a': S_accept(x); break;
       case 'p': S_type(x); break;
+      case 'n': S_to_number(x); break;
+      case 'y': memset(buf, 0, 1024); S_dump_S(buf, x); printf(" %s", buf); break;
       }
     }
 	} while(1);
