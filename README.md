@@ -1,6 +1,6 @@
 # SLOTH
 
-A small, simple, relatively fast, double stack based virtual machine with human readable/writeable bytecode meant for extending applications.
+A small, simple, relatively fast, double stack based virtual machine f with human readable/writeable bytecode meant for extending application.
 
 In the future there will be other implementations (at least Java/Kotlin for Android development).
 
@@ -9,13 +9,11 @@ Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor.
 Features:
 
 * One C89 header only. Very easily embedabble in a C/C++ application.
-* Human readable bytecode (ASCII 32-126)
+* Human readable bytecode (ASCII 32-126), no need to use an assembler.
 * Cell based data and return stack
 * Quotations at bytecode level.
 * Relatively fast interpreter.
 * Ability to add C function extensions (bytecodes A-Z).
-* No dictionary/words/symbols needed at bytecode level.
-* Input/output thru 2 user defined key/emit functions
  
 ## Bytecode
 
