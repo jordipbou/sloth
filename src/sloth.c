@@ -40,7 +40,7 @@ int _getch ()
 #endif
 
 void key(X* x) { S_lit(x, (C)_getch()); }
-void emit(X* x) { printf("%c", (B)S_drop(x)->v.i); }
+void emit(X* x) { printf("%c", (B)S_drop_C(x)); }
 
 B* bootForth =
 "\\here _[cb.+ . b.+]q"

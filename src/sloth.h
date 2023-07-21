@@ -11,7 +11,7 @@ typedef double F;
 
 typedef struct { C t; C l; union { C i; F f; void *p; } v; } O;
 
-enum { INT = 2, FLOAT = 3, RETURN = 5 } T;
+enum { INT = 2, FLOAT = 3, MANAGED = 5, RETURN = 7 } T;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
@@ -77,6 +77,12 @@ C S_dump_CODE(B* s, B* a) {
 	return sprintf(s, "%.*s", (unsigned int)i, a);
 }
 
+C S_dump_OBJECT(B* s, O o) {
+  if (o.t % INT == 0) {
+    return sprintf(s, "#%ld ", o.v.i);
+  }
+}
+
 C S_dump_R(B* s, X* x) {
 	C i, t = 1, n = 0;
 	s += t = S_dump_CODE(s, x->ip); n += t;
@@ -85,7 +91,7 @@ C S_dump_R(B* s, X* x) {
     if (x->r[i].t == RETURN) {
 		  s += t = S_dump_CODE(s, (B*)x->r[i].v.p); n += t;
     } else {
-      /* TODO */
+      s += t = S_dump_OBJECT(s, x->r[i]); n += t;
     }
 	}
 	return n;
@@ -129,8 +135,14 @@ void S_swap(X* x) {
   SWAP(TS(x), NS(x), v.i);
 }
 
-/* drop should free managed items */
-O* S_drop(X* x) { return &x->s[--x->sp]; }
+void S_drop(X* x) {
+  O o = x->s[--x->sp];
+  if (o.t % MANAGED == 0) {
+    free(o.v.p);
+  }
+}
+C S_drop_C(X* x) { return x->s[--x->sp].v.i; }
+F S_drop_F(X* x) { return x->s[--x->sp].v.f; }
 
 void S_add(X* x) { NS(x)->v.i = NS(x)->v.i + TS(x)->v.i; --x->sp; }
 void S_sub(X* x) { NS(x)->v.i = NS(x)->v.i - TS(x)->v.i; --x->sp; }
@@ -149,30 +161,49 @@ void S_eq(X* x) { NS(x)->v.i = NS(x)->v.i == TS(x)->v.i; --x->sp; }
 void S_gt(X* x) { NS(x)->v.i = NS(x)->v.i > TS(x)->v.i; --x->sp; }
 
 #define MOVE(a, b) a->t = b->t; a->l = b->l; a->v.i = b->v.i;
-void S_to_R(X* x) { O* a = &x->r[x->rp++]; O* b = &x->s[--x->sp]; MOVE(a, b); }
+O* S_to_R(X* x) { O* a = &x->r[x->rp++]; O* b = &x->s[--x->sp]; MOVE(a, b); return b; }
 void S_from_R(X* x) { O* a = &x->s[x->sp++]; O* b = &x->r[--x->rp]; MOVE(a, b); }
 void S_peek_R(X* x, C n) { O* a = &x->s[x->sp++]; O* b = &x->r[x->rp - 1 - n]; MOVE(a, b); }
 
 void S_push(X* x) { O* o = &x->r[x->rp++]; o->t = RETURN; o->l = 0; o->v.p = x->ip; }
-void S_pop(X* x) { /* Remove non returns */ x->ip = x->r[--x->rp].v.p; }
-void S_call(X* x) { B t = S_peek(x); if (t && t != ']' && t != '}') S_push(x); x->ip = S_drop(x)->v.p; }
+void S_pop(X* x) {
+  O o;
+  while (x->rp > 0) {
+    o = x->r[--x->rp];
+    if (o.t % MANAGED == 0) {
+      free(o.v.p);
+    } else if (o.t % RETURN == 0) {
+      x->ip = o.v.p;
+      return;
+    }
+  }
+}
+
+void S_call(X* x) { 
+  B t = S_peek(x); 
+  if (t && t != ']' && t != '}') { 
+    S_push(x); 
+  }
+  x->ip = S_to_R(x)->v.p;
+}
+/* It should be better to directly push to R */
 void S_eval(X* x, B* q) { S_lit(x, (C)q); S_call(x); S_inner(x); }
 
-void S_bstore(X* x) { B* a = (B*)S_drop(x)->v.p; *a = (B)S_drop(x)->v.i; }
-void S_cstore(X* x) { C* a = (C*)S_drop(x)->v.p; *a = S_drop(x)->v.i; }
+void S_bstore(X* x) { B* a = (B*)S_drop_C(x); *a = (B)S_drop_C(x); }
+void S_cstore(X* x) { C* a = (C*)S_drop_C(x); *a = S_drop_C(x); }
 
-void S_bfetch(X* x) { S_lit(x, *((B*)S_drop(x)->v.p)); }
-void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x)->v.p)); }
+void S_bfetch(X* x) { S_lit(x, *((B*)S_drop_C(x))); }
+void S_cfetch(X* x) { S_lit(x, *((C*)S_drop_C(x))); }
 
-void S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x)->v.i)); }
-void S_free(X* x) { free(S_drop(x)->v.p); }
+void S_malloc(X* x) { S_lit(x, (C)malloc(S_drop_C(x))); }
+void S_free(X* x) { free((void*)S_drop_C(x)); }
 
 void S_inspect(X* x) {
   /* TODO: Show ASCII representation */
   /* TODO: Use vectored I/O */
   C i = 0, j;
-  C n = S_drop(x)->v.i;
-  B* a = (B*)S_drop(x)->v.p;
+  C n = S_drop_C(x);
+  B* a = (B*)S_drop_C(x);
   while (i < n) {
     /* Do with type! */
     printf("\n%p: ", a + i);
@@ -191,23 +222,23 @@ void S_inspect(X* x) {
 
 void S_branch(X* x) { 
   S_rot(x); 
-  if (!S_drop(x)->v.i) { S_swap(x); }
+  if (!S_drop_C(x)) { S_swap(x); }
   S_drop(x);
   S_call(x);
 }
 
 void S_times(X* x) { 
-  B* q = (B*)S_drop(x)->v.p; 
-  C n = S_drop(x)->v.i; 
+  B* q = (B*)S_drop_C(x); 
+  C n = S_drop_C(x); 
   while (n-- > 0) { S_eval(x, q); } 
 }
 
 void S_while(X* x) { 
-  B* q = (B*)S_drop(x)->v.p;
-  B* c = (B*)S_drop(x)->v.p;
+  B* q = (B*)S_drop_C(x);
+  B* c = (B*)S_drop_C(x);
   do { 
     S_eval(x, c); 
-    if (!S_drop(x)->v.i) break; 
+    if (!S_drop_C(x)) break; 
     S_eval(x, q); 
   } while(1);
 }
@@ -218,8 +249,8 @@ void S_allot(X* x) {
 */
 
 void S_create(X* x) {
-  C l = S_drop(x)->v.i;
-  B* s = (B*)S_drop(x)->v.p;
+  C l = S_drop_C(x);
+  B* s = (B*)S_drop_C(x);
   B* w = x->b + S_HERE(x);
 	*((B**)w) = (B*)S_LATEST(x);
 	S_LATEST(x) = (C)w;
@@ -231,8 +262,8 @@ void S_create(X* x) {
 }
 
 void S_find(X* x) {
-  C l = S_drop(x)->v.i;
-  B* s = (B*)S_drop(x)->v.p;
+  C l = S_drop_C(x);
+  B* s = (B*)S_drop_C(x);
   B* w = (B*)S_LATEST(x);
   while (w) {
 		if (S_NL(w) == l && !strncmp(S_NFA(w), s, l)) {
@@ -261,7 +292,7 @@ void S_symbol(X* x) {
   S_lit(x, l);
   S_find(x);
   if (TS(x)->v.i) {
-    w = (B*)S_drop(x)->v.p;
+    w = (B*)S_drop_C(x);
     S_lit(x, (C)S_CFA(w));
   } else {
     S_drop(x);
@@ -270,8 +301,8 @@ void S_symbol(X* x) {
 }
 
 void S_to_number(x) {
-  C l = S_drop(x)->v.i;
-  B* s = (B*)S_drop(x)->v.p;
+  C l = S_drop_C(x);
+  B* s = (B*)S_drop_C(x);
   char *ptr;
   C n = strtol(s, &ptr, 10);
   S_lit(x, n);
@@ -294,7 +325,7 @@ void S_ccompile(X* x) {
 */
 void S_qcompile(X* x, C e) { 
   C l = 0, t = 1; 
-  B* q = (B*)S_drop(x)->v.p;
+  B* q = (B*)S_drop_C(x);
   while (t) {
     if (q[l] == '[') t++;
     if (q[l] == ']') t--;
@@ -306,8 +337,8 @@ void S_qcompile(X* x, C e) {
 
 void S_accept(X* x) { 
 	C i = 0;
-  C l1 = S_drop(x)->v.i;
-  B* s1 = (B*)S_drop(x)->v.p;
+  C l1 = S_drop_C(x);
+  B* s1 = (B*)S_drop_C(x);
 	do { 
 		x->key(x); 
 		if (TS(x)->v.i == 10) {
@@ -334,8 +365,8 @@ void S_accept(X* x) {
 
 void S_type(X* x) {
 	C i = 0;
-	C n = S_drop(x)->v.i;
-	B* s = (B*)S_drop(x)->v.p;
+	C n = S_drop_C(x);
+	B* s = (B*)S_drop_C(x);
 	while (n-- > 0) { S_lit(x, s[i++]); x->emit(x); }
 }
 
