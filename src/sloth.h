@@ -1,9 +1,9 @@
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
-#include<stdint.h>
-#include<stdlib.h>
-#include<string.h>
+#include<stdint.h> /* intptr_t */
+#include<stdlib.h> /* malloc, free */
+#include<string.h> /* strncpy, memset, strncmp */
 
 typedef char B;
 typedef intptr_t C;
@@ -12,12 +12,14 @@ typedef intptr_t C;
 #define RSTACK_SIZE 64
 #define TSTACK_SIZE 64
 
+typedef struct _W { struct _W* l; B* c; B f; B s; B n[1]; } W;
+
 typedef struct _X { 
   C* s; C sp; C ss;
   B** r; C rp; C rs;
   C* t; C tp; C ts;
 	B* ip;
-  B* b;
+  B* b; /* TODO: This could be changed to a dictionary stack, or a namestack could be added to manage searches independent of this context dictionary */
 	void (*key)(struct _X*);
 	void (*emit)(struct _X*);
   void (**ext)(struct _X*);
@@ -27,25 +29,21 @@ typedef struct _X {
 
 #define EXT(x, l) (x->ext[l - 'A'])
 
-#define S_DICT_SIZE 65536
+#define S_DEFAULT_DICT_SIZE 65536
 
 #define S_BLOCK_SIZE(x) (((C*)x->b)[0])
 #define S_HERE(x) (((C*)x->b)[1])
 #define S_LATEST(x) (((C*)x->b)[2])
 
-#define S_FLAGS(s) (*((B*)(s + sizeof(C))))
-#define S_NL(s) (*((B*)(s + sizeof(C) + 1)))
-#define S_NFA(s) (s + sizeof(C) + 1 + 1)
-#define S_CFA(s) (S_NFA(s) + S_NL(s))
-  
 X* S_init() {
 	X* x = malloc(sizeof(X));
   x->s = malloc(STACK_SIZE*sizeof(C));
   x->r = malloc(RSTACK_SIZE*sizeof(C));
   x->t = malloc(TSTACK_SIZE*sizeof(C));
-	x->sp = x->rp = 0;
+	x->sp = x->rp = x->tp = 0;
   x->ss = STACK_SIZE;
   x->rs = RSTACK_SIZE;
+	x->ts = TSTACK_SIZE;
   x->ext = malloc(26*sizeof(C));
   x->ip = 0;
   x->b = 0;
@@ -143,6 +141,7 @@ void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 void S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 void S_free(X* x) { free((void*)S_drop(x)); }
 
+/* TODO: Could this be done "easily" in SLOTH */
 void S_inspect(X* x) {
   /* TODO: Show ASCII representation */
   /* TODO: Use vectored I/O */
@@ -172,6 +171,7 @@ void S_branch(X* x) {
   S_call(x);
 }
 
+/*
 void S_times(X* x) { 
   B* q = (B*)S_drop(x); 
   C n = S_drop(x); 
@@ -187,6 +187,7 @@ void S_while(X* x) {
     S_eval(x, q); 
   } while(1);
 }
+*/
 /*
 void S_allot(X* x) { 
   S_HERE(x) += S_drop(x); 
@@ -196,39 +197,40 @@ void S_allot(X* x) {
 void S_create(X* x) {
   C l = S_drop(x);
   B* s = (B*)S_drop(x);
-  B* w = x->b + S_HERE(x);
-	*((B**)w) = (B*)S_LATEST(x);
+	W* w = (W*)(x->b + S_HERE(x));
+	w->l = (W*)S_LATEST(x);
 	S_LATEST(x) = (C)w;
-	S_FLAGS(w) = 0;
-	S_NL(w) = l;
-	strncpy(S_NFA(w), s, l);
-	S_lit(x, (C)S_CFA(w));
-	S_HERE(x) += sizeof(B**) + 2 + l;
+	w->c = (B*)(w + 2*sizeof(C) + 2 + l);
+	w->f = 0;
+	w->s = l;
+	strncpy(w->n, s, l);
+	S_lit(x, (C)w->c);
+	S_HERE(x) += 2*sizeof(C) + 2 + l;
 }
 
 void S_find(X* x) {
   C l = S_drop(x);
   B* s = (B*)S_drop(x);
-  B* w = (B*)S_LATEST(x);
-  while (w) {
-		if (S_NL(w) == l && !strncmp(S_NFA(w), s, l)) {
+	W* w = (W*)S_LATEST(x);
+	while (w) {
+		if (w->s == l && !strncmp(w->n, s, l)) {
 			S_lit(x, (C)w);
 			return;
 		}
-		w = *((B**)w);
+		w = w->l;
 	}
-  S_lit(x, (C)s);
-  S_lit(x, l);
-  S_lit(x, 0);
+	S_lit(x, (C)s);
+	S_lit(x, l);
+	S_lit(x, 0);
 }
 
 void S_symbol(X* x) {
   C l = 0;
 	B* s = x->ip;
-	B* w;
+	W* w;
   if (x->b == 0) {
-    x->b = malloc(S_DICT_SIZE);
-    S_BLOCK_SIZE(x) = S_DICT_SIZE;
+    x->b = malloc(S_DEFAULT_DICT_SIZE);
+    S_BLOCK_SIZE(x) = S_DEFAULT_DICT_SIZE;
     S_HERE(x) = 3*sizeof(C);
     S_LATEST(x) = 0;
   }
@@ -237,8 +239,8 @@ void S_symbol(X* x) {
   S_lit(x, l);
   S_find(x);
   if (TS(x)) {
-    w = (B*)S_drop(x);
-    S_lit(x, (C)S_CFA(w));
+    w = (W*)S_drop(x);
+    S_lit(x, (C)w->c);
   } else {
     S_drop(x);
     S_create(x);
@@ -279,7 +281,7 @@ void S_qcompile(X* x, C e) {
   strncpy(x->b + S_HERE(x), q, l + e);
   S_HERE(x) += l + e; 
 }
-
+/*
 void S_accept(X* x) { 
 	C i = 0;
   C l1 = S_drop(x);
@@ -314,7 +316,7 @@ void S_type(X* x) {
 	B* s = (B*)S_drop(x);
 	while (n-- > 0) { S_lit(x, s[i++]); x->emit(x); }
 }
-
+*/
 void S_parse_literal(X* x) { 
 	C n = 0; 
 	while (S_is_digit(S_peek(x))) { n = 10*n + (S_token(x) - '0'); } 
@@ -343,11 +345,9 @@ void S_inner(X* x) {
 	B buf[1024];
 	C frame = x->rp;
 	do {
-    /*
 		memset(buf, 0, 255);
 		S_dump_X(buf, x, 100);
 		printf("%.95s <%ld>\n", buf, x->rp);
-  */
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -401,9 +401,7 @@ void S_inner(X* x) {
       case 'w': S_peek_T(x, 2); break;
       case 'x': S_peek_T(x, 3); break;
       case 'y': S_peek_T(x, 4); break;
-      case 'z': S_peek_T(x, 5); break;
-      case '$': S_call(x); break;
-			/*case 'x': S_call(x); break;*/
+      case 'a': S_call(x); break;
       /*case 'z': S_zcall(x); break;*/
       /*case 'q': exit(0); break;*/
       /* Memory */
@@ -420,17 +418,17 @@ void S_inner(X* x) {
 			case 'e': x->emit(x); break;
       /* Helpers */
       case '?': S_branch(x); break;
-      case 't': S_times(x); break;
+      /*case 't': S_times(x); break;*/
       /*case 'w': S_while(x); break;*/
       case 'i': S_inspect(x); break;
       case '\\': S_symbol(x); break;
-      /*case '$': S_symbol(x); S_call(x); break;*/
+      case '$': S_symbol(x); S_call(x); break;
       case 'g': S_qcompile(x, -1); break;
       case 'q': S_qcompile(x, 0); break;
       case 'h': S_create(x); break;
       case '`': S_find(x); break;
       /*case 'a': S_accept(x); break;*/
-      case 'p': S_type(x); break;
+      /*case 'p': S_type(x); break;*/
       case 'n': S_to_number(x); break;
       /*case 'y': memset(buf, 0, 1024); S_dump_S(buf, x); printf(" %s", buf); break;*/
       }

@@ -15,7 +15,7 @@ Features:
 * Relatively fast interpreter.
 * Ability to add C function extensions (bytecodes A-Z).
  
-## Bytecode
+## Bytecode (not updated)
 
 I don't think I like strings here....but if I have them, there must be also accept/type.
 
@@ -86,48 +86,7 @@ I don't think I like strings here....but if I have them, there must be also acce
     q -> compile quotation without return
     j -> compile quotation with return
 
-## Extensions
-
-I don't really like this for base.
-
-### Combinators
-
-    ? -> branch
-    1b -> 1bi
-    2b -> 2bi
-    3b -> 3bi
-    1t -> 1tri
-    2t -> 2tri
-    3t -> 3tri
-    b -> binrec
-    d -> dip
-    i -> ifte
-    l -> linrec
-    s -> sip
-    t -> times
-    u -> until
-    w -> while
-
-### Dictionary
-
-    a -> allot
-    h -> here
-    c -> create
-    f -> find
-    i -> init
-    ; -> compile byte
-    , -> compile cell
-    q -> compile quotation
-    Q -> compile quotation and return
-    s -> compile string
-
-### Strings
-
-    a -> accept
-    c -> compare
-    t -> type
-
-## ASCII ordered bytecodes
+## ASCII ordered bytecodes (updated)
 
     (SPACE) -> noop
     ! -> not
@@ -137,8 +96,8 @@ I don't really like this for base.
     % -> modulo
     & -> and
     ' -> byte literal
-    ( -> to r
-    ) -> from r
+    ( -> to t
+    ) -> from t
     * -> multiplication
     + -> addition
     , -> store cell
@@ -152,41 +111,41 @@ I don't really like this for base.
     = -> equal
     > -> greater than
     ? -> branch
-    @ -> relative to IP byte literal
+    @ -> (TODO) relative to IP byte literal
     A-Z -> C extensions
     [ -> start quotation
-    \ -> define/find symbol
+    \ -> define/find symbol (and initialize b if not done before)
     ] -> return/end of quotation
     ^ -> xor
     _ -> drop
     ` -> find
-    a -> accept
+    a -> apply (call/jump)
     b -> address of b register
-    c -> size of cell
+    c -> size of cell (8 on 64 bits, 4 on 32 bits, 2 on 16 bits)
     d -> drop
     e -> emit
-    f -> free from heap
-    g -> compile quotation without return
+    f -> free from heap (free)
+    g -> compile quotation without ending return
     h -> header
     i -> inspect memory
     j -> 
     k -> key
     l ->
-    m -> allocate on heap
-    n -> to number
+    m -> allocate on heap (malloc)
+    n -> string to number
     o -> over
-    p -> print (type)
+    p -> 
     q -> compile quotation
     r -> rot
     s -> swap
-    t -> times
-    u -> top of R
-    v -> second of R
-    w -> while
-    x -> call/jump
-    y ->
+    t -> 
+    u -> top of T
+    v -> second of T
+    w -> third of T
+    x -> fourth of T
+    y -> fifth of T
     z -> call/jump if zero
     { ->
     | -> or
-    } -> return
+    } -> return (alternative to ] for exiting returning from a quotation)
     ~ -> invert
