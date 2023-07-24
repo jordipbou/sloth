@@ -10,10 +10,12 @@ typedef intptr_t C;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
+#define TSTACK_SIZE 64
 
 typedef struct _X { 
   C* s; C sp; C ss;
   B** r; C rp; C rs;
+  C* t; C tp; C ts;
 	B* ip;
   B* b;
 	void (*key)(struct _X*);
@@ -40,6 +42,7 @@ X* S_init() {
 	X* x = malloc(sizeof(X));
   x->s = malloc(STACK_SIZE*sizeof(C));
   x->r = malloc(RSTACK_SIZE*sizeof(C));
+  x->t = malloc(TSTACK_SIZE*sizeof(C));
 	x->sp = x->rp = 0;
   x->ss = STACK_SIZE;
   x->rs = RSTACK_SIZE;
@@ -122,9 +125,9 @@ void S_lt(X* x) { NS(x) = NS(x) < TS(x); --x->sp; }
 void S_eq(X* x) { NS(x) = NS(x) == TS(x); --x->sp; }
 void S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
 
-void S_to_R(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
-void S_from_R(X* x) { x->s[x->sp++] = (C)x->r[--x->rp]; }
-void S_peek_R(X* x, C n) { x->s[x->sp++] = (C)x->r[x->rp - 1 - n]; }
+void S_to_T(X* x) { x->t[x->tp++] = x->s[--x->sp]; }
+void S_from_T(X* x) { x->s[x->sp++] = x->t[--x->tp]; }
+void S_peek_T(X* x, C n) { x->s[x->sp++] = x->t[x->tp - 1 - n]; }
 
 void S_push(X* x) { x->r[x->rp++] = x->ip; }
 void S_pop(X* x) { x->ip = x->r[--x->rp]; }
@@ -391,12 +394,17 @@ void S_inner(X* x) {
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
       /* Execution */
-      case ')': S_from_R(x); break;
-      case '(': S_to_R(x); break;
-      case 'u': S_peek_R(x, 0); break;
-      case 'v': S_peek_R(x, 1); break;
-			case 'x': S_call(x); break;
-      case 'z': /* S_zcall(x); */ break;
+      case ')': S_from_T(x); break;
+      case '(': S_to_T(x); break;
+      case 'u': S_peek_T(x, 0); break;
+      case 'v': S_peek_T(x, 1); break;
+      case 'w': S_peek_T(x, 2); break;
+      case 'x': S_peek_T(x, 3); break;
+      case 'y': S_peek_T(x, 4); break;
+      case 'z': S_peek_T(x, 5); break;
+      case '$': S_call(x); break;
+			/*case 'x': S_call(x); break;*/
+      /*case 'z': S_zcall(x); break;*/
       /*case 'q': exit(0); break;*/
       /* Memory */
       case 'm': S_malloc(x); break;
@@ -413,18 +421,18 @@ void S_inner(X* x) {
       /* Helpers */
       case '?': S_branch(x); break;
       case 't': S_times(x); break;
-      case 'w': S_while(x); break;
+      /*case 'w': S_while(x); break;*/
       case 'i': S_inspect(x); break;
       case '\\': S_symbol(x); break;
-      case '$': S_symbol(x); S_call(x); break;
+      /*case '$': S_symbol(x); S_call(x); break;*/
       case 'g': S_qcompile(x, -1); break;
       case 'q': S_qcompile(x, 0); break;
       case 'h': S_create(x); break;
       case '`': S_find(x); break;
-      case 'a': S_accept(x); break;
+      /*case 'a': S_accept(x); break;*/
       case 'p': S_type(x); break;
       case 'n': S_to_number(x); break;
-      case 'y': memset(buf, 0, 1024); S_dump_S(buf, x); printf(" %s", buf); break;
+      /*case 'y': memset(buf, 0, 1024); S_dump_S(buf, x); printf(" %s", buf); break;*/
       }
     }
 	} while(1);

@@ -107,7 +107,9 @@ int main(int argc, char** argv) {
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
 
+  /*
   S_eval(x, bootForth);
+  */
   
 	if (argc == 1 || argc == 3) {
 		do {
