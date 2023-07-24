@@ -11,7 +11,7 @@ typedef double F;
 
 typedef struct { C t; C l; union { C i; F f; void *p; } v; } O;
 
-enum { INT = 2, FLOAT = 3, MANAGED = 5, RETURN = 7 } T;
+enum { INT = 2, FLOAT = 3, MANAGED = 5, RETURN = 7, HANDLER = 9 } T;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
@@ -451,6 +451,8 @@ void S_inner(X* x) {
       case '(': S_to_R(x); break;
       case 'u': S_peek_R(x, 0); break;
       case 'v': S_peek_R(x, 1); break;
+      case 'w': S_peek_R(x, 2); break;
+      case 'j': S_peek_R(x, 3); break;
 			case 'x': S_call(x); break;
       case 'z': /* S_zcall(x); */ break;
       /*case 'q': exit(0); break;*/
@@ -469,7 +471,7 @@ void S_inner(X* x) {
       /* Helpers */
       case '?': S_branch(x); break;
       case 't': S_times(x); break;
-      case 'w': S_while(x); break;
+      /*case 'w': S_while(x); break;*/
       case 'i': S_inspect(x); break;
       case '\\': S_symbol(x); break;
       case '$': S_symbol(x); S_call(x); break;
