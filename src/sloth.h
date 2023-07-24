@@ -62,8 +62,8 @@ C S_dump_S(B* s, X* x) {
 
 C S_dump_CODE(B* s, B* a) {
 	C i = 0, t = 1;
-	if (a < 1000) {
-    return sprintf(s, "%ld", a);
+	if (((C)a) < 1000) {
+    return sprintf(s, "%ld", (C)a);
   }
 	while (t && a[i] && a[i] != 10) {
 		switch (a[i++]) {
@@ -245,7 +245,7 @@ void S_symbol(X* x) {
   }
 }
 
-void S_to_number(x) {
+void S_to_number(X* x) {
   C l = S_drop(x);
   B* s = (B*)S_drop(x);
   char *ptr;
