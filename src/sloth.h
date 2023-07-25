@@ -19,7 +19,7 @@ typedef struct _X {
   B** r; C rp; C rs;
   C* t; C tp; C ts;
 	B* ip;
-  B* b; /* TODO: This could be changed to a dictionary stack, or a namestack could be added to manage searches independent of this context dictionary */
+  B* b;
 	void (*key)(struct _X*);
 	void (*emit)(struct _X*);
   void (**ext)(struct _X*);
@@ -27,9 +27,11 @@ typedef struct _X {
   C tr;
 } X;
 
+#include "trace.h"
+
 #define EXT(x, l) (x->ext[l - 'A'])
 
-#define S_DEFAULT_DICT_SIZE 65536
+#define S_DEFAULT_DICT_SIZE 8192
 
 #define S_BLOCK_SIZE(x) (((C*)x->b)[0])
 #define S_HERE(x) (((C*)x->b)[1])
@@ -50,44 +52,6 @@ X* S_init() {
   x->err = 0;
   x->tr = 0;
 	return x;
-}
-
-C S_dump_S(B* s, X* x) {
-	C i = 0, t, n = 0;
-	while (i < x->sp) { s += t = sprintf(s, "%ld ", x->s[i]); n += t; i++; }
-	return n;
-}
-
-C S_dump_CODE(B* s, B* a) {
-	C i = 0, t = 1;
-	if (((C)a) < 1000) {
-    return sprintf(s, "%ld", (C)a);
-  }
-	while (t && a[i] && a[i] != 10) {
-		switch (a[i++]) {
-		case '[': t++; break;
-		case ']': t--; break;
-		}
-	}
-	return sprintf(s, "%.*s", (unsigned int)i, a);
-}
-
-C S_dump_R(B* s, X* x) {
-	C i, t = 1, n = 0;
-	s += t = S_dump_CODE(s, x->ip); n += t;
-	for (i = x->rp - 1; i >= 0; i--) {
-		*s++ = ' '; *s++ = ':'; *s++ = ' '; n += 3;
-		s += t = S_dump_CODE(s, x->r[i]); n += t;
-	}
-	return n;
-}
-
-C S_dump_X(B* s, X* x, unsigned int w) {
-	C t, n = 0;
-	s += t = S_dump_S(s, x); n += t;
-	*s++ = ':'; *s++ = ' '; n += 2;
-  s += t = S_dump_R(s, x); n += t;
-	return n;
 }
 
 void S_inner(X* x);
@@ -171,36 +135,13 @@ void S_branch(X* x) {
   S_call(x);
 }
 
-/*
-void S_times(X* x) { 
-  B* q = (B*)S_drop(x); 
-  C n = S_drop(x); 
-  while (n-- > 0) { S_eval(x, q); } 
-}
-
-void S_while(X* x) { 
-  B* q = (B*)S_drop(x);
-  B* c = (B*)S_drop(x);
-  do { 
-    S_eval(x, c); 
-    if (!S_drop(x)) break; 
-    S_eval(x, q); 
-  } while(1);
-}
-*/
-/*
-void S_allot(X* x) { 
-  S_HERE(x) += S_drop(x); 
-}
-*/
-
 void S_create(X* x) {
   C l = S_drop(x);
   B* s = (B*)S_drop(x);
 	W* w = (W*)(x->b + S_HERE(x));
 	w->l = (W*)S_LATEST(x);
 	S_LATEST(x) = (C)w;
-	w->c = (B*)(w + 2*sizeof(C) + 2 + l);
+	w->c = ((B*)w) + 2*sizeof(C) + 2 + l;
 	w->f = 0;
 	w->s = l;
 	strncpy(w->n, s, l);
@@ -224,9 +165,20 @@ void S_find(X* x) {
 	S_lit(x, 0);
 }
 
-void S_symbol(X* x) {
+void S_parse_symbol(X* x) {
   C l = 0;
-	B* s = x->ip;
+  B* s = x->ip;
+  while (!isspace(S_token(x))) { l++; }
+  S_lit(x, (C)s);
+  S_lit(x, l);
+}
+
+void S_cfa(X* x) {
+  W* w = (W*)S_drop(x);
+  S_lit(x, (C)w->c);
+}
+
+void S_symbol(X* x) {
 	W* w;
   if (x->b == 0) {
     x->b = malloc(S_DEFAULT_DICT_SIZE);
@@ -234,9 +186,7 @@ void S_symbol(X* x) {
     S_HERE(x) = 3*sizeof(C);
     S_LATEST(x) = 0;
   }
-	while (!isspace(S_token(x))) { l++; }
-  S_lit(x, (C)s);
-  S_lit(x, l);
+  S_parse_symbol(x);
   S_find(x);
   if (TS(x)) {
     w = (W*)S_drop(x);
@@ -257,19 +207,6 @@ void S_to_number(X* x) {
   S_lit(x, l - (C)(ptr - s));
 }
 
-/*
-void S_bcompile(X* x) { 
-  B v = (B)S_drop(x);
-  *(x->b + S_HERE(x)) = v;
-  S_HERE(x)++;
-}
-
-void S_ccompile(X* x) {
-  C v = S_drop(x);
-  *((C*)(x->b + S_HERE(x))) = v;
-  S_HERE(x) += sizeof(C);
-}
-*/
 void S_qcompile(X* x, C e) { 
   C l = 0, t = 1; 
   B* q = (B*)S_drop(x);
@@ -281,42 +218,7 @@ void S_qcompile(X* x, C e) {
   strncpy(x->b + S_HERE(x), q, l + e);
   S_HERE(x) += l + e; 
 }
-/*
-void S_accept(X* x) { 
-	C i = 0;
-  C l1 = S_drop(x);
-  B* s1 = (B*)S_drop(x);
-	do { 
-		x->key(x); 
-		if (TS(x) == 10) {
-			S_drop(x);
-			break;
-		} else if (TS(x) == 127) {
-      S_drop(x);
-      if (i > 0) {
-        S_lit(x, '\b');
-        x->emit(x);
-        S_lit(x, ' ');
-        x->emit(x);
-        S_lit(x, '\b');
-        x->emit(x);
-        i--;
-      }
-    } else {
-			s1[i++] = TS(x);
-			x->emit(x);
-		}
-	} while(i < l1);
-	S_lit(x, i);
-}
 
-void S_type(X* x) {
-	C i = 0;
-	C n = S_drop(x);
-	B* s = (B*)S_drop(x);
-	while (n-- > 0) { S_lit(x, s[i++]); x->emit(x); }
-}
-*/
 void S_parse_literal(X* x) { 
 	C n = 0; 
 	while (S_is_digit(S_peek(x))) { n = 10*n + (S_token(x) - '0'); } 
@@ -345,9 +247,7 @@ void S_inner(X* x) {
 	B buf[1024];
 	C frame = x->rp;
 	do {
-		memset(buf, 0, 255);
-		S_dump_X(buf, x, 100);
-		printf("%.95s <%ld>\n", buf, x->rp);
+    S_trace(x);
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -418,19 +318,14 @@ void S_inner(X* x) {
 			case 'e': x->emit(x); break;
       /* Helpers */
       case '?': S_branch(x); break;
-      /*case 't': S_times(x); break;*/
-      /*case 'w': S_while(x); break;*/
       case 'i': S_inspect(x); break;
       case '\\': S_symbol(x); break;
-      case '$': S_symbol(x); S_call(x); break;
+      case '$': S_parse_symbol(x); S_find(x); S_cfa(x); S_call(x); break;
       case 'g': S_qcompile(x, -1); break;
       case 'q': S_qcompile(x, 0); break;
       case 'h': S_create(x); break;
       case '`': S_find(x); break;
-      /*case 'a': S_accept(x); break;*/
-      /*case 'p': S_type(x); break;*/
       case 'n': S_to_number(x); break;
-      /*case 'y': memset(buf, 0, 1024); S_dump_S(buf, x); printf(" %s", buf); break;*/
       }
     }
 	} while(1);
