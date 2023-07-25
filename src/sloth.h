@@ -94,6 +94,7 @@ void S_peek_T(X* x, C n) { x->s[x->sp++] = x->t[x->tp - 1 - n]; }
 void S_push(X* x) { x->r[x->rp++] = x->ip; }
 void S_pop(X* x) { x->ip = x->r[--x->rp]; }
 void S_call(X* x) { B t = S_peek(x); if (t && t != ']' && t != '}') S_push(x); x->ip = (B*)S_drop(x); }
+void S_zcall(X* x) { S_swap(x); if (S_drop(x)) S_drop(x); else S_call(x); }
 void S_eval(X* x, B* q) { S_lit(x, (C)q); S_call(x); S_inner(x); }
 
 void S_bstore(X* x) { B* a = (B*)S_drop(x); *a = (B)S_drop(x); }
@@ -271,6 +272,7 @@ void S_inner(X* x) {
 			switch (S_token(x)) {
       case '\'': S_lit(x, (C)S_token(x)); break;
       case '#': S_lit(x, *((C*)x->ip)); x->ip += sizeof(C); break;
+      case '@': S_lit(x, (C)(x->ip + ((B)S_token(x)))); break;
       /* Stack */
 			case 's': S_swap(x); break;
 			case 'd': S_dup(x); break;
@@ -302,7 +304,7 @@ void S_inner(X* x) {
       case 'x': S_peek_T(x, 3); break;
       case 'y': S_peek_T(x, 4); break;
       case 'a': S_call(x); break;
-      /*case 'z': S_zcall(x); break;*/
+      case 'z': S_zcall(x); break;
       /*case 'q': exit(0); break;*/
       /* Memory */
       case 'm': S_malloc(x); break;
