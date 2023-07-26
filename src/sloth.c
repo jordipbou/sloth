@@ -43,14 +43,18 @@ void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
 
 B* bootForth =
-"\\here _[cb.+ . b.+]q"
-"\\allot _[cb.+ . + cb.+ ,]q"
-"\\, _[$here , c $allot ]q"
-"\\c, _[$here ; 1 $allot ]q"
-"\\latest _[cc+b.+ .]q"
-"\\flags _[c+]q"
-"\\nfa _[c1++ d : s 1+ s]q"
-"\\cfa _[c1++ d : s 1++]q"
+"\\block-size _[b..]q"
+"\\here _[cb.+.b.+]q"
+"\\latest _[cc+b.+.]q"
+"\\allot _[cb.+.+cb.+,]q"
+"\\, _\\here g[,c]g\\allot g[}]q"
+"\\c, _\\here g[;1]g\\allot g[}]q"
+"\\while _[[ua[vawa][]?](((wa)))___]q"
+"\\type _[[d0>][1-sd:e1+s]]g\\while g[__]q"
+"\\flags _[c+c+]q"
+"\\nfa _[c+c+1+ d : s 1+ s]q"
+"\\cfa _[c+.]q";
+/*
 "\\set-immediate _[$flags d:1|s;]q"
 "\\is-immediate? _[$flags :1&]q"
 "\\immediate _[$latest $set-immediate ]q"
@@ -60,9 +64,6 @@ B* bootForth =
 "\\source _[\\tib \\tib-length .]q"
 "\\compare _[ro=[1s[rroo:s:=(1+s1+sr)&]ts_s_][___0]?]q"
 "\\2over _[((oo)rr)rr]q"
-/*
-"\\find _[$latest [d0=[0][(oourr) $nfa $compare [s_s_0][1]?]?][.]w]q"
-*/
 "\\refill _[0\\in ,\\tib 255a\\tib-length ,]q"
 "\\bl _[' ]q"
 "\\is-space? _\\bl g[1+<]q"
@@ -78,6 +79,7 @@ B* bootForth =
 "\\dup _[d]q"
 "\\+ _[+]q"
 "\\.s _[y]q";
+*/
 
 int main(int argc, char** argv) {
 	FILE* fptr;
@@ -107,20 +109,14 @@ int main(int argc, char** argv) {
 		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 	}
 
-	/*
+  /*
   S_eval(x, bootForth);
-	*/
-
+  */
+  
 	if (argc == 1 || argc == 3) {
 		do {
 			fgets(buf, 255, stdin);
-			x->ip = buf;	
-			S_inner(x);
-			/*
-      memset(buf, 0, 255);
-      S_dump_X(buf, x, 50);
-      printf("%s\n", buf);
-			*/
+      S_eval(x, buf);
 			if (x->err != 0) { printf("ERROR: %ld", x->err); return; }
 			printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 		} while(1);

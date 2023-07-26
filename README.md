@@ -1,92 +1,51 @@
 # SLOTH
 
-A small, simple, relatively fast, double stack based virtual machine f with human readable/writeable bytecode meant for extending application.
+A small, simple, relatively fast, double stack based virtual machine with human readable/writeable bytecode meant for extending applications.
 
 In the future there will be other implementations (at least Java/Kotlin for Android development).
 
-Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor.
+Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor and Dawn.
 
 Features:
 
 * One C89 header only. Very easily embedabble in a C/C++ application.
 * Human readable bytecode (ASCII 32-126), no need to use an assembler.
-* Cell based data and return stack
+* Cell (64, 32 or 16 bits) based data stack, return stack and retain stack
 * Quotations at bytecode level.
 * Relatively fast interpreter.
-* Ability to add C function extensions (bytecodes A-Z).
- 
-## Bytecode (not updated)
+* Ability to add C function thru bytecode extensions (bytecodes A-Z).
 
-I don't think I like strings here....but if I have them, there must be also accept/type.
+## VM Architecture
 
-    ' -> byte literal
-    # -> cell literal
-    @ -> relative to IP byte literal
+* Data Stack (S)
+* Return Stack (R)
+* Retain Stack (T)
+* Handler Stack (H)
+* Program Counter Register (P)
+* Error Register (E)
+* Memory Block Register (B)
 
-    s -> swap
-    d -> dup
-    o -> over
-    r -> rot
-    _ -> drop
-    
-    + -> addition
-    - -> substraction
-    * -> multiplication
-    / -> division
-    % -> modulo
-    
-    < -> less than
-    = -> equal
-    > -> greater than
-    
-    x -> call, jump x] or x} or x<0>
-    ] -> return, also } and <0>
-    z -> call if zero, jump z] or z} or z<0>
-    ( -> to r
-    ) -> from r
-    u -> peek top of r
-    v -> peek next of r
-    
-    & -> and
-    | -> or
-    ! -> not
-    ~ -> invert
+## VM Instruction Set
 
-    k -> key
-    e -> emit
+    S_ -> DR (drop) -> _
+    S>T -> TT (to T) -> (
+    T>S -> FT (from T) -> )
+    Top of T->S -> T0 -> u
+    Second of T->S -> T1 -> v
+    Third of T->S -> T2 -> w
+    Fourth of T->S -> T3 -> x
+    Fifth of T->S -> T4 -> y
+    S>R -> TR (to R) -> {
+    R>S -> FR (from R) ->
+    R>P -> TP (to P) (return) -> 
+    P>S -> FP (from P) ->
 
-    b -> pushes b register address
-    
-    m -> malloc
-    f -> free
-    c -> cell size
-    ; -> store byte
-    : -> fetch byte
-    , -> store byte
-    . -> fetch byte
+call -> P>S, S>R, R>P -> 
+jump -> S>R, R>P -> 
+swap -> S>T, S>R, T>S, R>S
+rot -> S>R, S>T, S>T, T>S, T>S, R>S
 
-    --- Helpers
-
-    "" -> string literal
-    [] -> quotation literal
-    0-9 -> number literal
-
-    u -> accept
-    g -> type
-
-    i -> inspect
-    
-    ? -> branch
-    w -> while
-    t -> times
-
-    \ -> create/find symbol (pushes CFA)
-    $ -> call to symbol CFA
-
-    q -> compile quotation without return
-    j -> compile quotation with return
-
-## ASCII ordered bytecodes (updated)
+## Bytecodes
 
     (SPACE) -> noop
     ! -> not
@@ -119,18 +78,18 @@ I don't think I like strings here....but if I have them, there must be also acce
     ^ -> xor
     _ -> drop
     ` -> find
-    a -> apply (call/jump)
+    a -> 
     b -> address of b register
     c -> size of cell (8 on 64 bits, 4 on 32 bits, 2 on 16 bits)
-    d -> drop
+    d -> dup
     e -> emit
     f -> free from heap (free)
     g -> compile quotation without ending return
     h -> header
     i -> inspect memory
-    j -> 
+    j -> jump/call
     k -> key
-    l ->
+    l -> 
     m -> allocate on heap (malloc)
     n -> string to number
     o -> over
@@ -138,14 +97,14 @@ I don't think I like strings here....but if I have them, there must be also acce
     q -> compile quotation
     r -> rot
     s -> swap
-    t -> 
+    t -> throw (set E)
     u -> top of T
     v -> second of T
     w -> third of T
     x -> fourth of T
     y -> fifth of T
-    z -> call/jump if zero
-    { ->
+    z -> jump/call if zero
+    { -> to R
     | -> or
     } -> return (alternative to ] for exiting returning from a quotation)
     ~ -> invert

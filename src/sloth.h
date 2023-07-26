@@ -5,6 +5,8 @@
 #include<stdlib.h> /* malloc, free */
 #include<string.h> /* strncpy, memset, strncmp */
 
+#define V void 
+
 typedef char B;
 typedef intptr_t C;
 
@@ -20,9 +22,9 @@ typedef struct _X {
   C* t; C tp; C ts;
 	B* ip;
   B* b;
-	void (*key)(struct _X*);
-	void (*emit)(struct _X*);
-  void (**ext)(struct _X*);
+	V (*key)(struct _X*);
+	V (*emit)(struct _X*);
+  V (**ext)(struct _X*);
   C err;
   C tr;
 } X;
@@ -54,7 +56,7 @@ X* S_init() {
 	return x;
 }
 
-void S_inner(X* x);
+V S_inner(X* x);
 
 B S_peek(X* x) { return x->ip == 0 ? 0 : *x->ip; }
 B S_token(X* x) { B tk = S_peek(x); x->ip++; return tk; }
@@ -64,50 +66,51 @@ C S_is_digit(B c) { return c >= '0' && c <= '9'; }
 #define NS(x) (x->s[x->sp - 2])
 #define NNS(x) (x->s[x->sp - 3])
 
-void S_lit(X* x, C v) { x->s[x->sp++] = v; }
-void S_dup(X* x) { S_lit(x, TS(x)); }
-void S_over(X* x) { S_lit(x, NS(x)); }
-void S_rot(X* x) { C t = NNS(x); NNS(x) = NS(x); NS(x) = TS(x); TS(x) = t; TS(x); }
-void S_swap(X* x) { C t = TS(x); TS(x) = NS(x); NS(x) = t; }
+V S_lit(X* x, C v) { x->s[x->sp++] = v; }
+V S_dup(X* x) { S_lit(x, TS(x)); }
+V S_over(X* x) { S_lit(x, NS(x)); }
+V S_rot(X* x) { C t = NNS(x); NNS(x) = NS(x); NS(x) = TS(x); TS(x) = t; TS(x); }
+V S_swap(X* x) { C t = TS(x); TS(x) = NS(x); NS(x) = t; }
 C S_drop(X* x) { return x->s[--x->sp]; }
 
-void S_add(X* x) { NS(x) = NS(x) + TS(x); --x->sp; }
-void S_sub(X* x) { NS(x) = NS(x) - TS(x); --x->sp; }
-void S_mul(X* x) { NS(x) = NS(x) * TS(x); --x->sp; }
-void S_div(X* x) { NS(x) = NS(x) / TS(x); --x->sp; }
-void S_mod(X* x) { NS(x) = NS(x) % TS(x); --x->sp; }
+V S_add(X* x) { NS(x) = NS(x) + TS(x); --x->sp; }
+V S_sub(X* x) { NS(x) = NS(x) - TS(x); --x->sp; }
+V S_mul(X* x) { NS(x) = NS(x) * TS(x); --x->sp; }
+V S_div(X* x) { NS(x) = NS(x) / TS(x); --x->sp; }
+V S_mod(X* x) { NS(x) = NS(x) % TS(x); --x->sp; }
 
-void S_and(X* x) { NS(x) = NS(x) & TS(x); --x->sp; }
-void S_or(X* x) { NS(x) = NS(x) | TS(x); --x->sp; }
-void S_xor(X* x) { NS(x) = NS(x) ^ TS(x); --x->sp; }
-void S_not(X* x) { TS(x) = !TS(x); }
-void S_invert(X* x) { TS(x) = ~TS(x); }
+V S_and(X* x) { NS(x) = NS(x) & TS(x); --x->sp; }
+V S_or(X* x) { NS(x) = NS(x) | TS(x); --x->sp; }
+V S_xor(X* x) { NS(x) = NS(x) ^ TS(x); --x->sp; }
+V S_not(X* x) { TS(x) = !TS(x); }
+V S_invert(X* x) { TS(x) = ~TS(x); }
 
-void S_lt(X* x) { NS(x) = NS(x) < TS(x); --x->sp; }
-void S_eq(X* x) { NS(x) = NS(x) == TS(x); --x->sp; }
-void S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
+V S_lt(X* x) { NS(x) = NS(x) < TS(x); --x->sp; }
+V S_eq(X* x) { NS(x) = NS(x) == TS(x); --x->sp; }
+V S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
 
-void S_to_T(X* x) { x->t[x->tp++] = x->s[--x->sp]; }
-void S_from_T(X* x) { x->s[x->sp++] = x->t[--x->tp]; }
-void S_peek_T(X* x, C n) { x->s[x->sp++] = x->t[x->tp - 1 - n]; }
+V S_to_R(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
+V S_to_T(X* x) { x->t[x->tp++] = x->s[--x->sp]; }
+V S_from_T(X* x) { x->s[x->sp++] = x->t[--x->tp]; }
+V S_peek_T(X* x, C n) { x->s[x->sp++] = x->t[x->tp - 1 - n]; }
 
-void S_push(X* x) { x->r[x->rp++] = x->ip; }
-void S_pop(X* x) { x->ip = x->r[--x->rp]; }
-void S_call(X* x) { B t = S_peek(x); if (t && t != ']' && t != '}') S_push(x); x->ip = (B*)S_drop(x); }
-void S_zcall(X* x) { S_swap(x); if (S_drop(x)) S_drop(x); else S_call(x); }
-void S_eval(X* x, B* q) { S_lit(x, (C)q); S_call(x); S_inner(x); }
+V S_push(X* x) { x->r[x->rp++] = x->ip; }
+V S_pop(X* x) { x->ip = x->r[--x->rp]; }
+V S_call(X* x) { B t = S_peek(x); if (t && t != ']' && t != '}') S_push(x); x->ip = (B*)S_drop(x); }
+V S_zcall(X* x) { S_swap(x); if (S_drop(x)) S_drop(x); else S_call(x); }
+V S_eval(X* x, B* q) { S_lit(x, (C)q); S_call(x); S_inner(x); }
 
-void S_bstore(X* x) { B* a = (B*)S_drop(x); *a = (B)S_drop(x); }
-void S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
+V S_bstore(X* x) { B* a = (B*)S_drop(x); *a = (B)S_drop(x); }
+V S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
 
-void S_bfetch(X* x) { S_lit(x, *((B*)S_drop(x))); }
-void S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
+V S_bfetch(X* x) { S_lit(x, *((B*)S_drop(x))); }
+V S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 
-void S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
-void S_free(X* x) { free((void*)S_drop(x)); }
+V S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
+V S_free(X* x) { free((V*)S_drop(x)); }
 
 /* TODO: Could this be done "easily" in SLOTH */
-void S_inspect(X* x) {
+V S_inspect(X* x) {
   /* TODO: Show ASCII representation */
   /* TODO: Use vectored I/O */
   C i = 0, j;
@@ -129,14 +132,14 @@ void S_inspect(X* x) {
   printf("\n");
 }
 
-void S_branch(X* x) { 
+V S_branch(X* x) { 
   S_rot(x); 
   if (!S_drop(x)) { S_swap(x); }
   S_drop(x);
   S_call(x);
 }
 
-void S_create(X* x) {
+V S_create(X* x) {
   C l = S_drop(x);
   B* s = (B*)S_drop(x);
 	W* w = (W*)(x->b + S_HERE(x));
@@ -150,7 +153,7 @@ void S_create(X* x) {
 	S_HERE(x) += 2*sizeof(C) + 2 + l;
 }
 
-void S_find(X* x) {
+V S_find(X* x) {
   C l = S_drop(x);
   B* s = (B*)S_drop(x);
 	W* w = (W*)S_LATEST(x);
@@ -166,7 +169,7 @@ void S_find(X* x) {
 	S_lit(x, 0);
 }
 
-void S_parse_symbol(X* x) {
+V S_parse_symbol(X* x) {
   C l = 0;
   B* s = x->ip;
   while (!isspace(S_token(x))) { l++; }
@@ -174,12 +177,12 @@ void S_parse_symbol(X* x) {
   S_lit(x, l);
 }
 
-void S_cfa(X* x) {
+V S_cfa(X* x) {
   W* w = (W*)S_drop(x);
   S_lit(x, (C)w->c);
 }
 
-void S_symbol(X* x) {
+V S_symbol(X* x) {
 	W* w;
   if (x->b == 0) {
     x->b = malloc(S_DEFAULT_DICT_SIZE);
@@ -198,7 +201,7 @@ void S_symbol(X* x) {
   }
 }
 
-void S_to_number(X* x) {
+V S_to_number(X* x) {
   C l = S_drop(x);
   B* s = (B*)S_drop(x);
   char *ptr;
@@ -208,7 +211,7 @@ void S_to_number(X* x) {
   S_lit(x, l - (C)(ptr - s));
 }
 
-void S_qcompile(X* x, C e) { 
+V S_qcompile(X* x, C e) { 
   C l = 0, t = 1; 
   B* q = (B*)S_drop(x);
   while (t) {
@@ -220,13 +223,13 @@ void S_qcompile(X* x, C e) {
   S_HERE(x) += l + e; 
 }
 
-void S_parse_literal(X* x) { 
+V S_parse_literal(X* x) { 
 	C n = 0; 
 	while (S_is_digit(S_peek(x))) { n = 10*n + (S_token(x) - '0'); } 
 	S_lit(x, n); 
 }
 
-void S_parse_quotation(X* x) { 
+V S_parse_quotation(X* x) { 
 	C t = 1; 
 	B c; 
 	S_lit(x, (C)(++x->ip)); 
@@ -238,13 +241,13 @@ void S_parse_quotation(X* x) {
   }
 }
 
-void S_parse_string(X* x) {
+V S_parse_string(X* x) {
   S_lit(x, (C)(++x->ip));
   while (S_token(x) != '"') {}
   S_lit(x, (C)(x->ip - TS(x)) - 1);
 }
 
-void S_inner(X* x) {
+V S_inner(X* x) {
 	B buf[1024];
 	C frame = x->rp;
 	do {
@@ -296,6 +299,7 @@ void S_inner(X* x) {
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
       /* Execution */
+      case '{': S_to_R(x); break;
       case ')': S_from_T(x); break;
       case '(': S_to_T(x); break;
       case 'u': S_peek_T(x, 0); break;
@@ -303,8 +307,9 @@ void S_inner(X* x) {
       case 'w': S_peek_T(x, 2); break;
       case 'x': S_peek_T(x, 3); break;
       case 'y': S_peek_T(x, 4); break;
-      case 'a': S_call(x); break;
+      case 'j': S_call(x); break;
       case 'z': S_zcall(x); break;
+      case '?': S_branch(x); break;
       /*case 'q': exit(0); break;*/
       /* Memory */
       case 'm': S_malloc(x); break;
@@ -319,7 +324,6 @@ void S_inner(X* x) {
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
       /* Helpers */
-      case '?': S_branch(x); break;
       case 'i': S_inspect(x); break;
       case '\\': S_symbol(x); break;
       case '$': S_parse_symbol(x); S_find(x); S_cfa(x); S_call(x); break;
