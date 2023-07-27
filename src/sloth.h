@@ -22,14 +22,17 @@ typedef struct _X {
   C* t; C tp; C ts;
 	B* ip;
   B* b;
+  void* o; B on;
+  void* d; B dn;
 	V (*key)(struct _X*);
 	V (*emit)(struct _X*);
+  V (*trace)(struct _X*);
   V (**ext)(struct _X*);
   C err;
   C tr;
 } X;
 
-#include "trace.h"
+/*#include "trace.h"*/
 
 #define EXT(x, l) (x->ext[l - 'A'])
 
@@ -91,33 +94,55 @@ V S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
 
 V S_to_R(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
 V S_to_T(X* x) { x->t[x->tp++] = x->s[--x->sp]; }
-V S_from_T(X* x) { x->s[x->sp++] = x->t[--x->tp]; }
+V S_drop_T(X* x) { x->tp--; }
 V S_peek_T(X* x, C n) { x->s[x->sp++] = x->t[x->tp - 1 - n]; }
 
 V S_push(X* x) { x->r[x->rp++] = x->ip; }
 V S_pop(X* x) { x->ip = x->r[--x->rp]; }
-V S_call(X* x) { B t = S_peek(x); if (t && t != ']' && t != '}') S_push(x); x->ip = (B*)S_drop(x); }
+V S_call(X* x) { 
+  B t = S_peek(x); 
+  if (x->ip && t && t != ']' && t != '}')
+    S_push(x);
+  x->ip = (B*)S_drop(x); 
+}
 V S_zcall(X* x) { S_swap(x); if (S_drop(x)) S_drop(x); else S_call(x); }
-V S_eval(X* x, B* q) { S_lit(x, (C)q); S_call(x); S_inner(x); }
+V S_eval(X* x, B* q) { 
+  S_lit(x, (C)q); 
+  S_call(x); 
+  S_inner(x); 
+}
 
-V S_bstore(X* x) { B* a = (B*)S_drop(x); *a = (B)S_drop(x); }
-V S_cstore(X* x) { C* a = (C*)S_drop(x); *a = S_drop(x); }
+V S_bstore(X* x) { 
+  x->d = (void*)S_drop(x);
+  x->dn = 1;
+  *((B*)x->d) = (B)S_drop(x); 
+}
+V S_cstore(X* x) { 
+  x->d = (void*)S_drop(x);
+  x->dn = sizeof(C);
+  *((C*)x->d) = S_drop(x); 
+}
 
-V S_bfetch(X* x) { S_lit(x, *((B*)S_drop(x))); }
-V S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
+V S_bfetch(X* x) { 
+  x->o = (void*)S_drop(x); 
+  x->on = 1;
+  S_lit(x, *((B*)x->o)); 
+}
+V S_cfetch(X* x) { 
+  x->o = (void*)S_drop(x);
+  x->on = sizeof(C);
+  S_lit(x, *((C*)x->o)); 
+}
 
 V S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 V S_free(X* x) { free((V*)S_drop(x)); }
 
-/* TODO: Could this be done "easily" in SLOTH */
+/* 
 V S_inspect(X* x) {
-  /* TODO: Show ASCII representation */
-  /* TODO: Use vectored I/O */
   C i = 0, j;
   C n = S_drop(x);
   B* a = (B*)S_drop(x);
   while (i < n) {
-    /* Do with type! */
     printf("\n%p: ", a + i);
     for (j = 0; j < 4 && i < n; j++, i++) {
       printf("%02X ", (unsigned char)a[i]);
@@ -131,7 +156,7 @@ V S_inspect(X* x) {
   }
   printf("\n");
 }
-
+*/
 V S_branch(X* x) { 
   S_rot(x); 
   if (!S_drop(x)) { S_swap(x); }
@@ -176,13 +201,13 @@ V S_parse_symbol(X* x) {
   S_lit(x, (C)s);
   S_lit(x, l);
 }
-
+/*
 V S_cfa(X* x) {
   W* w = (W*)S_drop(x);
   S_lit(x, (C)w->c);
 }
-
-V S_symbol(X* x) {
+*/
+V S_symbol(X* x, C c) {
 	W* w;
   if (x->b == 0) {
     x->b = malloc(S_DEFAULT_DICT_SIZE);
@@ -193,14 +218,14 @@ V S_symbol(X* x) {
   S_parse_symbol(x);
   S_find(x);
   if (TS(x)) {
-    w = (W*)S_drop(x);
-    S_lit(x, (C)w->c);
+    TS(x) = (C)(((W*)TS(x))->c);
+    if (c) S_call(x);
   } else {
     S_drop(x);
     S_create(x);
   }
 }
-
+/*
 V S_to_number(X* x) {
   C l = S_drop(x);
   B* s = (B*)S_drop(x);
@@ -210,7 +235,7 @@ V S_to_number(X* x) {
   S_lit(x, (C)ptr);
   S_lit(x, l - (C)(ptr - s));
 }
-
+*/
 V S_qcompile(X* x, C e) { 
   C l = 0, t = 1; 
   B* q = (B*)S_drop(x);
@@ -249,9 +274,13 @@ V S_parse_string(X* x) {
 
 V S_inner(X* x) {
 	B buf[1024];
+  printf("Inner: frame: %ld\n", x->rp);
+  printf("Inner: ip: %s\n", x->ip);
 	C frame = x->rp;
 	do {
-    S_trace(x);
+#ifndef S_NO_TRACING
+    if (x->tr) x->trace(x);
+#endif
 		switch (S_peek(x)) {
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': 
@@ -262,7 +291,10 @@ V S_inner(X* x) {
       S_parse_string(x); break;
 		case 0: case ']': case '}':
       if (x->rp > frame && x->rp > 0) S_pop(x);
-			else return;
+			else {
+        x->ip = 0;
+        return;
+      }
       break;
     case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
     case 'G': case 'H': case 'I': case 'J': case 'K': case 'L':
@@ -300,7 +332,7 @@ V S_inner(X* x) {
 			case '>': S_gt(x); break;
       /* Execution */
       case '{': S_to_R(x); break;
-      case ')': S_from_T(x); break;
+      case ')': S_drop_T(x); break;
       case '(': S_to_T(x); break;
       case 'u': S_peek_T(x, 0); break;
       case 'v': S_peek_T(x, 1); break;
@@ -324,14 +356,19 @@ V S_inner(X* x) {
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
       /* Helpers */
+      case 'p': x->tr = !x->tr; break;
+        /*
       case 'i': S_inspect(x); break;
-      case '\\': S_symbol(x); break;
-      case '$': S_parse_symbol(x); S_find(x); S_cfa(x); S_call(x); break;
+      */
+      case '\\': S_symbol(x, 0); break;
+      case '$': S_symbol(x, 1); break;
       case 'g': S_qcompile(x, -1); break;
       case 'q': S_qcompile(x, 0); break;
       case 'h': S_create(x); break;
       case '`': S_find(x); break;
+        /*
       case 'n': S_to_number(x); break;
+        */
       }
     }
 	} while(1);

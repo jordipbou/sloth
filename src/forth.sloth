@@ -1,0 +1,27 @@
+4096 m b ,
+4096 b. ,  [BLOCK SIZE]_
+3c* b.c+ , [HERE]_
+0 b.c+c+ , [LATEST]_
+
+\block-size _[b..]q
+\here _[cb.+.b.+]q
+\latest _[cc+b.+.]q
+
+\allot _[cb.+.+cb.+,]q
+\, _\here g[,c]g\allot g[}]q
+\c, _\here g[;1]g\allot g[}]q
+
+\in _0$, 
+\tib _255$allot
+\tib-length _255$,
+
+\while _[[uj[vjwj][]?](((wj)))]q
+\and-while _[[uj[vj[wjxj][]?][]?]((((xj))))]q
+
+\type _[[d0>][1-sd:e1+s]]g\while g[__]q
+\accept _[0[oo>][kd10=!][s(s(deo;1+u)u)]]g\and-while q
+
+\if _'@$c, $here 0$c, 'z$c, $here s']$c,
+\then _$here s-s;']$c,
+
+"Sloth Forth v0.0.0"$type 10e

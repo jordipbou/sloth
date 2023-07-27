@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include "sloth.h"
+#include "trace.h"
 /*
 #include "combinators.h"
 #include "dictionary.h"
@@ -49,21 +50,22 @@ B* bootForth =
 "\\allot _[cb.+.+cb.+,]q"
 "\\, _\\here g[,c]g\\allot g[}]q"
 "\\c, _\\here g[;1]g\\allot g[}]q"
-"\\while _[[ua[vawa][]?](((wa)))___]q"
+"\\while _[[uj[vjwj][]?](((wj)))___]q"
 "\\type _[[d0>][1-sd:e1+s]]g\\while g[__]q"
+"\\accept _[[](((wj)))___"
 "\\flags _[c+c+]q"
 "\\nfa _[c+c+1+ d : s 1+ s]q"
-"\\cfa _[c+.]q";
-/*
-"\\set-immediate _[$flags d:1|s;]q"
-"\\is-immediate? _[$flags :1&]q"
-"\\immediate _[$latest $set-immediate ]q"
+"\\cfa _[c+.]q"
+"\\set-immediate _\\flags g[d:1|s;]q"
+"\\is-immediate? _\\flags g[:1&]q"
+"\\immediate _\\latest g\\set-immediate q"
 "\\in _0$, "
 "\\tib _255$allot "
 "\\tib-length _0$, "
 "\\source _[\\tib \\tib-length .]q"
 "\\compare _[ro=[1s[rroo:s:=(1+s1+sr)&]ts_s_][___0]?]q"
-"\\2over _[((oo)rr)rr]q"
+"\\2over _[((oo)rr)rr]q";
+/*
 "\\refill _[0\\in ,\\tib 255a\\tib-length ,]q"
 "\\bl _[' ]q"
 "\\is-space? _\\bl g[1+<]q"
@@ -90,14 +92,17 @@ int main(int argc, char** argv) {
 	
   x->key = &key;
   x->emit = &emit;
+  x->trace = &S_trace;
   /*
   EXT(x, 'D') = &SD_ext;
   EXT(x, 'Q') = &SC_ext;
   EXT(x, 'S') = &SS_ext;
   */
 
-	if (argc == 2 || argc == 3) {
-		fptr = fopen(argv[1], "r");
+	/*if (argc == 2 || argc == 3) {*/
+		/*fptr = fopen(argv[1], "r");*/
+  /*
+    fptr = fopen("src/forth.sloth", "r");
 		while (fgets(buf, 255, fptr)) {
 			S_eval(x, buf);
 			if (x->err != 0) {
@@ -106,9 +111,10 @@ int main(int argc, char** argv) {
 			}
 			x->err = 0;
 		}
-		printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
-	}
-
+  */
+		/*printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");*/
+	/*}*/
+  
   /*
   S_eval(x, bootForth);
   */

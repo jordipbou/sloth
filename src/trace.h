@@ -42,8 +42,9 @@ C S_dump_X(B* s, X* x, unsigned int w) {
 void S_trace(X* x) {
   B buf[1024];
   memset(buf, 0, 255);
-	S_dump_X(buf, x, 100);
-	printf("%.95s <%ld>\n", buf, x->rp);
+	S_dump_X(buf, x, 30);
+	printf("%.35s <%ld>\n", buf, x->rp);
+  printf("R:%x %d W:%x %d\n", x->o, x->on, x->d, x->dn);
 }
 
 #endif

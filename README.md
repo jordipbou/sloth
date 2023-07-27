@@ -8,7 +8,7 @@ Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor and Dawn.
 
 Features:
 
-* One C89 header only. Very easily embedabble in a C/C++ application.
+* C89. Very easily embedabble in a C/C++ application.
 * Human readable bytecode (ASCII 32-126), no need to use an assembler.
 * Cell (64, 32 or 16 bits) based data stack, return stack and retain stack
 * Quotations at bytecode level.
@@ -19,31 +19,11 @@ Features:
 
 * Data Stack (S)
 * Return Stack (R)
-* Retain Stack (T)
-* Handler Stack (H)
-* Program Counter Register (P)
-* Error Register (E)
+* Retain Stack (T) -don' think i need this-
+* Name Stack (N)
+* Instruction Pointer Register (IP)
+* Error Register (ERR)
 * Memory Block Register (B)
-
-## VM Instruction Set
-
-    S_ -> DR (drop) -> _
-    S>T -> TT (to T) -> (
-    T>S -> FT (from T) -> )
-    Top of T->S -> T0 -> u
-    Second of T->S -> T1 -> v
-    Third of T->S -> T2 -> w
-    Fourth of T->S -> T3 -> x
-    Fifth of T->S -> T4 -> y
-    S>R -> TR (to R) -> {
-    R>S -> FR (from R) ->
-    R>P -> TP (to P) (return) -> 
-    P>S -> FP (from P) ->
-
-call -> P>S, S>R, R>P -> 
-jump -> S>R, R>P -> 
-swap -> S>T, S>R, T>S, R>S
-rot -> S>R, S>T, S>T, T>S, T>S, R>S
 
 ## Bytecodes
 
@@ -93,7 +73,7 @@ rot -> S>R, S>T, S>T, T>S, T>S, R>S
     m -> allocate on heap (malloc)
     n -> string to number
     o -> over
-    p -> 
+    p -> toggle printing traces
     q -> compile quotation
     r -> rot
     s -> swap
