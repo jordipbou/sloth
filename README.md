@@ -19,56 +19,22 @@ Features:
 
 * Data Stack (S)
 * Return Stack (R)
-* Names Stack (N)
 * Instruction Pointer Register (IP)
 * Error Register (ERR)
 * Memory Block Register (B)
 
-### NGA Analysis
-
-    noop -> 
-    lit <v> -> mem to S
-    dup -> S to S
-    drop -> S to S
-    swap -> S to S
-    push -> S to R
-    pop -> R to S
-    jump -> S to IP
-    call -> IP to R, S to IP
-    ccall -> call if #t
-    return -> R to IP
-    eq -> S to S
-    neq -> S to S
-    lt -> S to S
-    gt -> S to S
-    fetch -> mem to S
-    store -> S to mem
-    add -> S to S
-    sub -> S to S
-    mul -> S to S
-    divmod -> S to S
-    and -> S to S
-    or -> S to S
-    xor -> S to S
-    shift -> S to S
-    zret -> ret if TS = 0
-    halt -> stop
-    io enumerate -> ?
-    io query -> ?
-    io interact -> ? 
-    
 ## Bytecodes
 
     (SPACE) -> no ->noop
     ! -> not
     " -> string literal
-    # -> li -> cell literal
+    # -> cell literal
     $ -> find and call symbol
     % -> modulo
     & -> and
     ' -> byte literal
-    ( -> to t
-    ) -> from t
+    ( -> to R
+    ) -> from R
     * -> multiplication
     + -> addition
     , -> store cell
@@ -82,41 +48,55 @@ Features:
     = -> equal
     > -> greater than
     ? -> branch
-    @ -> (TODO) relative to IP byte literal
+    @ -> relative to IP byte literal
     A-Z -> C extensions
     [ -> start quotation
     \ -> define/find symbol (and initialize b if not done before)
     ] -> return/end of quotation
     ^ -> xor
-    _ -> dr -> drop
-    ` -> find
-    a -> 
-    b -> address of b register
-    c -> size of cell (8 on 64 bits, 4 on 32 bits, 2 on 16 bits)
-    d -> du -> dup
+    _ -> drop
+    ` -> return
+    a -> apply (call)
+		bh -> block here address
+		bl -> block latest address
+		bs -> block size address
+		cb -> compile byte
+		cc -> compile cell
+		cg -> compile quotation without ending return
+		cq -> compile quotation
+    d -> dup
     e -> emit
-    f -> free from heap (free)
-    g -> compile quotation without ending return
-    h -> header
-    i -> inspect memory
-    j -> jump/call
+    f -> find
+    g -> (MOVE TO C)compile quotation without ending return
+    h -> create header
+    i -> if (jump if zero)
+    j -> jump
     k -> key
-    l -> 
-    m -> allocate on heap (malloc)
-    n -> string to number
+    l -> load and evaluate file
+		ma -> allot
+		mf -> free
+		mi -> inspect memory
+		mm -> malloc
+    n -> (MOVE TO EXTENSION)string to number
     o -> over
-    p -> toggle printing traces
-    q -> compile quotation
+    p -> 
+    q -> 
     r -> rot
-    s -> sw -> swap
-    t -> throw (set E)
-    u -> top of T
-    v -> second of T
-    w -> third of T
-    x -> fourth of T
-    y -> fifth of T
-    z -> jump/call if zero
-    { -> pu -> to R
+    s -> swap
+    t -> times (combinator)
+    u -> 
+    v ->
+    w -> while (combinator)
+    xa -> context address
+		xb -> address of block variable
+		xc -> size of cell
+		xq -> quit/halt
+		xr -> RP@
+		xs -> SP@
+		xt -> trace/untrace
+    y -> 
+    z -> zcall (call if zero)
+    { -> 
     | -> or
     } -> return (alternative to ] for exiting returning from a quotation)
     ~ -> invert

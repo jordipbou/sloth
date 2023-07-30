@@ -1,8 +1,5 @@
-/* TODO: Words must be aligned */
-/* TODO: Inspect should show ASCII */
 /* TODO: times, while and maybe recurse are really helpful for bootstrapping */
 /* TODO: o,on,d,dn are helpful for a blinkenlights like debugger, but will I ever make it? */
-/* TODO: Names stacks for searching on different namespaces would be helpful */
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -69,6 +66,7 @@ C S_is_digit(B c) { return c >= '0' && c <= '9'; }
 #define NNS(x) (x->s[x->sp - 3])
 
 V S_lit(X* x, C v) { x->s[x->sp++] = v; }
+#define S_STR(x, s) S_lit(x, (C)s); S_lit(x, (C)strlen(s))
 V S_dup(X* x) { S_lit(x, TS(x)); }
 V S_over(X* x) { S_lit(x, NS(x)); }
 V S_rot(X* x) { C t = NNS(x); NNS(x) = NS(x); NS(x) = TS(x); TS(x) = t; TS(x); }
@@ -112,10 +110,10 @@ V S_call(X* x) {
     S_push(x);
   x->ip = (B*)S_drop(x); 
 }
-V S_zcall(X* x) { 
+V S_zjump(X* x) { 
   S_swap(x); 
   if (S_drop(x)) S_drop(x); 
-  else S_call(x); 
+  else /*S_call(x); */x->ip = (B*)S_drop(x);
 }
 
 V S_eval(X* x, B* q) { 
@@ -149,23 +147,21 @@ V S_cfetch(X* x) {
 V S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 V S_free(X* x) { free((V*)S_drop(x)); }
 
+/* TODO: Modify inspect to use key/emit */
 V S_inspect(X* x) {
   C i = 0, j;
-  C n = S_drop(x);
   B* a = (B*)S_drop(x);
-  while (i < n) {
-    printf("\n%p: ", a + i);
-    for (j = 0; j < 4 && i < n; j++, i++) {
-      printf("%02X ", (unsigned char)a[i]);
-    }
-    if (i < n) {
-      printf("- ");
-      for (j = 0; j < 4 && i < n; j++, i++) {
-        printf("%02X ", (unsigned char)a[i]);
-      }
-    }
-  }
-  printf("\n");
+	for (i = 0; i < 6; i++) {
+		printf("\n%p ", a + 8*i);
+		for (j = 0; j < 8; j++) {
+			printf("%02X ", (unsigned char)a[8*i + j]);
+		}
+		for (j = 0; j < 8; j++) {
+			if (a[8*i + j] < 32 || a[8*i + j] > 126) printf(".");
+			else printf("%c", a[8*i + j]);
+		}
+	}
+	printf("\n");
 }
 
 V S_branch(X* x) { 
@@ -236,17 +232,7 @@ V S_symbol(X* x, C c) {
     S_create(x);
   }
 }
-/*
-V S_to_number(X* x) {
-  C l = S_drop(x);
-  B* s = (B*)S_drop(x);
-  char *ptr;
-  C n = strtol(s, &ptr, 10);
-  S_lit(x, n);
-  S_lit(x, (C)ptr);
-  S_lit(x, l - (C)(ptr - s));
-}
-*/
+
 V S_qcompile(X* x, C e) { 
   C l = 0, t = 1; 
   B* q = (B*)S_drop(x);
@@ -306,8 +292,6 @@ V S_parse_string(X* x) {
 
 V S_inner(X* x) {
 	B buf[1024];
-  printf("Inner: frame: %ld\n", x->rp);
-  printf("Inner: ip: %s\n", x->ip);
 	C frame = x->rp;
 	do {
 #ifndef S_NO_TRACING
@@ -365,42 +349,63 @@ V S_inner(X* x) {
       /* Execution */
       case '{': S_to_R(x); break;
       case ')': S_from_R(x); break;
-        /*
-      case '(': S_to_T(x); break;
-      case 'u': S_peek_T(x, 0); break;
-      case 'v': S_peek_T(x, 1); break;
-      case 'w': S_peek_T(x, 2); break;
-      case 'x': S_peek_T(x, 3); break;
-      case 'y': S_peek_T(x, 4); break;
-      */
-      case 'j': S_call(x); break;
-      case 'z': S_zcall(x); break;
+      /*case 'j': S_jump(x); break;*/
+      case 'z': S_zjump(x); break;
+			case 'a': S_call(x); break;
       case '?': S_branch(x); break;
-      /*case 'q': exit(0); break;*/
       /* Memory */
-      case 'm': S_malloc(x); break;
-      case 'f': S_free(x); break;
-      case 'c': S_lit(x, sizeof(C)); break;
+			case 'm':
+				switch (S_token(x)) {
+					/*case 'a': S_allot(x); break;*/
+					case 'i': S_inspect(x); break;
+					case 'm': S_malloc(x); break;
+					case 'f': S_free(x); break;
+				}
+				break;
       case ':': S_bfetch(x); break;
       case ';': S_bstore(x); break;
 			case '.': S_cfetch(x); break;
 			case ',': S_cstore(x); break;
-      case 'b': S_lit(x, (C)(&x->b)); break;
+			/* Compilation */
+			case 'c':
+				switch (S_token(x)) {
+				/*
+					case 'b': S_bcompile(x); break;
+					case 'c': S_ccompile(x); break;
+				*/
+					case 'g': S_qcompile(x, -1); break;
+					case 'q': S_qcompile(x, 0); break;
+				}
+				break;
       /* Input/output */
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
-      /* Helpers */
-      case 'p': x->tr = !x->tr; break;
-      case 'i': S_inspect(x); break;
+      /* Symbols */
       case '\\': S_symbol(x, 0); break;
       case '$': S_symbol(x, 1); break;
-      case 'g': S_qcompile(x, -1); break;
-      case 'q': S_qcompile(x, 0); break;
       case 'h': S_create(x); break;
-      case '`': S_find(x); break;
-        /*
-      case 'n': S_to_number(x); break;
-        */
+      case 'f': S_find(x); break;
+			/* Block */
+			case 'b': 
+				switch (S_token(x)) {
+				case 'h': S_lit(x, (C)(x->b + sizeof(C))); break;
+				case 'l': S_lit(x, (C)(x->b + 2*sizeof(C))); break;
+				case 's': S_lit(x, (C)(x->b)); break;
+				}
+				break;
+			/* Context */
+			case 'x':
+				switch (S_token(x)) {
+				case 'a': S_lit(x, (C)x); break;
+				case 'b': S_lit(x, (C)(&x->b)); break;
+				case 'c': S_lit(x, sizeof(C)); break;
+				case 'q': exit(0); break;
+				case 'r': S_lit(x, (C)(&(x->r[x->rp - 1]))); break;
+				case 's': S_lit(x, (C)(&(x->s[x->sp - 1]))); break;
+				case 't': x->tr = !x->tr; break;
+				}
+				break;
+			/* File input */
       case 'l': S_load_file(x); break;
       }
     }
