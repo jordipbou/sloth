@@ -1,3 +1,8 @@
+/* TODO: Words must be aligned */
+/* TODO: Inspect should show ASCII */
+/* TODO: times, while and maybe recurse are really helpful for bootstrapping */
+/* TODO: o,on,d,dn are helpful for a blinkenlights like debugger, but will I ever make it? */
+/* TODO: Names stacks for searching on different namespaces would be helpful */
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -12,14 +17,12 @@ typedef intptr_t C;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
-#define TSTACK_SIZE 64
 
 typedef struct _W { struct _W* l; B* c; B f; B s; B n[1]; } W;
 
 typedef struct _X { 
   C* s; C sp; C ss;
   B** r; C rp; C rs;
-  C* t; C tp; C ts;
 	B* ip;
   B* b;
   void* o; B on;
@@ -31,8 +34,6 @@ typedef struct _X {
   C err;
   C tr;
 } X;
-
-/*#include "trace.h"*/
 
 #define EXT(x, l) (x->ext[l - 'A'])
 
@@ -46,11 +47,9 @@ X* S_init() {
 	X* x = malloc(sizeof(X));
   x->s = malloc(STACK_SIZE*sizeof(C));
   x->r = malloc(RSTACK_SIZE*sizeof(C));
-  x->t = malloc(TSTACK_SIZE*sizeof(C));
-	x->sp = x->rp = x->tp = 0;
+	x->sp = x->rp = 0;
   x->ss = STACK_SIZE;
   x->rs = RSTACK_SIZE;
-	x->ts = TSTACK_SIZE;
   x->ext = malloc(26*sizeof(C));
   x->ip = 0;
   x->b = 0;
@@ -91,11 +90,19 @@ V S_invert(X* x) { TS(x) = ~TS(x); }
 V S_lt(X* x) { NS(x) = NS(x) < TS(x); --x->sp; }
 V S_eq(X* x) { NS(x) = NS(x) == TS(x); --x->sp; }
 V S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
-
+/*
+V S_push(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
+V S_pop(X* x) { x-s[x->sp++] = (C)x->r[--x->rp]; }
+V S_jump(X* x) { x->ip = (B*)S_drop(x); }
+V S_call(X* x) { 
+  B t = S_peek(x); 
+  if (x->ip && t && t != ']' && t != '}')
+    x->r[x->rp++] = x->ip;
+  x->ip = (B*)S_drop(x); }
+V S_ccall(X* x) { if (S_drop(x)) S_call(x); else S_drop(x); }
+*/
 V S_to_R(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
-V S_to_T(X* x) { x->t[x->tp++] = x->s[--x->sp]; }
-V S_drop_T(X* x) { x->tp--; }
-V S_peek_T(X* x, C n) { x->s[x->sp++] = x->t[x->tp - 1 - n]; }
+V S_from_R(X* x) { x->s[x->sp++] = x->r[--x->rp]; }
 
 V S_push(X* x) { x->r[x->rp++] = x->ip; }
 V S_pop(X* x) { x->ip = x->r[--x->rp]; }
@@ -105,7 +112,12 @@ V S_call(X* x) {
     S_push(x);
   x->ip = (B*)S_drop(x); 
 }
-V S_zcall(X* x) { S_swap(x); if (S_drop(x)) S_drop(x); else S_call(x); }
+V S_zcall(X* x) { 
+  S_swap(x); 
+  if (S_drop(x)) S_drop(x); 
+  else S_call(x); 
+}
+
 V S_eval(X* x, B* q) { 
   S_lit(x, (C)q); 
   S_call(x); 
@@ -137,7 +149,6 @@ V S_cfetch(X* x) {
 V S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 V S_free(X* x) { free((V*)S_drop(x)); }
 
-/* 
 V S_inspect(X* x) {
   C i = 0, j;
   C n = S_drop(x);
@@ -156,7 +167,7 @@ V S_inspect(X* x) {
   }
   printf("\n");
 }
-*/
+
 V S_branch(X* x) { 
   S_rot(x); 
   if (!S_drop(x)) { S_swap(x); }
@@ -248,6 +259,27 @@ V S_qcompile(X* x, C e) {
   S_HERE(x) += l + e; 
 }
 
+V S_load_file(X* x) {
+  C l = S_drop(x); 
+  B* s = (B*)S_drop(x);
+  FILE* fptr;
+  B buf[1024];
+  B tmp[1024];
+  strncpy(tmp, s, l);
+  tmp[l] = 0;
+  printf("Trying to open: %s\n", tmp);
+  fptr = fopen(tmp, "r");
+  if (!fptr) {
+    printf("Can't load file\n");
+    return;
+  }
+	while (fgets(buf, 255, fptr)) {
+		S_eval(x, buf);
+  }
+}
+
+/* Parsing */
+
 V S_parse_literal(X* x) { 
 	C n = 0; 
 	while (S_is_digit(S_peek(x))) { n = 10*n + (S_token(x) - '0'); } 
@@ -332,13 +364,15 @@ V S_inner(X* x) {
 			case '>': S_gt(x); break;
       /* Execution */
       case '{': S_to_R(x); break;
-      case ')': S_drop_T(x); break;
+      case ')': S_from_R(x); break;
+        /*
       case '(': S_to_T(x); break;
       case 'u': S_peek_T(x, 0); break;
       case 'v': S_peek_T(x, 1); break;
       case 'w': S_peek_T(x, 2); break;
       case 'x': S_peek_T(x, 3); break;
       case 'y': S_peek_T(x, 4); break;
+      */
       case 'j': S_call(x); break;
       case 'z': S_zcall(x); break;
       case '?': S_branch(x); break;
@@ -357,9 +391,7 @@ V S_inner(X* x) {
 			case 'e': x->emit(x); break;
       /* Helpers */
       case 'p': x->tr = !x->tr; break;
-        /*
       case 'i': S_inspect(x); break;
-      */
       case '\\': S_symbol(x, 0); break;
       case '$': S_symbol(x, 1); break;
       case 'g': S_qcompile(x, -1); break;
@@ -369,6 +401,7 @@ V S_inner(X* x) {
         /*
       case 'n': S_to_number(x); break;
         */
+      case 'l': S_load_file(x); break;
       }
     }
 	} while(1);

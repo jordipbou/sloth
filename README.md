@@ -19,18 +19,50 @@ Features:
 
 * Data Stack (S)
 * Return Stack (R)
-* Retain Stack (T) -don' think i need this-
-* Name Stack (N)
+* Names Stack (N)
 * Instruction Pointer Register (IP)
 * Error Register (ERR)
 * Memory Block Register (B)
 
+### NGA Analysis
+
+    noop -> 
+    lit <v> -> mem to S
+    dup -> S to S
+    drop -> S to S
+    swap -> S to S
+    push -> S to R
+    pop -> R to S
+    jump -> S to IP
+    call -> IP to R, S to IP
+    ccall -> call if #t
+    return -> R to IP
+    eq -> S to S
+    neq -> S to S
+    lt -> S to S
+    gt -> S to S
+    fetch -> mem to S
+    store -> S to mem
+    add -> S to S
+    sub -> S to S
+    mul -> S to S
+    divmod -> S to S
+    and -> S to S
+    or -> S to S
+    xor -> S to S
+    shift -> S to S
+    zret -> ret if TS = 0
+    halt -> stop
+    io enumerate -> ?
+    io query -> ?
+    io interact -> ? 
+    
 ## Bytecodes
 
-    (SPACE) -> noop
+    (SPACE) -> no ->noop
     ! -> not
     " -> string literal
-    # -> cell literal
+    # -> li -> cell literal
     $ -> find and call symbol
     % -> modulo
     & -> and
@@ -56,12 +88,12 @@ Features:
     \ -> define/find symbol (and initialize b if not done before)
     ] -> return/end of quotation
     ^ -> xor
-    _ -> drop
+    _ -> dr -> drop
     ` -> find
     a -> 
     b -> address of b register
     c -> size of cell (8 on 64 bits, 4 on 32 bits, 2 on 16 bits)
-    d -> dup
+    d -> du -> dup
     e -> emit
     f -> free from heap (free)
     g -> compile quotation without ending return
@@ -76,7 +108,7 @@ Features:
     p -> toggle printing traces
     q -> compile quotation
     r -> rot
-    s -> swap
+    s -> sw -> swap
     t -> throw (set E)
     u -> top of T
     v -> second of T
@@ -84,7 +116,7 @@ Features:
     x -> fourth of T
     y -> fifth of T
     z -> jump/call if zero
-    { -> to R
+    { -> pu -> to R
     | -> or
     } -> return (alternative to ] for exiting returning from a quotation)
     ~ -> invert

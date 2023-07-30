@@ -15,13 +15,9 @@
 \tib _255$allot
 \tib-length _255$,
 
-\while _[[uj[vjwj][]?](((wj)))]q
-\and-while _[[uj[vj[wjxj][]?][]?]((((xj))))]q
+\if _['#$c, $here c$allot 'z$c, ]q
+\then _[$here s,]q
 
-\type _[[d0>][1-sd:e1+s]]g\while g[__]q
-\accept _[0[oo>][kd10=!][s(s(deo;1+u)u)]]g\and-while q
-
-\if _'@$c, $here 0$c, 'z$c, $here s']$c,
-\then _$here s-s;']$c,
+\recurse _[$latest c+.'#$c, $, 'j$c, ]q
 
 "Sloth Forth v0.0.0"$type 10e
