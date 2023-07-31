@@ -402,7 +402,8 @@ V S_inner(X* x) {
 				case 'q': exit(0); break;
 				case 'r': S_lit(x, (C)(&(x->r[x->rp - 1]))); break;
 				case 's': S_lit(x, (C)(&(x->s[x->sp - 1]))); break;
-				case 't': x->tr = !x->tr; break;
+				case 't': x->tr = 1; break;
+        case 'u': x->tr = 0; break;
 				}
 				break;
 			/* File input */
