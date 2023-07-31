@@ -93,6 +93,9 @@ int main(int argc, char** argv) {
   x->key = &key;
   x->emit = &emit;
   x->trace = &S_trace;
+
+  x->tr = 1;
+  
   /*
   EXT(x, 'D') = &SD_ext;
   EXT(x, 'Q') = &SC_ext;

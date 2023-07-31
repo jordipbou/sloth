@@ -1,12 +1,20 @@
-4096 m b ,
-4096 b. ,  [BLOCK SIZE]_
-3c* b.c+ , [HERE]_
-0 b.c+c+ , [LATEST]_
+4096 mmxb ,
+4096 bs,
+3c* bh,
+0 bl,
 
-\block-size _[b..]q
-\here _[cb.+.b.+]q
-\latest _[cc+b.+.]q
+\here _[bh.xb+]q
+\latest _[bl.]q
 
+4096 xb. ,  [BLOCK SIZE]_
+3c* xb.xc+ , [HERE]_
+0 xb.xc+xc+ , [LATEST]_
+
+\block-size _[xb..]cq
+\here _[xcxb.+.xb.+]cq
+\latest _[xcxc+xb.+.]cq
+
+\allot _[]
 \allot _[cb.+.+cb.+,]q
 \, _\here g[,c]g\allot g[}]q
 \c, _\here g[;1]g\allot g[}]q

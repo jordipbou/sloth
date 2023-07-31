@@ -1,5 +1,3 @@
-/* TODO: times, while and maybe recurse are really helpful for bootstrapping */
-/* TODO: o,on,d,dn are helpful for a blinkenlights like debugger, but will I ever make it? */
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -17,13 +15,12 @@ typedef intptr_t C;
 
 typedef struct _W { struct _W* l; B* c; B f; B s; B n[1]; } W;
 
-typedef struct _X { 
+typedef struct _X {
+  B* u; B* v;
   C* s; C sp; C ss;
   B** r; C rp; C rs;
 	B* ip;
   B* b;
-  void* o; B on;
-  void* d; B dn;
 	V (*key)(struct _X*);
 	V (*emit)(struct _X*);
   V (*trace)(struct _X*);
@@ -49,7 +46,7 @@ X* S_init() {
   x->rs = RSTACK_SIZE;
   x->ext = malloc(26*sizeof(C));
   x->ip = 0;
-  x->b = 0;
+  x->b = x->u = x->v = 0;
   x->err = 0;
   x->tr = 0;
 	return x;
@@ -67,6 +64,7 @@ C S_is_digit(B c) { return c >= '0' && c <= '9'; }
 
 V S_lit(X* x, C v) { x->s[x->sp++] = v; }
 #define S_STR(x, s) S_lit(x, (C)s); S_lit(x, (C)strlen(s))
+
 V S_dup(X* x) { S_lit(x, TS(x)); }
 V S_over(X* x) { S_lit(x, NS(x)); }
 V S_rot(X* x) { C t = NNS(x); NNS(x) = NS(x); NS(x) = TS(x); TS(x) = t; TS(x); }
@@ -88,17 +86,27 @@ V S_invert(X* x) { TS(x) = ~TS(x); }
 V S_lt(X* x) { NS(x) = NS(x) < TS(x); --x->sp; }
 V S_eq(X* x) { NS(x) = NS(x) == TS(x); --x->sp; }
 V S_gt(X* x) { NS(x) = NS(x) > TS(x); --x->sp; }
-/*
+
 V S_push(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
-V S_pop(X* x) { x-s[x->sp++] = (C)x->r[--x->rp]; }
+V S_pop(X* x) { x->s[x->sp++] = (C)x->r[--x->rp]; }
 V S_jump(X* x) { x->ip = (B*)S_drop(x); }
+V S_zjump(X* x) { S_swap(x); if (!S_drop(x)) S_jump(x); else S_drop(x); }
 V S_call(X* x) { 
   B t = S_peek(x); 
   if (x->ip && t && t != ']' && t != '}')
     x->r[x->rp++] = x->ip;
-  x->ip = (B*)S_drop(x); }
-V S_ccall(X* x) { if (S_drop(x)) S_call(x); else S_drop(x); }
-*/
+  S_jump(x);
+}
+C S_return(X* x, C f) {
+  if (x->rp > f && x->rp > 0) {
+    x->ip = x->r[--x->rp];
+  }	else {
+    x->ip = 0;
+  }
+  return x->ip;
+}
+
+/*
 V S_to_R(X* x) { x->r[x->rp++] = (B*)x->s[--x->sp]; }
 V S_from_R(X* x) { x->s[x->sp++] = x->r[--x->rp]; }
 
@@ -110,12 +118,13 @@ V S_call(X* x) {
     S_push(x);
   x->ip = (B*)S_drop(x); 
 }
+V S_jump(X* x) { x->ip = (B*)S_drop(x); }
 V S_zjump(X* x) { 
   S_swap(x); 
   if (S_drop(x)) S_drop(x); 
-  else /*S_call(x); */x->ip = (B*)S_drop(x);
+  else S_jump(x);
 }
-
+*/
 V S_eval(X* x, B* q) { 
   S_lit(x, (C)q); 
   S_call(x); 
@@ -123,26 +132,24 @@ V S_eval(X* x, B* q) {
 }
 
 V S_bstore(X* x) { 
-  x->d = (void*)S_drop(x);
-  x->dn = 1;
-  *((B*)x->d) = (B)S_drop(x); 
+  B* a = (B*)S_drop(x);
+  *a = (B)S_drop(x); 
 }
 V S_cstore(X* x) { 
-  x->d = (void*)S_drop(x);
-  x->dn = sizeof(C);
-  *((C*)x->d) = S_drop(x); 
+  C* a = (C*)S_drop(x);
+  *a = S_drop(x); 
 }
+V S_ustore(X* x) { *(x->u++) = (B)S_drop(x); }
 
 V S_bfetch(X* x) { 
-  x->o = (void*)S_drop(x); 
-  x->on = 1;
-  S_lit(x, *((B*)x->o)); 
+  S_lit(x, *((B*)S_drop(x))); 
 }
 V S_cfetch(X* x) { 
-  x->o = (void*)S_drop(x);
-  x->on = sizeof(C);
-  S_lit(x, *((C*)x->o)); 
+  S_lit(x, *((C*)S_drop(x))); 
 }
+V S_ufetch(X* x) { S_lit(x, *(x->u++)); }
+
+V S_copy(X* x) { *(x->v++) = *(x->u++); }
 
 V S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 V S_free(X* x) { free((V*)S_drop(x)); }
@@ -169,6 +176,22 @@ V S_branch(X* x) {
   if (!S_drop(x)) { S_swap(x); }
   S_drop(x);
   S_call(x);
+}
+
+V S_times(X* x) {
+  B* q = (B*)S_drop(x);
+  C n = S_drop(x);
+  for (; n > 0; n--) S_eval(x, q);
+}
+
+V S_while(X* x) {
+  B* q = (B*)S_drop(x);
+  B* c = (B*)S_drop(x); 
+  do {
+    S_eval(x, c);
+    if (S_drop(x)) S_eval(x, q);
+    else break;
+  } while (1);
 }
 
 V S_create(X* x) {
@@ -208,12 +231,7 @@ V S_parse_symbol(X* x) {
   S_lit(x, (C)s);
   S_lit(x, l);
 }
-/*
-V S_cfa(X* x) {
-  W* w = (W*)S_drop(x);
-  S_lit(x, (C)w->c);
-}
-*/
+
 V S_symbol(X* x, C c) {
 	W* w;
   if (x->b == 0) {
@@ -231,6 +249,24 @@ V S_symbol(X* x, C c) {
     S_drop(x);
     S_create(x);
   }
+}
+
+V S_csize(X* x) { S_lit(x, sizeof(C)); }
+V S_here(X* x) { S_lit(x, (C)(x->b + S_HERE(x))); }
+V S_allot(X* x) { S_HERE(x) += S_drop(x); }
+
+V S_bcompile(X* x) {
+  S_here(x);
+  S_bstore(x);
+  S_lit(x, 1);
+  S_allot(x);
+}
+
+V S_ccompile(X* x) {
+  S_here(x);
+  S_cstore(x);
+  S_csize(x);
+  S_allot(x);
 }
 
 V S_qcompile(X* x, C e) { 
@@ -305,12 +341,17 @@ V S_inner(X* x) {
       S_parse_quotation(x); break;
     case '"':
       S_parse_string(x); break;
-		case 0: case ']': case '}':
+		case 0: 
+      if (!S_return(x, frame)) {
+        return;
+      }
+      /*
       if (x->rp > frame && x->rp > 0) S_pop(x);
 			else {
         x->ip = 0;
         return;
       }
+      */
       break;
     case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
     case 'G': case 'H': case 'I': case 'J': case 'K': case 'L':
@@ -324,12 +365,14 @@ V S_inner(X* x) {
       case '\'': S_lit(x, (C)S_token(x)); break;
       case '#': S_lit(x, *((C*)x->ip)); x->ip += sizeof(C); break;
       case '@': S_lit(x, (C)(x->ip + ((B)S_token(x)))); break;
-      /* Stack */
+      /* Stacks */
+      case '_': S_drop(x); break;
 			case 's': S_swap(x); break;
 			case 'd': S_dup(x); break;
 			case 'o': S_over(x); break;
 			case 'r': S_rot(x); break;
-			case '_': S_drop(x); break;
+      case '(': S_push(x); break;
+      case ')': S_pop(x); break;
       /* Arithmetics */
 			case '+': S_add(x); break;
 			case '-': S_sub(x); break;
@@ -337,76 +380,55 @@ V S_inner(X* x) {
 			case '/': S_div(x); break;
 			case '%': S_mod(x); break;
       /* Bitwise */
+      case '!': S_not(x); break;
+			case '~': S_invert(x); break;
 			case '&': S_and(x); break;
 			case '|': S_or(x); break;
 			case '^': S_xor(x); break;
-			case '!': S_not(x); break;
-			case '~': S_invert(x); break;
       /* Comparison */
 			case '<': S_lt(x); break;
 			case '=': S_eq(x); break;
 			case '>': S_gt(x); break;
       /* Execution */
-      case '{': S_to_R(x); break;
-      case ')': S_from_R(x); break;
-      /*case 'j': S_jump(x); break;*/
+      case ']': case '}':
+        if (!S_return(x, frame)) {
+          return;
+        }
+        break;
+      case 'x': S_call(x); break;
+      case 'j': S_jump(x); break;
       case 'z': S_zjump(x); break;
-			case 'a': S_call(x); break;
+      case 'y': exit(0); break;
+      /* Helpers */
       case '?': S_branch(x); break;
+      case 't': S_times(x); break;
+      case 'w': S_while(x); break;
+      /*case 'n': S_str_to_num(x); break;*/
       /* Memory */
-			case 'm':
-				switch (S_token(x)) {
-					/*case 'a': S_allot(x); break;*/
-					case 'i': S_inspect(x); break;
-					case 'm': S_malloc(x); break;
-					case 'f': S_free(x); break;
-				}
-				break;
+      case 'u': S_lit(x, (C)(&x->u)); break;
+      case 'v': S_lit(x, (C)(&x->v)); break;
+      case 'b': S_lit(x, (C)(&x->b)); break;
+      case '.': S_cfetch(x); break;
       case ':': S_bfetch(x); break;
+      case ',': S_cstore(x); break;
       case ';': S_bstore(x); break;
-			case '.': S_cfetch(x); break;
-			case ',': S_cstore(x); break;
-			/* Compilation */
-			case 'c':
-				switch (S_token(x)) {
-				/*
-					case 'b': S_bcompile(x); break;
-					case 'c': S_ccompile(x); break;
-				*/
-					case 'g': S_qcompile(x, -1); break;
-					case 'q': S_qcompile(x, 0); break;
-				}
-				break;
+      case 'c': S_copy(x); break;
+      case 'i': S_ustore(x); break;
+      case 'p': S_ufetch(x); break;
+			case 'm': S_malloc(x); break;
+      case 'f': S_free(x); break;
+      case '{': S_inspect(x); break;
+			/* Dictionary */
+      case 'a': S_allot(x); break;
+      case 'h': S_create(x); break;
+      case '\\': S_symbol(x, 0); break;
+      case '`': S_find(x); break;
+      case '$': S_symbol(x, 1); break;
+      case 'g': S_qcompile(x, -1); break;
+			case 'q': S_qcompile(x, 0); break;
       /* Input/output */
 			case 'k': x->key(x); break;
 			case 'e': x->emit(x); break;
-      /* Symbols */
-      case '\\': S_symbol(x, 0); break;
-      case '$': S_symbol(x, 1); break;
-      case 'h': S_create(x); break;
-      case 'f': S_find(x); break;
-			/* Block */
-			case 'b': 
-				switch (S_token(x)) {
-				case 'h': S_lit(x, (C)(x->b + sizeof(C))); break;
-				case 'l': S_lit(x, (C)(x->b + 2*sizeof(C))); break;
-				case 's': S_lit(x, (C)(x->b)); break;
-				}
-				break;
-			/* Context */
-			case 'x':
-				switch (S_token(x)) {
-				case 'a': S_lit(x, (C)x); break;
-				case 'b': S_lit(x, (C)(&x->b)); break;
-				case 'c': S_lit(x, sizeof(C)); break;
-				case 'q': exit(0); break;
-				case 'r': S_lit(x, (C)(&(x->r[x->rp - 1]))); break;
-				case 's': S_lit(x, (C)(&(x->s[x->sp - 1]))); break;
-				case 't': x->tr = 1; break;
-        case 'u': x->tr = 0; break;
-				}
-				break;
-			/* File input */
       case 'l': S_load_file(x); break;
       }
     }

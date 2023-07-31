@@ -22,10 +22,101 @@ Features:
 * Instruction Pointer Register (IP)
 * Error Register (ERR)
 * Memory Block Register (B)
+* U Register
+* V Register
 
 ## Bytecodes
 
-    (SPACE) -> no ->noop
+(Only trace and size of cell is left from the list!)
+
+### Ordered by use
+
+#### Stack operations
+
+    _ -> drop
+    s -> swap
+    d -> dup
+    o -> over
+    r -> rot
+    ( -> push
+    ) -> pop
+
+#### Arithmetic operations
+
+    + -> addition
+    - -> substraction
+    * -> multiplication
+    / -> division
+    % -> modulo
+
+#### Bitwise operations
+
+    ! -> not
+    ~ -> invert
+    & -> and
+    | -> or
+    ^ -> xor
+
+#### Comparison operations
+
+    < -> less than
+    = -> equal
+    > -> greater than
+    
+#### Execution operations
+
+    ]/} -> return
+    x -> call/tail call
+    j -> jump
+    z -> zjump
+    y -> yield
+    
+#### Helpers
+
+    ? -> branch (combinator)
+    t -> times (combinator)
+    w -> while (combinator)
+    n -> string to number
+
+#### Memory operations
+
+    u -> address of u var (and context)
+    v -> address of v var
+    b -> address of b var (dict/block)
+
+    . -> fetch cell
+    : -> fetch byte
+    , -> store cell
+    ; -> store byte
+
+    c -> copy byte from u to v (auto incr both)
+    i -> store byte via u (auto incr)
+    p -> fetch byte via u (auto incr)
+
+    m -> malloc
+    f -> free
+
+    { -> inspect memory
+
+#### Dictionary
+
+    a -> allot (auto init
+    h -> header (create)
+    \ -> define/find symbol (auto init)
+    ` -> find symbol from string
+    $ -> find and call symbol
+    q -> compile quotation with return
+    g -> compile quotation
+
+#### Input/Output
+
+    e -> emit
+    k -> key
+    l -> load and eval file
+
+## ASCII ordered
+
+    (SPACE) -> noop
     ! -> not
     " -> string literal
     # -> cell literal
@@ -33,8 +124,8 @@ Features:
     % -> modulo
     & -> and
     ' -> byte literal
-    ( -> to R
-    ) -> from R
+    ( -> push to R
+    ) -> pop from R
     * -> multiplication
     + -> addition
     , -> store cell
@@ -50,53 +141,39 @@ Features:
     ? -> branch
     @ -> relative to IP byte literal
     A-Z -> C extensions
-    [ -> start quotation
+    [ -> start quotation/push IP+1
     \ -> define/find symbol (and initialize b if not done before)
     ] -> return/end of quotation
     ^ -> xor
     _ -> drop
-    ` -> return
-    a -> apply (call)
-		bh -> block here address
-		bl -> block latest address
-		bs -> block size address
-		cb -> compile byte
-		cc -> compile cell
-		cg -> compile quotation without ending return
-		cq -> compile quotation
+    ` -> find symbol from string
+    a -> allot
+    b -> address of b variable
+		c -> copy byte from u to v (auto incr)
     d -> dup
     e -> emit
-    f -> find
-    g -> (MOVE TO C)compile quotation without ending return
-    h -> create header
-    i -> if (jump if zero)
+    f -> free
+    g -> compile quotation
+    h -> header (create)
+    i -> store via v and incr
     j -> jump
     k -> key
     l -> load and evaluate file
-		ma -> allot
-		mf -> free
-		mi -> inspect memory
-		mm -> malloc
-    n -> (MOVE TO EXTENSION)string to number
+		m -> malloc
+    n -> string to number
     o -> over
-    p -> 
-    q -> 
+    p -> fetch (peek) via u and incr
+    q -> compile quotation and return
     r -> rot
     s -> swap
     t -> times (combinator)
-    u -> 
-    v ->
+    u -> address of u var (and context)
+    v -> address of v var
     w -> while (combinator)
-    xa -> context address
-		xb -> address of block variable
-		xc -> size of cell
-		xq -> quit/halt
-		xr -> RP@
-		xs -> SP@
-		xt -> trace/untrace
-    y -> 
-    z -> zcall (call if zero)
-    { -> 
+    x -> execute/apply
+    y -> yield
+    z -> zjump (jump if zero)
+    { -> inspect memory
     | -> or
-    } -> return (alternative to ] for exiting returning from a quotation)
+    } -> return
     ~ -> invert
