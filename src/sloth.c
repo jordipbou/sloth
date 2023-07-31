@@ -1,5 +1,6 @@
 #include<stdio.h>
-#include "sloth.h"
+#include"sloth.h"
+#include"trace.h"
 /*
 #include "combinators.h"
 #include "dictionary.h"
@@ -88,12 +89,14 @@ int main(int argc, char** argv) {
 	
   x->key = &key;
   x->emit = &emit;
+	x->trace = &S_trace;
   /*
   EXT(x, 'D') = &SD_ext;
   EXT(x, 'Q') = &SC_ext;
   EXT(x, 'S') = &SS_ext;
   */
 
+/*
 	if (argc == 2 || argc == 3) {
 		fptr = fopen(argv[1], "r");
 		while (fgets(buf, 255, fptr)) {
@@ -108,19 +111,15 @@ int main(int argc, char** argv) {
 	}
 
   S_eval(x, bootForth);
-  
+ */ 
 	if (argc == 1 || argc == 3) {
 		do {
 			fgets(buf, 255, stdin);
 			x->ip = buf;	
 			S_inner(x);
-			/*
-      memset(buf, 0, 255);
-      S_dump_X(buf, x, 50);
-      printf("%s\n", buf);
-			*/
 			if (x->err != 0) { printf("ERROR: %ld", x->err); return; }
-			printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i].v.i); } printf("\n");
+			printf("Ok "); 
+			memset(buf, 0, 255); S_dump_S(buf, x); printf("%s\n", buf);
 		} while(1);
 	}
 }
