@@ -22,8 +22,6 @@ Features:
 * Instruction Pointer Register (IP)
 * Error Register (ERR)
 * Memory Block Register (B)
-* U Register
-* V Register
 
 ## Bytecodes
 
@@ -80,8 +78,6 @@ Features:
 
 #### Memory operations
 
-    u -> address of u var (and context)
-    v -> address of v var
     b -> address of b var (dict/block)
 
     . -> fetch cell
@@ -89,9 +85,7 @@ Features:
     , -> store cell
     ; -> store byte
 
-    c -> copy byte from u to v (auto incr both)
-    i -> store byte via u (auto incr)
-    p -> fetch byte via u (auto incr)
+    c -> copy n bytes from src to dst
 
     m -> malloc
     f -> free
@@ -149,28 +143,28 @@ Features:
     ` -> find symbol from string
     a -> allot
     b -> address of b variable
-		c -> copy byte from u to v (auto incr)
+		c -> size of cell
     d -> dup
     e -> emit
     f -> free
     g -> compile quotation
     h -> header (create)
-    i -> store via v and incr
+    i -> interpret/apply/call
     j -> jump
     k -> key
     l -> load and evaluate file
 		m -> malloc
-    n -> string to number
+    n -> 
     o -> over
-    p -> fetch (peek) via u and incr
+    p -> 
     q -> compile quotation and return
     r -> rot
     s -> swap
     t -> times (combinator)
-    u -> address of u var (and context)
-    v -> address of v var
+    u -> untrace
+    v -> view traces
     w -> while (combinator)
-    x -> execute/apply
+    x -> context address
     y -> yield
     z -> zjump (jump if zero)
     { -> inspect memory
