@@ -112,8 +112,8 @@ Features:
 
     (SPACE) -> noop
     ! -> not
-    " -> string literal
-    # -> cell literal
+    " -> cell literal
+    # -> count quotation characters
     $ -> find and call symbol
     % -> modulo
     & -> and

@@ -1,6 +1,7 @@
 #include<stdio.h>
 #include "sloth.h"
 #include "trace.h"
+#include "forth.h"
 /*
 #include "combinators.h"
 #include "dictionary.h"
@@ -95,6 +96,8 @@ int main(int argc, char** argv) {
   x->trace = &S_trace;
 
   x->tr = 1;
+
+  SF_init(x);
   
   /*
   EXT(x, 'D') = &SD_ext;

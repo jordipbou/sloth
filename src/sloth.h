@@ -74,8 +74,7 @@ V S_parse_literal(X* x) {
 
 V S_parse_quotation(X* x) { 
 	C t = 1; 
-	B c; 
-	S_lit(x, (C)(++x->ip)); 
+	S_lit(x, (C)(x->ip)); 
 	while (t) { 
     switch (S_token(x)) { 
     case '[': t++; break; 
@@ -85,7 +84,7 @@ V S_parse_quotation(X* x) {
 }
 
 V S_parse_string(X* x) {
-  S_lit(x, (C)(++x->ip));
+  S_lit(x, (C)(x->ip));
   while (S_token(x) != '"') {}
   S_lit(x, (C)(x->ip - TS(x)) - 1);
 }
@@ -281,10 +280,6 @@ void S_inner(X* x) {
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9': 
       S_parse_literal(x); break;
-    case '[': 
-      S_parse_quotation(x); break;
-    case '"':
-      S_parse_string(x); break;
     case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
     case 'G': case 'H': case 'I': case 'J': case 'K': case 'L':
     case 'M': case 'N': case 'O': case 'P': case 'Q': case 'R':
@@ -294,8 +289,11 @@ void S_inner(X* x) {
       break;
     default:
       switch (S_token(x)) {
+      case '[': S_parse_quotation(x); break;
+      case '"': S_parse_string(x); break;
       case '\'': S_lit(x, (C)S_token(x)); break;
       case '#': S_lit(x, *((C*)x->ip)); x->ip += sizeof(C); break;
+      /*case '#': S_count(x); break;*/
       case '@': S_lit(x, (C)(x->ip + ((B)S_token(x)))); break;
       /* Stacks */
       case '_': S_drop(x); break;
