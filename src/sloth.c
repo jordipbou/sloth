@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include "sloth.h"
 #include "trace.h"
-#include "forth.h"
+/*#include "forth.h"*/
 /*
 #include "combinators.h"
 #include "dictionary.h"
@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
 
   x->tr = 1;
 
-  SF_init(x);
+  /*SF_init(x);*/
   
   /*
   EXT(x, 'D') = &SD_ext;
@@ -124,7 +124,8 @@ int main(int argc, char** argv) {
   /*
   S_eval(x, bootForth);
   */
-  
+
+  /*
 	if (argc == 1 || argc == 3) {
 		do {
 			fgets(buf, 255, stdin);
@@ -133,4 +134,8 @@ int main(int argc, char** argv) {
 			printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
 		} while(1);
 	}
+  */
+  x = SF_init(x);
+  
+  SF_outer(x);
 }
