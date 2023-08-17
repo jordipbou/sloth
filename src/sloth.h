@@ -237,9 +237,10 @@ typedef struct _W { struct _W* p; B* i; B* c; C h; C l; B n[1]; } W;
 
 typedef struct { C sz; C h; W* l; C st; C src_id; B* src; C src_sz; C in; B tib[SF_TIB_SIZE]; } D;
 
-W* SF_header(X* x, B* n) {
+W* SF_header(X* x) {
+  B l = (B)S_drop(x);
+  B* n = (B*)S_drop(x);
   D* d = (D*)x->b;
-  B l = strlen(n);
   /* SF_align(x); */
   W* w = (W*)(x->b + d->h);
   d->h += sizeof(W) + l - sizeof(C) + 1;
@@ -272,14 +273,30 @@ V SF_find_name(X* x) {
   B* n = (B*)S_drop(x);
   W* w = ((D*)x->b)->l;
   while (w != 0) {
-    if (w->l == l && !strncmp(w->n, n, l)) break;
+    if (!w->h && w->l == l && !strncmp(w->n, n, l)) break;
     w = w->p;
   }
   S_lit(x, (C)w);
 }
 
 V SF_compile(X* x) {
-  /* Just copy the bytecode into the new word? */
+  printf("COMPILING WORD\n");
+  B* q = (B*)S_drop(x);
+  D* d = (D*)x->b;
+  C t = 1;
+  while (1) {
+    printf("COMPILING %c\n", *q);
+    *(x->b + d->h) = *q;
+    if (*q == '[') t++;
+    if (*q == ']') t--;
+    if (t) {
+      d->h++;
+      q++;
+    } else {
+      break;
+    }
+  }
+  printf("COMPILED\n");
 }
 
 V SF_to_number(X* x) {
@@ -295,28 +312,28 @@ V SF_to_number(X* x) {
 V SF_interpret(X* x) {
   while (SF_parse_name(x)) {
     x->trace(x);
+    printf("ST: %ld WORD: %.*s\n", ((D*)x->b)->st, TS(x), NS(x));
     S_over(x);
     S_over(x);
     SF_find_name(x);
     if (TS(x)) {
-      printf("WORD FOUND!\n");
       W* w = S_drop(x);
       S_drop(x);
       S_drop(x);
       if (((D*)x->b)->st) {
+        printf("COMPILING\n");
         if (w->c) {
+          printf("DUAL WORD\n");
           S_eval(x, w->c);
         } else {
-          printf("NON DUAL WORD\n");
+          printf("NORMAL WORD\n");
           S_lit(x, (C)w->i);
-          printf("COMPILING\n");
           SF_compile(x);
         }
       } else {
         S_eval(x, w->i);
       }
     } else {
-      printf("WORD NOT FOUND!\n");
       S_drop(x);
       SF_to_number(x);
       x->trace(x);
@@ -358,13 +375,50 @@ V SF_outer(X* x) {
   }
 }
 
+#define SF_STR_LIT(x, s, l) S_lit(x, (C)s); S_lit(x, (C)l);
+
+V SF_rbracket(X* x) {
+  D* d = (D*)x->b;
+  d->st = 1;
+}
+
+V SF_lbracket(X* x) {
+  D* d = (D*)x->b;
+  d->st = 0;
+}
+
+V SF_reveal(X* x) {
+  D* d = (D*)x->b;
+  *(x->b + d->h) = ']';
+  d->h++;
+  d->l->h = 0;
+}
+
+V SF_immediate(X* x) {
+  D* d = (D*)x->b;
+  d->l->c = d->l->i;
+}
+
+V SF_ext(X* x) {
+  switch (S_token(x)) {
+  case 'h': SF_header(x); break;
+  case 'i': SF_immediate(x); break;
+  case 'l': SF_lbracket(x); break;
+  case 'p': SF_parse_name(x); break;
+  case 'r': SF_rbracket(x); break;
+  case 'v': SF_reveal(x); break;
+  }
+}
+
 V SF_add_primitive(X* x, B* n, B* c) {
   D* d = (D*)x->b;
-  SF_header(x, n);
+  SF_STR_LIT(x, n, strlen(n));
+  SF_header(x);
   strcpy(x->b + d->h, c);
   d->h += strlen(c);
   *(x->b + d->h) = ']';
   d->h++;
+  SF_reveal(x);
 }
 
 X* SF_init(X* x) {
@@ -381,11 +435,16 @@ X* SF_init(X* x) {
   d->in = 0;
   memset(d->tib, 0, SF_TIB_SIZE);
 
+  EXT(x, 'F') = &SF_ext;
+
   SF_add_primitive(x, "swap", "s");
   SF_add_primitive(x, "drop", "_");
   SF_add_primitive(x, "dup", "d");
   SF_add_primitive(x, "over", "o");
   SF_add_primitive(x, "rot", "r");
+
+  SF_add_primitive(x, ">r", "(");
+  SF_add_primitive(x, "r>", ")");
 
   SF_add_primitive(x, "+", "+");
   SF_add_primitive(x, "-", "-");
@@ -407,6 +466,17 @@ X* SF_init(X* x) {
   SF_add_primitive(x, "jump", "j");
   SF_add_primitive(x, "zjump", "z");
 
+  SF_add_primitive(x, "parse-name", "Fp");
+  SF_add_primitive(x, "create", "FpFh");
+  SF_add_primitive(x, "]", "Fr");
+  SF_add_primitive(x, "[", "Fl");
+  SF_add_primitive(x, "reveal", "Fv");
+
+  SF_add_primitive(x, ":", "FpFhFr");
+  SF_add_primitive(x, ";", "FlFv");
+  SF_immediate(x);
+  SF_add_primitive(x, "immediate", "i");
+  
   return x;
 }
 

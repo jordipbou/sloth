@@ -1,35 +1,27 @@
-# SLOTH
+# SLOTH (another SLOw forTH)
 
-A small, simple, relatively fast, double stack based virtual machine with human readable/writeable bytecode meant for extending applications.
+An ANS Forth implemented on a small, simple, relatively fast (or relatively slow), double stack based virtual machine with human readable/writeable bytecode meant for extending applications.
 
-In the future there will be other implementations (at least Java/Kotlin for Android development).
+Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor.
 
-Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor and Dawn.
+## VIRTUAL MACHINE
+
+[In the future there will be other implementations (at least Java/Kotlin for Android development)]
 
 Features:
 
 * C89. Very easily embedabble in a C/C++ application.
-* Human readable bytecode (ASCII 32-126), no need to use an assembler.
+* Human readable bytecode (ASCII 32-126).
 * Cell (64, 32 or 16 bits) based data stack, return stack and retain stack
-* Quotations at bytecode level.
+* Quotations and combinators at bytecode level.
 * Relatively fast interpreter.
-* Ability to add C function thru bytecode extensions (bytecodes A-Z).
+* Ability to add C functions thru bytecode extensions (bytecodes A-Z).
 
-## VM Architecture
+### BYTECODE
 
-* Data Stack (S)
-* Return Stack (R)
-* Instruction Pointer Register (IP)
-* Error Register (ERR)
-* Memory Block Register (B)
+#### Ordered by use
 
-## Bytecodes
-
-(Only trace and size of cell is left from the list!)
-
-### Ordered by use
-
-#### Stack operations
+##### Stack operations
 
     _ -> drop
     s -> swap
@@ -39,7 +31,7 @@ Features:
     ( -> push
     ) -> pop
 
-#### Arithmetic operations
+##### Arithmetic operations
 
     + -> addition
     - -> substraction
@@ -47,7 +39,7 @@ Features:
     / -> division
     % -> modulo
 
-#### Bitwise operations
+##### Bitwise operations
 
     ! -> not
     ~ -> invert
@@ -55,13 +47,13 @@ Features:
     | -> or
     ^ -> xor
 
-#### Comparison operations
+##### Comparison operations
 
     < -> less than
     = -> equal
     > -> greater than
     
-#### Execution operations
+##### Execution operations
 
     ]/} -> return
     x -> call/tail call
@@ -69,14 +61,14 @@ Features:
     z -> zjump
     y -> yield
     
-#### Helpers
+##### Helpers
 
     ? -> branch (combinator)
     t -> times (combinator)
     w -> while (combinator)
     n -> string to number
 
-#### Memory operations
+##### Memory operations
 
     b -> address of b var (dict/block)
 
@@ -92,7 +84,7 @@ Features:
 
     { -> inspect memory
 
-#### Dictionary
+##### Dictionary
 
     a -> allot (auto init
     h -> header (create)
@@ -102,13 +94,13 @@ Features:
     q -> compile quotation with return
     g -> compile quotation
 
-#### Input/Output
+##### Input/Output
 
     e -> emit
     k -> key
     l -> load and eval file
 
-## ASCII ordered
+### ASCII ordered
 
     (SPACE) -> noop
     ! -> not
@@ -171,3 +163,6 @@ Features:
     | -> or
     } -> return
     ~ -> invert
+
+## FORTH
+
