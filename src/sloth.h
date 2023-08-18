@@ -1,6 +1,29 @@
 /* TODO: Errors */
 /* IDEAS: Implement registers A, B, X, Y (in return stack as ReForth?) */
 /* IDEAS: Implement recognizers? */
+/* IDEAS: Add just : and ; for creating new words? */
+/* TODO: How to implement IF and the other control structures? */
+/* TODO: Change dictionary and jump addresses to be relative */
+
+/* 
+Instructions with post-literals:
+
+  # -> literal
+  
+  ? -> 0branch
+  b -> branch
+  c -> call
+
+Instructions with pre-literals:
+
+  z -> 0jump
+  j -> jump
+  x -> call
+
+Does it make sense?
+I don't think so.
+*/
+  
 
 #ifndef SLOTH_VM
 #define SLOTH_VM
@@ -309,6 +332,14 @@ V SF_to_number(X* x) {
   S_lit(x, endptr - s);
 }
 
+V SF_literal(X* x) {
+  D* d = (D*)x->b;
+  *(x->b + d->h) = '#';
+  d->h++;
+  *((C*)(x->b + d->h)) = S_drop(x);
+  d->h += sizeof(C);
+}
+
 V SF_interpret(X* x) {
   while (SF_parse_name(x)) {
     x->trace(x);
@@ -340,6 +371,9 @@ V SF_interpret(X* x) {
       if (TS(x)) {
         S_drop(x);
         S_drop(x);
+        if (((D*)x->b)->st) {
+          SF_literal(x);
+        }
       } else {
         /* Error */
       }
@@ -399,6 +433,55 @@ V SF_immediate(X* x) {
   d->l->c = d->l->i;
 }
 
+V SF_here(X* x) {
+  D* d = (D*)x->b;
+  S_lit(x, (C)(x->b + d->h));
+}
+
+V SF_bcompile(X* x) {
+  D* d = (D*)x->b;
+  *(x->b + d->h) = (B)S_drop(x);
+  d->h++;
+}
+
+V SF_ahead(X* x) {
+  SF_here(x);
+  S_lit(x, 1);
+  S_add(x);
+  S_lit(x, 0);
+  SF_literal(x); 
+}
+
+V SF_0branch(X* x) {
+  S_lit(x, 'z');
+  SF_bcompile(x);
+}
+
+V SF_branch(X* x) {
+  S_lit(x, 'j');
+  SF_bcompile(x);
+}
+
+V SF_if(X* x) {
+  SF_ahead(x);
+  SF_0branch(x);
+}
+
+/* TODO: Not working! */
+V SF_else(X* x) {
+  SF_ahead(x);
+  SF_branch(x);
+  SF_here(x);
+  S_rot(x);
+  S_cstore(x);
+}
+
+V SF_then(X* x) {
+  SF_here(x);
+  S_swap(x);
+  S_cstore(x);
+}
+
 V SF_ext(X* x) {
   switch (S_token(x)) {
   case 'h': SF_header(x); break;
@@ -407,6 +490,9 @@ V SF_ext(X* x) {
   case 'p': SF_parse_name(x); break;
   case 'r': SF_rbracket(x); break;
   case 'v': SF_reveal(x); break;
+  case 'f': SF_if(x); break;
+  case 'e': SF_else(x); break;
+  case 't': SF_then(x); break;
   }
 }
 
@@ -476,6 +562,13 @@ X* SF_init(X* x) {
   SF_add_primitive(x, ";", "FlFv");
   SF_immediate(x);
   SF_add_primitive(x, "immediate", "i");
+
+  SF_add_primitive(x, "if", "Ff"); 
+  SF_immediate(x);
+  SF_add_primitive(x, "then", "Ft");
+  SF_immediate(x);
+  SF_add_primitive(x, "else", "Fe");
+  SF_immediate(x);
   
   return x;
 }
