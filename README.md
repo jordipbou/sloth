@@ -66,47 +66,43 @@ Features:
     ? -> branch (combinator)
     t -> times (combinator)
     w -> while (combinator)
-    n -> string to number
+    u -> unview traces
+    v -> view traces
+    [ n -> string to number ]
 
 ##### Memory operations
 
-    b -> address of b var (dict/block)
+    m -> malloc
+    f -> free
 
     . -> fetch cell
     : -> fetch byte
     , -> store cell
     ; -> store byte
 
-    c -> copy n bytes from src to dst
+    b -> address of b var (dict/block)
+    c -> size of cell in bytes
 
-    m -> malloc
-    f -> free
-
-    { -> inspect memory
+    [ { -> inspect memory ]
 
 ##### Dictionary
 
-    a -> allot (auto init
-    h -> header (create)
-    \ -> define/find symbol (auto init)
-    ` -> find symbol from string
-    $ -> find and call symbol
-    q -> compile quotation with return
-    g -> compile quotation
+    h -> header (create label)
+    $ -> find symbol
 
 ##### Input/Output
 
     e -> emit
     k -> key
-    l -> load and eval file
+    [ l -> load and eval file ]
 
 ### ASCII ordered
 
     (SPACE) -> noop
     ! -> not
-    " -> cell literal
-    # -> count quotation characters
-    $ -> find and call symbol
+    " -> string literal
+    # -> cell literal
+    $ -> find symbol
     % -> modulo
     & -> and
     ' -> byte literal
@@ -128,38 +124,38 @@ Features:
     @ -> relative to IP byte literal
     A-Z -> C extensions
     [ -> start quotation/push IP+1
-    \ -> define/find symbol (and initialize b if not done before)
+    \ -> 
     ] -> return/end of quotation
     ^ -> xor
     _ -> drop
-    ` -> find symbol from string
-    a -> allot
+    ` -> 
+    a -> 
     b -> address of b variable
 		c -> size of cell
     d -> dup
     e -> emit
     f -> free
-    g -> compile quotation
-    h -> header (create)
-    i -> interpret/apply/call
+    g -> 
+    h -> header (create symbol)
+    i -> 
     j -> jump
     k -> key
-    l -> load and evaluate file
+    l -> 
 		m -> malloc
     n -> 
     o -> over
     p -> 
-    q -> compile quotation and return
+    q -> 
     r -> rot
     s -> swap
     t -> times (combinator)
     u -> untrace
     v -> view traces
     w -> while (combinator)
-    x -> context address
+    x -> interpret/call/execute
     y -> yield
     z -> zjump (jump if zero)
-    { -> inspect memory
+    { -> 
     | -> or
     } -> return
     ~ -> invert

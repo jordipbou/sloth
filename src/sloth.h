@@ -3,28 +3,7 @@
 /* IDEAS: Implement recognizers? */
 /* IDEAS: Add just : and ; for creating new words? */
 /* TODO: How to implement IF and the other control structures? */
-/* TODO: Change dictionary and jump addresses to be relative */
-
-/* 
-Instructions with post-literals:
-
-  # -> literal
-  
-  ? -> 0branch
-  b -> branch
-  c -> call
-
-Instructions with pre-literals:
-
-  z -> 0jump
-  j -> jump
-  x -> call
-
-Does it make sense?
-I don't think so.
-*/
-  
-
+/* TODO: Change dictionary and jump addresses to be relative? */
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -37,6 +16,103 @@ I don't think so.
 typedef char B;
 typedef intptr_t C;
 
+/* Memory model */
+
+/* 
+Four logical spaces, each one with its own allocator:
+- Name Space
+- Code Space
+- Data Space
+- Heap Space
+Right now, I don't really need to create functions for each space, just design Sloth to allow later redesigning for multiple allocators?
+*/
+
+/* Environments */
+
+#define S_ENV 255
+#define S_HIDDEN 2
+#define S_DUAL 1
+
+typedef struct _Label {
+  struct _Label* p; /* previous */
+  C f; /* flags */
+  B* i; /* interp. code addres */
+  B* c; /* comp. code address */
+  C nl; /* name length */
+  B n[sizeof(C)]; /* name + 0 */
+} L;
+
+#define HIDDEN(l) (l->f & S_HIDDEN)
+#define DUAL(l) (l->f & S_DUAL)
+
+typedef struct _Env { 
+  struct _Env* p; /* parent env. */
+  L* l; /* latest defined label */
+} E;
+
+/* Allocator for name space */
+#ifndef NMALLOC
+#define NMALLOC(n) malloc(n)
+#define NFREE(p) free(p)
+#endif
+
+E* S_newE(E* p) {
+  E* e = NMALLOC(sizeof(E));
+  if (e) {
+    e->p = p;
+    e->l = 0;
+  }
+  return e;
+}
+
+V S_freeE(E* e) {
+  NFREE(e);
+}
+
+L* S_newL(E* e, B* n, C nl) {
+  L* l = NMALLOC(sizeof(L) + nl - sizeof(C) + 1);
+  if (l) {
+    l->p = e->l;
+    e->l = l;
+    l->f = 0;
+    l->i = 0;
+    l->c = 0;
+    l->nl = nl;
+    strncpy(l->n, n, nl);
+    l->n[nl] = 0;
+  }
+  return l;
+}
+
+C S_sameL(L* l, B* n, C nl) {
+  return
+    !HIDDEN(l) &&
+    l->nl == nl &&
+    !strncmp(l->n, n, nl);
+}
+
+L* S_findL(E* e, B* n, C nl) {
+  L* l = e->l;
+  while (e) {
+    L* l = e->l;
+    while (l) {
+      if (S_sameL(l, n, nl)) {
+        return l;
+      } else {
+        l = l->p;
+      }
+    }
+    e = e->p;
+  }
+  return 0;
+}
+
+V S_freeL(L* l) {
+  NFREE(l);
+}
+
+/* Contexts */
+
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
 
@@ -45,6 +121,7 @@ typedef struct _X {
   B** r; C rp; C rs;
 	B* ip;
   B* b;
+  E* e; /* environment */
 	void (*key)(struct _X*);
 	void (*emit)(struct _X*);
   void (*trace)(struct _X*);
@@ -55,6 +132,10 @@ typedef struct _X {
 
 #define EXT(x, l) (x->ext[l - 'A'])
 
+#define LOCALS2(x, t1,v1,t2,v2) \
+  t1 v1 = (t1)S_drop(x); \
+  t2 v2 = (t2)S_drop(x);
+
 X* S_init() {
 	X* x = malloc(sizeof(X));
   x->s = malloc(STACK_SIZE*sizeof(C));
@@ -63,7 +144,7 @@ X* S_init() {
   x->ss = STACK_SIZE;
   x->rs = RSTACK_SIZE;
   x->ext = malloc(26*sizeof(C));
-  x->ip = x->b = 0;
+  x->ip = x->b = x->e = 0;
   x->err = 0;
   x->tr = 0;
 	return x;
@@ -98,6 +179,12 @@ V S_parse_quotation(X* x) {
     case ']': t--; break;
     } 
   }
+}
+
+V S_parse_string(X* x) {
+  S_lit(x, (C)x->ip);
+  while (S_token(x) != '"') {}
+  S_lit(x, ((C)x->ip) - TS(x) - 1);
 }
 
 /* Stack instructions */
@@ -174,6 +261,25 @@ V S_while(X* x) {
   } while (1);
 }
 
+V S_create(X* x) {
+  LOCALS2(x, C, nl, B*, n);
+  if (!x->e) x->e = S_newE(0);
+  if (x->e) {
+    S_lit(x, (C)S_newL(x->e, n, nl));
+  } else {
+    S_lit(x, 0);
+  }
+}
+
+V S_find(X* x) {
+  LOCALS2(x, C, nl, B*, n);
+  if (x->e) {
+    S_lit(x, (C)S_findL(x->e, n, nl));
+  } else {
+    S_lit(x, 0);
+  }
+}
+    
 void S_inner(X* x) {
   C frame = x->rp;
   do {
@@ -195,6 +301,7 @@ void S_inner(X* x) {
     default:
       switch (S_token(x)) {
       case '[': S_parse_quotation(x); break;
+      case '"': S_parse_string(x); break;
       case '\'': S_lit(x, (C)S_token(x)); break;
       case '#': S_lit(x, *((C*)x->ip)); x->ip += sizeof(C); break;
       case '@': S_lit(x, (C)(x->ip + ((B)S_token(x)))); break;
@@ -230,7 +337,7 @@ void S_inner(X* x) {
       case 'y': exit(0); break;
       /* Helpers */
       case '?': S_branch(x); break;
-      case 'n': S_times(x); break;
+      case 't': S_times(x); break;
       case 'w': S_while(x); break;
       case 'u': x->tr = 0; break;
       case 'v': x->tr = 1; break;
@@ -243,6 +350,9 @@ void S_inner(X* x) {
       case ';': S_bstore(x); break;
       case 'b': S_lit(x, (C)&x->b); break;
       case 'c': S_lit(x, sizeof(C)); break;
+      /* Symbols */
+      case 'h': S_create(x); break;
+      case '$': S_find(x); break;
       /* Input/output */
       case 'k': x->key(x); break;
       case 'e': x->emit(x); break;
@@ -253,18 +363,37 @@ void S_inner(X* x) {
 
 /* FORTH */
 
+/* Allocator for code space */
+
+#ifndef CMALLOC
+#define CMALLOC(n) malloc(n)
+#define CREALLOC(p, n) realloc(p, n)
+#define CFREE(n) free(n)
+#endif
+
+
+/* Minimum API:
+
+S_create(X* x) ( "name" -- )
+S_find(X* x) ( "name" -- )
+S_execute(X* x) ( "name" -- )
+
+compile?
+*/
+
 typedef struct _W { struct _W* p; B* i; B* c; C h; C l; B n[1]; } W;
 
 #define SF_DICT_SIZE 65536
 #define SF_TIB_SIZE 1024
 
-typedef struct { C sz; C h; W* l; C st; C src_id; B* src; C src_sz; C in; B tib[SF_TIB_SIZE]; } D;
+typedef struct { C sz; C h; W* l; C st; C in; B tib[SF_TIB_SIZE]; } D;
+
+#define DICT(x) ((D*)x->b)
 
 W* SF_header(X* x) {
   B l = (B)S_drop(x);
   B* n = (B*)S_drop(x);
-  D* d = (D*)x->b;
-  /* SF_align(x); */
+  D* d = DICT(x);
   W* w = (W*)(x->b + d->h);
   d->h += sizeof(W) + l - sizeof(C) + 1;
   w->p = d->l;
@@ -280,21 +409,21 @@ W* SF_header(X* x) {
 
 C SF_parse_name(X* x) {
   D* d = (D*)x->b;
-  while (d->in < d->src_sz && d->src[d->in] != 0 && isspace(d->src[d->in])) {
+  while (d->in < SF_TIB_SIZE && d->tib[d->in] != 0 && isspace(d->tib[d->in])) {
     d->in++;
   } 
-  S_lit(x, (C)(d->src + d->in));
-  while (d->in < d->src_sz && d->src[d->in] != 0 && !isspace(d->src[d->in])) {
+  S_lit(x, (C)(d->tib + d->in));
+  while (d->in < SF_TIB_SIZE && d->tib[d->in] != 0 && !isspace(d->tib[d->in])) {
     d->in++;
   }
-  S_lit(x, ((C)(d->src + d->in)) - TS(x));
+  S_lit(x, ((C)(d->tib + d->in)) - TS(x));
   return TS(x);
 }
 
 V SF_find_name(X* x) {
   B l = (B)S_drop(x);
   B* n = (B*)S_drop(x);
-  W* w = ((D*)x->b)->l;
+  W* w = DICT(x)->l;
   while (w != 0) {
     if (!w->h && w->l == l && !strncmp(w->n, n, l)) break;
     w = w->p;
@@ -385,7 +514,7 @@ V SF_interpret(X* x) {
 
 V SF_refill(X* x) {
   D* d = (D*)x->b;
-  fgets(d->src, d->src_sz, stdin);
+  fgets(d->tib, SF_TIB_SIZE, stdin);
   d->in = 0;
 }
 
@@ -508,16 +637,12 @@ V SF_add_primitive(X* x, B* n, B* c) {
 }
 
 X* SF_init(X* x) {
-  /* TODO: Forth C implemented words should be added as an extension to Sloth! */
   x->b = malloc(SF_DICT_SIZE);
   D* d = (D*)x->b;
   d->sz = SF_DICT_SIZE;
   d->h = sizeof(D);
   d->l = 0;
   d->st = 0;
-  d->src_id = 0;
-  d->src = d->tib;
-  d->src_sz = SF_TIB_SIZE;
   d->in = 0;
   memset(d->tib, 0, SF_TIB_SIZE);
 
