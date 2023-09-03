@@ -86,7 +86,7 @@ B* bootForth =
 
 int main(int argc, char** argv) {
 	FILE* fptr;
-	B buf[1024];
+	B buf[1024][255];
 	C i;
 	B* j;
 	X* x = S_init();
@@ -125,13 +125,16 @@ int main(int argc, char** argv) {
   S_eval(x, bootForth);
   */
 
-  
+
+	C line = 0;
 	if (argc == 1 || argc == 3) {
 		do {
-			fgets(buf, 255, stdin);
-      S_eval(x, buf);
+			fgets(buf[line], 255, stdin);
+      S_eval(x, buf[line]);
 			if (x->err != 0) { printf("ERROR: %ld", x->err); return; }
 			printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
+			line++;
+			if (line >= 1024) line = 0;
 		} while(1);
 	}
   

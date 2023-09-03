@@ -100,12 +100,12 @@ Features:
 
     (SPACE) -> noop
     ! -> not
-    " -> string literal
+    " -> 
     # -> cell literal
-    $ -> find symbol
+    $ -> 
     % -> modulo
     & -> and
-    ' -> byte literal
+    ' -> symbol (find/create)
     ( -> push to R
     ) -> pop from R
     * -> multiplication
@@ -122,9 +122,35 @@ Features:
     > -> greater than
     ? -> branch
     @ -> relative to IP byte literal
-    A-Z -> C extensions
+		A -> C extension
+		B -> C extension
+		C -> C extension
+		D -> C extension
+		E -> C extension
+		F -> C extension
+		G -> C extension
+		H -> C extension
+		I -> C extension
+		J -> C extension
+		K -> C extension
+		L -> C extension
+		M -> C extension
+		N -> C extension
+		O -> C extension
+		P -> C extension
+		Q -> C extension
+		R -> C extension
+		Q -> C extension
+		S -> C extension
+		T -> C extension
+		U -> C extension
+		V -> C extension
+		W -> C extension
+		X -> C extension
+		Y -> C extension
+		Z -> C extension
     [ -> start quotation/push IP+1
-    \ -> 
+    \ -> find symbol from string
     ] -> return/end of quotation
     ^ -> xor
     _ -> drop
@@ -135,8 +161,8 @@ Features:
     d -> dup
     e -> emit
     f -> free
-    g -> 
-    h -> header (create symbol)
+    g -> get 
+    h -> 
     i -> 
     j -> jump
     k -> key
@@ -144,7 +170,7 @@ Features:
 		m -> malloc
     n -> 
     o -> over
-    p -> 
+    p -> put
     q -> 
     r -> rot
     s -> swap
