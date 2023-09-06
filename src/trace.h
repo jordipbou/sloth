@@ -9,8 +9,8 @@ C S_dump_S(B* s, X* x) {
 
 C S_dump_CODE(B* s, B* a) {
 	C i = 0, t = 1;
-	if (a < 1000) {
-    return sprintf(s, "%ld", a);
+	if (((C)a) < 1000) {
+    return sprintf(s, "%ld", (C)a);
   }
 	while (t && a[i] && a[i] != 10) {
 		switch (a[i++]) {
@@ -45,7 +45,6 @@ void S_trace(X* x) {
   memset(buf, 0, 255);
 	S_dump_X(buf, x, 30);
 	printf("%.35s <%ld>\n", buf, x->rp);
-  /*printf("R:%d %d W:%d %d\n", x->o, x->on, x->d, x->dn);*/
 }
 
 #endif

@@ -155,31 +155,31 @@ Features:
     ^ -> xor
     _ -> drop
     ` -> 
-    a -> 
+    a -> accept
     b -> address of b variable
 		c -> size of cell
     d -> dup
     e -> emit
     f -> free
-    g -> get 
+    g -> 
     h -> 
-    i -> 
+    i -> interpret/call/execute
     j -> jump
     k -> key
     l -> 
 		m -> malloc
     n -> 
     o -> over
-    p -> put
-    q -> 
+    p -> print
+    q -> quit
     r -> rot
     s -> swap
     t -> times (combinator)
     u -> untrace
     v -> view traces
     w -> while (combinator)
-    x -> interpret/call/execute
-    y -> yield
+    x -> 
+    y -> 
     z -> zjump (jump if zero)
     { -> 
     | -> or

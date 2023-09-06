@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include "sloth.h"
 #include "trace.h"
-/*#include "forth.h"*/
+#include "forth.h"
 /*
 #include "combinators.h"
 #include "dictionary.h"
@@ -43,7 +43,7 @@ int _getch ()
 
 void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
-
+/*
 B* bootForth =
 "\\block-size _[b..]q"
 "\\here _[cb.+.b.+]q"
@@ -66,7 +66,7 @@ B* bootForth =
 "\\source _[\\tib \\tib-length .]q"
 "\\compare _[ro=[1s[rroo:s:=(1+s1+sr)&]ts_s_][___0]?]q"
 "\\2over _[((oo)rr)rr]q";
-/*
+
 "\\refill _[0\\in ,\\tib 255a\\tib-length ,]q"
 "\\bl _[' ]q"
 "\\is-space? _\\bl g[1+<]q"
@@ -84,26 +84,42 @@ B* bootForth =
 "\\.s _[y]q";
 */
 
+B* bootForth =
+"65536mb,"
+"65536b.,"
+"16b.c+,"
+"[b.c+.b.+]'here ,"
+"[]'interpret ,";
+
+typedef struct {
+  C counter;
+} Status;
+
+void test(X* x, void* s) {
+  Status* st = (Status*)s;
+  printf("Counter: %ld\n", st->counter);
+  st->counter++;
+}
+
 int main(int argc, char** argv) {
+  X* x = SF_init();
+  C i;
+  while (1) {
+    SF_repl(x);
+  	printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");  
+  }
+  /*
 	FILE* fptr;
 	B buf[1024][255];
 	C i;
-	B* j;
+	B* j, *res;
 	X* x = S_init();
-	
-  x->key = &key;
-  x->emit = &emit;
-  x->trace = &S_trace;
-
-  x->tr = 1;
-
+*/	
   /*SF_init(x);*/
-  
-  /*
-  EXT(x, 'D') = &SD_ext;
-  EXT(x, 'Q') = &SC_ext;
-  EXT(x, 'S') = &SS_ext;
-  */
+/*
+  EXT(x, 'T') = &test;
+  ST(x, 'T') = malloc(sizeof(Status));
+*/
 
 	/*if (argc == 2 || argc == 3) {*/
 		/*fptr = fopen(argv[1], "r");*/
@@ -124,12 +140,11 @@ int main(int argc, char** argv) {
   /*
   S_eval(x, bootForth);
   */
-
-
+/*
 	C line = 0;
 	if (argc == 1 || argc == 3) {
 		do {
-			fgets(buf[line], 255, stdin);
+			res = fgets(buf[line], 255, stdin);
       S_eval(x, buf[line]);
 			if (x->err != 0) { printf("ERROR: %ld", x->err); return; }
 			printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");
@@ -137,6 +152,10 @@ int main(int argc, char** argv) {
 			if (line >= 1024) line = 0;
 		} while(1);
 	}
+ */ 
+/*
+  S_repl(x);
+  */
   
   /*
   x = SF_init(x);
