@@ -1,6 +1,7 @@
-#ifndef SLOTH_VM
-#define SLOTH_VM
+#ifndef SLOTH2_H
+#define SLOTH2_H
 
+#include<stdio.h> /* fgets, stdin */
 #include<stdint.h> /* intptr_t */
 #include<stdlib.h> /* malloc, free */
 #include<string.h> /* strncpy */
@@ -10,29 +11,37 @@
 typedef char B;
 typedef intptr_t C;
 
-/* Contexts */
+typedef struct _Symbol {
+  struct _Symbol* previous;
+  C flags;
+  B* interpretation;
+  B* compilation;
+  C nlen;
+  B name[sizeof(C)];
+} S;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
 #define INPUT_BUFFER_SIZE 255
+#define DEFAULT_DICT_SIZE 65536
 
-typedef struct _X {
+typedef struct _Context {
   C* s; C sp; C ss;
   B** r; C rp; C rs;
 	B* ip;
   C err;
-  void (**ext)(struct _X*, void* st);
-  void* st[26];
+  void (**ext)(struct _Context*);
+  C state;
+  S* latest;
+  B ibuf[INPUT_BUFFER_SIZE];
+  C in;
+  C here;
+  B dict[DEFAULT_DICT_SIZE];
 } X;
 
+#include "trace.h"
+
 #define EXT(x, l) (x->ext[l - 'A'])
-#define ST(x, l) (x->st[l - 'A'])
-
-#define LOCAL(x, t1, v1) t1 v1 = (t1)S_drop(x)
-
-#define LOCALS2(x, t1, v1, t2, v2) \
-  t1 v1 = (t1)S_drop(x); \
-  t2 v2 = (t2)S_drop(x)
 
 X* S_init() {
 	X* x = malloc(sizeof(X));
@@ -44,7 +53,11 @@ X* S_init() {
   x->ext = malloc(26*sizeof(C));
   x->ip = 0;
   x->err = 0;
-	return x;
+  x->state = 0;
+  x->latest = 0;
+  x->in = 0;
+  x->here = 0;	
+  return x;
 }
 
 void S_inner(X* x);
@@ -79,6 +92,7 @@ V S_over(X* x) { S_lit(x, NS(x)); }
 V S_rot(X* x) { C t = NNS(x); NNS(x) = NS(x); NS(x) = TS(x); TS(x) = t; TS(x); }
 V S_swap(X* x) { C t = TS(x); TS(x) = NS(x); NS(x) = t; }
 C S_drop(X* x) { return x->s[--x->sp]; }
+V S_nip(X* x) { NS(x) = TS(x); x->sp--; }
 
 V S_add(X* x) { NS(x) = NS(x) + TS(x); --x->sp; }
 V S_sub(X* x) { NS(x) = NS(x) - TS(x); --x->sp; }
@@ -146,13 +160,68 @@ V S_while(X* x) {
   } while (1);
 }
 
+V S_parse_name(X* x) {
+  while (x->in < INPUT_BUFFER_SIZE && 
+         x->ibuf[x->in] != 0 &&
+         isspace(x->ibuf[x->in])) {
+    x->in++;
+  }
+  S_lit(x, &x->ibuf[x->in]);
+  while (x->in < INPUT_BUFFER_SIZE &&
+         x->ibuf[x->in] != 0 &&
+         !isspace(x->ibuf[x->in])) {
+    x->in++;
+  }
+  S_lit(x, &x->ibuf[x->in] - TS(x));
+}
+
+V S_header(X* x) {
+  C nlen = S_drop(x);
+  B* name = (B*)S_drop(x);
+  S* s = (S*)(&x->dict[x->here]);
+  x->here += sizeof(S) + nlen - sizeof(C) + 1;
+  s->previous = x->latest;
+  x->latest = s;
+  s->flags = 0;
+  s->interpretation = (S*)(&x->dict[x->here]);;
+  s->compilation = 0;
+  s->nlen = nlen;
+  strncpy(s->name, name, nlen);
+  s->name[nlen] = 0;    
+  S_lit(x, s);
+}
+
+V S_create(X* x) {
+  S_parse_name(x);
+  S_header(x);
+}
+
+V S_colon(X* x) {
+  printf("Colon\n");
+  S_create(x);
+  x->state = 1;
+  printf("x->latest: %ld\n", x->latest);
+  if (x->latest) {
+    printf("x->latest->name: %s\n", x->latest->name);
+  }
+  printf("x->state: %ld\n", x->state);
+}
+
+V S_semicolon(X* x) {
+  B* i;
+  printf("Semicolon\n");
+  x->state = 0; 
+  for (i = (B*)x->latest; i < &x->dict[x->here]; i++) {
+    printf("%c", *i);
+  }
+}
+
 /* Can be done with a step function as a macro, as it was done? */
 /* That way, tracing does not belong to here */
 void S_inner(X* x) {
   B l;
   C frame = x->rp;
   do {
-    EXT(x, 'T')(x, 0);
     switch (S_peek(x)) {
     case 0: if (!S_return(x, frame)) { return; } break;
     case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
@@ -161,7 +230,7 @@ void S_inner(X* x) {
     case 'S': case 'T': case 'U': case 'V': case 'W': case 'X':
     case 'Y': case 'Z':
       l = S_token(x);
-      EXT(x, l)(x, ST(x, l));
+      EXT(x, l)(x);
       break;
     default:
       switch (S_token(x)) {
@@ -177,6 +246,7 @@ void S_inner(X* x) {
       case 'd': S_dup(x); break;
       case 'o': S_over(x); break;
       case 'r': S_rot(x); break;
+      case 'n': S_nip(x); break;
       case '(': S_push(x); break;
       case ')': S_pop(x); break;
       /* Arithmetics */
@@ -213,9 +283,158 @@ void S_inner(X* x) {
       case ',': S_cstore(x); break;
       case ';': S_bstore(x); break;
       case 'c': S_lit(x, sizeof(C)); break;
+      /* Colon */
+      case '$': S_colon(x); break;
+      case '{': S_semicolon(x); break;
       }
     }
   } while(1);
+}
+
+V S_compile(X* x) {
+  S* s = (S*)S_drop(x);
+  x->dict[x->here] = '#';
+  x->here++;
+  *((C*)(&x->dict[x->here])) = s->interpretation;
+  x->here+=sizeof(C);
+  x->dict[x->here] = 'i';
+  x->here++;
+}
+
+V S_find_name(X* x) {
+  C nlen = S_drop(x);
+  B* name = (B*)S_drop(x);
+  S* s = x->latest;
+  while (s) {
+    if (s->nlen == nlen && !strncmp(s->name, name, nlen)) {
+      break;
+    }
+    s = s->previous;
+  }
+  S_lit(x, s);
+}
+
+V S_name_interpret(X* x) {
+  S* s = (S*)S_drop(x);
+  S_lit(x, s->interpretation);
+}
+
+V S_name_compile(X* x) {
+  S* s = (S*)S_drop(x);
+  S_lit(x, s->compilation);
+}
+
+V S_dual(X* x) {
+  S* s = (S*)S_drop(x);
+  S_lit(x, s->compilation != 0);
+}
+
+V S_to_number(X* x) {
+  C slen = S_drop(x);
+  B* str = (B*)S_drop(x);
+  B* end;
+  C n;
+  n = strtol(str, &end, 10);
+  if (n == 0 && str == end) {
+    /* Error */
+  } else {
+    S_lit(x, n);
+  }
+}
+
+V S_interpret(X* x) {
+  do {
+    S_parse_name(x);
+    if (!TS(x)) { S_drop(x); S_drop(x); return; }
+    S_over(x); S_over(x);
+    S_find_name(x);
+    if (TS(x)) {
+      S_nip(x); S_nip(x); 
+      if (!x->state) {
+        S_name_interpret(x);
+        S_call(x);
+        S_inner(x);
+      } else {
+        S_dup(x);
+        S_dual(x);
+        if (S_drop(x)) {
+          S_name_compile(x);
+          S_call(x);
+          S_inner(x);
+        } else {
+          S_compile(x);
+        }
+      }
+    } else {
+      S_drop(x);
+      S_to_number(x); 
+    }
+  } while(1);
+}
+
+V S_repl(X* x) {
+  while (!x->err) {
+    fgets(x->ibuf, INPUT_BUFFER_SIZE, stdin);
+    x->in = 0;
+    S_interpret(x);
+    S_trace(x);
+  } 
+}
+
+V S_add_primitive(X* x, B* name, B* i, B* c) {
+  S* s;
+  S_lit(x, name);
+  S_lit(x, strlen(name));
+  S_header(x);
+  s = (S*)S_drop(x); 
+  s->interpretation = i;
+  s->compilation = c;
+}
+
+V S_primitives(X* x) {
+  S_add_primitive(x, "dup", "d", 0);
+  S_add_primitive(x, "over", "o", 0);
+  S_add_primitive(x, "swap", "s", 0);
+  S_add_primitive(x, "drop", "_", 0);
+  S_add_primitive(x, "rot", "r", 0);
+  S_add_primitive(x, "nip", "n", 0); 
+
+  S_add_primitive(x, ">r", "(", 0);
+  S_add_primitive(x, "r>", ")", 0);
+
+  S_add_primitive(x, "+", "+", 0);
+  S_add_primitive(x, "-", "-", 0);
+  S_add_primitive(x, "*", "*", 0);
+  S_add_primitive(x, "/", "/", 0);
+  S_add_primitive(x, "mod", "%", 0);
+
+  S_add_primitive(x, "not", "!", 0);
+  S_add_primitive(x, "invert", "~", 0);
+  S_add_primitive(x, "and", "&", 0);
+  S_add_primitive(x, "or", "|", 0);
+  S_add_primitive(x, "xor", "^", 0);
+
+  S_add_primitive(x, "<", "<", 0);
+  S_add_primitive(x, "=", "=", 0);
+  S_add_primitive(x, ">", ">", 0);
+
+  S_add_primitive(x, "exit", "}", 0);
+  S_add_primitive(x, "execute", "i", 0);
+  S_add_primitive(x, "branch", "j", 0);
+  S_add_primitive(x, "0branch", "z", 0);
+
+  S_add_primitive(x, ":", "$", 0);
+  S_add_primitive(x, ";", 0, "{");
+
+ /* 
+      case 'f': S_free(x); break;
+      case 'm': S_malloc(x); break;
+      case '.': S_cfetch(x); break;
+      case ':': S_bfetch(x); break;
+      case ',': S_cstore(x); break;
+      case ';': S_bstore(x); break;
+      case 'c': S_lit(x, sizeof(C)); break;
+  */
 }
 
 #endif

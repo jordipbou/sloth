@@ -1,26 +1,35 @@
-#include<stdio.h>
-#include "sloth.h"
-#include "trace.h"
-#include "forth.h"
+#include "sloth2.h"
+
+int main(int argc, char** argv) {
+  X* x = S_init(x);
+  S_primitives(x);
+  S_repl(x);
+}
+
+/*#include<stdio.h>*/
+/*#include "sloth.h"*/
+/*#include "trace.h"*/
+/*#include "forth.h"*/
 /*
 #include "combinators.h"
 #include "dictionary.h"
 #include "strings.h"
 */
-
+/*
 #ifdef _WIN32
   #include <conio.h>
 #else
 	#include <unistd.h>
 	#include <termios.h>
 #endif
-
+*/
 /*
  Source code for getch is taken from:
  Crossline readline (https://github.com/jcwangxp/Crossline).
  It's a fantastic readline cross-platform replacement, but only getch was
  needed and there's no need to include everything else.
 */
+/*
 #ifdef _WIN32
 int _getch (void) {	fflush (stdout); return _getch(); }
 #else
@@ -31,11 +40,11 @@ int _getch ()
 	fflush (stdout);
 	if (tcgetattr(STDIN_FILENO, &old_term) < 0)	{ perror("tcsetattr"); }
 	cur_term = old_term;
-	cur_term.c_lflag &= ~(ICANON | ECHO | ISIG); /* echoing off, canonical off, no signal chars */
+	cur_term.c_lflag &= ~(ICANON | ECHO | ISIG); 
 	cur_term.c_cc[VMIN] = 1;
 	cur_term.c_cc[VTIME] = 0;
 	if (tcsetattr(STDIN_FILENO, TCSANOW, &cur_term) < 0)	{ perror("tcsetattr"); }
-	if (read(STDIN_FILENO, &ch, 1) < 0)	{ /* perror("read()"); */ } /* signal will interrupt */
+	if (read(STDIN_FILENO, &ch, 1) < 0)	{ } 
 	if (tcsetattr(STDIN_FILENO, TCSADRAIN, &old_term) < 0)	{ perror("tcsetattr"); }
 	return ch;
 }
@@ -43,6 +52,7 @@ int _getch ()
 
 void key(X* x) { S_lit(x, (C)_getch()); }
 void emit(X* x) { printf("%c", (B)S_drop(x)); }
+*/
 /*
 B* bootForth =
 "\\block-size _[b..]q"
@@ -83,7 +93,7 @@ B* bootForth =
 "\\+ _[+]q"
 "\\.s _[y]q";
 */
-
+/*
 B* bootForth =
 "65536mb,"
 "65536b.,"
@@ -100,21 +110,27 @@ void test(X* x, void* s) {
   printf("Counter: %ld\n", st->counter);
   st->counter++;
 }
-
-int main(int argc, char** argv) {
+*/
+/*int main(int argc, char** argv) {*/
+  /*
   X* x = SF_init();
   C i;
   while (1) {
     SF_repl(x);
   	printf("Ok "); for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); } printf("\n");  
   }
+  */
   /*
 	FILE* fptr;
 	B buf[1024][255];
 	C i;
 	B* j, *res;
+  X* x = SS_init();
+  EXT(x, 'T') = &S_trace;
+  */
+  /*
 	X* x = S_init();
-*/	
+ */
   /*SF_init(x);*/
 /*
   EXT(x, 'T') = &test;
@@ -140,7 +156,7 @@ int main(int argc, char** argv) {
   /*
   S_eval(x, bootForth);
   */
-/*
+  /*
 	C line = 0;
 	if (argc == 1 || argc == 3) {
 		do {
@@ -152,7 +168,7 @@ int main(int argc, char** argv) {
 			if (line >= 1024) line = 0;
 		} while(1);
 	}
- */ 
+ */
 /*
   S_repl(x);
   */
@@ -162,4 +178,4 @@ int main(int argc, char** argv) {
   
   SF_outer(x);
   */
-}
+/*}*/

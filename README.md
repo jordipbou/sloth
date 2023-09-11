@@ -102,7 +102,7 @@ Features:
     ! -> not
     " -> 
     # -> cell literal
-    $ -> 
+    $ -> colon
     % -> modulo
     & -> and
     ' -> symbol (find/create)
@@ -181,7 +181,7 @@ Features:
     x -> 
     y -> 
     z -> zjump (jump if zero)
-    { -> 
+    { -> semicolon
     | -> or
     } -> return
     ~ -> invert
