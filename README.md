@@ -161,25 +161,25 @@ Features:
     d -> dup
     e -> emit
     f -> free
-    g -> 
-    h -> 
+    g -> resolve
+    h -> hop
     i -> interpret/call/execute
     j -> jump
     k -> key
     l -> 
 		m -> malloc
-    n -> 
+    n -> nip
     o -> over
     p -> print
     q -> quit
     r -> rot
     s -> swap
     t -> times (combinator)
-    u -> untrace
-    v -> view traces
+    u -> constant 
+    v -> variable
     w -> while (combinator)
-    x -> 
-    y -> 
+    x -> ahead
+    y -> recurse
     z -> zjump (jump if zero)
     { -> semicolon
     | -> or
