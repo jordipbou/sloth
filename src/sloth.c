@@ -4,8 +4,10 @@
 int main(int argc, char** argv) {
   B buf[255];
   X* x = SF_init();
-  fgets(buf, 255, stdin);
-	S_evaluate(x, buf);
+	while (1) {
+	  fgets(buf, 255, stdin);
+		S_evaluate(x, buf);
+	}
 }
 
 /*#include<stdio.h>*/

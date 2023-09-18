@@ -168,6 +168,8 @@ void S_inner(X* x) {
     S_trace(x);
     switch (S_peek(x)) {
     case 0: if (!S_return(x, frame)) { return; } break;
+		/* Let's try this directly, if space, just return */
+		case ' ': return; break;
     case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
     case 'G': case 'H': case 'I': case 'J': case 'K': case 'L':
     case 'M': case 'N': case 'O': case 'P': case 'Q': case 'R':
@@ -209,7 +211,7 @@ void S_inner(X* x) {
       case '=': S_eq(x); break;
       case '>': S_gt(x); break;
       /* Execution */
-      case ']': case '}': case ' ': if (!S_return(x, frame)) { return; } break;
+      case ']': case '}': if (!S_return(x, frame)) { return; } break;
       case 'i': S_call(x); break;
       case 'j': S_jump(x); break;
       case 'z': S_zjump(x); break;
@@ -266,6 +268,7 @@ V S_outer(X* x) {
 					if (w->interpretation) {
             printf("Evaluating interpretation semantics\n");
 						S_eval(x, w->interpretation);
+						printf("ip after interpreting: %s\n", x->ip);
 					} else {
             printf("Word has no interpretation semantics\n");
 						/* Word can not be interpreted */
@@ -301,7 +304,7 @@ V S_evaluate(X* x, B* s) { S_lit(x, s); S_call(x); S_outer(x); }
 
 V S_primitive(X* x, B* n, B* i, B* c) {
   C l = strlen(n);
-  S* s = malloc(sizeof(S) + n - sizeof(C) + 1);
+  S* s = malloc(sizeof(S) + l - sizeof(C) + 1);
   s->previous = x->latest;
   x->latest = s;
   s->interpretation = i;
@@ -315,20 +318,22 @@ X* SF_init() {
   x->state = 0;
 
   /* Primitives could be defined in Sloth by using the \ sigil */
-  S_primitive(x, "dup", "d", 0);
-  S_primitive(x, "swap", "s", 0);
-  S_primitive(x, "drop", "_", 0);
-  S_primitive(x, "over", "o", 0);
-  S_primitive(x, "rot", "r", 0);
+  S_primitive(x, "dup", "d]", 0);
+  S_primitive(x, "swap", "s]", 0);
+  S_primitive(x, "drop", "_]", 0);
+  S_primitive(x, "over", "o]", 0);
+  S_primitive(x, "rot", "r]", 0);
 
-  S_primitive(x, ">r", "(", 0);
-  S_primitive(x, "r>", ")", 0);
+  S_primitive(x, ">r", "(]", 0);
+  S_primitive(x, "r>", ")]", 0);
 
-  S_primitive(x, "+", "+", 0);
-  S_primitive(x, "-", "-", 0);
-  S_primitive(x, "*", "*", 0);
-  S_primitive(x, "/", "/", 0);
-  S_primitive(x, "mod", "%", 0);
+  S_primitive(x, "+", "+]", 0);
+  S_primitive(x, "-", "-]", 0);
+  S_primitive(x, "*", "*]", 0);
+  S_primitive(x, "/", "/]", 0);
+  S_primitive(x, "mod", "%]", 0);
+
+	S_primitive(x, "bye", "q", 0);
 
   return x;
 }
