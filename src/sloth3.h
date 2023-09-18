@@ -14,7 +14,6 @@ typedef intptr_t C;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
-#define INPUT_BUFFER_SIZE 255
 
 typedef struct _Symbol {
   struct _Symbol* previous;
@@ -31,7 +30,7 @@ typedef struct _Context {
 	B* ip;
   C err;
 	S* latest;
-	C state;
+	C state; /* could be merged with err */
   void (**ext)(struct _Context*, void* st);
   void* st[26];
 } X;
@@ -165,7 +164,8 @@ void S_inner(X* x) {
   B l;
   C frame = x->rp;
   do {
-    EXT(x, 'T')(x, 0);
+    /*EXT(x, 'T')(x, 0);*/
+    S_trace(x);
     switch (S_peek(x)) {
     case 0: if (!S_return(x, frame)) { return; } break;
     case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
@@ -209,7 +209,7 @@ void S_inner(X* x) {
       case '=': S_eq(x); break;
       case '>': S_gt(x); break;
       /* Execution */
-      case ']': case '}': if (!S_return(x, frame)) { return; } break;
+      case ']': case '}': case ' ': if (!S_return(x, frame)) { return; } break;
       case 'i': S_call(x); break;
       case 'j': S_jump(x); break;
       case 'z': S_zjump(x); break;
@@ -238,12 +238,20 @@ V S_outer(X* x) {
   B tk;
   C frame = x->rp;
   while (S_peek(x)) {
-    while ((tk = S_token(x)) && isspace(tk)) { printf("parsing space: %c\n", tk); }
+    while (S_peek(x) && isspace(S_peek(x))) {
+      S_token(x);
+    }
 		if (S_peek(x) == '\\') {
-		  S_eval(x, ++x->ip);
+      /* TODO: This is not working well */
+      printf("Calling assembler on: %s\n", x->ip);
+      S_inner(x);
+      printf("After assembler: %s\n", x->ip);
+		  /*S_eval(x, ++x->ip);*/
 		} else {
 		  s = x->ip;
-			while ((tk = S_token(x) && !isspace(tk))) { printf("parsing non space: %c\n", tk); }
+			while (S_peek(x) && !isspace(S_peek(x))) {
+        S_token(x);
+      }
 			l = (C)(x->ip - s);
 			printf("token: %.*s\n", l, s);
 			w = x->latest;
@@ -254,15 +262,21 @@ V S_outer(X* x) {
 			if (w) {
 				printf("word found\n");
 				if (!x->state) {
+          printf("Interpreting\n");
 					if (w->interpretation) {
+            printf("Evaluating interpretation semantics\n");
 						S_eval(x, w->interpretation);
 					} else {
+            printf("Word has no interpretation semantics\n");
 						/* Word can not be interpreted */
 					}
 				} else {
+          printf("Compiling\n");
 					if (w->compilation) {
+            printf("Evaluating compilation semantics\n");
 						S_eval(x, w->compilation);
 					} else {
+            printf("Compiling word (TODO)\n");
 						/* compile */
 					}
 				}
@@ -284,5 +298,39 @@ V S_outer(X* x) {
 }
 
 V S_evaluate(X* x, B* s) { S_lit(x, s); S_call(x); S_outer(x); }
+
+V S_primitive(X* x, B* n, B* i, B* c) {
+  C l = strlen(n);
+  S* s = malloc(sizeof(S) + n - sizeof(C) + 1);
+  s->previous = x->latest;
+  x->latest = s;
+  s->interpretation = i;
+  s->compilation = c;
+  s->nlen = l;
+  strcpy(s->name, n);
+}
+
+X* SF_init() {
+  X* x = S_init();
+  x->state = 0;
+
+  /* Primitives could be defined in Sloth by using the \ sigil */
+  S_primitive(x, "dup", "d", 0);
+  S_primitive(x, "swap", "s", 0);
+  S_primitive(x, "drop", "_", 0);
+  S_primitive(x, "over", "o", 0);
+  S_primitive(x, "rot", "r", 0);
+
+  S_primitive(x, ">r", "(", 0);
+  S_primitive(x, "r>", ")", 0);
+
+  S_primitive(x, "+", "+", 0);
+  S_primitive(x, "-", "-", 0);
+  S_primitive(x, "*", "*", 0);
+  S_primitive(x, "/", "/", 0);
+  S_primitive(x, "mod", "%", 0);
+
+  return x;
+}
 
 #endif
