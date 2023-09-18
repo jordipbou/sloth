@@ -1,9 +1,11 @@
-#include "sloth2.h"
+#include<stdio.h>
+#include "sloth3.h"
 
 int main(int argc, char** argv) {
+  B buf[255];
   X* x = S_init(x);
-  S_primitives(x);
-  S_repl(x);
+  fgets(buf, 255, stdin);
+	S_evaluate(x, buf);
 }
 
 /*#include<stdio.h>*/
