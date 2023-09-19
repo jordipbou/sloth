@@ -14,23 +14,48 @@ typedef intptr_t C;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
+#define MEMORY_SIZE 65536
 
-typedef struct _Symbol {
-  struct _Symbol* previous;
+typedef struct _System {
+	C mem_size;
+	C here;
+	B* memory;
+} S;
+
+S* S_init_system() {
+	S* s = malloc(sizeof(S));
+	if (s) {
+		s->memory = malloc(MEMORY_SIZE);
+		if (s->memory) {
+			s->mem_size = MEMORY_SIZE;
+			s->here = 0;
+		}
+	}
+	return s;
+}
+
+V S_free_system(S* s) {
+	free(s->memory);
+	free(s);
+}
+
+typedef struct _Word {
+  struct _Word* previous;
 	C flags;
 	B* interpretation;
 	B* compilation;
   C nlen;
 	B name[sizeof(C)];
-} S;
+} W;
 
 typedef struct _Context {
+	S* system;
   C* s; C sp; C ss;
   B** r; C rp; C rs;
 	B* ip;
 	B* ibuf;
   C err;
-	S* latest;
+	W* latest;
 	C state; /* could be merged with err? */
   void (**ext)(struct _Context*, void* st);
   void* st[26];
@@ -47,12 +72,18 @@ typedef struct _Context {
 
 X* S_init() {
 	X* x = malloc(sizeof(X));
+	if (!x) return 0;
+	x->system = S_init_system();
+	if (!x->system) { free(x); return 0; }
   x->s = malloc(STACK_SIZE*sizeof(C));
+	if (!x->s) { S_free_system(x->system); free(x); return 0; }
   x->r = malloc(RSTACK_SIZE*sizeof(C));
+	if (!x->r) { free(x->s); S_free_system(x->system); free(x); return 0; }
 	x->sp = x->rp = 0;
   x->ss = STACK_SIZE;
   x->rs = RSTACK_SIZE;
   x->ext = malloc(26*sizeof(C));
+	if (!x->ext) { free(x->r); free(x->s); S_free_system(x->system); free(x); return 0; }
   x->ip = 0;
   x->err = 0;
 	return x;
@@ -169,6 +200,8 @@ V S_while(X* x) {
   } while (1);
 }
 
+V S_create(X* x);
+
 /* Can be done with a step function as a macro, as it was done? */
 /* That way, tracing does not belong to here */
 void S_inner(X* x) {
@@ -239,13 +272,24 @@ void S_inner(X* x) {
       case ',': S_cstore(x); break;
       case ';': S_bstore(x); break;
       case 'c': S_lit(x, sizeof(C)); break;
+			/* Symbols */
+			case 'h': S_create(x); break;
+			/* Context */
+			case 'x':
+			  switch (S_token(x)) {
+				case 'c': x->state = 1; break;
+				case 'f': S_lit(x, x->system->mem_size - x->system->here); break;
+				case 'h': S_lit(x, &x->system->memory[x->system->here]); break;
+				case 'i': x->state = 0; break;
+				}
+				break;
       }
     }
   } while(1);
 }
 
 V S_parse_space(X* x) { while (x->ibuf && *x->ibuf && isspace(*x->ibuf)) { x->ibuf++; } }
-V S_parse_non_space(X* x) { while (x->ibuf && * x->ibuf && !isspace(*x->ibuf)) { x->ibuf++; } }
+V S_parse_non_space(X* x) { while (x->ibuf && *x->ibuf && !isspace(*x->ibuf)) { x->ibuf++; } }
 V S_parse_name(X* x) { 
 	S_parse_space(x); 
 	S_lit(x, x->ibuf); 
@@ -255,7 +299,7 @@ V S_parse_name(X* x) {
 V S_find_name(X* x) {
 	C n = TS(x);
   B* s = (B*)NS(x);
-	S* w = x->latest;
+	W* w = x->latest;
 	while (w) {
 	  if (w->nlen == n && !strncmp(w->name, s, n)) break;
 		w = w->previous;
@@ -263,9 +307,40 @@ V S_find_name(X* x) {
 	S_lit(x, w);
 }
 
+V S_create_word(X* x, B* n, C l, B* i, B* c) {
+  W* s = malloc(sizeof(W) + l - sizeof(C) + 1);
+  s->previous = x->latest;
+  x->latest = s;
+  s->interpretation = i;
+  s->compilation = c;
+  s->nlen = l;
+  strcpy(s->name, n);
+}
+
+V S_primitive(X* x, B* n, B* i, B* c) { S_create_word(x, n, strlen(n), i, c); }
+
+V S_create(X* x) {
+	B* s;
+	C l;
+	S_parse_name(x);
+	l = S_drop(x);
+	s = (B*)S_drop(x);
+	S_create_word(x, s, l, &x->system->memory[x->system->here], 0);
+}
+
+V S_compile(X* x) {
+	W* w = (W*)S_drop(x);
+	x->system->memory[x->system->here] = '#';
+	x->system->here++;
+	*((B**)(&x->system->memory[x->system->here])) = w->interpretation;
+	x->system->here += sizeof(C);
+	x->system->memory[x->system->here] = 'i';
+	x->system->here++;
+}
+
 V S_evaluate(X* x, B* s) {
 	B* p;
-	S* w;
+	W* w;
 	C n;
 	x->ibuf = s;
   while (x->ibuf && *x->ibuf) {
@@ -273,12 +348,20 @@ V S_evaluate(X* x, B* s) {
 		if (x->ibuf && *x->ibuf) {
 			if (*x->ibuf == '\\') {
 				x->ibuf++;
-				S_eval(x, x->ibuf);
-				S_parse_non_space(x);
+				if (!x->state) {
+				  S_eval(x, x->ibuf);
+				  S_parse_non_space(x);
+				} else {
+					while (x->ibuf && *x->ibuf && !isspace(*x->ibuf)) {
+						x->system->memory[x->system->here] = *x->ibuf;
+						x->system->here++;
+						x->ibuf++;
+					}
+				}
 			} else {
 				S_parse_name(x);
 				S_find_name(x);
-				w = (S*)S_drop(x);
+				w = (W*)S_drop(x);
 				n = S_drop(x);
 				p = (B*)S_drop(x);
 				if (w) {
@@ -292,15 +375,13 @@ V S_evaluate(X* x, B* s) {
 						if (w->compilation) {
 							S_eval(x, w->compilation);
 						} else {
-							/* TODO: compile */
-              /* How to malloc for compilation without knowing size of block? */
-              /* Using realloc? */
-              /* Which its the current compilation target? */
+							S_lit(x, w);
+							S_compile(x);
 						}
 					}
 				} else {
-					n = strtol(p, &w, 10);
-					if (n == 0 && w == p) {
+					n = strtol(p, (B**)(&w), 10);
+					if (n == 0 && (B*)w == p) {
 						/* no valid conversion, word not found */
 					} else {
 						S_lit(x, n);
@@ -310,17 +391,6 @@ V S_evaluate(X* x, B* s) {
 		}
 		S_trace(x);
 	}
-}
-
-V S_primitive(X* x, B* n, B* i, B* c) {
-  C l = strlen(n);
-  S* s = malloc(sizeof(S) + l - sizeof(C) + 1);
-  s->previous = x->latest;
-  x->latest = s;
-  s->interpretation = i;
-  s->compilation = c;
-  s->nlen = l;
-  strcpy(s->name, n);
 }
 
 X* SF_init() {
@@ -342,6 +412,12 @@ X* SF_init() {
   S_primitive(x, "*", "*", 0);
   S_primitive(x, "/", "/", 0);
   S_primitive(x, "mod", "%", 0);
+
+	S_primitive(x, "]", "xc", 0);
+	S_primitive(x, "[", "xi", "xi");
+
+	S_primitive(x, ":", "hxc", 0);
+	S_primitive(x, ";", 0, "xi");
 
 	S_primitive(x, "bye", "q", 0);
 
