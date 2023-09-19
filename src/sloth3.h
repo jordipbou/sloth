@@ -31,7 +31,7 @@ typedef struct _Context {
 	B* ibuf;
   C err;
 	S* latest;
-	C state; /* could be merged with err */
+	C state; /* could be merged with err? */
   void (**ext)(struct _Context*, void* st);
   void* st[26];
 } X;
@@ -74,15 +74,25 @@ C S_is_digit(B c) { return c >= '0' && c <= '9'; }
 
 /* Parsing */
 
-V S_parse_quotation(X* x) { 
-	C t = 1; 
-	S_lit(x, (C)(x->ip)); 
+V S_parse_quotation(X* x) {
+	C t = 1;
+  C len = 0;
+  B* src = x->ip;
+  B* dst = 0;
+	/*S_lit(x, (C)(x->ip));*/
 	while (t) { 
     switch (S_token(x)) { 
     case '[': t++; break; 
     case ']': t--; break;
-    } 
+    }
   }
+  len = x->ip - src;
+  dst = malloc(len + 1);
+  if (dst) { 
+    strncpy(dst, src, len);
+    dst[len] = 0;
+  }
+  S_lit(x, dst);
 }
 
 /* Stack instructions */
@@ -283,6 +293,9 @@ V S_evaluate(X* x, B* s) {
 							S_eval(x, w->compilation);
 						} else {
 							/* TODO: compile */
+              /* How to malloc for compilation without knowing size of block? */
+              /* Using realloc? */
+              /* Which its the current compilation target? */
 						}
 					}
 				} else {
@@ -314,7 +327,7 @@ X* SF_init() {
   X* x = S_init();
   x->state = 0;
 
-  /* Primitives could be defined in Sloth by using the \ sigil */
+  /* Primitives could be defined in Sloth by using the \ sigil? */
   S_primitive(x, "dup", "d", 0);
   S_primitive(x, "swap", "s", 0);
   S_primitive(x, "drop", "_", 0);
