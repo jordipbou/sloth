@@ -28,6 +28,7 @@ typedef struct _Context {
   C* s; C sp; C ss;
   B** r; C rp; C rs;
 	B* ip;
+	B* ibuf;
   C err;
 	S* latest;
 	C state; /* could be merged with err */
@@ -233,74 +234,70 @@ void S_inner(X* x) {
   } while(1);
 }
 
-V S_outer(X* x) {
-	B* s;
-	C l;
+V S_parse_space(X* x) { while (x->ibuf && *x->ibuf && isspace(*x->ibuf)) { x->ibuf++; } }
+V S_parse_non_space(X* x) { while (x->ibuf && * x->ibuf && !isspace(*x->ibuf)) { x->ibuf++; } }
+V S_parse_name(X* x) { 
+	S_parse_space(x); 
+	S_lit(x, x->ibuf); 
+	S_parse_non_space(x); 
+	S_lit(x, (x->ibuf - ((B*)TS(x)))); 
+}
+V S_find_name(X* x) {
+	C n = TS(x);
+  B* s = (B*)NS(x);
+	S* w = x->latest;
+	while (w) {
+	  if (w->nlen == n && !strncmp(w->name, s, n)) break;
+		w = w->previous;
+	}
+	S_lit(x, w);
+}
+
+V S_evaluate(X* x, B* s) {
+	B* p;
 	S* w;
-  B tk;
-  C frame = x->rp;
-  while (S_peek(x)) {
-    while (S_peek(x) && isspace(S_peek(x))) {
-      S_token(x);
-    }
-		if (S_peek(x) == '\\') {
-      /* TODO: This is not working well */
-      printf("Calling assembler on: %s\n", x->ip);
-      S_inner(x);
-      printf("After assembler: %s\n", x->ip);
-		  /*S_eval(x, ++x->ip);*/
-		} else {
-		  s = x->ip;
-			while (S_peek(x) && !isspace(S_peek(x))) {
-        S_token(x);
-      }
-			l = (C)(x->ip - s);
-			printf("token: %.*s\n", l, s);
-			w = x->latest;
-			while (w) {
-				if (l == w->nlen && !strncmp(w->name, s, l)) { break; }
-				w = w->previous;
-			}
-			if (w) {
-				printf("word found\n");
-				if (!x->state) {
-          printf("Interpreting\n");
-					if (w->interpretation) {
-            printf("Evaluating interpretation semantics\n");
-						S_eval(x, w->interpretation);
-						printf("ip after interpreting: %s\n", x->ip);
-					} else {
-            printf("Word has no interpretation semantics\n");
-						/* Word can not be interpreted */
-					}
-				} else {
-          printf("Compiling\n");
-					if (w->compilation) {
-            printf("Evaluating compilation semantics\n");
-						S_eval(x, w->compilation);
-					} else {
-            printf("Compiling word (TODO)\n");
-						/* compile */
-					}
-				}
+	C n;
+	x->ibuf = s;
+  while (x->ibuf && *x->ibuf) {
+		S_parse_space(x);
+		if (x->ibuf && *x->ibuf) {
+			if (*x->ibuf == '\\') {
+				x->ibuf++;
+				S_eval(x, x->ibuf);
+				S_parse_non_space(x);
 			} else {
-			  printf("word not found\n");
-				l = strtol(s, &w, 10);
-				if (l == 0 && w == s) {
-				  printf("can't convert to number\n");
-					/* word not found */
-					/* maybe use recognizers? maybe \asm should be here? */
+				S_parse_name(x);
+				S_find_name(x);
+				w = (S*)S_drop(x);
+				n = S_drop(x);
+				p = (B*)S_drop(x);
+				if (w) {
+					if (!x->state) {
+						if (w->interpretation) {
+							S_eval(x, w->interpretation);
+						} else {
+							/* Word can not be interpreted */
+						}
+					} else {
+						if (w->compilation) {
+							S_eval(x, w->compilation);
+						} else {
+							/* TODO: compile */
+						}
+					}
 				} else {
-				  printf("pushing %ld\n", l);
-					S_lit(x, l);
+					n = strtol(p, &w, 10);
+					if (n == 0 && w == p) {
+						/* no valid conversion, word not found */
+					} else {
+						S_lit(x, n);
+					}
 				}
 			}
 		}
 		S_trace(x);
 	}
 }
-
-V S_evaluate(X* x, B* s) { S_lit(x, s); S_call(x); S_outer(x); }
 
 V S_primitive(X* x, B* n, B* i, B* c) {
   C l = strlen(n);
@@ -318,20 +315,20 @@ X* SF_init() {
   x->state = 0;
 
   /* Primitives could be defined in Sloth by using the \ sigil */
-  S_primitive(x, "dup", "d]", 0);
-  S_primitive(x, "swap", "s]", 0);
-  S_primitive(x, "drop", "_]", 0);
-  S_primitive(x, "over", "o]", 0);
-  S_primitive(x, "rot", "r]", 0);
+  S_primitive(x, "dup", "d", 0);
+  S_primitive(x, "swap", "s", 0);
+  S_primitive(x, "drop", "_", 0);
+  S_primitive(x, "over", "o", 0);
+  S_primitive(x, "rot", "r", 0);
 
-  S_primitive(x, ">r", "(]", 0);
-  S_primitive(x, "r>", ")]", 0);
+  S_primitive(x, ">r", "(", 0);
+  S_primitive(x, "r>", ")", 0);
 
-  S_primitive(x, "+", "+]", 0);
-  S_primitive(x, "-", "-]", 0);
-  S_primitive(x, "*", "*]", 0);
-  S_primitive(x, "/", "/]", 0);
-  S_primitive(x, "mod", "%]", 0);
+  S_primitive(x, "+", "+", 0);
+  S_primitive(x, "-", "-", 0);
+  S_primitive(x, "*", "*", 0);
+  S_primitive(x, "/", "/", 0);
+  S_primitive(x, "mod", "%", 0);
 
 	S_primitive(x, "bye", "q", 0);
 
