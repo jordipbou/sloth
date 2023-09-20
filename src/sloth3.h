@@ -124,19 +124,8 @@ V S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 V S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 V S_free(X* x) { free((void*)S_drop(x)); }
 
-V S_branch(X* x) { 
-  S_rot(x); 
-  if (!S_drop(x)) { S_swap(x); }
-  S_drop(x);
-  S_call(x);
-}
-
-V S_times(X* x) {
-  B* q = (B*)S_drop(x);
-  C n = S_drop(x);
-  for (; n > 0; n--) S_eval(x, q);
-}
-
+V S_branch(X* x) { S_rot(x); if (!S_drop(x)) { S_swap(x); } S_drop(x); S_call(x); }
+V S_times(X* x) { B* q = (B*)S_drop(x); C n = S_drop(x); for (; n > 0; n--) S_eval(x, q); }
 V S_while(X* x) {
   B* q = (B*)S_drop(x);
   B* c = (B*)S_drop(x); 
@@ -227,13 +216,13 @@ void S_inner(X* x) {
       case ',': S_cstore(x); break;
       case ';': S_bstore(x); break;
       case 'c': S_lit(x, sizeof(C)); break;
-			/* Symbols */
-			case 'h': S_create(x); break;
+      /* Symbols (depend on a system being present) */
+      case 'h': S_create(x); break;
       case 'i': S_immediate(x); break;
       case 'b': S_bcompile(x); break;
       /* State */
-			case ']': x->state = 1; break;
-			case '[': x->state = 0; break;
+      case ']': x->state = 1; break;
+      case '[': x->state = 0; break;
       }
     }
   } while(1);
