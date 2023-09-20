@@ -10,52 +10,34 @@
 typedef char B;
 typedef intptr_t C;
 
-/* Contexts */
-
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
 #define MEMORY_SIZE 65536
+#define IMMEDIATE 1
+#define HIDDEN 2
+
+typedef struct _Word {
+  struct _Word* previous;
+	C flags;
+  B* code;
+  C nlen;
+	B name[1];
+} W;
 
 typedef struct _System {
 	C mem_size;
 	C here;
 	B* memory;
+	W* latest;
 } S;
 
-S* S_init_system() {
-	S* s = malloc(sizeof(S));
-	if (s) {
-		s->memory = malloc(MEMORY_SIZE);
-		if (s->memory) {
-			s->mem_size = MEMORY_SIZE;
-			s->here = 0;
-		}
-	}
-	return s;
-}
-
-V S_free_system(S* s) {
-	free(s->memory);
-	free(s);
-}
-
-typedef struct _Word {
-  struct _Word* previous;
-	C flags;
-	B* interpretation;
-	B* compilation;
-  C nlen;
-	B name[sizeof(C)];
-} W;
-
 typedef struct _Context {
-	S* system;
-  C* s; C sp; C ss;
-  B** r; C rp; C rs;
+  C s[STACK_SIZE]; C sp;
+  B* r[RSTACK_SIZE]; C rp;
 	B* ip;
+	S* system;
 	B* ibuf;
   C err;
-	W* latest;
 	C state; /* could be merged with err? */
   void (**ext)(struct _Context*, void* st);
   void* st[26];
@@ -63,31 +45,6 @@ typedef struct _Context {
 
 #define EXT(x, l) (x->ext[l - 'A'])
 #define ST(x, l) (x->st[l - 'A'])
-
-#define LOCAL(x, t1, v1) t1 v1 = (t1)S_drop(x)
-
-#define LOCALS2(x, t1, v1, t2, v2) \
-  t1 v1 = (t1)S_drop(x); \
-  t2 v2 = (t2)S_drop(x)
-
-X* S_init() {
-	X* x = malloc(sizeof(X));
-	if (!x) return 0;
-	x->system = S_init_system();
-	if (!x->system) { free(x); return 0; }
-  x->s = malloc(STACK_SIZE*sizeof(C));
-	if (!x->s) { S_free_system(x->system); free(x); return 0; }
-  x->r = malloc(RSTACK_SIZE*sizeof(C));
-	if (!x->r) { free(x->s); S_free_system(x->system); free(x); return 0; }
-	x->sp = x->rp = 0;
-  x->ss = STACK_SIZE;
-  x->rs = RSTACK_SIZE;
-  x->ext = malloc(26*sizeof(C));
-	if (!x->ext) { free(x->r); free(x->s); S_free_system(x->system); free(x); return 0; }
-  x->ip = 0;
-  x->err = 0;
-	return x;
-}
 
 #include "trace.h"
 
@@ -107,23 +64,13 @@ C S_is_digit(B c) { return c >= '0' && c <= '9'; }
 
 V S_parse_quotation(X* x) {
 	C t = 1;
-  C len = 0;
-  B* src = x->ip;
-  B* dst = 0;
-	/*S_lit(x, (C)(x->ip));*/
+	S_lit(x, (C)(x->ip));
 	while (t) { 
     switch (S_token(x)) { 
-    case '[': t++; break; 
-    case ']': t--; break;
+    case '{': t++; break; 
+    case '}': t--; break;
     }
   }
-  len = x->ip - src;
-  dst = malloc(len + 1);
-  if (dst) { 
-    strncpy(dst, src, len);
-    dst[len] = 0;
-  }
-  S_lit(x, dst);
 }
 
 /* Stack instructions */
@@ -200,7 +147,14 @@ V S_while(X* x) {
   } while (1);
 }
 
-V S_create(X* x);
+V S_create(X*);
+V S_immediate(X*);
+
+V S_bcompile(X* x) {
+  B b = (B)S_drop(x);
+  x->system->memory[x->system->here] = b;
+  x->system->here++;
+}
 
 /* Can be done with a step function as a macro, as it was done? */
 /* That way, tracing does not belong to here */
@@ -224,12 +178,13 @@ void S_inner(X* x) {
       break;
     default:
       switch (S_token(x)) {
-      case '[': S_parse_quotation(x); break;
+      case '{': S_parse_quotation(x); break;
       /* Literals */
       case '0': S_lit(x, 0); break;
       case '1': S_lit(x, 1); break;
       case '#': S_lit(x, *((C*)x->ip)); x->ip += sizeof(C); break;
       case '@': S_lit(x, (C)(x->ip + ((B)S_token(x)))); break;
+      case '\'': S_lit(x, S_token(x)); break;
       /* Stacks */
       case '_': S_drop(x); break;
       case 's': S_swap(x); break;
@@ -255,8 +210,8 @@ void S_inner(X* x) {
       case '=': S_eq(x); break;
       case '>': S_gt(x); break;
       /* Execution */
-      case ']': case '}': if (!S_return(x, frame)) { return; } break;
-      case 'i': S_call(x); break;
+      case '}': if (!S_return(x, frame)) { return; } break;
+      case '$': S_call(x); break;
       case 'j': S_jump(x); break;
       case 'z': S_zjump(x); break;
       case 'q': /* Set error */ exit(0); break;
@@ -274,15 +229,11 @@ void S_inner(X* x) {
       case 'c': S_lit(x, sizeof(C)); break;
 			/* Symbols */
 			case 'h': S_create(x); break;
-			/* Context */
-			case 'x':
-			  switch (S_token(x)) {
-				case 'c': x->state = 1; break;
-				case 'f': S_lit(x, x->system->mem_size - x->system->here); break;
-				case 'h': S_lit(x, &x->system->memory[x->system->here]); break;
-				case 'i': x->state = 0; break;
-				}
-				break;
+      case 'i': S_immediate(x); break;
+      case 'b': S_bcompile(x); break;
+      /* State */
+			case ']': x->state = 1; break;
+			case '[': x->state = 0; break;
       }
     }
   } while(1);
@@ -299,7 +250,7 @@ V S_parse_name(X* x) {
 V S_find_name(X* x) {
 	C n = TS(x);
   B* s = (B*)NS(x);
-	W* w = x->latest;
+	W* w = x->system->latest;
 	while (w) {
 	  if (w->nlen == n && !strncmp(w->name, s, n)) break;
 		w = w->previous;
@@ -307,17 +258,17 @@ V S_find_name(X* x) {
 	S_lit(x, w);
 }
 
-V S_create_word(X* x, B* n, C l, B* i, B* c) {
-  W* s = malloc(sizeof(W) + l - sizeof(C) + 1);
-  s->previous = x->latest;
-  x->latest = s;
-  s->interpretation = i;
-  s->compilation = c;
+V S_create_word(X* x, B* n, C l, B* c, C f) {
+  W* s = malloc(sizeof(W) + l);
+  s->previous = x->system->latest;
+  x->system->latest = s;
+  s->code = c;
+  s->flags = f;
   s->nlen = l;
   strcpy(s->name, n);
 }
 
-V S_primitive(X* x, B* n, B* i, B* c) { S_create_word(x, n, strlen(n), i, c); }
+V S_primitive(X* x, B* n, B* c, C f) { S_create_word(x, n, strlen(n), c, f); }
 
 V S_create(X* x) {
 	B* s;
@@ -328,12 +279,22 @@ V S_create(X* x) {
 	S_create_word(x, s, l, &x->system->memory[x->system->here], 0);
 }
 
+V S_immediate(X* x) {
+  x->system->latest->flags |= IMMEDIATE;
+}
+
+V S_literal(X* x) {
+  C n = S_drop(x);
+  x->system->memory[x->system->here] = '#';
+  x->system->here++;
+  *((C*)(&x->system->memory[x->system->here])) = n;
+  x->system->here += sizeof(C);
+}
+
 V S_compile(X* x) {
 	W* w = (W*)S_drop(x);
-	x->system->memory[x->system->here] = '#';
-	x->system->here++;
-	*((B**)(&x->system->memory[x->system->here])) = w->interpretation;
-	x->system->here += sizeof(C);
+  S_lit(x, w->code);
+  S_literal(x);
 	x->system->memory[x->system->here] = 'i';
 	x->system->here++;
 }
@@ -352,11 +313,11 @@ V S_evaluate(X* x, B* s) {
 				  S_eval(x, x->ibuf);
 				  S_parse_non_space(x);
 				} else {
-					while (x->ibuf && *x->ibuf && !isspace(*x->ibuf)) {
-						x->system->memory[x->system->here] = *x->ibuf;
-						x->system->here++;
-						x->ibuf++;
-					}
+				  while (x->ibuf && *x->ibuf && !isspace(*x->ibuf)) {
+				  	x->system->memory[x->system->here] = *x->ibuf;
+				  	x->system->here++;
+				  	x->ibuf++;
+          }
 				}
 			} else {
 				S_parse_name(x);
@@ -365,26 +326,19 @@ V S_evaluate(X* x, B* s) {
 				n = S_drop(x);
 				p = (B*)S_drop(x);
 				if (w) {
-					if (!x->state) {
-						if (w->interpretation) {
-							S_eval(x, w->interpretation);
-						} else {
-							/* Word can not be interpreted */
-						}
-					} else {
-						if (w->compilation) {
-							S_eval(x, w->compilation);
-						} else {
-							S_lit(x, w);
-							S_compile(x);
-						}
-					}
+					if (!x->state || w->flags & IMMEDIATE) {
+            S_eval(x, w->code);
+          } else {
+            S_lit(x, w);
+            S_compile(x);
+          }
 				} else {
 					n = strtol(p, (B**)(&w), 10);
 					if (n == 0 && (B*)w == p) {
 						/* no valid conversion, word not found */
 					} else {
 						S_lit(x, n);
+            if (x->state) S_literal(x); 
 					}
 				}
 			}
@@ -393,33 +347,44 @@ V S_evaluate(X* x, B* s) {
 	}
 }
 
-X* SF_init() {
-  X* x = S_init();
+S* S_init_system() {
+	S* s = malloc(sizeof(S));
+	if (s) {
+		s->memory = malloc(MEMORY_SIZE);
+		if (s->memory) {
+			s->mem_size = MEMORY_SIZE;
+			s->here = 0;
+      s->latest = 0;
+		}
+	}
+  
+	return s;
+}
+
+V S_free_system(S* s) {
+	free(s->memory);
+	free(s);
+}
+
+X* S_init() {
+	X* x = malloc(sizeof(X));
+	x->sp = x->rp = 0;
+  x->ext = malloc(26*sizeof(C));
+	if (!x->ext) { free(x->r); free(x->s); S_free_system(x->system); free(x); return 0; }
+  x->ip = 0;
+  x->err = 0;
   x->state = 0;
+ 
+	return x;
+}
 
-  /* Primitives could be defined in Sloth by using the \ sigil? */
-  S_primitive(x, "dup", "d", 0);
-  S_primitive(x, "swap", "s", 0);
-  S_primitive(x, "drop", "_", 0);
-  S_primitive(x, "over", "o", 0);
-  S_primitive(x, "rot", "r", 0);
-
-  S_primitive(x, ">r", "(", 0);
-  S_primitive(x, "r>", ")", 0);
-
-  S_primitive(x, "+", "+", 0);
-  S_primitive(x, "-", "-", 0);
-  S_primitive(x, "*", "*", 0);
-  S_primitive(x, "/", "/", 0);
-  S_primitive(x, "mod", "%", 0);
-
-	S_primitive(x, "]", "xc", 0);
-	S_primitive(x, "[", "xi", "xi");
-
-	S_primitive(x, ":", "hxc", 0);
-	S_primitive(x, ";", 0, "xi");
-
-	S_primitive(x, "bye", "q", 0);
+X* S_forth() {
+  X* x = S_init();
+  S* s = S_init_system();
+  x->system = s;
+  
+  S_primitive(x, ":", "h]", 0);
+  S_primitive(x, ";", "0b[", IMMEDIATE);
 
   return x;
 }

@@ -55,8 +55,8 @@ Features:
     
 ##### Execution operations
 
-    ]/} -> return
-    x -> call/tail call
+    ]/}/0 -> return
+    $ -> call
     j -> jump
     z -> zjump
     y -> yield
@@ -80,7 +80,6 @@ Features:
     , -> store cell
     ; -> store byte
 
-    b -> address of b var (dict/block)
     c -> size of cell in bytes
 
     [ { -> inspect memory ]
@@ -88,7 +87,8 @@ Features:
 ##### Dictionary
 
     h -> header (create label)
-    $ -> find symbol
+    i -> set latest word as immediate
+    b -> compile byte
 
 ##### Input/Output
 
@@ -102,10 +102,10 @@ Features:
     ! -> not
     " -> 
     # -> cell literal
-    $ -> colon
+    $ -> call
     % -> modulo
     & -> and
-    ' -> symbol (find/create)
+    ' -> 
     ( -> push to R
     ) -> pop from R
     * -> multiplication
@@ -114,7 +114,16 @@ Features:
     - -> substraction
     . -> fetch cell
     / -> division
-    0-9 -> parsed numeric literal
+    0 -> literal 0
+    1 -> literal 1
+    2 ->
+    3 ->
+    4 ->
+    5 ->
+    6 ->
+    7 ->
+    8 ->
+    9 ->
     : -> fetch byte
     ; -> store byte
     < -> less than
@@ -149,42 +158,39 @@ Features:
 		X -> C extension
 		Y -> C extension
 		Z -> C extension
-    [ -> start quotation/push IP+1
+    [ -> 
     \ -> find symbol from string
-    ] -> return/end of quotation
+    ] -> 
     ^ -> xor
     _ -> drop
     ` -> 
     a -> accept
-    b -> address of b variable
+    b -> compile byte to dictionary
 		c -> size of cell
     d -> dup
     e -> emit
     f -> free
-    g -> resolve
-    h -> hop
-    i -> interpret/call/execute
+    g -> 
+    h -> 
+    i -> immediate
     j -> jump
     k -> key
     l -> 
 		m -> malloc
-    n -> nip
+    n -> 
     o -> over
-    p -> print
+    p -> 
     q -> quit
     r -> rot
     s -> swap
     t -> times (combinator)
-    u -> constant 
-    v -> variable
+    u -> 
+    v -> 
     w -> while (combinator)
-    x -> ahead
-    y -> recurse
+    x -> 
+    y -> 
     z -> zjump (jump if zero)
-    { -> semicolon
+    { -> start quotation/push IP+1 
     | -> or
-    } -> return
+    } -> return/end of quotation 
     ~ -> invert
-
-## FORTH
-
