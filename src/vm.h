@@ -1,8 +1,6 @@
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
-/****** VIRTUAL CPU ******/
-
 #include<stdint.h> /* intptr_t */
 #include<stdlib.h> /* malloc, free */
 #include<string.h> /* strncpy */
@@ -15,16 +13,11 @@ typedef intptr_t C;
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
 
-/* TODO: System dependency here */
 typedef struct _Context {
   C s[STACK_SIZE]; C sp;
   B* r[RSTACK_SIZE]; C rp;
 	B* ip;
-	/* S* system; */ /* If system is not defined, how should be this here? */
-	/* B* ibuf; */ /* This should not be necessary for simple virtual CPU */
   C err;
-	C state; /* could be merged with err? */
-/* TODO: Extensions could be extracted to a external structure to just hold a pointer in each context */
   void (*ext[26])(struct _Context*);
   void* st[26];
 } X;
@@ -124,22 +117,6 @@ V S_while(X* x) {
   } while (1);
 }
 
-/* TODO: System dependency here */
-/*
-V S_create(X*);
-V S_immediate(X*);
-V S_variable(X*);
-V S_constant(X*);
-V S_bcompile(X* x) {
-  B b = (B)S_drop(x);
-  x->system->memory[x->system->here] = b;
-  x->system->here++;
-}
-*/
-
-/* TODO: System dependency here */
-/* Can be done with a step function as a macro, as it was done? */
-/* That way, tracing does not belong to here */
 void S_inner(X* x) {
   B l;
   C frame = x->rp;
@@ -148,7 +125,7 @@ void S_inner(X* x) {
     S_trace(x);
     switch (S_peek(x)) {
     case 0: if (!S_return(x, frame)) { return; } break;
-		/* Let's try this directly, if space, just return */
+		/* Let's try this directly, if space, just return? */
 		case ' ': return; break;
     case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
     case 'G': case 'H': case 'I': case 'J': case 'K': case 'L':
@@ -209,10 +186,6 @@ void S_inner(X* x) {
       case ',': S_cstore(x); break;
       case ';': S_bstore(x); break;
       case 'c': S_lit(x, sizeof(C)); break;
-			/* TODO: state is not part of the CPU, isn't it? */
-      /* State */
-      case ']': x->state = 1; break;
-      case '[': x->state = 0; break;
       }
     }
   } while(1);
@@ -223,198 +196,8 @@ X* S_init() {
 	x->sp = x->rp = 0;
   x->ip = 0;
   x->err = 0;
-  /*x->state = 0;*/
  
 	return x;
 }
-
-/****** FORTH ******/
-
-/*
-
-#define MEMORY_SIZE 65536
-
-typedef struct _System {
-	C mem_size;
-	C here;
-	B* memory;
-	W* latest;
-} S;
-
-V S_parse_space(X* x) { while (x->ibuf && *x->ibuf && isspace(*x->ibuf)) { x->ibuf++; } }
-V S_parse_non_space(X* x) { while (x->ibuf && *x->ibuf && !isspace(*x->ibuf)) { x->ibuf++; } }
-V S_parse_name(X* x) { 
-	S_parse_space(x); 
-	S_lit(x, x->ibuf); 
-	S_parse_non_space(x); 
-	S_lit(x, (x->ibuf - ((B*)TS(x)))); 
-}
-V S_find_name(X* x) {
-	C n = TS(x);
-  B* s = (B*)NS(x);
-	W* w = x->system->latest;
-	while (w) {
-	  if (w->nlen == n && !strncmp(w->name, s, n)) break;
-		w = w->previous;
-	}
-	S_lit(x, w);
-}
-
-V S_create_word(X* x, B* n, C l, B* c, C f) {
-  W* s = malloc(sizeof(W) + l);
-  s->previous = x->system->latest;
-  x->system->latest = s;
-  s->code = c;
-  s->flags = f;
-  s->nlen = l;
-  strcpy(s->name, n);
-}
-
-V S_primitive(X* x, B* n, B* c, C f) { S_create_word(x, n, strlen(n), c, f); }
-
-V S_create(X* x) {
-	B* s;
-	C l;
-	S_parse_name(x);
-	l = S_drop(x);
-	s = (B*)S_drop(x);
-	S_create_word(x, s, l, &x->system->memory[x->system->here], 0);
-}
-
-V S_immediate(X* x) {
-  x->system->latest->flags |= IMMEDIATE;
-}
-
-V S_variable(X* x) {
-  S_create(x);
-  x->system->latest->flags |= VARIABLE;
-}
-
-V S_constant(X* x) {
-  C n = S_drop(x);
-  S_create(x);
-  x->system->latest->flags |= CONSTANT;
-  x->system->latest->code = (B*)n;
-}
-
-V S_literal(X* x) {
-  C n = S_drop(x);
-  x->system->memory[x->system->here] = '#';
-  x->system->here++;
-  *((C*)(&x->system->memory[x->system->here])) = n;
-  x->system->here += sizeof(C);
-}
-
-V S_compile(X* x) {
-	W* w = (W*)S_drop(x);
-  S_lit(x, w->code);
-  S_literal(x);
-	x->system->memory[x->system->here] = '$';
-	x->system->here++;
-}
-
-V S_evaluate(X* x, B* s) {
-	B* p;
-	W* w;
-	C n;
-	x->ibuf = s;
-  while (x->ibuf && *x->ibuf) {
-		S_parse_space(x);
-		if (x->ibuf && *x->ibuf) {
-			if (*x->ibuf == '\\') {
-				x->ibuf++;
-				if (!x->state) {
-				  S_eval(x, x->ibuf);
-				  S_parse_non_space(x);
-				} else {
-				  while (x->ibuf && *x->ibuf && !isspace(*x->ibuf)) {
-				  	x->system->memory[x->system->here] = *x->ibuf;
-				  	x->system->here++;
-				  	x->ibuf++;
-          }
-				}
-			} else {
-				S_parse_name(x);
-				S_find_name(x);
-				w = (W*)S_drop(x);
-				n = S_drop(x);
-				p = (B*)S_drop(x);
-				if (w) {
-					if (!x->state || w->flags & IMMEDIATE) {
-            if (w->flags & VARIABLE) {
-              S_lit(x, &w->code);
-            } else if (w->flags & CONSTANT) {
-              S_lit(x, w->code);
-            } else {
-              S_eval(x, w->code);
-            }
-          } else {
-            if (w->flags & VARIABLE) {
-              S_lit(x, &w->code);
-              S_literal(x);
-            } else if (w->flags & CONSTANT) {
-              S_lit(x, w->code);
-              S_literal(x);
-            } else {
-              S_lit(x, w);
-              S_compile(x);
-            }
-          }
-				} else {
-					n = strtol(p, (B**)(&w), 10);
-					if (n == 0 && (B*)w == p) {
-					} else {
-						S_lit(x, n);
-            if (x->state) S_literal(x); 
-					}
-				}
-			}
-		}
-		S_trace(x);
-	}
-}
-
-S* S_init_system() {
-	S* s = malloc(sizeof(S));
-	if (s) {
-		s->memory = malloc(MEMORY_SIZE);
-		if (s->memory) {
-			s->mem_size = MEMORY_SIZE;
-			s->here = 0;
-      s->latest = 0;
-		}
-	}
-  
-	return s;
-}
-
-V S_free_system(S* s) {
-	free(s->memory);
-	free(s);
-}
-
-X* S_init() {
-	X* x = malloc(sizeof(X));
-	x->sp = x->rp = 0;
-  x->ext = malloc(26*sizeof(C));
-	if (!x->ext) { free(x->r); free(x->s); S_free_system(x->system); free(x); return 0; }
-  x->ip = 0;
-  x->err = 0;
-  x->state = 0;
- 
-	return x;
-}
-
-X* S_forth() {
-  X* x = S_init();
-  S* s = S_init_system();
-  x->system = s;
-  
-  S_primitive(x, ":", "p]", 0);
-  S_primitive(x, ";", "0b[", IMMEDIATE);
-
-  return x;
-}
-*/
 
 #endif
