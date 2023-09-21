@@ -1,6 +1,8 @@
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
+/****** VIRTUAL CPU ******/
+
 #include<stdint.h> /* intptr_t */
 #include<stdlib.h> /* malloc, free */
 #include<string.h> /* strncpy */
@@ -12,36 +14,17 @@ typedef intptr_t C;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
-#define MEMORY_SIZE 65536
-#define IMMEDIATE 1
-#define HIDDEN 2
-#define VARIABLE 4
-#define CONSTANT 8
 
-typedef struct _Word {
-  struct _Word* previous;
-	C flags;
-  B* code; 
-  C nlen;
-	B name[1];
-} W;
-
-typedef struct _System {
-	C mem_size;
-	C here;
-	B* memory;
-	W* latest;
-} S;
-
+/* TODO: System dependency here */
 typedef struct _Context {
   C s[STACK_SIZE]; C sp;
   B* r[RSTACK_SIZE]; C rp;
 	B* ip;
-	S* system;
-	B* ibuf;
+	/* S* system; */ /* If system is not defined, how should be this here? */
+	/* B* ibuf; */ /* This should not be necessary for simple virtual CPU */
   C err;
 	C state; /* could be merged with err? */
-  void (**ext)(struct _Context*, void* st);
+  void (*ext[26])(struct _Context*, void* st);
   void* st[26];
 } X;
 
@@ -82,6 +65,7 @@ V S_over(X* x) { S_lit(x, NS(x)); }
 V S_rot(X* x) { C t = NNS(x); NNS(x) = NS(x); NS(x) = TS(x); TS(x) = t; TS(x); }
 V S_swap(X* x) { C t = TS(x); TS(x) = NS(x); NS(x) = t; }
 C S_drop(X* x) { return x->s[--x->sp]; }
+V S_nip(X* x) { NS(x) = TS(x); --x->sp; }
 
 V S_add(X* x) { NS(x) = NS(x) + TS(x); --x->sp; }
 V S_sub(X* x) { NS(x) = NS(x) - TS(x); --x->sp; }
@@ -126,6 +110,7 @@ V S_cfetch(X* x) { S_lit(x, *((C*)S_drop(x))); }
 V S_malloc(X* x) { S_lit(x, (C)malloc(S_drop(x))); }
 V S_free(X* x) { free((void*)S_drop(x)); }
 
+/* TODO: Shouldn't combinators be an extension and have more of them? */
 V S_branch(X* x) { S_rot(x); if (!S_drop(x)) { S_swap(x); } S_drop(x); S_call(x); }
 V S_times(X* x) { B* q = (B*)S_drop(x); C n = S_drop(x); for (; n > 0; n--) S_eval(x, q); }
 V S_while(X* x) {
@@ -138,17 +123,20 @@ V S_while(X* x) {
   } while (1);
 }
 
+/* TODO: System dependency here */
+/*
 V S_create(X*);
 V S_immediate(X*);
 V S_variable(X*);
 V S_constant(X*);
-
 V S_bcompile(X* x) {
   B b = (B)S_drop(x);
   x->system->memory[x->system->here] = b;
   x->system->here++;
 }
+*/
 
+/* TODO: System dependency here */
 /* Can be done with a step function as a macro, as it was done? */
 /* That way, tracing does not belong to here */
 void S_inner(X* x) {
@@ -184,6 +172,7 @@ void S_inner(X* x) {
       case 'd': S_dup(x); break;
       case 'o': S_over(x); break;
       case 'r': S_rot(x); break;
+			case 'n': S_nip(x); break;
       case '(': S_push(x); break;
       case ')': S_pop(x); break;
       /* Arithmetics */
@@ -219,13 +208,8 @@ void S_inner(X* x) {
       case ':': S_bfetch(x); break;
       case ',': S_cstore(x); break;
       case ';': S_bstore(x); break;
-      /*case 'c': S_lit(x, sizeof(C)); break;*/
-      /* Symbols (depend on a system being present) */
-      case 'p': S_create(x); break;
-      case 'i': S_immediate(x); break;
-      case 'b': S_bcompile(x); break;
-      case 'v': S_variable(x); break;
-      case 'c': S_constant(x); break;
+      case 'c': S_lit(x, sizeof(C)); break;
+			/* TODO: state is not part of the CPU, isn't it? */
       /* State */
       case ']': x->state = 1; break;
       case '[': x->state = 0; break;
@@ -233,6 +217,127 @@ void S_inner(X* x) {
     }
   } while(1);
 }
+
+X* S_init() {
+	X* x = malloc(sizeof(X));
+	x->sp = x->rp = 0;
+  x->ip = 0;
+  x->err = 0;
+  /*x->state = 0;*/
+ 
+	return x;
+}
+
+/****** ENVIRONMENTS ******/
+
+#define IMMEDIATE 1
+#define HIDDEN 2
+#define VARIABLE 4
+#define CONSTANT 8
+
+typedef struct _Word {
+  struct _Word* previous;
+	C flags;
+  B* code; 
+  C nlen;
+	B name[1];
+} W;
+
+typedef struct _Environment {
+	struct _Environment* parent;
+	W* latest;
+} E;
+
+V S_create(X* x) {
+  E* e = ST(x, 'E');
+	C nlen = S_drop(x);
+	B* name = (B*)S_drop(x);
+	W* w = malloc(sizeof(W) + nlen);
+	if (w) {
+		w->nlen = nlen;
+		strncpy(w->name, name, nlen);
+		w->name[nlen] = 0;
+		w->previous = e->latest;
+		e->latest = w;
+	}
+	S_lit(x, w);
+}
+
+V S_find_name(X* x) {
+	E* e = ST(x, 'E');
+	C nlen = TS(x);
+  B* name = (B*)NS(x);
+	W* w = e->latest;
+	while (w) {
+	  if (w->nlen == nlen && !strncmp(w->name, name, nlen)) break;
+		w = w->previous;
+	}
+	S_lit(x, w);
+}
+
+V S_parse_symbol(X* x) {
+	S_lit(x, x->ip);
+	while (S_peek(x) && !isspace(S_token(x))) {}
+	S_lit(x, (x->ip - (B*)TS(x)) - 1);
+}
+
+V S_symbol(X* x) {
+  W* w;
+	C nlen;
+	B* name;
+	S_parse_symbol(x);
+	S_find_name(x);
+	if (TS(x)) {
+		S_nip(x); S_nip(x);
+		w = (W*)S_drop(x);
+		if (w->flags & CONSTANT) S_lit(x, w->code);
+		else if (w->flags & VARIABLE) S_lit(x, &w->code);
+		else S_eval(x, w->code);
+	} else {
+		S_drop(x);
+		S_header(x);
+	}
+}
+
+V S_latest(X* x) { E* e = ST(x, 'E'); S_lit(x, e->latest); }
+V S_variable(X* x) { W* w = (W*)S_drop(x); w->flags |= VARIABLE; }
+V S_constant(X* x) { W* w = (W*)S_drop(x); w->flags |= CONSTANT; }
+V S_hidden(X* x) { W* w = (W*)S_drop(x); w->flags |= HIDDEN; }
+V S_reveal(X* x) { W* w = (W*)S_drop(x); w->flags &= ~HIDDEN; }
+
+V S_env_ext(X* x) {
+	switch (S_token(x)) {
+	case 'c': S_constant(x); break;
+	case 'h': S_hidden(x); break;
+	case 'l': S_latest(x); break;
+	case 'r': S_reveal(x); break;
+	case 'v': S_variable(x); break;
+	case 'x': S_create(x); break;
+	case '\'': S_symbol(x); break;
+	}
+}
+
+X* S_env_init(X* x) {
+	E* e = malloc(sizeof(E));
+	e->parent = 0;
+	e->latest = 0;
+	EXT(x, 'E') = &S_env_ext;
+	ST(x, 'E') = e;
+	return x;
+}
+
+/****** FORTH ******/
+
+/*
+
+#define MEMORY_SIZE 65536
+
+typedef struct _System {
+	C mem_size;
+	C here;
+	B* memory;
+	W* latest;
+} S;
 
 V S_parse_space(X* x) { while (x->ibuf && *x->ibuf && isspace(*x->ibuf)) { x->ibuf++; } }
 V S_parse_non_space(X* x) { while (x->ibuf && *x->ibuf && !isspace(*x->ibuf)) { x->ibuf++; } }
@@ -280,14 +385,12 @@ V S_immediate(X* x) {
 
 V S_variable(X* x) {
   S_create(x);
-  /* reveal */
   x->system->latest->flags |= VARIABLE;
 }
 
 V S_constant(X* x) {
   C n = S_drop(x);
   S_create(x);
-  /* reveal */
   x->system->latest->flags |= CONSTANT;
   x->system->latest->code = (B*)n;
 }
@@ -358,7 +461,6 @@ V S_evaluate(X* x, B* s) {
 				} else {
 					n = strtol(p, (B**)(&w), 10);
 					if (n == 0 && (B*)w == p) {
-						/* no valid conversion, word not found */
 					} else {
 						S_lit(x, n);
             if (x->state) S_literal(x); 
@@ -411,5 +513,6 @@ X* S_forth() {
 
   return x;
 }
+*/
 
 #endif
