@@ -21,6 +21,10 @@ typedef struct _Environment {
 	W* latest;
 } E;
 
+V S_new_env(X* x) {
+  /* TODO: An environment must have a name? */
+}
+
 V S_create(X* x) {
   E* e = ST(x, 'E');
 	C nlen = S_drop(x);
@@ -36,6 +40,7 @@ V S_create(X* x) {
 	S_lit(x, w);
 }
 
+/* TODO: Find in parent environments also */
 V S_find_name(X* x) {
 	E* e = ST(x, 'E');
 	C nlen = TS(x);
@@ -81,6 +86,7 @@ V S_reveal(X* x) { W* w = (W*)S_drop(x); w->flags &= ~HIDDEN; }
 V S_env_ext(X* x) {
 	switch (S_token(x)) {
 	case 'c': S_constant(x); break;
+  case 'e': S_new_env(x); break;
 	case 'h': S_hidden(x); break;
 	case 'l': S_latest(x); break;
 	case 'r': S_reveal(x); break;

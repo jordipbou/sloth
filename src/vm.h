@@ -24,6 +24,7 @@ typedef struct _Context {
 	/* B* ibuf; */ /* This should not be necessary for simple virtual CPU */
   C err;
 	C state; /* could be merged with err? */
+/* TODO: Extensions could be extracted to a external structure to just hold a pointer in each context */
   void (*ext[26])(struct _Context*);
   void* st[26];
 } X;
