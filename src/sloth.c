@@ -1,5 +1,6 @@
 #include<stdio.h>
-#include"sloth.h"
+#include"vm.h"
+#include"symbols.h"
 
 int main(int argc, char** argv) {
   B buf[255];

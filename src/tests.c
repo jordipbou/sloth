@@ -1,8 +1,8 @@
 #include<stdlib.h>
 #include<string.h>
 
-#include "unity.h"
-#include "sloth.h"
+#include"unity.h"
+#include"vm.h"
 
 /*
 #define PUSH(v) S_push(x, v)
