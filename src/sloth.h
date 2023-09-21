@@ -15,11 +15,13 @@ typedef intptr_t C;
 #define MEMORY_SIZE 65536
 #define IMMEDIATE 1
 #define HIDDEN 2
+#define VARIABLE 4
+#define CONSTANT 8
 
 typedef struct _Word {
   struct _Word* previous;
 	C flags;
-  B* code;
+  B* code; 
   C nlen;
 	B name[1];
 } W;
@@ -138,6 +140,8 @@ V S_while(X* x) {
 
 V S_create(X*);
 V S_immediate(X*);
+V S_variable(X*);
+V S_consstant(X*);
 
 V S_bcompile(X* x) {
   B b = (B)S_drop(x);
@@ -215,11 +219,13 @@ void S_inner(X* x) {
       case ':': S_bfetch(x); break;
       case ',': S_cstore(x); break;
       case ';': S_bstore(x); break;
-      case 'c': S_lit(x, sizeof(C)); break;
+      /*case 'c': S_lit(x, sizeof(C)); break;*/
       /* Symbols (depend on a system being present) */
-      case 'h': S_create(x); break;
+      case 'p': S_create(x); break;
       case 'i': S_immediate(x); break;
       case 'b': S_bcompile(x); break;
+      case 'v': S_variable(x); break;
+      case 'c': S_constant(x); break;
       /* State */
       case ']': x->state = 1; break;
       case '[': x->state = 0; break;
@@ -272,6 +278,20 @@ V S_immediate(X* x) {
   x->system->latest->flags |= IMMEDIATE;
 }
 
+V S_variable(X* x) {
+  S_create(x);
+  /* reveal */
+  x->system->latest->flags |= VARIABLE;
+}
+
+V S_constant(X* x) {
+  C n = S_drop(x);
+  S_create(x);
+  /* reveal */
+  x->system->latest->flags |= CONSTANT;
+  x->system->latest->code = (B*)n;
+}
+
 V S_literal(X* x) {
   C n = S_drop(x);
   x->system->memory[x->system->here] = '#';
@@ -284,7 +304,7 @@ V S_compile(X* x) {
 	W* w = (W*)S_drop(x);
   S_lit(x, w->code);
   S_literal(x);
-	x->system->memory[x->system->here] = 'i';
+	x->system->memory[x->system->here] = '$';
 	x->system->here++;
 }
 
@@ -316,10 +336,24 @@ V S_evaluate(X* x, B* s) {
 				p = (B*)S_drop(x);
 				if (w) {
 					if (!x->state || w->flags & IMMEDIATE) {
-            S_eval(x, w->code);
+            if (w->flags & VARIABLE) {
+              S_lit(x, &w->code);
+            } else if (w->flags & CONSTANT) {
+              S_lit(x, w->code);
+            } else {
+              S_eval(x, w->code);
+            }
           } else {
-            S_lit(x, w);
-            S_compile(x);
+            if (w->flags & VARIABLE) {
+              S_lit(x, &w->code);
+              S_literal(x);
+            } else if (w->flags & CONSTANT) {
+              S_lit(x, w->code);
+              S_literal(x);
+            } else {
+              S_lit(x, w);
+              S_compile(x);
+            }
           }
 				} else {
 					n = strtol(p, (B**)(&w), 10);
@@ -372,7 +406,7 @@ X* S_forth() {
   S* s = S_init_system();
   x->system = s;
   
-  S_primitive(x, ":", "h]", 0);
+  S_primitive(x, ":", "p]", 0);
   S_primitive(x, ";", "0b[", IMMEDIATE);
 
   return x;
