@@ -141,7 +141,7 @@ V S_while(X* x) {
 V S_create(X*);
 V S_immediate(X*);
 V S_variable(X*);
-V S_consstant(X*);
+V S_constant(X*);
 
 V S_bcompile(X* x) {
   B b = (B)S_drop(x);
