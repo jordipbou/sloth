@@ -86,13 +86,13 @@ V S_evaluate(X* x, B* str) {
 	C n;
 	s->ibuf = str;
   while (s->ibuf && *s->ibuf) {
-		S_parse_space(x);
+		S_spaces(x);
 		if (s->ibuf && *s->ibuf) {
 			if (*s->ibuf == '\\') {
 				s->ibuf++;
 				if (!s->state) {
 				  S_eval(x, s->ibuf);
-				  S_parse_non_space(x);
+				  S_non_spaces(x);
 				} else {
 				  while (s->ibuf && *s->ibuf && !isspace(*s->ibuf)) {
 				  	s->block[s->here] = *s->ibuf;
@@ -152,6 +152,13 @@ V S_create_word(X* x, B* n, C l, B* c, C f) {
   strcpy(w->name, n);
 }
 
+V S_variable(X* x) {
+  S* s = ST(x, 'S');
+  if (s->environment->latest) {
+    s->environment->latest->flags |= VARIABLE;
+  }
+}
+
 V S_primitive(X* x, B* n, B* c, C f) { S_create_word(x, n, strlen(n), c, f); }
 
 V S_header(X* x) {
@@ -169,6 +176,7 @@ V S_sloth_ext(X* x) {
 	switch (S_token(x)) {
 		case 'b': S_bcompile(x); break;
 		case 'h': S_header(x); break;
+    case 'v': S_variable(x); break;
 		case ']': s->state = 1; break;
 		case '[': s->state = 0; break;
 	}

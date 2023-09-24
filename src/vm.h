@@ -10,6 +10,13 @@
 typedef char B;
 typedef intptr_t C;
 
+/** TEST: Code memory block **/
+typedef struct _Memory {
+  C here;
+  /* Data array could be of any type, allowing more bytes per address. Like konilo? t*/
+  B data[32767];
+} M;
+
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
 
