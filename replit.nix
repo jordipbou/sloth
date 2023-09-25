@@ -1,6 +1,7 @@
 { pkgs }: {
 	deps = [
-		pkgs.nodejs
+		pkgs.unzip
+  pkgs.nodejs
   pkgs.cmake
   pkgs.clang_12
 		pkgs.ccls
