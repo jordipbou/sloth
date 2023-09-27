@@ -58,7 +58,6 @@ V block_common(X* x) {
 }
 
 V read_block(X* x) {
-  printf("Reading block %d\n", T(x));
   x->f = open(x->blocks, O_RDONLY, 0666);
   block_common(x);
   read(x->f, x->m + x->b, 4096);
@@ -129,21 +128,21 @@ V io(X* x) {
 
 V process(X* x, I o) {
   switch (o) {
-    case  0:       break;   case  1: li(x); break;
-    case  2: du(x); break;   case  3: dr(x); break;
-    case  4: sw(x); break;   case  5: pu(x); break;
-    case  6: po(x); break;   case  7: ju(x); break;
-    case  8: ca(x); break;   case  9: cc(x); break;
-    case 10: cj(x); break;   case 11: re(x); break;
-    case 12: eq(x); break;   case 13: ne(x); break;
-    case 14: lt(x); break;   case 15: gt(x); break;
-    case 16: fe(x); break;   case 17: st(x); break;
-    case 18: ad(x); break;   case 19: su(x); break;
-    case 20: mu(x); break;   case 21: di(x); break;
-    case 22: an(x); break;   case 23: or(x); break;
-    case 24: xo(x); break;   case 25: sl(x); break;
-    case 26: sr(x); break;   case 27: cp(x); break;
-    case 28: cy(x); break;   case 29: io(x); break;
+    case  0:        break;   case  1: li(x); break;
+    case  2: case 'd': du(x); break;   case  3: case '_': dr(x); break;
+    case  4: case 's': sw(x); break;   case  5: case '(': pu(x); break;
+    case  6: case ')': po(x); break;   case  7: case 'j': ju(x); break;
+    case  8: case '$': ca(x); break;   case  9: case '?': cc(x); break;
+    case 10: case 'i': cj(x); break;   case 11: case '#': re(x); break;
+    case 12: case '=': eq(x); break;   case 13: case '~': ne(x); break;
+    case 14: case '<': lt(x); break;   case 15: case '>': gt(x); break;
+    case 16: case '@': fe(x); break;   case 17: case '!': st(x); break;
+    case 18: case '+': ad(x); break;   case 19: case '-': su(x); break;
+    case 20: case '*': mu(x); break;   case 21: case '/': di(x); break;
+    case 22: case '&': an(x); break;   case 23: case '|': or(x); break;
+    case 24: case '^': xo(x); break;   case 25: case 'l': sl(x); break;
+    case 26: case 'r': sr(x); break;   case 27: case 'm': cp(x); break;
+    case 28: case 'y': cy(x); break;   case 29: io(x); break;
     default: break;
   }
 }
