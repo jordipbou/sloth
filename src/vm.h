@@ -1,10 +1,11 @@
 /* TODOS:
+
+	- Correct eval/return/inner problem. Check with 1111+1+1+{so+}ts_ 
+
   - Find the relation between a packed memory and directly executing strings (maybe don't used packed memory? But, in high level languages everything is stored as objects, not pointers, or packing its used or a table holding references)
   The main problem is the index that points to there (here). Is it byte based or int based?
 	- Test shoud be added to ensure call/return/eval/inner works correctly
-	- Block could be (and should be) reutilized from parse and trace (and compile if implemented)
 	- More basic functions can be added, there are enough ASCII characters left and there's no reason to not do it
- - Adapt trace to use strings
 */
 
 /*
@@ -58,28 +59,30 @@ typedef struct _Context {
 
 #define S_push(x, v) (x->ds[x->sp++] = (C)(v))
 
-V S_halt(X* x) { x->err = -1; }
-V S_quit(X* x) { exit(0); }
-V S_lit(X* x) { S_push(x, ((*x->ip) << 8 + *(x->ip + 1)) & 0xEFFF); x->ip++; }
-
 #define T(x) (x->ds[x->sp - 1])
 #define N(x) (x->ds[x->sp - 2])
 #define NN(x) (x->ds[x->sp - 3])
 #define R(x) (x->as[x->rp - 1])
 
+#define NEOC(tk) (tk) && *(tk) && *(tk) != 10
+
 C S_block(X* x, B* tk) { 
 	C t = 1; 
 	B* s = tk;
-	for (;t && tk && *tk && *tk != 10; tk++) { 
+	for (;t && NEOC(tk); tk++) { 
 		if (*tk == '{') { t++; }
 		if (*tk == '}' || *tk == ']') { t--; }
 	}
 	return tk - s;
 }
 
-V S_parse_block(X* x) { S_push(x, x->ip + 1); x->ip += S_block(x, x->ip + 1); }
+/* Literals */
 
+V S_parse_block(X* x) { S_push(x, x->ip + 1); x->ip += S_block(x, x->ip + 1); }
 V S_char(X* x) { x->ip += 1; S_push(x, *x->ip); }
+V S_lit(X* x) { S_push(x, ((*x->ip) << 8 + *(x->ip + 1)) & 0xEFFF); x->ip++; }
+
+V S_quit(X* x) { exit(0); }
 
 V S_dup(X* x) { S_push(x, T(x)); }
 C S_drop(X* x) { return x->ds[--x->sp]; }
@@ -89,12 +92,12 @@ V S_over(X* x) { S_push(x, N(x)); }
 V S_to_R(X* x) { x->as[x->rp++] = (B*)x->ds[--x->sp]; }
 V S_from_R(X* x) { x->ds[x->sp++] = (C)x->as[--x->rp]; }
 
-V S_save_ip(X* x) { x->as[x->rp++] = x->ip; }
+V S_save_ip(X* x) { if (x->ip != 0 && *x->ip != 0 && *x->ip != 10) x->as[x->rp++] = x->ip; }
 V S_jump(X* x) { x->ip = (B*)S_drop(x); }
 V S_call(X* x) { S_save_ip(x); S_jump(x); }
 V S_ccall(X* x) { S_swap(x); if (S_drop(x)) S_call(x); else S_drop(x); }
 V S_cjump(X* x) { S_swap(x); if (S_drop(x)) S_jump(x); else S_drop(x); }
-V S_return(X* x) { if (x->rp > 0) { x->ip = R(x); x->rp--; } else { x->rp = 0; x->ip = 0; } }
+V S_return(X* x) { if (x->rp > 0) { x->ip = R(x) - 1; x->rp--; } else { x->rp = 0; x->ip = 0; } }
 
 V S_eq(X* x) { N(x) = (N(x) == T(x)) ? -1 : 0; x->sp--; }
 V S_neq(X* x) { N(x) = (N(x) != T(x)) ? -1 : 0; x->sp--; }
@@ -120,15 +123,12 @@ V S_shl(X* x) { N(x) = N(x) << T(x); x->sp -= 1; }
 V S_shr(X* x) { N(x) = N(x) >> T(x); x->sp -= 1; }
 
 V S_eval(X* x, B* s);
-/* Times is used for testing quotations mainly, should it stay on VM or on combinators extension? */
-V S_times(X* x) {
-	B* q = (B*)S_drop(x);
-	C n = S_drop(x);
-	for (;n > 0; n--) { S_eval(x, q); }
-}
+V S_trace(X* x);
+
+V S_times(X* x) {	B* q = (B*)S_drop(x);	C n = S_drop(x); for (;n > 0; n--) { S_eval(x, q); } }
 
 #define DC(a) { b += m = sprintf(b, "%ld ", a); n += m; }
-C D_co(X* x, B* b, B* c) { return c ? sprintf(b, "%.*s", (int)S_block(x, c), c) : sprintf(b, "0"); }
+C D_co(X* x, B* b, B* c) { return !c || *c == 0 || *c == 10 ? sprintf(b, "0") : sprintf(b, "%.*s", (int)S_block(x, c), c); }
 C D_ds(X* x, B* b) { C i = 0; C n = 0; C m = 0; for (;i < x->sp; i++) DC(x->ds[i]); return n; }
 C D_ctx(X* x, B* b) {
 	C i; C n = 0; C m = 0;
@@ -147,21 +147,6 @@ V S_trace(X* x) {
 	memset(buf, 0, 255);
 	D_ctx(x, buf);
 	printf("%s\n", buf);
-/*
-	DL;
-  B buf[255];
-	B* b = buf;
-  memset(b, 0, 255);
-  D_ds(x, b);
-  printf("%s", b);
-  printf("| ");
-  memset(b, 0, 255);
-  D_co(x, b, x->ip);
-	printf("%s", b);
-	S_trace_code(x, x->ip);
-	for (i = x->rp - 1; i >= 0; i--) { DS(" : "); D_co(x, x->as[i]); }
-	printf("\n");
-*/
 }
 
 V S_step(X* x) {
@@ -183,7 +168,7 @@ V S_step(X* x) {
 		case 'x': S_call(x); break;
 		case 'c': S_ccall(x); break; /* Where is this used? */
 		case 'i': S_cjump(x); break; /* Where is this used? */
-		case 0: case '}': break;
+		case 0: case 10: case '}': case ']': S_return(x); break;
 		case '=': S_eq(x); break;
 		case '.': S_fetch(x); break;
 		case ',': S_store(x); break;
@@ -211,9 +196,9 @@ V S_step(X* x) {
 	}
 }
 
-V S_inner(X* x) { C rp = x->rp; while(!x->err && x->rp >= rp && x->ip && *x->ip && *x->ip != 10) { S_step(x); x->ip += 1; } }
+V S_inner(X* x) { C rp = x->rp; while(!x->err && x->rp >= rp && NEOC(x->ip)) { S_step(x); x->ip += 1; } }
 
-V S_eval(X* x, B* s) { S_push(x, s); S_call(x); S_inner(x); S_return(x); }
+V S_eval(X* x, B* s) { printf("EVAL: RP: %ld\n", x->rp); S_push(x, s); S_call(x); S_inner(x); /* S_return(x); */ printf("EVAL OUT: RP: %ld\n", x->rp); }
 
 X* S_init() {
 	S* s = malloc(sizeof(S));
