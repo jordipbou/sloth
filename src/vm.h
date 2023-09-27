@@ -1,7 +1,10 @@
 /* TODOS:
-	- Test shoud be added to ensure call/return/eval/inner works correctly *7
+  - Find the relation between a packed memory and directly executing strings (maybe don't used packed memory? But, in high level languages everything is stored as objects, not pointers, or packing its used or a table holding references)
+  The main problem is the index that points to there (here). Is it byte based or int based?
+	- Test shoud be added to ensure call/return/eval/inner works correctly
 	- Block could be (and should be) reutilized from parse and trace (and compile if implemented)
 	- More basic functions can be added, there are enough ASCII characters left and there's no reason to not do it
+ - Adapt trace to use strings
 */
 
 #ifndef SLOTH_VM
@@ -41,6 +44,7 @@ typedef struct _Context {
 	S* s;
   void (*ext[26])(struct _Context*);
   void* st[26];
+  C i, t, n;
 } X;
 
 #define EXT(x, l) (x->ext[l - 'A'])
@@ -65,16 +69,15 @@ V S_lit(X* x) { S_push(x, ((*x->ip) << 8 + *(x->ip + 1)) & 0xEFFF); x->ip++; }
 /*V S_block(X* x, B** c) { C t = 1; while (t) { EOL(x, *c); LBRACE(x, *c); RBRACE(x, *c); *c++; } }*/
 /*V S_parse_block(X* x) { x->ip += 1; S_push(x, x->ip); S_block(x, &x->ip); }*/
 /*V S_parse_block(X* x) { S_push(x, x->ip + 1); BLOCK(x, x->ip); }*/
-V S_parse_block(X* x) {
-	C t = 1;
-	x->ip += 1;
-	S_push(x, x->ip);
-	while (t && x->ip && *x->ip) {
-		if (*x->ip == '{') t++;
-		if (*x->ip == '}') t--;
-		if (t) x->ip += 1;
-	}
-}
+
+#define ST(v, b) \
+  for (;t && v && *v; v++) { \
+    if (*v == '{') { t++; } \
+    if (*v == '}' || *v == '\\') { t--; } \
+    if (*v != 10) { b; } \
+  }
+
+V S_parse_block(X* x) {	C t = 1; x->ip += 1; S_push(x, x->ip); ST(x->ip,); x->ip--; }
 
 V S_char(X* x) { x->ip += 1; S_push(x, *x->ip); }
 
@@ -124,25 +127,25 @@ V S_times(X* x) {
 	for (;n > 0; n--) { S_eval(x, q); }
 }
 
-V S_trace_code(X* x, B* c) {
-	C t = 1;
-	if (c == 0) printf("0");
-	else {
-		while (t && c && *c) {
-			if (*c == '{') t++;
-			if (*c == '}') t--;
-			if (*c != 10) printf("%c", *c);
-			c++;
-		}
-	}
-}
+#define DL C i, t, n; i = t = n = 0
+#define DC(a) { b += t = sprintf(b, "%ld ", a); n += t; }
+#define DB(a) { b += t = sprintf(b, "%c", a); n += t; }
+#define DS(a) { b += t = sprintf(b, "%s", a); n += t; }
+#define DR return n
 
+C D_co(X* x, B* c) { C t = 1; if (c == 0) DC(0); ST(c, DB(*c)); DR;}
+C D_ds(X* x, B* b) { DL; for (;i < x->sp; i++) DC(x->ds[i]); DR; }
 V S_trace(X* x) {
 	C i;
-	for (i = 0; i < x->sp; i++) { printf("%ld ", x->ds[i]); }
-	printf("| ");
-	S_trace_code(x, x->ip);
-	for (i = x->rp - 1; i >= 0; i--) { printf(" : "); S_trace_code(x, x->as[i]); }
+  B buf[255];
+  memset(buf, 0, 255);
+  D_ds(x, buf);
+  printf("%s", buf);
+  printf("| ");
+  memset(buf, 0, 255);
+  D_co(x, x->ip);
+	/*S_trace_code(x, x->ip);*/
+	for (i = x->rp - 1; i >= 0; i--) { DS(" : "); D_co(x, x->as[i]); } /*S_trace_code(x, x->as[i]); } */
 	printf("\n");
 }
 
@@ -193,7 +196,6 @@ V S_step(X* x) {
 	}
 }
 
-/* In this way, its not possible to call eval from inside times and return from inner, that's why I used frame reference! */
 V S_inner(X* x) { C rp = x->rp; while(!x->err && x->rp >= rp && x->ip) { S_step(x); x->ip += 1; } }
 
 V S_eval(X* x, B* s) { S_push(x, s); S_call(x); S_inner(x); /*S_return(x);*/ }
