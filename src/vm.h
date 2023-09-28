@@ -43,7 +43,6 @@ typedef struct _Environment {
 #endif
 
 typedef struct _System {
-	B* ibuf;
 	B* r;	/* rom - will I use this? */
 	B* b; /* blocks - will I use this? */
   H m[DICT_SIZE];
@@ -62,7 +61,8 @@ typedef struct _Context {
 	S* s;
   void (*ext[26])(struct _Context*);
   void* st[26];
-  C i, t, n;
+  B* ibuf;
+  E* environment;
 } X;
 
 #define EXT(x, l) (x->ext[l - 'A'])
@@ -225,29 +225,74 @@ V S_inner(X* x) { C rp = x->rp; while(!x->err && x->rp >= rp && x->ip) { S_step(
 
 V S_eval(X* x, B* s) { S_push(x, s); S_call(x); S_inner(x); }
 
-X* S_init() {
-	S* s = malloc(sizeof(S));
-	X* x = malloc(sizeof(X));
-	return x;
+/* With symbols and environment */
+
+#define TOKEN(cond) (x->ibuf && *x->ibuf && cond)
+V S_parse_spaces(X* x) { while (TOKEN(isspace(*x->ibuf))) { x->ibuf++; } }
+V S_parse_non_spaces(X* x) { while (TOKEN(!isspace(*x->ibuf))) { x->ibuf++; } }
+
+V S_parse_name(X* x) {
+	S_parse_spaces(x); 
+	S_push(x, x->ibuf); 
+	S_parse_non_spaces(x); 
+	S_push(x, (x->ibuf - ((B*)T(x)))); 
 }
 
-#define TOKEN(cond) (x->s->ibuf && *x->s->ibuf && cond)
-V S_parse_spaces(X* x) { while (TOKEN(isspace(*x->s->ibuf))) { x->s->ibuf++; } }
-V S_parse_non_spaces(X* x) { while (TOKEN(!isspace(*x->s->ibuf))) { x->s->ibuf++; } }
+V S_find_name(X* x) {
+  C len = T(x);
+  B* name = (B*)N(x);
+	W* w = x->environment->latest;
+	while (w) {
+	  if (w->nlen == len && !strncmp(w->name, name, len)) break;
+		w = w->previous;
+	}
+	S_push(x, w);
+}
 
 V S_assembler(X* x) {
+  C len = S_drop(x);
+  B* code = (B*)S_drop(x);
+  B t = code[len];
+  code[len] = 0;
+  S_eval(x, code);
+  code[len] = t;
 }
 
-V S_interpret(X* x) {
+V S_to_number(X* x) {
+  char* end;
+  C _ = S_drop(x);
+  B* str = (B*)S_drop(x);
+  C n = strtol(str, &end, 10);
+  if (n == 0 && str == end) {
+    /* error: word not found */
+  } else {
+    S_push(x, n);
+  }
 }
 
 V S_evaluate(X* x, B* s) {
-	x->s->ibuf = s;
-	while (x->s->ibuf && *x->s->ibuf) {
-		S_parse_spaces(x);
-		if (TOKEN(*x->s->ibuf == '\\')) S_assembler(x);
-		else S_interpret(x);
+	x->ibuf = s;
+	while (TOKEN(1)) {
+    S_parse_name(x);
+    S_find_name(x);
+    if (T(x)) {
+      /* interpret or compile */
+    } else {
+      S_drop(x);
+      if (*((B*)N(x)) == '\\') {
+        S_assembler(x);
+      } else {
+        S_to_number(x);
+      }
+    }
 	}
+}
+
+X* S_init() {
+	S* s = malloc(sizeof(S));
+	X* x = malloc(sizeof(X));
+  x->environment = malloc(sizeof(E));
+	return x;
 }
 
 #endif

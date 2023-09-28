@@ -18,7 +18,8 @@ int main(int argc, char** argv) {
 	  fgets(buf, 255, stdin);
 		/*S_evaluate(x, buf);*/
 		/*S_eval(x, buf);*/
-		S_eval(x, buf);
+		/*S_eval(x, buf);*/
+    S_evaluate(x, buf);
 		/*
 		for (i = 0; i < x->sp; i++) {
 			printf("%ld ", x->ds[i]);
