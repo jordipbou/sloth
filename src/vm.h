@@ -25,13 +25,27 @@ typedef char B;
 typedef int32_t H;
 typedef intptr_t C;
 
+typedef struct _Word {
+  struct _Word* previous;
+	C flags;
+  B* code; 
+  C nlen;
+	B name[1];
+} W;
+
+typedef struct _Environment {
+	struct _Environment* parent;
+	W* latest;
+} E;
+
 #ifndef DICT_SIZE
 #define DICT_SIZE 32768
 #endif
 
 typedef struct _System {
-	B* r;
-	B* b;
+	B* ibuf;
+	B* r;	/* rom - will I use this? */
+	B* b; /* blocks - will I use this? */
   H m[DICT_SIZE];
 } S;
 
@@ -215,6 +229,25 @@ X* S_init() {
 	S* s = malloc(sizeof(S));
 	X* x = malloc(sizeof(X));
 	return x;
+}
+
+#define TOKEN(cond) (x->s->ibuf && *x->s->ibuf && cond)
+V S_parse_spaces(X* x) { while (TOKEN(isspace(*x->s->ibuf))) { x->s->ibuf++; } }
+V S_parse_non_spaces(X* x) { while (TOKEN(!isspace(*x->s->ibuf))) { x->s->ibuf++; } }
+
+V S_assembler(X* x) {
+}
+
+V S_interpret(X* x) {
+}
+
+V S_evaluate(X* x, B* s) {
+	x->s->ibuf = s;
+	while (x->s->ibuf && *x->s->ibuf) {
+		S_parse_spaces(x);
+		if (TOKEN(*x->s->ibuf == '\\')) S_assembler(x);
+		else S_interpret(x);
+	}
 }
 
 #endif
