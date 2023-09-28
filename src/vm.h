@@ -1,7 +1,4 @@
 /* TODOS:
-
-	- Correct eval/return/inner problem. Check with 1111+1+1+{so+}ts_ 
-
   - Find the relation between a packed memory and directly executing strings (maybe don't used packed memory? But, in high level languages everything is stored as objects, not pointers, or packing its used or a table holding references)
   The main problem is the index that points to there (here). Is it byte based or int based?
 	- Test shoud be added to ensure call/return/eval/inner works correctly
@@ -64,25 +61,29 @@ typedef struct _Context {
 #define NN(x) (x->ds[x->sp - 3])
 #define R(x) (x->as[x->rp - 1])
 
-#define NEOC(tk) (tk) && *(tk) && *(tk) != 10
+V S_eval(X* x, B* s);
+V S_trace(X* x);
+
+/* Literals */
 
 C S_block(X* x, B* tk) { 
 	C t = 1; 
 	B* s = tk;
-	for (;t && NEOC(tk); tk++) { 
+	for (;t && tk && *tk && *tk != 10; tk++) { 
 		if (*tk == '{') { t++; }
 		if (*tk == '}' || *tk == ']') { t--; }
 	}
 	return tk - s;
 }
-
-/* Literals */
-
 V S_parse_block(X* x) { S_push(x, x->ip + 1); x->ip += S_block(x, x->ip + 1); }
+C is_number(B c) { return c >= 48 && c <= 57; }
+V S_parse_number(X* x) { C n = 0; x->ip += 1; while (is_number(*x->ip)) { n = n*10 + ((*x->ip++) - 48); } x->ip -= 1; S_push(x, n); }
 V S_char(X* x) { x->ip += 1; S_push(x, *x->ip); }
 V S_lit(X* x) { S_push(x, ((*x->ip) << 8 + *(x->ip + 1)) & 0xEFFF); x->ip++; }
 
 V S_quit(X* x) { exit(0); }
+
+/* Stack operators */
 
 V S_dup(X* x) { S_push(x, T(x)); }
 C S_drop(X* x) { return x->ds[--x->sp]; }
@@ -92,26 +93,36 @@ V S_over(X* x) { S_push(x, N(x)); }
 V S_to_R(X* x) { x->as[x->rp++] = (B*)x->ds[--x->sp]; }
 V S_from_R(X* x) { x->ds[x->sp++] = (C)x->as[--x->rp]; }
 
+/* Execution */
+
 V S_save_ip(X* x) { if (x->ip != 0 && *x->ip != 0 && *x->ip != 10) x->as[x->rp++] = x->ip; }
 V S_jump(X* x) { x->ip = (B*)S_drop(x); }
 V S_call(X* x) { S_save_ip(x); S_jump(x); }
 V S_ccall(X* x) { S_swap(x); if (S_drop(x)) S_call(x); else S_drop(x); }
 V S_cjump(X* x) { S_swap(x); if (S_drop(x)) S_jump(x); else S_drop(x); }
-V S_return(X* x) { if (x->rp > 0) { x->ip = R(x) - 1; x->rp--; } else { x->rp = 0; x->ip = -1; } }
+V S_return(X* x) { if (x->rp > 0) { x->ip = R(x) - 1; x->rp--; } else { x->rp = 0; x->ip = (B*)-1; } }
+
+/* Comparison operators */
 
 V S_eq(X* x) { N(x) = (N(x) == T(x)) ? -1 : 0; x->sp--; }
 V S_neq(X* x) { N(x) = (N(x) != T(x)) ? -1 : 0; x->sp--; }
 V S_lt(X* x) { N(x) = (N(x) < T(x)) ? -1 : 0; x->sp--; }
 V S_gt(X* x) { N(x) = (N(x) > T(x)) ? -1 : 0; x->sp--; }
 
+/* Memory operators */
+
 V S_fetch(X* x) { T(x) = x->s->m[T(x)]; }
 V S_store(X* x) { x->s->m[T(x)] = N(x); x->sp -= 2; }
+
+/* Arithmetic operators */
 
 V S_add(X* x) { N(x) = N(x) + T(x); x->sp -= 1; }
 V S_sub(X* x) { N(x) = N(x) - T(x); x->sp -= 1; }
 V S_mul(X* x) { N(x) = N(x) * T(x); x->sp -= 1; }
 /* On konilo, crc does something called symmetric to change sign... */
 V S_divmod(X* x) { C a = T(x); C b = N(x); T(x) = b / a; N(x) = b % a; }
+
+/* Bitwise operators */
 
 V S_and(X* x) { N(x) = N(x) & T(x); x->sp -= 1; }
 V S_or(X* x) { N(x) = N(x) | T(x); x->sp -= 1; }
@@ -122,13 +133,12 @@ V S_invert(X* x) { T(x) = ~T(x); }
 V S_shl(X* x) { N(x) = N(x) << T(x); x->sp -= 1; }
 V S_shr(X* x) { N(x) = N(x) >> T(x); x->sp -= 1; }
 
-V S_eval(X* x, B* s);
-V S_trace(X* x);
-
 V S_times(X* x) {	B* q = (B*)S_drop(x);	C n = S_drop(x); for (;n > 0; n--) { S_eval(x, q); } }
 
+/* Dump context */
+
 #define DC(a) { b += m = sprintf(b, "%ld ", a); n += m; }
-C D_co(X* x, B* b, B* c) { return !c || *c == 0 || *c == 10 ? sprintf(b, "0") : sprintf(b, "%.*s", (int)S_block(x, c), c); }
+C D_co(X* x, B* b, B* c) { return sprintf(b, "%.*s", (int)S_block(x, c), c); }
 C D_ds(X* x, B* b) { C i = 0; C n = 0; C m = 0; for (;i < x->sp; i++) DC(x->ds[i]); return n; }
 C D_ctx(X* x, B* b) {
 	C i; C n = 0; C m = 0;
@@ -157,6 +167,7 @@ V S_step(X* x) {
 		case '0': S_push(x, 0); break;
 		case '1': S_push(x, 1); break;
 		case '{': S_parse_block(x); break;
+		case '#': S_parse_number(x); break;
 		case '\'': S_char(x); break;
 	  case 'd': S_dup(x); break;	
 		case '_': S_drop(x); break;
