@@ -97,7 +97,7 @@ V S_jump(X* x) { x->ip = (B*)S_drop(x); }
 V S_call(X* x) { S_save_ip(x); S_jump(x); }
 V S_ccall(X* x) { S_swap(x); if (S_drop(x)) S_call(x); else S_drop(x); }
 V S_cjump(X* x) { S_swap(x); if (S_drop(x)) S_jump(x); else S_drop(x); }
-V S_return(X* x) { if (x->rp > 0) { x->ip = R(x) - 1; x->rp--; } else { x->rp = 0; x->ip = 0; } }
+V S_return(X* x) { if (x->rp > 0) { x->ip = R(x) - 1; x->rp--; } else { x->rp = 0; x->ip = -1; } }
 
 V S_eq(X* x) { N(x) = (N(x) == T(x)) ? -1 : 0; x->sp--; }
 V S_neq(X* x) { N(x) = (N(x) != T(x)) ? -1 : 0; x->sp--; }
@@ -196,9 +196,9 @@ V S_step(X* x) {
 	}
 }
 
-V S_inner(X* x) { C rp = x->rp; while(!x->err && x->rp >= rp && NEOC(x->ip)) { S_step(x); x->ip += 1; } }
+V S_inner(X* x) { C rp = x->rp; while(!x->err && x->rp >= rp && x->ip) { S_step(x); x->ip += 1; } }
 
-V S_eval(X* x, B* s) { printf("EVAL: RP: %ld\n", x->rp); S_push(x, s); S_call(x); S_inner(x); /* S_return(x); */ printf("EVAL OUT: RP: %ld\n", x->rp); }
+V S_eval(X* x, B* s) { S_push(x, s); S_call(x); S_inner(x); }
 
 X* S_init() {
 	S* s = malloc(sizeof(S));
