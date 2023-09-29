@@ -25,18 +25,8 @@ typedef char B;
 typedef int32_t H;
 typedef intptr_t C;
 
-typedef struct _Word {
-  struct _Word* previous;
-	C flags;
-  B* code; 
-  C nlen;
-	B name[1];
-} W;
-
-typedef struct _Environment {
-	struct _Environment* parent;
-	W* latest;
-} E;
+typedef struct _Word { struct _Word* p;	C f; B* c; C l;	B n[1]; } W;
+typedef struct _Environment {	struct _Environment* p;	W* l; } E;
 
 #ifndef DICT_SIZE
 #define DICT_SIZE 32768
@@ -62,13 +52,18 @@ typedef struct _Context {
   void (*ext[26])(struct _Context*);
   void* st[26];
   B* ibuf;
-  E* environment;
+  E* e;
 } X;
+
+#define NNF	-1
 
 #define EXT(x, l) (x->ext[l - 'A'])
 #define ST(x, l) (x->st[l - 'A'])
 
 #define S_push(x, v) (x->ds[x->sp++] = (C)(v))
+#define P1(x, v1) S_push(x, v1)
+#define P2(x, v1, v2) S_push(x, v1); S_push(x, v2)
+#define P3(x, v1, v2, v3) S_push(x, v1); S_push(x, v2); S_push(x, v3)
 
 #define T(x) (x->ds[x->sp - 1])
 #define N(x) (x->ds[x->sp - 2])
@@ -227,62 +222,33 @@ V S_eval(X* x, B* s) { S_push(x, s); S_call(x); S_inner(x); }
 
 /* With symbols and environment */
 
+#define L2(x, t1, v1, t2, v2) t1 v1 = (t1)S_drop(x); t2 v2 = (t2)S_drop(x)
+
 #define TOKEN(cond) (x->ibuf && *x->ibuf && cond)
-V S_parse_spaces(X* x) { while (TOKEN(isspace(*x->ibuf))) { x->ibuf++; } }
-V S_parse_non_spaces(X* x) { while (TOKEN(!isspace(*x->ibuf))) { x->ibuf++; } }
+V S_spaces(X* x) { while (TOKEN(isspace(*x->ibuf))) { x->ibuf++; } }
+V S_non_spaces(X* x) { while (TOKEN(!isspace(*x->ibuf))) { x->ibuf++; } }
+V S_parse_name(X* x) { S_spaces(x); P1(x, x->ibuf); S_non_spaces(x); P1(x, (x->ibuf - ((B*)T(x)))); }
 
-V S_parse_name(X* x) {
-	S_parse_spaces(x); 
-	S_push(x, x->ibuf); 
-	S_parse_non_spaces(x); 
-	S_push(x, (x->ibuf - ((B*)T(x)))); 
-}
+#define EQ_STR(w, n_, l_) (w->l == l_ && !strncmp(w->n, n_, l_))
+V S_find_name(X* x) { L2(x, C, l, B*, n); W* w; for (w = x->e->l; w && !(EQ_STR(w, n, l)); w = w->p) {} P3(x, n, l, w); }
 
-V S_find_name(X* x) {
-  C len = T(x);
-  B* name = (B*)N(x);
-	W* w = x->environment->latest;
-	while (w) {
-	  if (w->nlen == len && !strncmp(w->name, name, len)) break;
-		w = w->previous;
-	}
-	S_push(x, w);
-}
-
-V S_assembler(X* x) {
-  C len = S_drop(x);
-  B* code = (B*)S_drop(x);
-  B t = code[len];
-  code[len] = 0;
-  S_eval(x, code);
-  code[len] = t;
-}
-
-V S_to_number(X* x) {
-  char* end;
-  C _ = S_drop(x);
-  B* str = (B*)S_drop(x);
-  C n = strtol(str, &end, 10);
-  if (n == 0 && str == end) {
-    /* error: word not found */
-  } else {
-    S_push(x, n);
-  }
-}
+V S_asm(X* x) { L2(x, C, l, B*, c); B t = c[l]; c[l] = 0; S_eval(x, c + 1); c[l] = t; }
+V S_num(X* x) { L2(x, C, _, B*, s); B* e; C n = strtol(s, &e, 10); (!n && s == e) ? x->err = NNF : S_push(x, n); }
 
 V S_evaluate(X* x, B* s) {
 	x->ibuf = s;
 	while (TOKEN(1)) {
     S_parse_name(x);
+		if (T(x) == 0) { S_drop(x); S_drop(x); break; }
     S_find_name(x);
     if (T(x)) {
       /* interpret or compile */
     } else {
       S_drop(x);
-      if (*((B*)N(x)) == '\\') {
-        S_assembler(x);
+      if (T(x) && *((B*)N(x)) == '\\') {
+        S_asm(x);
       } else {
-        S_to_number(x);
+        S_num(x);
       }
     }
 	}
@@ -291,7 +257,7 @@ V S_evaluate(X* x, B* s) {
 X* S_init() {
 	S* s = malloc(sizeof(S));
 	X* x = malloc(sizeof(X));
-  x->environment = malloc(sizeof(E));
+  x->e = malloc(sizeof(E));
 	return x;
 }
 
