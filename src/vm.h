@@ -25,7 +25,7 @@ typedef char B;
 typedef int32_t H;
 typedef intptr_t C;
 
-typedef struct _Word { struct _Word* p;	C f; B* c; C l;	B n[1]; } W;
+typedef struct _Word { struct _Word* p; C f; B* c; C l;	B n[1]; } W;
 typedef struct _Environment {	struct _Environment* p;	W* l; } E;
 
 #ifndef DICT_SIZE
@@ -173,7 +173,20 @@ V S_parse_name(X* x);
 
 V S_header(X* x) {
   S_parse_name(x);
-  printf("HEADER::parsed name:%.*s\n", T(x), (B*)(N(x)));
+  C nlen = S_drop(x);
+  B* name = (B*)S_drop(x);
+  if (nlen) {
+    W* w = malloc(sizeof(W) + nlen);
+    if (!w) { /* error */ return; }
+    w->p = x->e->l;
+    x->e->l = w;
+    w->f = 0;
+    w->c = 0;
+    w->l = nlen;
+    strncpy(w->n, name, nlen);
+    w->n[nlen] = 0;
+    S_push(x, w);
+  }
 }
 
 /* --------------------- */
@@ -246,6 +259,11 @@ V S_find_name(X* x) { L2(x, C, l, B*, n); W* w; for (w = x->e->l; w && !(EQ_STR(
 V S_asm(X* x) { L2(x, C, l, B*, c); B t = c[l]; c[l] = 0; S_eval(x, c + 1); c[l] = t; }
 V S_num(X* x) { L2(x, C, _, B*, s); B* e; C n = strtol(s, &e, 10); (!n && s == e) ? x->err = NNF : S_push(x, n); }
 
+V S_interpret(X* x) {
+  W* w = (W*)S_drop(x);
+  printf("Interpreting %.*s\n", w->l, w->n);
+}
+               
 V S_evaluate(X* x, B* s) {
 	x->ibuf = s;
 	while (TOKEN(1)) {
@@ -253,7 +271,7 @@ V S_evaluate(X* x, B* s) {
 		if (T(x) == 0) { S_drop(x); S_drop(x); break; }
     S_find_name(x);
     if (T(x)) {
-      /* interpret or compile */
+      S_interpret(x);
     } else {
       S_drop(x);
       if (T(x) && *((B*)N(x)) == '\\') {
