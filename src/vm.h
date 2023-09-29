@@ -168,6 +168,16 @@ V S_trace(X* x) {
 	printf("%s\n", buf);
 }
 
+/* create/end definition */
+V S_parse_name(X* x);
+
+V S_header(X* x) {
+  S_parse_name(x);
+  printf("HEADER::parsed name:%.*s\n", T(x), (B*)(N(x)));
+}
+
+/* --------------------- */
+
 V S_step(X* x) {
   B token = *x->ip;
 	S_trace(x);
@@ -204,6 +214,7 @@ V S_step(X* x) {
 		case 'l': S_shl(x); break;
 		case 'r': S_shr(x); break;
 		case 't': S_times(x); break;
+    case 'h': S_header(x); break;
 		case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G': case 'H': case 'I':
 		case 'J': case 'K': case 'L': case 'M': case 'N': case 'O': case 'P': case 'Q': case 'R':
 		case 'S': case 'T': case 'U': case 'V': case 'W': case 'X': case 'Y': case 'Z':
@@ -246,6 +257,7 @@ V S_evaluate(X* x, B* s) {
     } else {
       S_drop(x);
       if (T(x) && *((B*)N(x)) == '\\') {
+        S_spaces(x);
         S_asm(x);
       } else {
         S_num(x);
