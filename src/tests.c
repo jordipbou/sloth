@@ -20,12 +20,6 @@ void setUp() {
 
 void tearDown() {}
 
-void test_eval() {
-  X* x = S_init();
-  x->ip = "s";
-  S_eval(x, "111+");
-}
-
 /* Arithmetics */
 /*
 void test_add() {

@@ -14,18 +14,19 @@ int main(int argc, char** argv) {
 	*/
 	/*S_forth_init(x);*/
 	/*X* x = S_sloth();*/
+  printf("> ");
 	while (1) {
 	  fgets(buf, 255, stdin);
 		/*S_evaluate(x, buf);*/
 		/*S_eval(x, buf);*/
-		/*S_eval(x, buf);*/
-    S_evaluate(x, buf);
+		S_ev(x, buf);
+    /*S_evaluate(x, buf);*/
 		/*
 		for (i = 0; i < x->sp; i++) {
 			printf("%ld ", x->ds[i]);
 		}
 		printf("Ok\n");
 		*/
-		printf("OK "); S_trace(x);
+		printf("> "); /* S_trace(x); */
 	}
 }

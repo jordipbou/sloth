@@ -1,16 +1,7 @@
-/* TODOS:
-  - Find the relation between a packed memory and directly executing strings (maybe don't used packed memory? But, in high level languages everything is stored as objects, not pointers, or packing its used or a table holding references)
-  The main problem is the index that points to there (here). Is it byte based or int based?
-	- Test shoud be added to ensure call/return/eval/inner works correctly
-	- More basic functions can be added, there are enough ASCII characters left and there's no reason to not do it
-*/
-
-/*
-	Bytecode
-	--------
-	END OF CODE -> 0, 10 (return), '}', '\'
-*/
-
+/* What about using string/start/end for quotations? That will map well 
+to Java objects, and will ease printing quotations and all that, although it will complicate the use of the interpreter from a stream point of view, requiring a buffer in the process. Is that a problem? */
+/* There's no possibility to stream bytecode right now, as parse quotation needs to go until the end of the quotation. */
+/* Either streaming is important or string/start/end is better. Which one? */
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -22,26 +13,134 @@
 #define V void /* inline void ? */
 
 typedef char B;
-typedef int32_t H;
 typedef intptr_t C;
 
-typedef struct _Word { struct _Word* p;	C f; B* c; C l;	B n[1]; } W;
+#define STACK_SIZE 64
+#define RSTACK_SIZE 64
+
+typedef struct _Context {
+  C ds[STACK_SIZE]; C dp;
+  B* rs[RSTACK_SIZE]; C rp;
+	B* ip;
+} X;
+
+#define S_pu(x, v) (x->ds[x->dp++] = (C)(v))
+#define S_po(x) (x->ds[--x->dp])
+
+#define L1(x, t, v) t v = (t)S_po(x)
+#define L2(x, t1, v1, t2, v2) t1 v1 = (t1)S_po(x); t2 v2 = (t2)S_po(x)
+#define L3(x, t1, v1, t2, v2, t3, v3) t1 v1 = (t1)S_po(x); t2 v2 = (t2)S_po(x); t3 v3 = (t3)S_po(x)
+
+#define TS(x) (x->ds[x->dp - 1])
+#define NS(x) (x->ds[x->dp - 2])
+#define NNS(x) (x->ds[x->dp - 3])
+
+V S_si(X* x, C i) { x->rs[x->rp++] = x->ip + i; }
+#define TC(a) ((a) != 0 && *(a) != 0 && *(a) != 10 && *(a) != '}')
+V S_ca(X* x, C i) { L1(x, B*, q); if (TC(x->ip + i)) S_si(x, i); x->ip = q; }
+V S_ex(X* x) { if (x->rp == 0) x->ip = 0; else x->ip = x->rs[--x->rp]; }
+
+V S_dr(X* x) { S_po(x); }
+V S_sw(X* x) { C t = TS(x); TS(x) = NS(x); NS(x) = t; }
+V S_ov(X* x) { S_pu(x, NS(x)); }
+V S_du(X* x) { S_pu(x, TS(x)); }
+V S_ro(X* x) { C t = NNS(x); NNS(x) = NS(x); NS(x) = TS(x); TS(x) = t; }
+
+V S_ad(X* x) { NS(x) = NS(x) + TS(x); x->dp--; }
+V S_su(X* x) { NS(x) = NS(x) - TS(x); x->dp--; }
+V S_mu(X* x) { NS(x) = NS(x) * TS(x); x->dp--; }
+V S_di(X* x) { NS(x) = NS(x) / TS(x); x->dp--; }
+V S_mo(X* x) { NS(x) = NS(x) % TS(x); x->dp--; }
+
+V S_an(X* x) { NS(x) = NS(x) & TS(x); x->dp--; }
+V S_or(X* x) { NS(x) = NS(x) | TS(x); x->dp--; }
+V S_xo(X* x) { NS(x) = NS(x) ^ TS(x); x->dp--; }
+V S_no(X* x) { TS(x) = !TS(x); }
+V S_iv(X* x) { TS(x) = ~TS(x); }
+
+V S_ev(X* x, B* q);
+V S_ti(X* x) { L2(x, B*, q, C, n); for(;n > 0; n--) { S_ev(x, q); } }
+V S_br(X* x) { L3(x, B*, f, B*, t, C, b); if (b) S_ev(x, t); else S_ev(x, f); }
+
+#define S_bl(a, b) \
+  { \
+    C t = 1; \
+    while (t) { \
+      if ((a) == 0 || *(a) == 0 || *(a) == 10) break; \
+      if (*(a) == '{') t++; \
+      if (*(a) == '}') t--; \
+      b; \
+      (a)++; \
+    } \
+  }
+
+V S_pq(X* x) { x->ip = x->ip + 1; S_pu(x, x->ip); S_bl(x->ip,); }
+
+#define S_pr(s, n, f, a) { C t; s += t = sprintf(s, f, a); n += t; }
+              
+C S_co(X* x, B* c) { S_bl(c, printf("%c", *c)); }
+V S_tr(X* x) {
+  C i;
+  B* t;
+  for (i = 0; i < x->dp; i++) printf("%ld ", x->ds[i]);
+  printf("| ");
+  S_co(x, x->ip);
+  for (i = x->rp - 1; i >= 0; i--) {
+    printf(" : ");
+    S_co(x, x->rs[i]); 
+  }
+  printf("\n");
+}
+              
+V S_st(X* x) {
+  S_tr(x);
+  switch (*x->ip) {
+    case '{': S_pq(x); return;
+    case 0: 
+    case 10: 
+    case '}': S_ex(x); return;
+    case 'x': S_ca(x, 1); return;
+    case '0': S_pu(x, 0); break;
+    case '1': S_pu(x, 1); break;
+    case '_': S_dr(x); break;
+    case 's': S_sw(x); break;
+    case 'o': S_ov(x); break;
+    case 'd': S_du(x); break;
+    case 'r': S_ro(x); break;
+    case '+': S_ad(x); break;
+    case '-': S_su(x); break;
+    case '*': S_mu(x); break;
+    case '/': S_di(x); break;
+    case '%': S_mo(x); break;
+    case '&': S_an(x); break;
+    case '|': S_or(x); break;
+    case '!': S_no(x); break;
+    case '^': S_xo(x); break;
+    case '~': S_iv(x); break;
+    case 't': S_ti(x); break;
+    case '?': S_br(x); break;
+  } 
+  x->ip = x->ip + 1;
+}
+              
+V S_in(X* x) { C rp = x->rp; while(x->rp >= rp && x->ip) { S_st(x); } }
+V S_ev(X* x, B* q) { S_pu(x, q); S_ca(x, 0); S_in(x); }
+
+X* S_init() { return malloc(sizeof(X)); }
+
+/*
+typedef struct _Word { struct _Word* p; C f; B* c; C l;	B n[1]; } W;
 typedef struct _Environment {	struct _Environment* p;	W* l; } E;
 
 #ifndef DICT_SIZE
-#define DICT_SIZE 32768
+#define DICT_SIZE 64*1024
 #endif
 
 typedef struct _System {
-	B* r;	/* rom - will I use this? */
-	B* b; /* blocks - will I use this? */
-  H m[DICT_SIZE];
 } S;
 
 S* S_init_system() { return malloc(sizeof(S)); }
 
-#define STACK_SIZE 64
-#define RSTACK_SIZE 64
 
 typedef struct _Context {
   C ds[STACK_SIZE]; C sp;
@@ -73,8 +172,6 @@ typedef struct _Context {
 V S_eval(X* x, B* s);
 V S_trace(X* x);
 
-/* Literals */
-
 C S_block(X* x, B* tk) { 
 	C t = 1; 
 	B* s = tk;
@@ -92,8 +189,6 @@ V S_lit(X* x) { S_push(x, ((*x->ip) << 8 + *(x->ip + 1)) & 0xEFFF); x->ip++; }
 
 V S_quit(X* x) { exit(0); }
 
-/* Stack operators */
-
 V S_dup(X* x) { S_push(x, T(x)); }
 C S_drop(X* x) { return x->ds[--x->sp]; }
 V S_swap(X* x) { C t = T(x); T(x) = N(x); N(x) = t; }
@@ -102,36 +197,23 @@ V S_over(X* x) { S_push(x, N(x)); }
 V S_to_R(X* x) { x->as[x->rp++] = (B*)x->ds[--x->sp]; }
 V S_from_R(X* x) { x->ds[x->sp++] = (C)x->as[--x->rp]; }
 
-/* Execution */
-
 V S_save_ip(X* x) { if (x->ip != 0 && *x->ip != 0 && *x->ip != 10) x->as[x->rp++] = x->ip; }
 V S_jump(X* x) { x->ip = (B*)S_drop(x); }
 V S_call(X* x) { S_save_ip(x); S_jump(x); }
-V S_ccall(X* x) { S_swap(x); if (S_drop(x)) S_call(x); else S_drop(x); }
-V S_cjump(X* x) { S_swap(x); if (S_drop(x)) S_jump(x); else S_drop(x); }
 V S_return(X* x) { if (x->rp > 0) { x->ip = R(x) - 1; x->rp--; } else { x->rp = 0; x->ip = (B*)-1; } }
-
-/* Comparison operators */
 
 V S_eq(X* x) { N(x) = (N(x) == T(x)) ? -1 : 0; x->sp--; }
 V S_neq(X* x) { N(x) = (N(x) != T(x)) ? -1 : 0; x->sp--; }
 V S_lt(X* x) { N(x) = (N(x) < T(x)) ? -1 : 0; x->sp--; }
 V S_gt(X* x) { N(x) = (N(x) > T(x)) ? -1 : 0; x->sp--; }
 
-/* Memory operators */
-
 V S_fetch(X* x) { T(x) = x->s->m[T(x)]; }
 V S_store(X* x) { x->s->m[T(x)] = N(x); x->sp -= 2; }
-
-/* Arithmetic operators */
 
 V S_add(X* x) { N(x) = N(x) + T(x); x->sp -= 1; }
 V S_sub(X* x) { N(x) = N(x) - T(x); x->sp -= 1; }
 V S_mul(X* x) { N(x) = N(x) * T(x); x->sp -= 1; }
-/* On konilo, crc does something called symmetric to change sign... */
 V S_divmod(X* x) { C a = T(x); C b = N(x); T(x) = b / a; N(x) = b % a; }
-
-/* Bitwise operators */
 
 V S_and(X* x) { N(x) = N(x) & T(x); x->sp -= 1; }
 V S_or(X* x) { N(x) = N(x) | T(x); x->sp -= 1; }
@@ -143,8 +225,6 @@ V S_shl(X* x) { N(x) = N(x) << T(x); x->sp -= 1; }
 V S_shr(X* x) { N(x) = N(x) >> T(x); x->sp -= 1; }
 
 V S_times(X* x) {	B* q = (B*)S_drop(x);	C n = S_drop(x); for (;n > 0; n--) { S_eval(x, q); } }
-
-/* Dump context */
 
 #define DC(a) { b += m = sprintf(b, "%ld ", a); n += m; }
 C D_co(X* x, B* b, B* c) { return sprintf(b, "%.*s", (int)S_block(x, c), c); }
@@ -168,21 +248,39 @@ V S_trace(X* x) {
 	printf("%s\n", buf);
 }
 
-/* create/end definition */
 V S_parse_name(X* x);
 
-V S_header(X* x) {
+V S_create(X* x) {
   S_parse_name(x);
-  printf("HEADER::parsed name:%.*s\n", T(x), (B*)(N(x)));
+  C nlen = S_drop(x);
+  B* name = (B*)S_drop(x);
+  if (nlen) {
+    W* w = malloc(sizeof(W) + nlen);
+    if (!w) { return; }
+    w->p = x->e->l;
+    x->e->l = w;
+    w->f = 0;
+    w->c = 0;
+    w->l = nlen;
+    strncpy(w->n, name, nlen);
+    w->n[nlen] = 0;
+    S_push(x, w);
+  }
 }
 
-/* --------------------- */
+V S_compile_quotation(X* x) {
+  B* q = (B*)S_drop(x);
+  C l = S_block(x, q);
+  strncpy(&x->s->m[x->s->h], q, l);
+  x->s->m[x->s->h + l] = 0;
+  S_push(x, &x->s->m[x->s->h]);
+  x->s->h += l + 1;
+}
 
 V S_step(X* x) {
   B token = *x->ip;
 	S_trace(x);
 	switch (token) {
-		case 'q': S_quit(x); break;
 		case '0': S_push(x, 0); break;
 		case '1': S_push(x, 1); break;
 		case '{': S_parse_block(x); break;
@@ -196,8 +294,6 @@ V S_step(X* x) {
 		case ')': S_from_R(x); break;
 		case 'j': S_jump(x); break;
 		case 'x': S_call(x); break;
-		case 'c': S_ccall(x); break; /* Where is this used? */
-		case 'i': S_cjump(x); break; /* Where is this used? */
 		case 0: case 10: case '}': case ']': S_return(x); break;
 		case '=': S_eq(x); break;
 		case '.': S_fetch(x); break;
@@ -214,7 +310,8 @@ V S_step(X* x) {
 		case 'l': S_shl(x); break;
 		case 'r': S_shr(x); break;
 		case 't': S_times(x); break;
-    case 'h': S_header(x); break;
+    case 'c': S_create(x); break;
+    case 'q': S_compile_quotation(x); break;
 		case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G': case 'H': case 'I':
 		case 'J': case 'K': case 'L': case 'M': case 'N': case 'O': case 'P': case 'Q': case 'R':
 		case 'S': case 'T': case 'U': case 'V': case 'W': case 'X': case 'Y': case 'Z':
@@ -222,7 +319,7 @@ V S_step(X* x) {
 			break;
 		default:
 			if (token > 127) { S_lit(x); }
-			else { /* NOOP */ }
+			else { }
 			break;
 	}
 }
@@ -230,8 +327,6 @@ V S_step(X* x) {
 V S_inner(X* x) { C rp = x->rp; while(!x->err && x->rp >= rp && x->ip) { S_step(x); x->ip += 1; } }
 
 V S_eval(X* x, B* s) { S_push(x, s); S_call(x); S_inner(x); }
-
-/* With symbols and environment */
 
 #define L2(x, t1, v1, t2, v2) t1 v1 = (t1)S_drop(x); t2 v2 = (t2)S_drop(x)
 
@@ -246,6 +341,10 @@ V S_find_name(X* x) { L2(x, C, l, B*, n); W* w; for (w = x->e->l; w && !(EQ_STR(
 V S_asm(X* x) { L2(x, C, l, B*, c); B t = c[l]; c[l] = 0; S_eval(x, c + 1); c[l] = t; }
 V S_num(X* x) { L2(x, C, _, B*, s); B* e; C n = strtol(s, &e, 10); (!n && s == e) ? x->err = NNF : S_push(x, n); }
 
+V S_interpret(X* x) {
+  W* w = (W*)S_drop(x);
+}
+               
 V S_evaluate(X* x, B* s) {
 	x->ibuf = s;
 	while (TOKEN(1)) {
@@ -253,7 +352,7 @@ V S_evaluate(X* x, B* s) {
 		if (T(x) == 0) { S_drop(x); S_drop(x); break; }
     S_find_name(x);
     if (T(x)) {
-      /* interpret or compile */
+      S_interpret(x);
     } else {
       S_drop(x);
       if (T(x) && *((B*)N(x)) == '\\') {
@@ -267,10 +366,11 @@ V S_evaluate(X* x, B* s) {
 }
 
 X* S_init() {
-	S* s = malloc(sizeof(S));
 	X* x = malloc(sizeof(X));
+  x->s = malloc(sizeof(S));
   x->e = malloc(sizeof(E));
 	return x;
 }
+*/
 
 #endif

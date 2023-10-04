@@ -11,9 +11,9 @@ Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor.
 Features:
 
 * C89. Very easily embedabble in a C/C++ application.
-* Human readable bytecode (ASCII 32-126).
-* Cell (64, 32 or 16 bits) based data stack, return stack and retain stack
-* Quotations and combinators at bytecode level.
+* String based human readable bytecode (ASCII 32-126).
+* Cell (64, 32 or 16 bits) based data stack and return stack.
+* Quotations and combinators implemented at bytecode level.
 * Relatively fast interpreter.
 * Ability to add C functions thru bytecode extensions (bytecodes A-Z).
 
