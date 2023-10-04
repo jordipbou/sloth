@@ -343,6 +343,7 @@ V S_num(X* x) { L2(x, C, _, B*, s); B* e; C n = strtol(s, &e, 10); (!n && s == e
 
 V S_interpret(X* x) {
   W* w = (W*)S_drop(x);
+  printf("Interpreting %.*s\n", w->l, w->n);
 }
                
 V S_evaluate(X* x, B* s) {
