@@ -2,6 +2,7 @@
 to Java objects, and will ease printing quotations and all that, although it will complicate the use of the interpreter from a stream point of view, requiring a buffer in the process. Is that a problem? */
 /* There's no possibility to stream bytecode right now, as parse quotation needs to go until the end of the quotation. */
 /* Either streaming is important or string/start/end is better. Which one? */
+/* Streaming is important because it represents the basic concept of concatenative */
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -13,7 +14,18 @@ to Java objects, and will ease printing quotations and all that, although it wil
 #define V void /* inline void ? */
 
 typedef char B;
+typedef int16_t B2;
 typedef intptr_t C;
+
+#define CBUF_SIZE 1024
+#define BUCKETS_SIZE 65536
+
+typedef struct _System {
+  C cp;
+  B c[CBUF_SIZE];
+  C bp;
+  B* b[BUCKETS_SIZE];
+} S;
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
@@ -106,6 +118,7 @@ V S_st(X* x) {
     case 'e': S_ca(x, 1); return;
     case '0': S_pu(x, 0); break;
     case '1': S_pu(x, 1); break;
+    case '#': S_pu(x, *((B2*)(x->ip + 1))); x->ip += 3; break;
     case '_': S_dr(x); break;
     case 's': S_sw(x); break;
     case 'o': S_ov(x); break;
@@ -128,7 +141,7 @@ V S_st(X* x) {
     case '?': S_br(x); break;
     case 'w': /* word/s inspection */ break;
     case 'x': /* context reflection */ break;
-  } 
+  }
   x->ip = x->ip + 1;
 }
               
