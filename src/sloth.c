@@ -27,6 +27,7 @@ int main(int argc, char** argv) {
 		}
 		printf("Ok\n");
 		*/
+    S_tr(x);
 		printf("> "); /* S_trace(x); */
 	}
 }

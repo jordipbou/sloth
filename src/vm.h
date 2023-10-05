@@ -75,6 +75,25 @@ V S_eq(X* x) { NS(x) = NS(x) == TS(x); x->dp--; }
 V S_gt(X* x) { NS(x) = NS(x) > TS(x); x->dp--; }
 
 V S_ev(X* x, B* q);
+V S__rb(X* x, B* a, B* b, B* c, B* d) {
+  S_ev(x, a);
+  if (S_po(x)) {
+    S_ev(x, b);
+  } else {
+    S_ev(x, c);
+    S__rb(x, a, b, c, d);
+    S_sw(x);
+    S__rb(x, a, b, c, d);
+    S_ev(x, d);
+  }
+}
+V S_rb(X* x) {
+  B* d = (B*)S_po(x);
+  B* c = (B*)S_po(x);
+  B* b = (B*)S_po(x);
+  B* a = (B*)S_po(x);
+  S__rb(x, a, b, c, d);
+}
 V S_ti(X* x) { L2(x, B*, q, C, n); for(;n > 0; n--) { S_ev(x, q); } }
 V S_br(X* x) { L3(x, B*, f, B*, t, C, b); if (b) S_ev(x, t); else S_ev(x, f); }
 
@@ -109,7 +128,7 @@ V S_tr(X* x) {
 }
               
 V S_st(X* x) {
-  S_tr(x);
+  /*S_tr(x);*/
   switch (*x->ip) {
     case '{': S_pq(x); return;
     case 0: 
@@ -137,10 +156,12 @@ V S_st(X* x) {
     case '<': S_lt(x); break;
     case '=': S_eq(x); break;
     case '>': S_gt(x); break;
+    case 'b': S_rb(x); break;
     case 't': S_ti(x); break;
     case '?': S_br(x); break;
     case 'w': /* word/s inspection */ break;
     case 'x': /* context reflection */ break;
+    case 'm': S_pu(x, 1000000); break;
   }
   x->ip = x->ip + 1;
 }
