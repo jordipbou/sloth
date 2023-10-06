@@ -17,6 +17,25 @@ Features:
 * Relatively fast interpreter.
 * Ability to add C functions thru bytecode extensions (bytecodes A-Z).
 
+### EXTENSIBILITY
+
+There are two interpreters (as in Forth), the inner and the outer interpreter.
+The outer interpreter is the one that allows Forth/Sloth to be extensible, it parses the input string word by word and if its found in the dictionary its evaluated/compiled.
+Only : ; \<asm> are hardcoded in the outer interpreter, but they happen after trying to find a word. If the word its found, its executed. This allows full extensibility of the system just by redefining any possible word.
+
+### ARCHITECTURE
+
+* System
+  * Input buffer
+  * Environments
+  * Memory
+* Context
+  * Executes bytecode
+  * Stateless
+  * Different contexts may use same system (in same thread)
+* Environment
+  * Words
+  
 ### BYTECODE
 
 #### Ordered by use

@@ -21,6 +21,8 @@ typedef intptr_t C;
 #define BUCKETS_SIZE 65536
 
 typedef struct _System {
+  C in;
+  B* ibuf;
   C cp;
   B c[CBUF_SIZE];
   C bp;
