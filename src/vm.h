@@ -17,6 +17,9 @@ typedef char B;
 typedef int16_t B2;
 typedef intptr_t C;
 
+typedef struct _Word { struct _Word* p; C f; B* c; C l;	B n[1]; } W;
+typedef struct _Environment {	struct _Environment* p;	W* l; } E;
+
 #define CBUF_SIZE 1024
 #define BUCKETS_SIZE 65536
 
@@ -27,6 +30,8 @@ typedef struct _System {
   B c[CBUF_SIZE];
   C bp;
   B* b[BUCKETS_SIZE];
+	E* e;
+	C st;
 } S;
 
 #define STACK_SIZE 64
@@ -36,10 +41,15 @@ typedef struct _Context {
   C ds[STACK_SIZE]; C dp;
   B* rs[RSTACK_SIZE]; C rp;
 	B* ip;
+	S* s;
 } X;
 
 #define S_pu(x, v) (x->ds[x->dp++] = (C)(v))
 #define S_po(x) (x->ds[--x->dp])
+
+#define P1(x, u) S_pu(x, u)
+#define P2(x, u, v) S_pu(x, u); S_pu(x, v)
+#define P3(x, u, v, w) S_pu(x, u); S_pu(x, v); S_pu(x, w)
 
 #define L1(x, t, v) t v = (t)S_po(x)
 #define L2(x, t1, v1, t2, v2) t1 v1 = (t1)S_po(x); t2 v2 = (t2)S_po(x)
@@ -77,25 +87,6 @@ V S_eq(X* x) { NS(x) = NS(x) == TS(x); x->dp--; }
 V S_gt(X* x) { NS(x) = NS(x) > TS(x); x->dp--; }
 
 V S_ev(X* x, B* q);
-V S__rb(X* x, B* a, B* b, B* c, B* d) {
-  S_ev(x, a);
-  if (S_po(x)) {
-    S_ev(x, b);
-  } else {
-    S_ev(x, c);
-    S__rb(x, a, b, c, d);
-    S_sw(x);
-    S__rb(x, a, b, c, d);
-    S_ev(x, d);
-  }
-}
-V S_rb(X* x) {
-  B* d = (B*)S_po(x);
-  B* c = (B*)S_po(x);
-  B* b = (B*)S_po(x);
-  B* a = (B*)S_po(x);
-  S__rb(x, a, b, c, d);
-}
 V S_ti(X* x) { L2(x, B*, q, C, n); for(;n > 0; n--) { S_ev(x, q); } }
 V S_br(X* x) { L3(x, B*, f, B*, t, C, b); if (b) S_ev(x, t); else S_ev(x, f); }
 
@@ -111,8 +102,8 @@ V S_br(X* x) { L3(x, B*, f, B*, t, C, b); if (b) S_ev(x, t); else S_ev(x, f); }
     } \
   }
 
-V S_pq(X* x) { x->ip = x->ip + 1; S_pu(x, x->ip); S_bl(x->ip,); }
-
+V S_pq(X* x) { x->ip = x->ip + 1; S_pu(x, x->ip); S_bl(x->ip, {}); }
+ 
 #define S_pr(s, n, f, a) { C t; s += t = sprintf(s, f, a); n += t; }
               
 C S_co(X* x, B* c) { S_bl(c, printf("%c", *c)); }
@@ -130,7 +121,7 @@ V S_tr(X* x) {
 }
               
 V S_st(X* x) {
-  /*S_tr(x);*/
+  S_tr(x);
   switch (*x->ip) {
     case '{': S_pq(x); return;
     case 0: 
@@ -158,12 +149,10 @@ V S_st(X* x) {
     case '<': S_lt(x); break;
     case '=': S_eq(x); break;
     case '>': S_gt(x); break;
-    case 'b': S_rb(x); break;
     case 't': S_ti(x); break;
     case '?': S_br(x); break;
     case 'w': /* word/s inspection */ break;
     case 'x': /* context reflection */ break;
-    case 'm': S_pu(x, 1000000); break;
   }
   x->ip = x->ip + 1;
 }
@@ -171,7 +160,71 @@ V S_st(X* x) {
 V S_in(X* x) { C rp = x->rp; while(x->rp >= rp && x->ip) { S_st(x); } }
 V S_ev(X* x, B* q) { S_pu(x, q); S_ca(x, 0); S_in(x); }
 
-X* S_init() { return malloc(sizeof(X)); }
+X* S_init() { X* x = malloc(sizeof(X)); x->s = malloc(sizeof(S)); return x; }
+
+#define TOKEN(cond) (x->s->ibuf && *x->s->ibuf && cond)
+V S_spaces(X* x) { while (TOKEN(isspace(*x->s->ibuf))) { x->s->ibuf++; } }
+V S_non_spaces(X* x) { while (TOKEN(!isspace(*x->s->ibuf))) { x->s->ibuf++; } }
+V S_parse_name(X* x) { S_spaces(x); P1(x, x->s->ibuf); S_non_spaces(x); P1(x, (x->s->ibuf - ((B*)TS(x)))); }
+
+V S_find_name(X* x) {
+	L2(x, C, l, B*, n);
+	E* e = x->s->e;
+	while (e) {
+		W* w = e->l;
+		while (w) {
+			if (w->l == l && !strncmp(w->n, n, l)) {
+				S_pu(x, n);
+				S_pu(x, l);
+				S_pu(x, w);
+			}
+			w = w->p;
+		}
+		e = e->p;
+	}
+	S_pu(x, n);
+	S_pu(x, l);
+	S_pu(x, 0);
+}
+
+V S_asm(X* x) { L2(x, C, l, B*, c); B t = c[l]; c[l] = 0; S_ev(x, c + 1); c[l] = t; }
+V S_num(X* x) { L2(x, C, _, B*, s); B* e; C n = strtol(s, &e, 10); (!n && s == e) ? 0 : S_pu(x, n); }
+
+V S_evaluate(X* x, B* s) {
+	C l;
+	B* t;
+	x->s->ibuf = s;
+	while (x->s->ibuf && *x->s->ibuf && *x->s->ibuf != 10) {
+		S_parse_name(x);
+		if (!TS(x)) { S_dr(x); S_dr(x); return; }
+		S_find_name(x);
+		if (TS(x)) {
+			if (x->s->st) {
+				/* Compile */
+			} else {
+				/* Interpret */
+			}
+		} else {
+			S_dr(x);
+			l = TS(x);
+			t = (B*)NS(x);
+			if (l && t[0] == ':') {
+				/* create */
+			} else if (l == 1 && t[0] == ':') {
+				/* reveal */
+			} else if (t[0] == '\\') {
+				if (x->s->st) {
+					/* Compile */
+				} else {
+					S_spaces(x);
+					S_asm(x);
+				}
+			} else {
+				S_num(x);
+			}
+		}
+	}
+}
 
 /*
 typedef struct _Word { struct _Word* p; C f; B* c; C l;	B n[1]; } W;
