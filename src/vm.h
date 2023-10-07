@@ -1,8 +1,3 @@
-/* What about using string/start/end for quotations? That will map well 
-to Java objects, and will ease printing quotations and all that, although it will complicate the use of the interpreter from a stream point of view, requiring a buffer in the process. Is that a problem? */
-/* There's no possibility to stream bytecode right now, as parse quotation needs to go until the end of the quotation. */
-/* Either streaming is important or string/start/end is better. Which one? */
-/* Streaming is important because it represents the basic concept of concatenative */
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -20,25 +15,24 @@ typedef intptr_t C;
 typedef struct _Word { struct _Word* p; C f; B* c; C l;	B n[1]; } W;
 typedef struct _Environment {	struct _Environment* p;	W* l; } E;
 
-#define CBUF_SIZE 1024
-#define BUCKETS_SIZE 65536
+#define HEAP_SIZE 65536
 
 typedef struct _System {
-  C in;
   B* ibuf;
-  C cp;
-  B c[CBUF_SIZE];
-  C bp;
-  B* b[BUCKETS_SIZE];
+  C hp;
+  B h[HEAP_SIZE];
 	E* e;
 	C st;
 } S;
+
+V S_bc(S* s, B b) { s->h[s->hp] = b; s->hp += 1; }
+V S_lc(S* s, B2 l) { *((B2*)&s->h[s->hp]) = l; s->hp += 2; }
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
 
 typedef struct _Context {
-  C ds[STACK_SIZE]; C dp;
+  C ds[STACK_SIZE]; C dp; C cp;
   B* rs[RSTACK_SIZE]; C rp;
 	B* ip;
 	S* s;
@@ -46,6 +40,9 @@ typedef struct _Context {
 
 #define S_pu(x, v) (x->ds[x->dp++] = (C)(v))
 #define S_po(x) (x->ds[--x->dp])
+
+#define S_tu(x, v) (x->ds[--x->cp] = (C)(v))
+#define S_to(x) (x->ds[x->cp++])
 
 #define P1(x, u) S_pu(x, u)
 #define P2(x, u, v) S_pu(x, u); S_pu(x, v)
@@ -63,7 +60,8 @@ V S_si(X* x, C i) { x->rs[x->rp++] = x->ip + i; }
 #define TC(a) ((a) != 0 && *(a) != 0 && *(a) != 10 && *(a) != '}')
 V S_ca(X* x, C i) { L1(x, B*, q); if (TC(x->ip + i)) S_si(x, i); x->ip = q; }
 V S_ex(X* x) { if (x->rp == 0) x->ip = 0; else x->ip = x->rs[--x->rp]; }
-
+V S_fj(X* x) { B2 d; x->ip++; S_pu(x, x->ip + 2); d = *((B2*)(x->ip)); x->ip += d; }
+                   
 V S_dr(X* x) { S_po(x); }
 V S_sw(X* x) { C t = TS(x); TS(x) = NS(x); NS(x) = t; }
 V S_ov(X* x) { S_pu(x, NS(x)); }
@@ -106,7 +104,20 @@ V S_pq(X* x) { x->ip = x->ip + 1; S_pu(x, x->ip); S_bl(x->ip, {}); }
  
 #define S_pr(s, n, f, a) { C t; s += t = sprintf(s, f, a); n += t; }
               
-C S_co(X* x, B* c) { S_bl(c, printf("%c", *c)); }
+/* C S_co(X* x, B* c) { S_bl(c, printf("%c", *c)); } */
+V S_co(X* x, B* c) {
+  C t = 1;
+  while (t) {
+    if (c == 0 || *c == 0 || *c == 10) break;
+    if (*c == '{') t++;
+    if (*c == '}') t--;
+    if (*c == '#') { printf("#%d", *((B2*)(c+1))); c += 3; }
+    else {
+      printf("%c", *c);
+      c++;
+    }
+  }
+}
 V S_tr(X* x) {
   C i;
   B* t;
@@ -123,14 +134,16 @@ V S_tr(X* x) {
 V S_st(X* x) {
   S_tr(x);
   switch (*x->ip) {
+    case '[': S_fj(x); return;
     case '{': S_pq(x); return;
     case 0: 
     case 10: 
+    case ']':
     case '}': S_ex(x); return;
     case 'e': S_ca(x, 1); return;
     case '0': S_pu(x, 0); break;
     case '1': S_pu(x, 1); break;
-    case '#': S_pu(x, *((B2*)(x->ip + 1))); x->ip += 3; break;
+    case '#': S_pu(x, *((B2*)(x->ip + 1))); x->ip += 3; return;
     case '_': S_dr(x); break;
     case 's': S_sw(x); break;
     case 'o': S_ov(x); break;
@@ -160,7 +173,7 @@ V S_st(X* x) {
 V S_in(X* x) { C rp = x->rp; while(x->rp >= rp && x->ip) { S_st(x); } }
 V S_ev(X* x, B* q) { S_pu(x, q); S_ca(x, 0); S_in(x); }
 
-X* S_init() { X* x = malloc(sizeof(X)); x->s = malloc(sizeof(S)); return x; }
+X* S_init() { X* x = malloc(sizeof(X)); x->s = malloc(sizeof(S)); x->s->e = malloc(sizeof(E)); return x; }
 
 #define TOKEN(cond) (x->s->ibuf && *x->s->ibuf && cond)
 V S_spaces(X* x) { while (TOKEN(isspace(*x->s->ibuf))) { x->s->ibuf++; } }
@@ -177,6 +190,7 @@ V S_find_name(X* x) {
 				S_pu(x, n);
 				S_pu(x, l);
 				S_pu(x, w);
+        return;
 			}
 			w = w->p;
 		}
@@ -193,6 +207,8 @@ V S_num(X* x) { L2(x, C, _, B*, s); B* e; C n = strtol(s, &e, 10); (!n && s == e
 V S_evaluate(X* x, B* s) {
 	C l;
 	B* t;
+  C i;
+  W* w;
 	x->s->ibuf = s;
 	while (x->s->ibuf && *x->s->ibuf && *x->s->ibuf != 10) {
 		S_parse_name(x);
@@ -201,28 +217,66 @@ V S_evaluate(X* x, B* s) {
 		if (TS(x)) {
 			if (x->s->st) {
 				/* Compile */
+        /* If I want to share code between Java/C I need 16 bit literals to
+           make it really easy. That means, I need buckets to save positions
+           in heap that will be pushed to the stack as real pointers */
 			} else {
-				/* Interpret */
+        w = S_po(x);
+        S_po(x); S_po(x);
+        S_ev(x, w->c);
 			}
 		} else {
 			S_dr(x);
 			l = TS(x);
 			t = (B*)NS(x);
 			if (l && t[0] == ':') {
-				/* create */
-			} else if (l == 1 && t[0] == ':') {
-				/* reveal */
+        S_po(x); S_po(x);
+        S_parse_name(x);
+        l = S_po(x);
+        t = S_po(x);
+        w = malloc(sizeof(W) + l);
+        w->p = x->s->e->l;
+        x->s->e->l = w;
+        w->l = l;
+        strncpy(w->n, t, l); 
+        w->n[l] = 0;
+        w->c = (B*)S_po(x);
+      } else if (l == 1 && t[0] == ';') {
+        /* Do I need it? */
+      } else if (l == 1 && t[0] == '[') {
+        S_po(x); S_po(x);
+        S_bc(x->s, '[');
+        S_tu(x, x->s->hp);
+        S_lc(x->s, 0);
+        if (!x->s->st) {
+          S_pu(x, &x->s->h[x->s->hp]);
+        }
+        x->s->st++;
+      } else if (l == 1 && t[0] == ']') {
+        S_po(x); S_po(x);
+        S_bc(x->s, ']'); 
+        i = S_to(x);
+        *((B2*)&x->s->h[i]) = (B2)(0 - (i - x->s->hp));
+        x->s->st--;
 			} else if (t[0] == '\\') {
 				if (x->s->st) {
-					/* Compile */
+          S_po(x); S_po(x);
+          for (i = 1; i < l; i++) {
+            S_bc(x->s, t[i]);
+          }
 				} else {
 					S_spaces(x);
 					S_asm(x);
 				}
 			} else {
 				S_num(x);
+        if (x->s->st) {
+          S_bc(x->s, '#');
+          S_lc(x->s, S_po(x));
+        }
 			}
 		}
+    S_tr(x);
 	}
 }
 
