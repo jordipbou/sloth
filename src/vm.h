@@ -12,10 +12,13 @@ typedef char B;
 typedef int16_t B2;
 typedef intptr_t C;
 
-typedef struct _Word { struct _Word* p; C f; B* c; C l;	B n[1]; } W;
+#define HIDDEN 1
+#define IMMEDIATE 2
+
+typedef struct _Word { struct _Word* p; C f; C c; C l;	B n[1]; } W;
 typedef struct _Environment {	struct _Environment* p;	W* l; } E;
 
-#define HEAP_SIZE 65536
+#define HEAP_SIZE 64*1024
 
 typedef struct _System {
   B* ibuf;
@@ -24,9 +27,6 @@ typedef struct _System {
 	E* e;
 	C st;
 } S;
-
-V S_bc(S* s, B b) { s->h[s->hp] = b; s->hp += 1; }
-V S_lc(S* s, B2 l) { *((B2*)&s->h[s->hp]) = l; s->hp += 2; }
 
 #define STACK_SIZE 64
 #define RSTACK_SIZE 64
@@ -144,6 +144,7 @@ V S_st(X* x) {
     case '0': S_pu(x, 0); break;
     case '1': S_pu(x, 1); break;
     case '#': S_pu(x, *((B2*)(x->ip + 1))); x->ip += 3; return;
+    case '$': S_pu(x, x->s->h + *((B2*)(x->ip + 1))); x->ip += 3; return;
     case '_': S_dr(x); break;
     case 's': S_sw(x); break;
     case 'o': S_ov(x); break;
@@ -204,6 +205,11 @@ V S_find_name(X* x) {
 V S_asm(X* x) { L2(x, C, l, B*, c); B t = c[l]; c[l] = 0; S_ev(x, c + 1); c[l] = t; }
 V S_num(X* x) { L2(x, C, _, B*, s); B* e; C n = strtol(s, &e, 10); (!n && s == e) ? 0 : S_pu(x, n); }
 
+V S_bc(X* x, B b) { x->s->h[x->s->hp] = b; x->s->hp += 1; }
+V S_lc(X* x, B2 l) { *((B2*)&x->s->h[x->s->hp]) = l; x->s->hp += 2; }
+V S_wc(X* x, W* w) { S_bc(x, '$'); S_lc(x, x->s->h + w->c); }
+V S_nc(X* x, C n) { S_bc(x, '#'); S_lc(x, n); }
+
 V S_evaluate(X* x, B* s) {
 	C l;
 	B* t;
@@ -215,16 +221,10 @@ V S_evaluate(X* x, B* s) {
 		if (!TS(x)) { S_dr(x); S_dr(x); return; }
 		S_find_name(x);
 		if (TS(x)) {
-			if (x->s->st) {
-				/* Compile */
-        /* If I want to share code between Java/C I need 16 bit literals to
-           make it really easy. That means, I need buckets to save positions
-           in heap that will be pushed to the stack as real pointers */
-			} else {
-        w = S_po(x);
-        S_po(x); S_po(x);
-        S_ev(x, w->c);
-			}
+			w = S_po(x);
+			S_po(x); S_po(x);
+			if (x->s->st) S_wc(x, w);
+			else S_ev(x, x->s->h + w->c); 
 		} else {
 			S_dr(x);
 			l = TS(x);
@@ -234,27 +234,33 @@ V S_evaluate(X* x, B* s) {
         S_parse_name(x);
         l = S_po(x);
         t = S_po(x);
+				/* This could be changed to use heap memory, it makes more sense now */
         w = malloc(sizeof(W) + l);
         w->p = x->s->e->l;
         x->s->e->l = w;
         w->l = l;
         strncpy(w->n, t, l); 
         w->n[l] = 0;
-        w->c = (B*)S_po(x);
+				w->f |= HIDDEN;
+				w->c = x->s->hp;
+				x->s->st = 1;
       } else if (l == 1 && t[0] == ';') {
-        /* Do I need it? */
+				S_po(x); S_po(x);
+				x->s->e->l->f &= ~HIDDEN;
+			  x->s->st = 0;	
+				S_bc(x, 0);
       } else if (l == 1 && t[0] == '[') {
         S_po(x); S_po(x);
-        S_bc(x->s, '[');
+        S_bc(x, '[');
         S_tu(x, x->s->hp);
-        S_lc(x->s, 0);
+        S_lc(x, 0);
         if (!x->s->st) {
           S_pu(x, &x->s->h[x->s->hp]);
         }
         x->s->st++;
       } else if (l == 1 && t[0] == ']') {
         S_po(x); S_po(x);
-        S_bc(x->s, ']'); 
+        S_bc(x, ']'); 
         i = S_to(x);
         *((B2*)&x->s->h[i]) = (B2)(0 - (i - x->s->hp));
         x->s->st--;
@@ -262,7 +268,7 @@ V S_evaluate(X* x, B* s) {
 				if (x->s->st) {
           S_po(x); S_po(x);
           for (i = 1; i < l; i++) {
-            S_bc(x->s, t[i]);
+            S_bc(x, t[i]);
           }
 				} else {
 					S_spaces(x);
@@ -271,8 +277,8 @@ V S_evaluate(X* x, B* s) {
 			} else {
 				S_num(x);
         if (x->s->st) {
-          S_bc(x->s, '#');
-          S_lc(x->s, S_po(x));
+          S_bc(x, '#');
+          S_lc(x, S_po(x));
         }
 			}
 		}
