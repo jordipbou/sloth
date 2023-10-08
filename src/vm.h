@@ -1,3 +1,6 @@
+/* Words should point to other words with I16, not with direct pointers !!! */
+/* That breaks the relocatable part of SLOTH */
+
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -62,14 +65,14 @@ V call(X* x, I i) {
   x->ip = q;
 }
 
-V ret(X* x) { x->ip = x->ip ? RPOP(x) : 0; }
+V ret(X* x) { if (x->rp > 0) x->ip = RPOP(x); else x->ip = 0; }
 
 V forward_jump(X* x) {
   I16 d;
   x->ip++;
   DPUSH(x, x->ip + 2);
   d = *((I16*)x->ip);
-  x->rp += d;
+  x->ip += d;
 }
 
 #define DDROP(x) (x->dp--)
@@ -122,6 +125,7 @@ V dump_code(X* x, B* c) {
     if (*c == '{') t++;
     if (*c == '}') t--;
     if (*c == '#') { printf("#%d", *((I16*)(c+1))); c += 3; }
+    if (*c == '[') { printf("["); c += 3; }
     else {
       printf("%c", *c);
       c++;
@@ -131,6 +135,7 @@ V dump_code(X* x, B* c) {
 V dump_context(X* x) {
   I i;
   B* t;
+  printf("[%ld] ", x->s->st);
   for (i = 0; i < x->dp; i++) printf("%ld ", x->ds[i]);
   printf(".. ");
   dump_code(x, x->ip);
@@ -138,6 +143,8 @@ V dump_context(X* x) {
     printf(" : ");
     dump_code(x, x->rs[i]); 
   }
+  printf("[%ld]", x->rp);
+  printf(" <%s>", x->s->ibuf);
   printf("\n");
 }
               
@@ -153,9 +160,10 @@ V step(X* x) {
     case 'e': call(x, 1); return;
     case '0': DPUSH(x, 0); break;
     case '1': DPUSH(x, 1); break;
+    case '2': DPUSH(x, 2); break;
     case '#': DPUSH(x, *((I16*)(x->ip + 1))); x->ip += 3; return;
     /* This one needs access to system, should be an extension */
-    case '$': DPUSH(x, x->s->h + *((I16*)(x->ip + 1))); x->ip += 3; return;
+    case '$': DPUSH(x, x->s->h + *((I16*)(x->ip + 1))); x->ip += 3; call(x, 0); return;
     case '_': DDROP(x); break;
     case 's': swap(x); break;
     case 'o': over(x); break;
@@ -249,9 +257,17 @@ B* here(X* x) { return &x->s->h[x->s->hp]; }
 V cbyte(X* x, B b) { x->s->h[x->s->hp] = b; x->s->hp += 1; }
 V ci16(X* x, I16 l) { *((I16*)&x->s->h[x->s->hp]) = l; x->s->hp += 2; }
 V cword(X* x, W* w) { cbyte(x, '$'); ci16(x, w->c); }
-V cnum(X* x, I16 n) { cbyte(x, '#'); ci16(x, n); }
+V cnum(X* x, I16 n) { 
+  if (n == 0) cbyte(x, '0');
+  else if (n == 1) cbyte(x, '1');
+  else if (n == 2) cbyte(x, '2');
+  else {
+    cbyte(x, '#'); 
+    ci16(x, n); 
+  }
+}
 
-V compile_inline(X* x, W* w) { B* c = x->s->h + w->c; while (c) { cbyte(x, *c); c++; } }
+V compile_inline(X* x, W* w) { B* c = x->s->h + w->c; while (*c) { cbyte(x, *c); c++; } }
 V compile(X* x) { DVAR3(x, W*, w, I, _, B*, __); if (strlen(x->s->h + w->c) < 3) compile_inline(x, w); else cword(x, w); }
 V interpret(X* x) { DVAR3(x, W*, w, I, _, B*, __); eval(x, x->s->h + w->c); }
 
@@ -262,7 +278,12 @@ V scode(X* x, W* w) { w->c = x->s->hp; }
 V header(X* x) { DVAR2(x, I, l, B*, n); W* w = aword(x, l); slatest(x, w); sname(w, l, n); scode(x, w); }
 V create(X* x) { DVAR2(x, I, _, B*, __); parse_name(x); header(x); x->s->st = 1; }
 
-V reveal(X* x) { DVAR2(x, I, _, B*, __); x->s->e->l->f &= ~HIDDEN; x->s->st = 0; cbyte(x, 0); }
+V semicolon(X* x) { 
+  DVAR2(x, I, _, B*, __); 
+  x->s->e->l->f &= ~HIDDEN; 
+  x->s->st = 0; 
+  cbyte(x, 0); 
+}
 
 V start_quotation(X* x) { 
 	DVAR2(x, I, _, B*, __);
@@ -289,6 +310,7 @@ V evaluate(X* x, B* s) {
   W* w;
 	x->s->ibuf = s;
 	while (x->s->ibuf && *x->s->ibuf && *x->s->ibuf != 10) {
+    dump_context(x);
 		parse_name(x);
 		if (!DT(x)) { DDROP(x); DDROP(x); return; }
 		find_name(x);
@@ -301,7 +323,7 @@ V evaluate(X* x, B* s) {
 			t = (B*)DN(x);
       /* This could be extracted to an extension, except assembler */
 			if (l == 1 && t[0] == ':') create(x);
-      else if (l == 1 && t[0] == ';') reveal(x);
+      else if (l == 1 && t[0] == ';') semicolon(x);
       else if (l == 1 && t[0] == '[') start_quotation(x);
       else if (l == 1 && t[0] == ']') end_quotation(x);
 			else if (t[0] == '\\') {
@@ -322,6 +344,21 @@ V evaluate(X* x, B* s) {
 	}
 }
 
+V see_word(X* x) {
+  DVAR(x, W*, w);
+  printf(": %.*s %s ;\n", w->l, w->n, &x->s->h[w->c]);  
+}
+
+V sloth_ext(X* x) {
+  x->ip++;
+  switch (*x->ip) {
+    case 'f': find_name(x); break;
+    case 'l': DPUSH(x, x->s->e->l); break;
+    case 'p': parse_name(x); break;
+    case 's': see_word(x); break;
+  } 
+}
+
 X* init_SLOTH() {
   X* x = init_EXT(init_VM());
   x->s = malloc(sizeof(S));
@@ -330,8 +367,14 @@ X* init_SLOTH() {
   x->s->e->l = 0;
   x->s->hp += sizeof(E);
 
+  /* Add extension */
+  EXT(x, 'S') = &sloth_ext;
+
   /* Add the necessary words */
   evaluate(x, ": dup \\d ; : drop \\_ ; : + \\+ ;");
+  evaluate(x, ": swap \\s ; : - \\- ; : times \\t ;");
+  evaluate(x, ": over \\o ; : execute \\e ;");
+  evaluate(x, ": fib 2 - 1 swap 1 swap [ swap over + ] times swap drop ;");
   
   return x;
 }
