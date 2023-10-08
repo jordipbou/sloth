@@ -205,10 +205,42 @@ V S_find_name(X* x) {
 V S_asm(X* x) { L2(x, C, l, B*, c); B t = c[l]; c[l] = 0; S_ev(x, c + 1); c[l] = t; }
 V S_num(X* x) { L2(x, C, _, B*, s); B* e; C n = strtol(s, &e, 10); (!n && s == e) ? 0 : S_pu(x, n); }
 
+B* S_hr(X* x) { return &x->s->h[x->s->hp]; }
 V S_bc(X* x, B b) { x->s->h[x->s->hp] = b; x->s->hp += 1; }
 V S_lc(X* x, B2 l) { *((B2*)&x->s->h[x->s->hp]) = l; x->s->hp += 2; }
 V S_wc(X* x, W* w) { S_bc(x, '$'); S_lc(x, x->s->h + w->c); }
 V S_nc(X* x, C n) { S_bc(x, '#'); S_lc(x, n); }
+
+V S_inline(X* x, W* w) { C* c = w->c; while (c) { S_bc(x, *c); c++; } }
+V S_compile(X* x) { L3(x, W*, w, C, _, B*, __); if (strlen(w->c) < 3) S_inline(x, w); else S_wc(x, w); }
+V S_interpret(X* x) { L3(x, W*, w, C, _, B*, __); S_ev(x, x->s->h + w->c); }
+
+W* S_aword(X* x, C l) { W* w = (W*)S_hr(x); x->s->hp += sizeof(W) + l; return w; }
+V S_slatest(X* x, W* w) { w->p = x->s->e->l; x->s->e->l = w; }
+V S_sname(W* w, C l, B* n) { w->l = l; strncpy(w->n, n, l); w->n[l] = 0; }
+V S_scode(X* x, W* w) { w->c = x->s->hp; }
+V S_header(X* x) { L2(x, C, l, B*, n); W* w = S_aword(x, l); S_slatest(x, w); S_sname(w, l, n); S_scode(x, w); }
+V S_create(X* x) { L2(x, C, _, B*, __); S_parse_name(x); S_header(x); x->s->st = 1; }
+
+V S_reveal(X* x) { L2(x, C, _, B*, __); x->s->e->l->f &= ~HIDDEN; x->s->st = 0; S_bc(x, 0); }
+
+V S_start_quotation(X* x) { 
+	L2(x, C, _, B*, __);
+  S_bc(x, '[');
+  S_tu(x, x->s->hp);
+  S_lc(x, 0);
+  if (!x->s->st) S_pu(x, &x->s->h[x->s->hp]);
+  x->s->st++;
+}
+
+V S_end_quotation(X* x) {
+	C i;
+	L2(x, C, _, B*, __);
+  S_bc(x, ']'); 
+  i = S_to(x);
+  *((B2*)&x->s->h[i]) = (B2)(0 - (i - x->s->hp));
+  x->s->st--;
+}
 
 V S_evaluate(X* x, B* s) {
 	C l;
@@ -221,51 +253,18 @@ V S_evaluate(X* x, B* s) {
 		if (!TS(x)) { S_dr(x); S_dr(x); return; }
 		S_find_name(x);
 		if (TS(x)) {
-			w = S_po(x);
-			S_po(x); S_po(x);
-			if (x->s->st) S_wc(x, w);
-			else S_ev(x, x->s->h + w->c); 
+			if (x->s->st) S_compile(x);
+			else S_interpret(x);
 		} else {
 			S_dr(x);
 			l = TS(x);
 			t = (B*)NS(x);
-			if (l && t[0] == ':') {
-        S_po(x); S_po(x);
-        S_parse_name(x);
-        l = S_po(x);
-        t = S_po(x);
-				/* This could be changed to use heap memory, it makes more sense now */
-        w = malloc(sizeof(W) + l);
-        w->p = x->s->e->l;
-        x->s->e->l = w;
-        w->l = l;
-        strncpy(w->n, t, l); 
-        w->n[l] = 0;
-				w->f |= HIDDEN;
-				w->c = x->s->hp;
-				x->s->st = 1;
-      } else if (l == 1 && t[0] == ';') {
-				S_po(x); S_po(x);
-				x->s->e->l->f &= ~HIDDEN;
-			  x->s->st = 0;	
-				S_bc(x, 0);
-      } else if (l == 1 && t[0] == '[') {
-        S_po(x); S_po(x);
-        S_bc(x, '[');
-        S_tu(x, x->s->hp);
-        S_lc(x, 0);
-        if (!x->s->st) {
-          S_pu(x, &x->s->h[x->s->hp]);
-        }
-        x->s->st++;
-      } else if (l == 1 && t[0] == ']') {
-        S_po(x); S_po(x);
-        S_bc(x, ']'); 
-        i = S_to(x);
-        *((B2*)&x->s->h[i]) = (B2)(0 - (i - x->s->hp));
-        x->s->st--;
-			} else if (t[0] == '\\') {
-				if (x->s->st) {
+			if (l == 1 && t[0] == ':') S_create(x);
+      else if (l == 1 && t[0] == ';') S_reveal(x);
+      else if (l == 1 && t[0] == '[') S_start_quotation(x);
+      else if (l == 1 && t[0] == ']') S_end_quotation(x);
+			else if (t[0] == '\\') {
+				if (x->s->st) { /* S_compile_asm(x); */
           S_po(x); S_po(x);
           for (i = 1; i < l; i++) {
             S_bc(x, t[i]);
