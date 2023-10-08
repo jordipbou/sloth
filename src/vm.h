@@ -192,12 +192,7 @@ V step(X* x) {
 V inner(X* x) { I rp = x->rp; while(x->rp >= rp && x->ip) step(x); }
 V eval(X* x, B* q) { DPUSH(x, q); call(x, 0); inner(x); }
 
-X* init_VM() { 
-  X* x = malloc(sizeof(X)); 
-  x->s = malloc(sizeof(S)); 
-  x->s->e = malloc(sizeof(E)); 
-  return x;
-}
+X* init_VM() { return malloc(sizeof(X)); } 
 
 
 #define TOKEN(cond) (x->s->ibuf && *x->s->ibuf && cond)
@@ -301,8 +296,17 @@ V S_evaluate(X* x, B* s) {
         }
 			}
 		}
-    dump_context(x);
 	}
+}
+
+X* init_SLOTH() {
+  X* x = init_VM();
+  x->s = malloc(sizeof(S));
+  x->s->e = (E*)x->s->h;
+  x->s->e->p = 0;
+  x->s->e->l = 0;
+  x->s->hp += sizeof(E);
+  return x;
 }
 
 /*

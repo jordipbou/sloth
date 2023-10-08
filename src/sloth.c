@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv) {
   B buf[255];
-	X* x = init_VM();
+	X* x = init_SLOTH();
 	while (1) {
     printf("> ");
 	  fgets(buf, 255, stdin);
