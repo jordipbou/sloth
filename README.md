@@ -12,7 +12,7 @@ Features:
 
 * C89. Very easily embedabble in a C/C++ application.
 * String based human readable bytecode (ASCII 32-126).
-* Cell (64, 32 or 16 bits) based data stack and return stack.
+* Data stack can hold pointers/objects (depending on implementation).
 * Relatively fast interpreter.
 * Ability to add C functions thru bytecode extensions (bytecodes A-Z).
 

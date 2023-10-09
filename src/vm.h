@@ -6,29 +6,29 @@
 #include<string.h> /* strncpy */
 #include<fcntl.h>  /* open, close, read, write, O_RDONLY, O_WRONLY */
 
+/* DODO Extensible Virtual Machine */
+
 typedef void V;
 typedef char B;
 typedef int16_t I16;
 typedef intptr_t I;
 
+#define DSTACK_SIZE 64
+#define RSTACK_SIZE 64
+
 typedef struct _Context X;
-
-#define HIDDEN 1
-#define IMMEDIATE 2
-
-typedef struct _Word { struct _Word* p; B f; I16 c; I16 l; B n[1]; } W;
-typedef struct _Environment {	struct _Environment* p;	W* l; } E;
-
-#define HEAP_SIZE 64*1024
-
-typedef struct _System { B* ibuf; I16 hp; B h[HEAP_SIZE];	E* e;	B st; } S;
-
 typedef V (*F)(X*);
 
-#define DSIZE 64
-#define RSIZE 64
-
-struct _Context { I ds[DSIZE]; I dp; I cp; B* rs[RSIZE]; I rp; B* ip; S* s; F* x; };
+struct _Context { 
+  I ds[DSTACK_SIZE]; 
+  I dp; 
+  I cp; 
+  B* rs[RSTACK_SIZE]; 
+  I rp; 
+  B* ip; 
+  B* d; 
+  F* x; 
+};
 
 #define EXT(x, l) (x->x[l - 'A'])
 
@@ -46,11 +46,11 @@ struct _Context { I ds[DSIZE]; I dp; I cp; B* rs[RSIZE]; I rp; B* ip; S* s; F* x
 #define DVAR2(x, t1, v1, t2, v2) DVAR(x, t1, v1); DVAR(x, t2, v2)
 #define DVAR3(x, t1, v1, t2, v2, t3, v3) DVAR2(x, t1, v1, t2, v2); DVAR(x, t3, v3)
 
-#define DT(x) (x->ds[x->dp - 1])
-#define DN(x) (x->ds[x->dp - 2])
-#define DNN(x) (x->ds[x->dp - 3])
+#define T(x) (x->ds[x->dp - 1])
+#define N(x) (x->ds[x->dp - 2])
+#define NN(x) (x->ds[x->dp - 3])
 
-#define RT(x) (x->rs[x->rp - 1])
+#define R(x) (x->rs[x->rp - 1])
 
 #define TAIL_CALL(a) ((a) == 0 || *(a) == 0 || *(a) == 10 || *(a) == '}' || *(a) == ']')
 
@@ -72,27 +72,31 @@ V forward_jump(X* x) {
   x->ip += d;
 }
 
+V lit(X* x) { DPUSH(x, *((I16*)x->ip + 1)); x->ip += 3; }
+V word(X* x) { lit(x); T(x) += (I)x->d; call(x, 0); }
+  
 #define DDROP(x) (x->dp--)
-V swap(X* x) { I t = DT(x); DT(x) = DN(x); DN(x) = t; }
-V over(X* x) { DPUSH(x, DN(x)); }
-V dup(X* x) { DPUSH(x, DT(x)); }
-V rot(X* x) { I t = DNN(x); DNN(x) = DN(x); DN(x) = DT(x); DT(x) = t; }
+V swap(X* x) { I t = T(x); T(x) = N(x); N(x) = t; }
+V over(X* x) { DPUSH(x, N(x)); }
+V dup(X* x) { DPUSH(x, T(x)); }
+V rot(X* x) { I t = NN(x); NN(x) = N(x); N(x) = T(x); T(x) = t; }
 
-V iadd(X* x) { DN(x) = DN(x) + DT(x); DDROP(x); }
-V isub(X* x) { DN(x) = DN(x) - DT(x); DDROP(x); }
-V imul(X* x) { DN(x) = DN(x) * DT(x); DDROP(x); }
-V idiv(X* x) { DN(x) = DN(x) / DT(x); DDROP(x); }
-V imod(X* x) { DN(x) = DN(x) % DT(x); DDROP(x); }
+#define OP2(x, op) N(x) = N(x) op T(x); DDROP(x)
+V add(X* x) { OP2(x, +); }
+V sub(X* x) { OP2(x, -); }
+V mul(X* x) { OP2(x, *); }
+V division(X* x) { OP2(x, /); }
+V mod(X* x) { OP2(x, %); }
 
-V and(X* x) { DN(x) = DN(x) & DT(x); DDROP(x); }
-V or(X* x) { DN(x) = DN(x) | DT(x); DDROP(x); }
-V xor(X* x) { DN(x) = DN(x) ^ DT(x); DDROP(x); }
-V not(X* x) { DT(x) = !DT(x); }
-V inverse(X* x) { DT(x) = ~DT(x); }
+V and(X* x) { OP2(x, &); }
+V or(X* x) { OP2(x, |);}
+V xor(X* x) { OP2(x, ^); }
+V not(X* x) { T(x) = !T(x); }
+V inverse(X* x) { T(x) = ~T(x); }
 
-V lt(X* x) { DN(x) = DN(x) < DT(x); DDROP(x); }
-V eq(X* x) { DN(x) = DN(x) == DT(x); DDROP(x); }
-V gt(X* x) { DN(x) = DN(x) > DT(x); DDROP(x); }
+V lt(X* x) { OP2(x, <); }
+V eq(X* x) { OP2(x, ==); }
+V gt(X* x) { OP2(x, >); }
 
 V eval(X* x, B* q);
 
@@ -132,22 +136,22 @@ V dump_code(X* x, B* c) {
 V dump_context(X* x) {
   I i;
   B* t;
-  printf("[%ld] ", x->s->st);
   for (i = 0; i < x->dp; i++) printf("%ld ", x->ds[i]);
-  printf(".. ");
+  printf(": ");
   dump_code(x, x->ip);
   for (i = x->rp - 1; i >= 0; i--) {
     printf(" : ");
     dump_code(x, x->rs[i]); 
   }
-  printf("[%ld]", x->rp);
-  printf(" <%s>", x->s->ibuf);
   printf("\n");
 }
-              
+
+#define PEEK(x) (*x->ip)
+#define TOKEN(x) (*(x->ip++))
+                
 V step(X* x) {
   dump_context(x);
-  switch (*x->ip) {
+  switch (PEEK(x)) {
     case '[': forward_jump(x); return;
     case '{': parse_quotation(x); return;
     case 0: 
@@ -155,45 +159,52 @@ V step(X* x) {
     case ']':
     case '}': ret(x); return;
     case 'e': call(x, 1); return;
-    case '0': DPUSH(x, 0); break;
-    case '1': DPUSH(x, 1); break;
-    case '2': DPUSH(x, 2); break;
-    case '#': DPUSH(x, *((I16*)(x->ip + 1))); x->ip += 3; return;
-    /* This one needs access to system, should be an extension */
-    case '$': DPUSH(x, x->s->h + *((I16*)(x->ip + 1))); x->ip += 3; call(x, 0); return;
-    case '_': DDROP(x); break;
-    case 's': swap(x); break;
-    case 'o': over(x); break;
-    case 'd': dup(x); break;
-    case 'r': rot(x); break;
-    case '+': iadd(x); break;
-    case '-': isub(x); break;
-    case '*': imul(x); break;
-    case '/': idiv(x); break;
-    case '%': imod(x); break;
-    case '&': and(x); break;
-    case '|': or(x); break;
-    case '!': not(x); break;
-    case '^': xor(x); break;
-    case '~': inverse(x); break;
-    case '<': lt(x); break;
-    case '=': eq(x); break;
-    case '>': gt(x); break;
-    case 't': times(x); break;
-    case '?': branch(x); break;
-    case 'w': /* word/s inspection */ break;
-    case 'x': /* context reflection */ break;
-    case 'A': case 'B': case 'C': case 'D':
-    case 'E': case 'F': case 'G': case 'H':
-    case 'I': case 'J': case 'K': case 'L':
-    case 'M': case 'N': case 'O': case 'P':
-    case 'Q': case 'R': case 'S': case 'T':
-    case 'U': case 'V': case 'W': case 'X':
+    case '#': lit(x); return;
+    case '$': word(x); return;
+    case 'A': case 'B': 
+    case 'C': case 'D':
+    case 'E': case 'F': 
+    case 'G': case 'H':
+    case 'I': case 'J': 
+    case 'K': case 'L':
+    case 'M': case 'N': 
+    case 'O': case 'P':
+    case 'Q': case 'R': 
+    case 'S': case 'T':
+    case 'U': case 'V': 
+    case 'W': case 'X':
     case 'Y': case 'Z':
-      EXT(x, *x->ip)(x);
+      EXT(x, TOKEN(x))(x);
       break;
+    default:
+      switch (TOKEN(x)) {
+      case '0': DPUSH(x, 0); break;
+      case '1': DPUSH(x, 1); break;
+      case '2': DPUSH(x, 2); break;
+      
+      case '_': DDROP(x); break;
+      case 's': swap(x); break;
+      case 'o': over(x); break;
+      case 'd': dup(x); break;
+      case 'r': rot(x); break;
+      case '+': add(x); break;
+      case '-': sub(x); break;
+      case '*': mul(x); break;
+      case '/': division(x); break;
+      case '%': mod(x); break;
+      case '&': and(x); break;
+      case '|': or(x); break;
+      case '!': not(x); break;
+      case '^': xor(x); break;
+      case '~': inverse(x); break;
+      case '<': lt(x); break;
+      case '=': eq(x); break;
+      case '>': gt(x); break;
+      case 't': times(x); break;
+      case '?': branch(x); break;
+      case 'x': /* context reflection */ break;
+    }
   }
-  x->ip++;
 }
               
 V inner(X* x) { I rp = x->rp; while(x->rp >= rp && x->ip) step(x); }
@@ -202,7 +213,33 @@ V eval(X* x, B* q) { DPUSH(x, q); call(x, 0); inner(x); }
 X* init_VM() { return malloc(sizeof(X)); }
 X* init_EXT(X* x) { x->x = malloc(26*sizeof(F*)); return x; }
 
-/* Start of REPL/state based part/word definitions */
+/* SLOTH Extensible language */
+
+/*
+#define HIDDEN 1
+#define IMMEDIATE 2
+
+typedef struct _Word { 
+  I16 previous; 
+  B flags; 
+  I16 code; 
+  I16 nlen; 
+  B name[1]; 
+} W;
+
+#define SYSTEM_SIZE 64*1024
+
+typedef struct _System { 
+  I16 here; 
+  I16 latest; 
+  B* ibuf; 
+  B st; 
+} S;
+
+#define HEAP(x) (x->s)
+#define ADDR(x, a) (x->s + a)
+#define ALLOT(x, n) (x->s->here += n)
+#define HERE(x) (x->s + x->s->here)
 
 #define TOKEN(cond) (x->s->ibuf && *x->s->ibuf && cond)
 V parse_spaces(X* x) { while (TOKEN(isspace(*x->s->ibuf))) { x->s->ibuf++; } }
@@ -216,17 +253,14 @@ V parse_name(X* x) {
 
 V find_name(X* x) {
 	DVAR2(x, I, l, B*, n);
-	E* e = x->s->e;
-	while (e) {
-		W* w = e->l;
-		while (w) {
-			if (w->l == l && !strncmp(w->n, n, l)) {
-        DPUSH3(x, n, l, w);
-        return;
-			}
-			w = w->p;
+	I16 wp = x->s->latest;
+	while (wp) {
+    W* w = (W*)ADDR(x, wp);
+		if (w->nlen == l && !strncmp(w->name, n, l)) {
+      DPUSH3(x, n, l, wp);
+      return;
 		}
-		e = e->p;
+		wp = w->previous;
 	}
   DPUSH3(x, n, l, 0);
 }
@@ -243,17 +277,13 @@ V num(X* x) {
   DVAR2(x, I, _, B*, s); 
   B* e; 
   I n = strtol(s, &e, 10); 
-  if (!n && s == e) { /* Conversion error */ }
+  if (!n && s == e) { }
   else DPUSH(x, n); 
 }
 
-B* here(X* x) { return &x->s->h[x->s->hp]; }
-
-/* Compilation */
-
-V cbyte(X* x, B b) { x->s->h[x->s->hp] = b; x->s->hp += 1; }
-V ci16(X* x, I16 l) { *((I16*)&x->s->h[x->s->hp]) = l; x->s->hp += 2; }
-V cword(X* x, W* w) { cbyte(x, '$'); ci16(x, w->c); }
+V cbyte(X* x, B b) { *(B*)HERE(x) = b; ALLOT(x, 1); }
+V ci16(X* x, I16 l) { *(I16*)HERE(x) = l; ALLOT(x, 2); }
+V cword(X* x, W* w) { cbyte(x, '$'); ci16(x, w->code); }
 V cnum(X* x, I16 n) { 
   if (n == 0) cbyte(x, '0');
   else if (n == 1) cbyte(x, '1');
@@ -264,11 +294,24 @@ V cnum(X* x, I16 n) {
   }
 }
 
-V compile_inline(X* x, W* w) { B* c = x->s->h + w->c; while (*c) { cbyte(x, *c); c++; } }
-V compile(X* x) { DVAR3(x, W*, w, I, _, B*, __); if (strlen(x->s->h + w->c) < 3) compile_inline(x, w); else cword(x, w); }
-V interpret(X* x) { DVAR3(x, W*, w, I, _, B*, __); eval(x, x->s->h + w->c); }
+V inlined(X* x, W* w) { 
+  B* c = (B*)ADDR(x, w->code);
+  while (*c) { 
+    cbyte(x, *c); 
+    c++; 
+  } 
+}
+V compile(X* x) { 
+  DVAR3(x, W*, w, I, _, B*, __); 
+  if (strlen((B*)ADDR(x, w->code)) < 3) inlined(x, w); 
+  else cword(x, w); 
+}
+V interpret(X* x) { 
+  DVAR3(x, W*, w, I, _, B*, __); 
+  eval(x, (B*)ADDR(x, w->code)); 
+}
 
-W* aword(X* x, I l) { W* w = (W*)here(x); x->s->hp += sizeof(W) + l; return w; }
+W* aword(X* x, I l) { W* w = (W*)(x); x->s->hp += sizeof(W) + l; return w; }
 V slatest(X* x, W* w) { w->p = x->s->e->l; x->s->e->l = w; }
 V sname(W* w, I l, B* n) { w->l = l; strncpy(w->n, n, l); w->n[l] = 0; }
 V scode(X* x, W* w) { w->c = x->s->hp; }
@@ -318,7 +361,6 @@ V evaluate(X* x, B* s) {
 			DDROP(x);
 			l = DT(x);
 			t = (B*)DN(x);
-      /* This could be extracted to an extension, except assembler */
 			if (l == 1 && t[0] == ':') create(x);
       else if (l == 1 && t[0] == ';') semicolon(x);
       else if (l == 1 && t[0] == '[') start_quotation(x);
@@ -358,16 +400,12 @@ V sloth_ext(X* x) {
 
 X* init_SLOTH() {
   X* x = init_EXT(init_VM());
-  x->s = malloc(sizeof(S));
-  x->s->e = (E*)x->s->h;
-  x->s->e->p = 0;
-  x->s->e->l = 0;
-  x->s->hp += sizeof(E);
+  x->s = malloc(SYSTEM_SIZE);
+  x->s->latest = 0;
+  x->s->here += sizeof(E);
 
-  /* Add extension */
   EXT(x, 'S') = &sloth_ext;
 
-  /* Add the necessary words */
   evaluate(x, ": dup \\d ; : drop \\_ ; : + \\+ ;");
   evaluate(x, ": swap \\s ; : - \\- ; : times \\t ;");
   evaluate(x, ": over \\o ; : execute \\e ;");
@@ -375,5 +413,5 @@ X* init_SLOTH() {
   
   return x;
 }
-
+*/
 #endif
