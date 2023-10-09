@@ -38,35 +38,19 @@ struct _Context {
 #define DPOP(x) (x->ds[--x->dp])
 #define CPOP(x) (x->ds[x->cp++])
 
-#define DVAR(x, t, v) t v = (t)DPOP(x)
-#define DVAR2(x, t1, v1, t2, v2) DVAR(x, t1, v1); DVAR(x, t2, v2)
-#define DVAR3(x, t1, v1, t2, v2, t3, v3) DVAR2(x, t1, v1, t2, v2); DVAR(x, t3, v3)
+#define L1(x, t, v) t v = (t)DPOP(x)
+#define L2(x, t1, v1, t2, v2) L1(x, t1, v1); L1(x, t2, v2)
+#define L3(x, t1, v1, t2, v2, t3, v3) L2(x, t1, v1, t2, v2); L1(x, t3, v3)
 
 #define T(x) (x->ds[x->dp - 1])
 #define N(x) (x->ds[x->dp - 2])
 #define NN(x) (x->ds[x->dp - 3])
 
-#define R(x) (x->rs[x->rp - 1])
-
-#define TAIL_CALL(a) ((a) == 0 || *(a) == 0 || *(a) == 10 || *(a) == '}' || *(a) == ']')
-
-V call(X* x, I i) {
-  DVAR(x, B*, q);
-  if (!(TAIL_CALL(x->ip + i))) {
-    x->rs[x->rp++] = x->ip + i;
-  }
-  x->ip = q;
-}
-
+#define TAIL(a) ((a) == 0 || *(a) == 0 || *(a) == 10 || *(a) == '}' || *(a) == ']')
+V save_ip(X* x, I i) { x->rs[x->rp++] = x->ip + i; }
+V call(X* x, I i) { L1(x, B*, q); if (!TAIL(x->ip + i)) save_ip(x, i); x->ip = q; }
 V ret(X* x) { if (x->rp > 0) x->ip = x->rs[--x->rp]; else x->ip = 0; }
-
-V forward_jump(X* x) {
-  I16 d;
-  x->ip++;
-  DPUSH(x, x->ip + 2);
-  d = *((I16*)x->ip);
-  x->ip += d;
-}
+V qjump(X* x) { I16 d; DPUSH(x, x->ip + 3); d = *((I16*)x->ip); x->ip += d + 1; }
 
 V lit(X* x) { DPUSH(x, *((I16*)(x->ip + 1))); x->ip += 3; }
 V word(X* x) { lit(x); T(x) += (I)x->d; call(x, 0); }
@@ -96,8 +80,8 @@ V gt(X* x) { OP2(x, >); }
 
 V eval(X* x, B* q);
 
-V times(X* x) { DVAR2(x, B*, q, I, n); for(;n > 0; n--) eval(x, q); }
-V branch(X* x) { DVAR3(x, B*, f, B*, t, I, b); b ? eval(x, t) : eval(x, f); }
+V times(X* x) { L2(x, B*, q, I, n); for(;n > 0; n--) eval(x, q); }
+V branch(X* x) { L3(x, B*, f, B*, t, I, b); b ? eval(x, t) : eval(x, f); }
 
 #define BLOCK(a, b) \
   { \
@@ -148,7 +132,7 @@ V dump_context(X* x) {
 V step(X* x) {
   dump_context(x);
   switch (PEEK(x)) {
-    case '[': forward_jump(x); return;
+    case '[': qjump(x); return;
     case '{': parse_quotation(x); return;
     case 0: case 10: 
     case ']': case '}': 
@@ -200,18 +184,8 @@ V step(X* x) {
   }
 }
               
-V inner(X* x) { 
-  I rp = x->rp; 
-  while(x->rp >= rp && x->ip) { 
-    step(x); 
-  }
-}
-                
-V eval(X* x, B* q) { 
-  DPUSH(x, q);
-  call(x, 0); 
-  inner(x); 
-}
+V inner(X* x) { I rp = x->rp; while(x->rp >= rp && x->ip) step(x); }
+V eval(X* x, B* q) { DPUSH(x, q); call(x, 0); inner(x); }
 
 X* init_VM() { return malloc(sizeof(X)); }
 X* init_EXT(X* x) { x->x = malloc(26*sizeof(F*)); return x; }
@@ -272,7 +246,7 @@ V inlined(X* x, W* w) {
 }
                 
 V compile(X* x) { 
-  DVAR3(x, W*, w, I, _, B*, __); 
+  L3(x, W*, w, I, _, B*, __); 
   if (strlen((B*)TO_PTR(x, w->c)) < 3) {
     inlined(x, w);
   } else {
@@ -293,7 +267,7 @@ V parse_name(X* x) {
 }
 
 V find_name(X* x) {
-	DVAR2(x, I, l, B*, n);
+	L2(x, I, l, B*, n);
 	I16 wa = D(x)->l;
 	while (wa) {
     W* w = (W*)TO_PTR(x, wa);
@@ -311,7 +285,7 @@ V find_name(X* x) {
 }
 
 V asm(X* x) { 
-  DVAR2(x, I, l, B*, c); 
+  L2(x, I, l, B*, c); 
   B t = c[l]; 
   c[l] = 0; 
   eval(x, c + 1); 
@@ -319,7 +293,7 @@ V asm(X* x) {
 }
 
 V num(X* x) { 
-  DVAR2(x, I, _, B*, s); 
+  L2(x, I, _, B*, s); 
   B* e; 
   I n = strtol(s, &e, 10); 
   if (!n && s == e) { }
@@ -327,14 +301,14 @@ V num(X* x) {
 }
 
 V interpret(X* x) { 
-  DVAR3(x, W*, w, I, _, B*, __); 
+  L3(x, W*, w, I, _, B*, __); 
   eval(x, (B*)TO_PTR(x, w->c)); 
 }
 
 /* Word definition */
 
 V header(X* x) { 
-  DVAR2(x, I, l, B*, n); 
+  L2(x, I, l, B*, n); 
   W* w = (W*)THERE(x);
   ALLOT(x, sizeof(W) + l); 
   w->p = D(x)->l;
@@ -346,21 +320,21 @@ V header(X* x) {
 }
 
 V create(X* x) { 
-  DVAR2(x, I, _, B*, __); 
+  L2(x, I, _, B*, __); 
   parse_name(x); 
   header(x); 
   D(x)->s = 1; 
 }
 
 V semicolon(X* x) { 
-  DVAR2(x, I, _, B*, __); 
+  L2(x, I, _, B*, __); 
   ((W*)TO_PTR(x, D(x)->l))->f = ~HIDDEN;
   D(x)->s = 0; 
   C(x, B, 0); 
 }
 
 V start_quotation(X* x) { 
-	DVAR2(x, I, _, B*, __);
+	L2(x, I, _, B*, __);
   C(x, B, '[');
   CPUSH(x, HERE(x));
   C(x, I16, 0);
@@ -370,7 +344,7 @@ V start_quotation(X* x) {
 
 V end_quotation(X* x) {
 	I i;
-	DVAR2(x, I, _, B*, __);
+	L2(x, I, _, B*, __);
   C(x, B, ']'); 
   i = CPOP(x);
   *((I16*)THERE(x)) = (I16)(0 - (i - HERE(x)));
