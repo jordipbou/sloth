@@ -1,6 +1,3 @@
-/* Words should point to other words with I16, not with direct pointers !!! */
-/* That breaks the relocatable part of SLOTH */
-
 #ifndef SLOTH_VM
 #define SLOTH_VM
 

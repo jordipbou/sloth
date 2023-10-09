@@ -13,7 +13,6 @@ Features:
 * C89. Very easily embedabble in a C/C++ application.
 * String based human readable bytecode (ASCII 32-126).
 * Cell (64, 32 or 16 bits) based data stack and return stack.
-* Quotations and combinators implemented at bytecode level.
 * Relatively fast interpreter.
 * Ability to add C functions thru bytecode extensions (bytecodes A-Z).
 
@@ -25,16 +24,8 @@ Only : ; \<asm> are hardcoded in the outer interpreter, but they happen after tr
 
 ### ARCHITECTURE
 
-* System
-  * Input buffer
-  * Environments
-  * Memory
-* Context
-  * Executes bytecode
-  * Stateless
-  * Different contexts may use same system (in same thread)
-* Environment
-  * Words
+* Inner interpreter
+* Outer interpreter
   
 ### BYTECODE
 
