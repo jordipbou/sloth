@@ -33,14 +33,10 @@ struct _Context {
 #define EXT(x, l) (x->x[l - 'A'])
 
 #define DPUSH(x, u) (x->ds[x->dp++] = (I)(u))
-#define DPUSH2(x, u, v) DPUSH(x, u); DPUSH(x, v)
-#define DPUSH3(x, u, v, w) DPUSH2(x, u, v); DPUSH(x, w)
 #define CPUSH(x, u) (x->ds[--x->cp] = (I)(u))
-#define RPUSH(x, u) (x->rs[x->rp++] = (B*)(u))
 
 #define DPOP(x) (x->ds[--x->dp])
 #define CPOP(x) (x->ds[x->cp++])
-#define RPOP(x) (x->rs[--x->rp])
 
 #define DVAR(x, t, v) t v = (t)DPOP(x)
 #define DVAR2(x, t1, v1, t2, v2) DVAR(x, t1, v1); DVAR(x, t2, v2)
@@ -57,12 +53,12 @@ struct _Context {
 V call(X* x, I i) {
   DVAR(x, B*, q);
   if (!(TAIL_CALL(x->ip + i))) {
-    RPUSH(x, x->ip + i);
+    x->rs[x->rp++] = x->ip + i;
   }
   x->ip = q;
 }
 
-V ret(X* x) { if (x->rp > 0) x->ip = RPOP(x); else x->ip = 0; }
+V ret(X* x) { if (x->rp > 0) x->ip = x->rs[--x->rp]; else x->ip = 0; }
 
 V forward_jump(X* x) {
   I16 d;
@@ -72,7 +68,7 @@ V forward_jump(X* x) {
   x->ip += d;
 }
 
-V lit(X* x) { DPUSH(x, *((I16*)x->ip + 1)); x->ip += 3; }
+V lit(X* x) { DPUSH(x, *((I16*)(x->ip + 1))); x->ip += 3; }
 V word(X* x) { lit(x); T(x) += (I)x->d; call(x, 0); }
   
 #define DDROP(x) (x->dp--)
@@ -154,10 +150,9 @@ V step(X* x) {
   switch (PEEK(x)) {
     case '[': forward_jump(x); return;
     case '{': parse_quotation(x); return;
-    case 0: 
-    case 10: 
-    case ']':
-    case '}': ret(x); return;
+    case 0: case 10: 
+    case ']': case '}': 
+      ret(x); return;
     case 'e': call(x, 1); return;
     case '#': lit(x); return;
     case '$': word(x); return;
@@ -180,8 +175,6 @@ V step(X* x) {
       switch (TOKEN(x)) {
       case '0': DPUSH(x, 0); break;
       case '1': DPUSH(x, 1); break;
-      case '2': DPUSH(x, 2); break;
-      
       case '_': DDROP(x); break;
       case 's': swap(x); break;
       case 'o': over(x); break;
@@ -207,62 +200,114 @@ V step(X* x) {
   }
 }
               
-V inner(X* x) { I rp = x->rp; while(x->rp >= rp && x->ip) step(x); }
-V eval(X* x, B* q) { DPUSH(x, q); call(x, 0); inner(x); }
+V inner(X* x) { 
+  I rp = x->rp; 
+  while(x->rp >= rp && x->ip) { 
+    step(x); 
+  }
+}
+                
+V eval(X* x, B* q) { 
+  DPUSH(x, q);
+  call(x, 0); 
+  inner(x); 
+}
 
 X* init_VM() { return malloc(sizeof(X)); }
 X* init_EXT(X* x) { x->x = malloc(26*sizeof(F*)); return x; }
 
 /* SLOTH Extensible language */
 
-/*
 #define HIDDEN 1
 #define IMMEDIATE 2
 
 typedef struct _Word { 
-  I16 previous; 
-  B flags; 
-  I16 code; 
-  I16 nlen; 
-  B name[1]; 
+  I16 p; 
+  B f; 
+  I16 c; 
+  I16 l; 
+  B n[1]; 
 } W;
 
-#define SYSTEM_SIZE 64*1024
+#define DICT_SIZE 64*1024
 
-typedef struct _System { 
-  I16 here; 
-  I16 latest; 
-  B* ibuf; 
-  B st; 
-} S;
+typedef struct _Dictionary { 
+  I16 h; 
+  I16 l; 
+  B* i; 
+  B s; 
+} DICT;
 
-#define HEAP(x) (x->s)
-#define ADDR(x, a) (x->s + a)
-#define ALLOT(x, n) (x->s->here += n)
-#define HERE(x) (x->s + x->s->here)
+#define D(x) ((DICT*)x->d)
+#define IBUF(x) (D(x)->i)
 
-#define TOKEN(cond) (x->s->ibuf && *x->s->ibuf && cond)
-V parse_spaces(X* x) { while (TOKEN(isspace(*x->s->ibuf))) { x->s->ibuf++; } }
-V parse_non_spaces(X* x) { while (TOKEN(!isspace(*x->s->ibuf))) { x->s->ibuf++; } }
+#define TO_IDX(x, p) (((I)p) - ((I)x->d))
+#define TO_PTR(x, i) (((I)i) + ((I)x->d))
+
+#define HERE(x) (D(x)->h)
+#define THERE(x) (TO_PTR(x, HERE(x)))
+#define ALLOT(x, n) (HERE(x) += n)
+
+/* Compilation */
+
+#define C(x, t, v) *((t*)THERE(x)) = v; ALLOT(x, sizeof(t))
+
+V cword(X* x, W* w) { C(x, B, '$'); C(x, I16, w->c); }
+
+V cnum(X* x, I16 n) { 
+  if (n == 0) { C(x, B, '0'); }
+  else if (n == 1) { C(x, B, '1'); }
+  else {
+    C(x, B, '#'); 
+    C(x, I16, n); 
+  }
+}
+                
+V inlined(X* x, W* w) { 
+  B* c = (B*)TO_PTR(x, w->c);
+  while (*c) { 
+    C(x, B, *c); 
+    c++; 
+  } 
+}
+                
+V compile(X* x) { 
+  DVAR3(x, W*, w, I, _, B*, __); 
+  if (strlen((B*)TO_PTR(x, w->c)) < 3) {
+    inlined(x, w);
+  } else {
+    cword(x, w); 
+  }
+}
+
+/* Parsing */
+
+#define CHAR(cond) (IBUF(x) && *(IBUF(x)) && cond)
+V parse_spaces(X* x) { while (CHAR(isspace(*IBUF(x)))) { IBUF(x)++; } }
+V parse_non_spaces(X* x) { while (CHAR(!isspace(*IBUF(x)))) { IBUF(x)++; } }
 V parse_name(X* x) { 
   parse_spaces(x); 
-  DPUSH(x, x->s->ibuf); 
+  DPUSH(x, IBUF(x)); 
   parse_non_spaces(x); 
-  DPUSH(x, (x->s->ibuf - ((B*)DT(x)))); 
+  DPUSH(x, IBUF(x) - ((B*)T(x))); 
 }
 
 V find_name(X* x) {
 	DVAR2(x, I, l, B*, n);
-	I16 wp = x->s->latest;
-	while (wp) {
-    W* w = (W*)ADDR(x, wp);
-		if (w->nlen == l && !strncmp(w->name, n, l)) {
-      DPUSH3(x, n, l, wp);
+	I16 wa = D(x)->l;
+	while (wa) {
+    W* w = (W*)TO_PTR(x, wa);
+		if (w->l == l && !strncmp(w->n, n, l)) {
+      DPUSH(x, n);
+      DPUSH(x, l);
+      DPUSH(x, w);
       return;
 		}
-		wp = w->previous;
+		wa = w->p;
 	}
-  DPUSH3(x, n, l, 0);
+  DPUSH(x, n);
+  DPUSH(x, l);
+  DPUSH(x, 0);
 }
 
 V asm(X* x) { 
@@ -281,66 +326,55 @@ V num(X* x) {
   else DPUSH(x, n); 
 }
 
-V cbyte(X* x, B b) { *(B*)HERE(x) = b; ALLOT(x, 1); }
-V ci16(X* x, I16 l) { *(I16*)HERE(x) = l; ALLOT(x, 2); }
-V cword(X* x, W* w) { cbyte(x, '$'); ci16(x, w->code); }
-V cnum(X* x, I16 n) { 
-  if (n == 0) cbyte(x, '0');
-  else if (n == 1) cbyte(x, '1');
-  else if (n == 2) cbyte(x, '2');
-  else {
-    cbyte(x, '#'); 
-    ci16(x, n); 
-  }
-}
-
-V inlined(X* x, W* w) { 
-  B* c = (B*)ADDR(x, w->code);
-  while (*c) { 
-    cbyte(x, *c); 
-    c++; 
-  } 
-}
-V compile(X* x) { 
-  DVAR3(x, W*, w, I, _, B*, __); 
-  if (strlen((B*)ADDR(x, w->code)) < 3) inlined(x, w); 
-  else cword(x, w); 
-}
 V interpret(X* x) { 
   DVAR3(x, W*, w, I, _, B*, __); 
-  eval(x, (B*)ADDR(x, w->code)); 
+  eval(x, (B*)TO_PTR(x, w->c)); 
 }
 
-W* aword(X* x, I l) { W* w = (W*)(x); x->s->hp += sizeof(W) + l; return w; }
-V slatest(X* x, W* w) { w->p = x->s->e->l; x->s->e->l = w; }
-V sname(W* w, I l, B* n) { w->l = l; strncpy(w->n, n, l); w->n[l] = 0; }
-V scode(X* x, W* w) { w->c = x->s->hp; }
-V header(X* x) { DVAR2(x, I, l, B*, n); W* w = aword(x, l); slatest(x, w); sname(w, l, n); scode(x, w); }
-V create(X* x) { DVAR2(x, I, _, B*, __); parse_name(x); header(x); x->s->st = 1; }
+/* Word definition */
+
+V header(X* x) { 
+  DVAR2(x, I, l, B*, n); 
+  W* w = (W*)THERE(x);
+  ALLOT(x, sizeof(W) + l); 
+  w->p = D(x)->l;
+  D(x)->l = TO_IDX(x, w);
+  w->l = l;
+  strncpy(w->n, n, l);
+  w->n[l] = 0;
+  w->c = HERE(x);
+}
+
+V create(X* x) { 
+  DVAR2(x, I, _, B*, __); 
+  parse_name(x); 
+  header(x); 
+  D(x)->s = 1; 
+}
 
 V semicolon(X* x) { 
   DVAR2(x, I, _, B*, __); 
-  x->s->e->l->f &= ~HIDDEN; 
-  x->s->st = 0; 
-  cbyte(x, 0); 
+  ((W*)TO_PTR(x, D(x)->l))->f = ~HIDDEN;
+  D(x)->s = 0; 
+  C(x, B, 0); 
 }
 
 V start_quotation(X* x) { 
 	DVAR2(x, I, _, B*, __);
-  cbyte(x, '[');
-  CPUSH(x, x->s->hp);
-  ci16(x, 0);
-  if (!x->s->st) DPUSH(x, &x->s->h[x->s->hp]);
-  x->s->st++;
+  C(x, B, '[');
+  CPUSH(x, HERE(x));
+  C(x, I16, 0);
+  if (!D(x)->s) DPUSH(x, THERE(x));
+  D(x)->s++;
 }
 
 V end_quotation(X* x) {
 	I i;
 	DVAR2(x, I, _, B*, __);
-  cbyte(x, ']'); 
+  C(x, B, ']'); 
   i = CPOP(x);
-  *((I16*)&x->s->h[i]) = (I16)(0 - (i - x->s->hp));
-  x->s->st--;
+  *((I16*)THERE(x)) = (I16)(0 - (i - HERE(x)));
+  D(x)->s--;
 }
 
 V evaluate(X* x, B* s) {
@@ -348,28 +382,28 @@ V evaluate(X* x, B* s) {
 	B* t;
   I i;
   W* w;
-	x->s->ibuf = s;
-	while (x->s->ibuf && *x->s->ibuf && *x->s->ibuf != 10) {
+	IBUF(x) = s;
+	while (IBUF(x) && *IBUF(x) && *IBUF(x) != 10) {
     dump_context(x);
 		parse_name(x);
-		if (!DT(x)) { DDROP(x); DDROP(x); return; }
+		if (!T(x)) { DDROP(x); DDROP(x); return; }
 		find_name(x);
-		if (DT(x)) {
-			if (x->s->st) compile(x);
+		if (T(x)) {
+			if (D(x)->s) compile(x);
 			else interpret(x);
 		} else {
 			DDROP(x);
-			l = DT(x);
-			t = (B*)DN(x);
+			l = T(x);
+			t = (B*)N(x);
 			if (l == 1 && t[0] == ':') create(x);
       else if (l == 1 && t[0] == ';') semicolon(x);
       else if (l == 1 && t[0] == '[') start_quotation(x);
       else if (l == 1 && t[0] == ']') end_quotation(x);
 			else if (t[0] == '\\') {
-				if (x->s->st) { 
+				if (D(x)->s) { 
           DDROP(x); DDROP(x);
           for (i = 1; i < l; i++) {
-            cbyte(x, t[i]);
+            C(x, B, t[i]);
           }
 				} else {
 					parse_spaces(x);
@@ -377,17 +411,13 @@ V evaluate(X* x, B* s) {
 				}
 			} else {
 				num(x);
-        if (x->s->st) cnum(x, DPOP(x));
+        if (D(x)->s) cnum(x, DPOP(x));
 			}
 		}
 	}
 }
 
-V see_word(X* x) {
-  DVAR(x, W*, w);
-  printf(": %.*s %s ;\n", w->l, w->n, &x->s->h[w->c]);  
-}
-
+/*
 V sloth_ext(X* x) {
   x->ip++;
   switch (*x->ip) {
@@ -397,21 +427,24 @@ V sloth_ext(X* x) {
     case 's': see_word(x); break;
   } 
 }
+*/
 
 X* init_SLOTH() {
   X* x = init_EXT(init_VM());
-  x->s = malloc(SYSTEM_SIZE);
-  x->s->latest = 0;
-  x->s->here += sizeof(E);
+  x->d = malloc(DICT_SIZE);
+  D(x)->l = 0;
+  HERE(x) += sizeof(DICT);
 
+/*
   EXT(x, 'S') = &sloth_ext;
-
+*/
+/*
   evaluate(x, ": dup \\d ; : drop \\_ ; : + \\+ ;");
   evaluate(x, ": swap \\s ; : - \\- ; : times \\t ;");
   evaluate(x, ": over \\o ; : execute \\e ;");
   evaluate(x, ": fib 2 - 1 swap 1 swap [ swap over + ] times swap drop ;");
-  
+*/ 
   return x;
 }
-*/
+
 #endif
