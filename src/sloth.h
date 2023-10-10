@@ -1,198 +1,307 @@
-#ifndef SLOTH
-#define SLOTH
+#ifndef SLOTH_OUTER
+#define SLOTH_OUTER
 
-#include"vm.h"
+#include "vm.h"
 
-#define IMMEDIATE 1
-#define HIDDEN 2
-#define VARIABLE 4
-#define CONSTANT 8
-#define ENVIRONMENT 16
+#define HIDDEN 1
+#define IMMEDIATE 2
 
-typedef struct _Word {
-  struct _Word* previous;
-	C flags;
-  B* code; 
-  C nlen;
-	B name[1];
+typedef struct _Word { 
+  I16 p; 
+  B f; 
+  I16 c; 
+  I16 l; 
+  B n[1]; 
 } W;
 
-typedef struct _Environment {
-	struct _Environment* parent;
-	W* latest;
-} E;
+#define DICT_SIZE 64*1024
 
-#define BLOCK_SIZE 65536
+typedef struct _Dictionary { 
+  I16 h; 
+  I16 l; 
+  B* i; 
+  B s;
+  I vp;
+  I* v;
+} DICT;
 
-typedef struct _System {
-	B* ibuf;
-	E* environment;
-	C state;
-	C here;
-	B block[BLOCK_SIZE];
-} S;
+#define D(x) ((DICT*)x->d)
+#define IBUF(x) (D(x)->i)
 
-#define TOK(cond) (s->ibuf && *s->ibuf && cond)
-V S_spaces(X* x) { S* s = ST(x, 'S'); while (TOK(isspace(*s->ibuf))) { s->ibuf++; } }
-V S_non_spaces(X* x) { S* s = ST(x, 'S'); while (TOK(!isspace(*s->ibuf))) { s->ibuf++; } }
+#define TO_IDX(x, p) (((I)p) - ((I)x->d))
+#define TO_PTR(x, i) (((I)i) + ((I)x->d))
 
-V S_parse_name(X* x) { 
-	S* s = ST(x, 'S');
-	S_spaces(x); 
-	S_lit(x, s->ibuf); 
-	S_non_spaces(x); 
-	S_lit(x, (s->ibuf - ((B*)TS(x)))); 
+#define HERE(x) (D(x)->h)
+#define THERE(x) (TO_PTR(x, HERE(x)))
+#define ALLOT(x, n) (HERE(x) += n)
+
+/* Compilation */
+
+#define C(x, t, v) *((t*)THERE(x)) = v; ALLOT(x, sizeof(t))
+
+V cword(X* x, W* w) { C(x, B, '$'); C(x, I16, w->c); }
+
+V cnum(X* x, I16 n) { 
+  if (n == 0) { C(x, B, '0'); }
+  else if (n == 1) { C(x, B, '1'); }
+  else {
+    C(x, B, '#'); 
+    C(x, I16, n); 
+  }
 }
-
-V S_find_name(X* x) {
-	S* s = ST(x, 'S');
-	C nlen = TS(x);
-  B* name = (B*)NS(x);
-	W* w = s->environment->latest;
-	while (w) {
-	  if (w->nlen == nlen && !strncmp(w->name, name, nlen)) break;
-		w = w->previous;
-	}
-	S_lit(x, w);
+                
+V inlined(X* x, W* w) { 
+  B* c = (B*)TO_PTR(x, w->c);
+  while (*c) { 
+    C(x, B, *c); 
+    c++; 
+  } 
 }
-
-V S_bcompile(X* x) {
-	S* s = ST(x, 'S');
-	s->block[s->here] = (B)S_drop(x);
-	s->here++;
-}
-
-V S_ccompile(X* x) { 
-	S* s = ST(x, 'S'); 
-	*((C*)(&s->block[s->here])) = S_drop(x); 
-	s->here += sizeof(C); 
-}
-
-V S_literal(X* x) {	S* s = ST(x, 'S'); S_lit(x, '#'); S_bcompile(x); S_ccompile(x); }
-
-V S_compile(X* x) {
-  S* s = ST(x, 'S');
-	W* w = (W*)S_drop(x);
-  S_lit(x, w->code);
-  S_literal(x);
-	s->block[s->here] = '$';
-	s->here++;
-}
-
-V S_evaluate(X* x, B* str) {
-  S* s = ST(x, 'S');
-	B* p;
-	W* w;
-	C n;
-	s->ibuf = str;
-  while (s->ibuf && *s->ibuf) {
-		S_spaces(x);
-		if (s->ibuf && *s->ibuf) {
-			if (*s->ibuf == '\\') {
-				s->ibuf++;
-				if (!s->state) {
-				  S_eval(x, s->ibuf);
-				  S_non_spaces(x);
-				} else {
-				  while (s->ibuf && *s->ibuf && !isspace(*s->ibuf)) {
-				  	s->block[s->here] = *s->ibuf;
-				  	s->here++;
-				  	s->ibuf++;
-          }
-				}
-			} else {
-				S_parse_name(x);
-				S_find_name(x);
-				w = (W*)S_drop(x);
-				n = S_drop(x);
-				p = (B*)S_drop(x);
-				if (w) {
-					if (!s->state || w->flags & IMMEDIATE) {
-            if (w->flags & VARIABLE) {
-              S_lit(x, &w->code);
-            } else if (w->flags & CONSTANT) {
-              S_lit(x, w->code);
-            } else {
-              S_eval(x, w->code);
-            }
-          } else {
-            if (w->flags & VARIABLE) {
-              S_lit(x, &w->code);
-              S_literal(x);
-            } else if (w->flags & CONSTANT) {
-              S_lit(x, w->code);
-              S_literal(x);
-            } else {
-              S_lit(x, w);
-              S_compile(x);
-            }
-          }
-				} else {
-					n = strtol(p, (B**)(&w), 10);
-					if (n == 0 && (B*)w == p) {
-					} else {
-						S_lit(x, n);
-            if (s->state) S_literal(x); 
-					}
-				}
-			}
-		}
-		S_trace(x);
-	}
-}
-
-V S_create_word(X* x, B* n, C l, B* c, C f) {
-	S* s = ST(x, 'S');
-  W* w = malloc(sizeof(W) + l);
-  w->previous = s->environment->latest;
-  s->environment->latest = w;
-  w->code = c;
-  w->flags = f;
-  w->nlen = l;
-  strcpy(w->name, n);
-}
-
-V S_variable(X* x) {
-  S* s = ST(x, 'S');
-  if (s->environment->latest) {
-    s->environment->latest->flags |= VARIABLE;
+                
+V compile(X* x) { 
+  L3(x, W*, w, I, _, B*, __); 
+  if (strlen((B*)TO_PTR(x, w->c)) < 3) {
+    inlined(x, w);
+  } else {
+    cword(x, w); 
   }
 }
 
-V S_primitive(X* x, B* n, B* c, C f) { S_create_word(x, n, strlen(n), c, f); }
+/* Parsing */
 
-V S_header(X* x) {
-	S* s = ST(x, 'S');
-	B* name;
-	C nlen;
-	S_parse_name(x);
-	nlen = S_drop(x);
-	name = (B*)S_drop(x);
-	S_create_word(x, name, nlen, &s->block[s->here], 0);
+#define CHAR(cond) (IBUF(x) && *(IBUF(x)) && cond)
+V parse_spaces(X* x) { while (CHAR(isspace(*IBUF(x)))) { IBUF(x)++; } }
+V parse_non_spaces(X* x) { while (CHAR(!isspace(*IBUF(x)))) { IBUF(x)++; } }
+V parse_name(X* x) { 
+  parse_spaces(x); 
+  DPUSH(x, IBUF(x)); 
+  parse_non_spaces(x); 
+  DPUSH(x, IBUF(x) - ((B*)T(x))); 
 }
 
-V S_sloth_ext(X* x) {
-	S* s = ST(x, 'S');
-	switch (S_token(x)) {
-		case 'b': S_bcompile(x); break;
-		case 'h': S_header(x); break;
-    case 'v': S_variable(x); break;
-		case ']': s->state = 1; break;
-		case '[': s->state = 0; break;
+V find_name(X* x) {
+	L2(x, I, l, B*, n);
+	I16 wa = D(x)->l;
+	while (wa) {
+    W* w = (W*)TO_PTR(x, wa);
+		if (w->l == l && !strncmp(w->n, n, l)) {
+      DPUSH(x, n);
+      DPUSH(x, l);
+      DPUSH(x, w);
+      return;
+		}
+		wa = w->p;
+	}
+  DPUSH(x, n);
+  DPUSH(x, l);
+  DPUSH(x, 0);
+}
+
+V asm(X* x) { 
+  L2(x, I, l, B*, c); 
+  B t = c[l]; 
+  c[l] = 0; 
+  eval(x, c + 1); 
+  c[l] = t;
+}
+
+V num(X* x) { 
+  L2(x, I, _, B*, s); 
+  B* e; 
+  I n = strtol(s, &e, 10); 
+  if (!n && s == e) { }
+  else DPUSH(x, n); 
+}
+
+V interpret(X* x) { 
+  L3(x, W*, w, I, _, B*, __); 
+  eval(x, (B*)TO_PTR(x, w->c)); 
+}
+
+/* Word definition */
+
+V header(X* x) { 
+  L2(x, I, l, B*, n); 
+  W* w = (W*)THERE(x);
+  ALLOT(x, sizeof(W) + l); 
+  w->p = D(x)->l;
+  D(x)->l = TO_IDX(x, w);
+  w->l = l;
+  strncpy(w->n, n, l);
+  w->n[l] = 0;
+  w->c = HERE(x);
+}
+
+V create(X* x) { 
+  parse_name(x); 
+  header(x); 
+  D(x)->s = 1; 
+}
+
+V semicolon(X* x) { 
+  ((W*)TO_PTR(x, D(x)->l))->f = ~HIDDEN;
+  D(x)->s = 0; 
+  C(x, B, 0); 
+}
+
+V start_quotation(X* x) { 
+	L2(x, I, _, B*, __);
+  C(x, B, '[');
+  CPUSH(x, HERE(x));
+  C(x, I16, 0);
+  if (!D(x)->s) DPUSH(x, THERE(x));
+  D(x)->s++;
+}
+
+V end_quotation(X* x) {
+	I i;
+	L2(x, I, _, B*, __);
+  C(x, B, ']'); 
+  i = CPOP(x);
+  *((I16*)THERE(x)) = (I16)(0 - (i - HERE(x)));
+  D(x)->s--;
+}
+
+V dump_repl_context(X* x) {
+  printf("[%d] ", D(x)->s);
+  dump_context(x);
+  printf("<%s>\n", D(x)->i);
+}
+
+V evaluate(X* x, B* s) {
+	I l;
+	B* t;
+  I i;
+  W* w;
+	IBUF(x) = s;
+	while (IBUF(x) && *IBUF(x) && *IBUF(x) != 10) {
+    dump_repl_context(x);
+		parse_name(x);
+		if (!T(x)) { DDROP(x); DDROP(x); return; }
+		find_name(x);
+		if (T(x)) {
+			if (D(x)->s) compile(x);
+			else interpret(x);
+		} else {
+			DDROP(x);
+			l = T(x);
+			t = (B*)N(x);
+			if (l == 1 && t[0] == ':') {
+        DDROP(x); DDROP(x);
+        create(x);
+      }
+      else if (l == 1 && t[0] == ';') {
+        DDROP(x); DDROP(x);
+        semicolon(x);
+      }
+      else if (l == 1 && t[0] == '[') start_quotation(x);
+      else if (l == 1 && t[0] == ']') end_quotation(x);
+			else if (t[0] == '\\') {
+				if (D(x)->s) { 
+          DDROP(x); DDROP(x);
+          for (i = 1; i < l; i++) {
+            C(x, B, t[i]);
+          }
+				} else {
+					parse_spaces(x);
+					asm(x);
+				}
+			} else {
+				num(x);
+        if (D(x)->s) cnum(x, DPOP(x));
+			}
+		}
 	}
 }
 
-X* S_sloth() {
-  X* x = S_init();
-	S* s = malloc(sizeof(S));
-	EXT(x, 'S') = &S_sloth_ext;
-	ST(x, 'S') = s;
-	s->environment = malloc(sizeof(E));
-  
-  S_primitive(x, ":", "ShS]", 0);
-  S_primitive(x, ";", "0SbS[", IMMEDIATE);
+/*
+V sloth_ext(X* x) {
+  x->ip++;
+  switch (*x->ip) {
+    case 'f': find_name(x); break;
+    case 'l': DPUSH(x, x->s->e->l); break;
+    case 'p': parse_name(x); break;
+    case 's': see_word(x); break;
+  } 
+}
+*/
 
-	return x;
+X* init_SLOTH() {
+  X* x = init_EXT(init_VM());
+  x->d = malloc(DICT_SIZE);
+  D(x)->l = 0;
+  HERE(x) += sizeof(DICT);
+
+/*
+  EXT(x, 'S') = &sloth_ext;
+*/
+/*
+  evaluate(x, ": dup \\d ; : drop \\_ ; : + \\+ ;");
+  evaluate(x, ": swap \\s ; : - \\- ; : times \\t ;");
+  evaluate(x, ": over \\o ; : execute \\e ;");
+  evaluate(x, ": fib 2 - 1 swap 1 swap [ swap over + ] times swap drop ;");
+*/ 
+  return x;
+}
+
+B* forth = 
+": drop \\_ ; "
+": dup \\d ; "
+": swap \\s ; "
+": over \\o ; "
+": rot \\r ; "
+": + \\+ ; "
+": - \\- ; "
+": * \\* ; "
+": / \\/ ; "
+": mod \\% ; "
+": < \\< ; "
+": = \\= ; "
+": > \\> ; ";
+
+V create_variable(X* x) {
+  printf("pre-create\n");
+  dump_context(x);
+  printf("%ld\n", x->dp);
+  create(x);
+  printf("post-create\n");
+  dump_context(x);
+  printf("%ld\n", x->dp);
+  cnum(x, D(x)->vp);
+  C(x, B, 'S');
+  C(x, B, 'v');
+  printf("post-compile var\n");
+  dump_context(x);
+  printf("%ld\n", x->dp);
+  (D(x)->vp)++;
+  semicolon(x);
+  printf("post-semicolon\n");
+  dump_context(x);
+  printf("%ld\n", x->dp);
+  printf("Name of latest: %s\n", ((W*)TO_PTR(x, D(x)->l))->n);
+  printf("Compiled code of latest: %s\n", TO_PTR(x, ((W*)TO_PTR(x, D(x)->l))->c));
+}
+
+V ext_SLOTH(X* x) {
+  switch (TOKEN(x)) {
+  case 'c': create_variable(x); break;
+  case 'v': DPUSH(x, &(D(x)->v[DPOP(x)])); break;
+  }
+}
+
+X* init_ANS_FORTH() {
+  X* x = init_EXT(init_VM());
+  x->d = malloc(DICT_SIZE);
+  D(x)->l = 0;
+  HERE(x) += sizeof(DICT);
+  D(x)->vp = 0;
+  D(x)->v = malloc(64*1024*sizeof(I));
+
+  EXT(x, 'S') = &ext_SLOTH;
+
+  /* evaluate(x, forth); */
+
+  return x;
 }
 
 #endif
