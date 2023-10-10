@@ -11,13 +11,18 @@ typedef char B;
 typedef int16_t I16;
 typedef intptr_t I;
 
+typedef struct _Symbol {
+  struct _Symbol* p;
+  B f;
+  I16 c;
+  I16 l;
+  B n[1];
+} S;
+
 #define DSTACK_SIZE 64
 #define RSTACK_SIZE 64
 
-typedef struct _Context X;
-typedef V (*F)(X*);
-
-struct _Context { 
+typedef struct _Context { 
   I ds[DSTACK_SIZE]; 
   I dp; 
   I cp; 
@@ -25,8 +30,9 @@ struct _Context {
   I rp; 
   B* ip; 
   B* d; 
-  F* x; 
-};
+  V (**x)(struct _Context*);
+  S* l;
+} X;
 
 #define EXT(x, l) (x->x[l - 'A'])
 
@@ -129,6 +135,36 @@ V dump_context(X* x) {
   printf("\n");
 }
 
+V parse_symbol(X* x) {
+  L1(x, B**, i);
+  while (*i && **i && isspace(**i)) (*i)++;
+  DPUSH(x, *i);
+  while (*i && **i && !isspace(**i)) (*i)++;
+  DPUSH(x, *i - T(x));
+}
+
+V find_symbol(X* x) {
+  L2(x, I, l, B*, n);
+  S* s = x->l;
+  while (s) {
+    if (s->l == l && !strncmp(s->n, n, l)) break;
+    s = s->p;
+  }
+  DPUSH(x, s);
+}
+
+V create_symbol(X* x) {
+  L2(x, I, l, B*, n);
+  S* s = malloc(sizeof(S) + l);
+  s->p = x->l;
+  x->l = s;
+  s->f = 0;
+  s->c = 0;
+  s->l = l;
+  strncpy(s->n, n, l);
+  s->n[l] = 0;
+}
+
 #define PEEK(x) (*x->ip)
 #define TOKEN(x) (*(x->ip++))
                 
@@ -136,7 +172,6 @@ V step(X* x) {
   dump_context(x);
   switch (PEEK(x)) {
     case '[': qjump(x); return;
-    case '{': parse_quotation(x); return;
     case 0: case 10: 
     case ']': case '}': 
       ret(x); return;
@@ -160,6 +195,10 @@ V step(X* x) {
       break;
     default:
       switch (TOKEN(x)) {
+      case '{': parse_quotation(x); return;
+      case '\'': DPUSH(x, &x->ip); parse_symbol(x); return;
+      case 'f': find_symbol(x); break;
+      case 'c': create_symbol(x); break;
       case '0': DPUSH(x, 0); break;
       case '1': DPUSH(x, 1); break;
       case '_': DDROP(x); break;
@@ -195,6 +234,6 @@ V inner(X* x) { I rp = x->rp; while(x->rp >= rp && x->ip) step(x); }
 V eval(X* x, B* q) { DPUSH(x, q); call(x, 0); inner(x); }
 
 X* init_VM() { return malloc(sizeof(X)); }
-X* init_EXT(X* x) { x->x = malloc(26*sizeof(F*)); return x; }
+X* init_EXT(X* x) { x->x = malloc(26*sizeof(I)); return x; }
 
 #endif
