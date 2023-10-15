@@ -11,6 +11,10 @@ typedef char B;
 typedef int16_t I16;
 typedef intptr_t I;
 
+typedef struct _Dictionary {
+  
+} D;
+
 typedef struct _Symbol {
   struct _Symbol* p;
   B f;
@@ -50,7 +54,7 @@ typedef struct _Context {
 #define N(x) (x->ds[x->dp - 2])
 #define NN(x) (x->ds[x->dp - 3])
 
-#define TAIL(a) ((a) == 0 || *(a) == 0 || *(a) == 10 || *(a) == '}' || *(a) == ']')
+#define TAIL(a) ((a) == 0 || *(a) == 0 || *(a) == '}' || *(a) == ']')
 V save_ip(X* x, I i) { x->rs[x->rp++] = x->ip + i; }
 V call(X* x, I i) { L1(x, B*, q); if (!TAIL(x->ip + i)) save_ip(x, i); x->ip = q; }
 V ret(X* x) { if (x->rp > 0) x->ip = x->rs[--x->rp]; else x->ip = 0; }
@@ -96,7 +100,7 @@ V branch(X* x) { L3(x, B*, f, B*, t, I, b); b ? eval(x, t) : eval(x, f); }
   { \
     I t = 1; \
     while (t) { \
-      if ((a) == 0 || *(a) == 0 || *(a) == 10) break; \
+      if ((a) == 0 || *(a) == 0) break; \
       if (*(a) == '{') t++; \
       if (*(a) == '}') t--; \
       b; \

@@ -4,6 +4,11 @@ An ANS Forth implemented on a small, simple, relatively fast (or relatively slow
 
 Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor.
 
+## IDEAS
+
+* Hyperstatic environment, inline as much as possible
+* 
+
 ## VIRTUAL MACHINE
 
 [In the future there will be other implementations (at least Java/Kotlin for Android development)]
@@ -21,6 +26,10 @@ Features:
 There are two interpreters (as in Forth), the inner and the outer interpreter.
 The outer interpreter is the one that allows Forth/Sloth to be extensible, it parses the input string word by word and if its found in the dictionary its evaluated/compiled.
 Only : ; \<asm> are hardcoded in the outer interpreter, but they happen after trying to find a word. If the word its found, its executed. This allows full extensibility of the system just by redefining any possible word.
+
+### LITERALS ENCODING
+
+Literals are stored in memory with a variable length encoding.
 
 ### ARCHITECTURE
 
