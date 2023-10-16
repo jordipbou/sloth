@@ -8,7 +8,7 @@
 
 typedef void V;
 typedef char B;
-typedef intptr_t I;
+typedef intptr_t C;
 
 #define HIDDEN 1
 #define IMMEDIATE 2
@@ -16,7 +16,7 @@ typedef intptr_t I;
 typedef struct _Symbol {
   struct _Symbol* p;
   B f;
-  I c;
+  C c;
   B l;
   B n[1];
 } S;
@@ -25,7 +25,7 @@ typedef struct _Symbol {
 
 typedef struct _Memory {
 	S* l;
-	I hp;
+	C hp;
 	B h[MEM_SIZE];
 } M;
 
@@ -33,27 +33,27 @@ typedef struct _Memory {
 #define RSTACK_SIZE 64
 
 typedef struct _Context { 
-  I d[DSTACK_SIZE]; 
-  I dp; 
-  I r[RSTACK_SIZE]; 
-  I rp; 
-  I ip;
-	I s;
-	I n;
+  C d[DSTACK_SIZE]; 
+  C dp; 
+  C r[RSTACK_SIZE]; 
+  C rp; 
+  C ip;
+  C s;
+  C n;
   M* m;
 	/* TODO: Take it out of context to memory? */
   V (**x)(struct _Context*);
 	/* TODO: Should ibuf be shared between contexts? Move to memory in that case */
 	B* ibuf;
-	I ilen;
-	I ipos;
+	C ilen;
+	C ipos;
 } X;
 
 V inner(X* x);
 
 #define EXT(x, l) (x->x[l - 'A'])
 
-#define DPUSH(x, u) (x->d[x->dp++] = (I)(u))
+#define DPUSH(x, u) (x->d[x->dp++] = (C)(u))
 #define DPOP(x) (x->d[--x->dp])
 #define DDROP(x) (x->dp--)
 
@@ -65,20 +65,28 @@ V inner(X* x);
 #define N(x) (x->d[x->dp - 2])
 #define NN(x) (x->d[x->dp - 3])
 
-#define GET(x, a) (x->m->h[a])
-#define PUTB(x, a, b) (x->m->h[a] = b)
-#define PUTI(x, a, i) (*((I*)&x->m->h[a]) = i)
+#define GETB(x, a) (x->m->h[a])
+#define GETS(x, a) (*((int16_t*)&x->m->h[a]))
+#define GETI(x, a) (*((int32_t*)&x->m->h[a]))
+#define GETL(x, a) (*((int64_t*)&x->m->h[a]))
+#define GETC(x, a) (*((C*)&x->m->h[a]))
 
-#define TAIL(x) (x->ip >= MEM_SIZE || GET(x, x->ip + 1) == ']' || GET(x, x->ip + 1) == '}')
-V call(X* x) { L1(x, I, q); if (!TAIL(x)) x->r[x->rp++] = x->ip; x->ip = q; }
+#define PUTB(x, a, b) (x->m->h[a] = b)
+#define PUTS(x, a, s) (*((int16_t*)&x->m->h[a]) = (int16_t)s)
+#define PUTI(x, a, w) (*((int32_t*)&x->m->h[a]) = (int32_t)w)
+#define PUTL(x, a, l) (*((int64_t*)&x->m->h[a]) = (int64_t)l)
+#define PUTC(x, a, i) (*((C*)&x->m->h[a]) = i)
+
+#define TAIL(x) (x->ip >= MEM_SIZE || GETB(x, x->ip + 1) == ']' || GETB(x, x->ip + 1) == '}')
+V call(X* x) { L1(x, C, q); if (!TAIL(x)) x->r[x->rp++] = x->ip; x->ip = q; }
 V ret(X* x) { if (x->rp > 0) x->ip = x->r[--x->rp]; else x->ip = MEM_SIZE; }
-V eval(X* x, I q) { DPUSH(x, q); call(x); inner(x); }
-V quotation(X* x) { L1(x, I, n); DPUSH(x, x->ip); x->ip += n - 1; }
+V eval(X* x, C q) { DPUSH(x, q); call(x); inner(x); }
+V quotation(X* x) { L1(x, C, n); DPUSH(x, x->ip); x->ip += n - 1; }
 
 V dup(X* x) { DPUSH(x, T(x)); }
 V over(X* x) { DPUSH(x, N(x)); }
-V swap(X* x) { I t = T(x); T(x) = N(x); N(x) = t; }
-V rot(X* x) { I t = NN(x); NN(x) = N(x); N(x) = T(x); T(x) = t; }
+V swap(X* x) { C t = T(x); T(x) = N(x); N(x) = t; }
+V rot(X* x) { C t = NN(x); NN(x) = N(x); N(x) = T(x); T(x) = t; }
 
 #define OP2(x, op) N(x) = N(x) op T(x); DDROP(x)
 V add(X* x) { OP2(x, +); }
@@ -104,8 +112,8 @@ V ifetch(X* x) { L1(x, I*, a); DPUSH(x, *a); }
 V bfetch(X* x) { L1(x, B*, a); DPUSH(x, *a); }
 */
 
-V times(X* x) { L2(x, I, q, I, n); for(;n > 0; n--) eval(x, q); }
-V branch(X* x) { L3(x, I, f, I, t, I, b); b ? eval(x, t) : eval(x, f); }
+V times(X* x) { L2(x, C, q, C, n); for(;n > 0; n--) eval(x, q); }
+V branch(X* x) { L3(x, C, f, C, t, C, b); b ? eval(x, t) : eval(x, f); }
 
 /*
 #define S_pr(s, n, f, a) { C t; s += t = sprintf(s, f, a); n += t; }
@@ -145,7 +153,7 @@ V colon(X* x) {
 	parse_name(x);
 	if (T(x) == 0) { DDROP(x); DDROP(x); /* Error */ return; }
 	else {
-		L2(x, I, l, B*, n);
+		L2(x, C, l, B*, n);
 		S* s = malloc(sizeof(S));
 		s->p = x->m->l;
 		x->m->l = s;
@@ -168,14 +176,10 @@ V immediate(X* x) {
 	x->m->l->f |= IMMEDIATE;
 }
 
-#define PEEK(x) (GET(x, x->ip))
-#define TOKEN(x) (GET(x, x->ip++))
+#define PEEK(x) (GETB(x, x->ip))
+#define TOKEN(x) (GETB(x, x->ip++))
                 
 V step(X* x) {
-	if (x->n) {
-		T(x) = (T(x) << 8) + TOKEN(x);
-		x->n--;
-	} else {
 		/*dump_context(x);*/
   	switch (PEEK(x)) {
   	  case 'A': case 'B': 
@@ -200,14 +204,10 @@ V step(X* x) {
   	  	case ']': case '}': ret(x); break;
   		  case '0': DPUSH(x, 0); break;
   		  case '1': DPUSH(x, 1); break;
-				case '#': x->n = 1; DPUSH(x, 0); break;
- 				case '2': x->n = 2; DPUSH(x, 0); break;
- 				case '3': x->n = 3; DPUSH(x, 0); break;
- 				case '4': x->n = 4; DPUSH(x, 0); break;
-				case '5': x->n = 5; DPUSH(x, 0); break;
- 				case '6': x->n = 6; DPUSH(x, 0); break;
- 				case '7': x->n = 7; DPUSH(x, 0); break;
- 				case '8': x->n = 8; DPUSH(x, 0); break;
+				case '#': /* TODO */ break;
+ 				case '2': /* TODO */ break;
+ 				case '4': /* TODO */ break;
+ 				case '8': /* TODO */ break;
 			  case '_': DDROP(x); break;
   		  case 's': swap(x); break;
   		  case 'o': over(x); break;
@@ -239,25 +239,31 @@ V step(X* x) {
 				case 'i': immediate(x); break;
 			}
   	}
-	}
 }
               
-V inner(X* x) { I rp = x->rp; while(x->rp >= rp && x->ip < MEM_SIZE) { step(x); } }
-
-B _literal(X* x, I n) {
-	if (n == 0) return 0;
-	else 
-}
+V inner(X* x) { C rp = x->rp; while(x->rp >= rp && x->ip < MEM_SIZE) { step(x); } }
 
 V literal(X* x) {
-	L1(x, I, n);
+	L1(x, C, n);
 	if (n == 0) PUTB(x, x->m->hp++, '0');
 	else if (n == 1) PUTB(x, x->m->hp++, '1');
-	else	PUTB(x, x->m->hp++, _literal(x, n));
+  else if (n > INT8_MIN && n < INT8_MAX) {
+    PUTB(x, x->m->hp++, '#');
+    PUTB(x, x->m->hp++, n);
+  } else if (n > INT16_MIN && n < INT16_MAX) {
+    PUTB(x, x->m->hp++, '2');
+    PUTS(x, x->m->hp++, n);
+  } else if (n > INT32_MIN && n < INT32_MAX) {
+    PUTB(x, x->m->hp++, '4');
+    PUTI(x, x->m->hp++, n);
+  } else {
+    PUTB(x, x->m->hp++, '8');
+    PUTL(x, x->m->hp++, n);
+  }
 }
 
 V find_name(X* x) {
-	L2(x, I, l, B*, t);
+	L2(x, C, l, B*, t);
 	S* s = x->m->l;
 	while (s) {
 		if (s->l == l && !strncmp(s->n, t, l)) break;
@@ -277,14 +283,14 @@ V evaluate(X* x, B* s) {
 		if (T(x) == 0) { DDROP(x); DDROP(x); return; }
 		find_name(x);
 		if (T(x)) {
-			L3(x, S*, s, I, l, B*, t);
+			L3(x, S*, s, C, l, B*, t);
 			if (!x->s || (s->f & IMMEDIATE) == IMMEDIATE) {
 				eval(x, s->c);
 			} else {
 				/* TODO: Compile */
 			}
 		} else {
-			L3(x, S*, _, I, l, B*, t);
+			L3(x, S*, _, C, l, B*, t);
 			if (t[0] == '\\') {
 				int i;
 				for (i = 1; i < l; i++) {
@@ -313,7 +319,7 @@ V evaluate(X* x, B* s) {
 }
 
 X* init_VM(M* m) { X* x = malloc(sizeof(X)); x->m = m; }
-X* init_EXT(X* x) { x->x = malloc(26*sizeof(I)); return x; }
+X* init_EXT(X* x) { x->x = malloc(26*sizeof(C)); return x; }
 M* init_MEM() { return malloc(sizeof(M)); }
 
 #endif
