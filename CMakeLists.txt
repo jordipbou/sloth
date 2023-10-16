@@ -14,12 +14,6 @@ add_executable (
 
 target_include_directories (sloth PRIVATE src)
 
-add_executable(
-  ilo
-  src/ilo)
-
-target_include_directories (ilo PRIVATE src)
-
 add_executable (
 	tests
 	src/tests

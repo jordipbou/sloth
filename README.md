@@ -4,11 +4,6 @@ An ANS Forth implemented on a small, simple, relatively fast (or relatively slow
 
 Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor.
 
-## IDEAS
-
-* Hyperstatic environment, inline as much as possible
-* 
-
 ## VIRTUAL MACHINE
 
 [In the future there will be other implementations (at least Java/Kotlin for Android development)]
@@ -17,7 +12,6 @@ Features:
 
 * C89. Very easily embedabble in a C/C++ application.
 * String based human readable bytecode (ASCII 32-126).
-* Data stack can hold pointers/objects (depending on implementation).
 * Relatively fast interpreter.
 * Ability to add C functions thru bytecode extensions (bytecodes A-Z).
 

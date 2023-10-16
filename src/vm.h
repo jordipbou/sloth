@@ -8,65 +8,76 @@
 
 typedef void V;
 typedef char B;
-typedef int16_t I16;
 typedef intptr_t I;
 
-typedef struct _Dictionary {
-  
-} D;
+#define HIDDEN 1
+#define IMMEDIATE 2
 
 typedef struct _Symbol {
   struct _Symbol* p;
   B f;
-  I16 c;
-  I16 l;
+  I c;
+  B l;
   B n[1];
 } S;
+
+#define MEM_SIZE 65536
+
+typedef struct _Memory {
+	S* l;
+	I hp;
+	B h[MEM_SIZE];
+} M;
 
 #define DSTACK_SIZE 64
 #define RSTACK_SIZE 64
 
 typedef struct _Context { 
-  I ds[DSTACK_SIZE]; 
+  I d[DSTACK_SIZE]; 
   I dp; 
-  I cp; 
-  B* rs[RSTACK_SIZE]; 
+  I r[RSTACK_SIZE]; 
   I rp; 
-  B* ip; 
-  B* d; 
+  I ip;
+	I s;
+	I n;
+  M* m;
+	/* TODO: Take it out of context to memory? */
   V (**x)(struct _Context*);
-  S* l;
+	/* TODO: Should ibuf be shared between contexts? Move to memory in that case */
+	B* ibuf;
+	I ilen;
+	I ipos;
 } X;
+
+V inner(X* x);
 
 #define EXT(x, l) (x->x[l - 'A'])
 
-#define DPUSH(x, u) (x->ds[x->dp++] = (I)(u))
-#define CPUSH(x, u) (x->ds[--x->cp] = (I)(u))
-
-#define DPOP(x) (x->ds[--x->dp])
-#define CPOP(x) (x->ds[x->cp++])
+#define DPUSH(x, u) (x->d[x->dp++] = (I)(u))
+#define DPOP(x) (x->d[--x->dp])
+#define DDROP(x) (x->dp--)
 
 #define L1(x, t, v) t v = (t)DPOP(x)
 #define L2(x, t1, v1, t2, v2) L1(x, t1, v1); L1(x, t2, v2)
 #define L3(x, t1, v1, t2, v2, t3, v3) L2(x, t1, v1, t2, v2); L1(x, t3, v3)
 
-#define T(x) (x->ds[x->dp - 1])
-#define N(x) (x->ds[x->dp - 2])
-#define NN(x) (x->ds[x->dp - 3])
+#define T(x) (x->d[x->dp - 1])
+#define N(x) (x->d[x->dp - 2])
+#define NN(x) (x->d[x->dp - 3])
 
-#define TAIL(a) ((a) == 0 || *(a) == 0 || *(a) == '}' || *(a) == ']')
-V save_ip(X* x, I i) { x->rs[x->rp++] = x->ip + i; }
-V call(X* x, I i) { L1(x, B*, q); if (!TAIL(x->ip + i)) save_ip(x, i); x->ip = q; }
-V ret(X* x) { if (x->rp > 0) x->ip = x->rs[--x->rp]; else x->ip = 0; }
-V qjump(X* x) { I16 d; DPUSH(x, x->ip + 3); d = *((I16*)x->ip); x->ip += d + 1; }
+#define GET(x, a) (x->m->h[a])
+#define PUTB(x, a, b) (x->m->h[a] = b)
+#define PUTI(x, a, i) (*((I*)&x->m->h[a]) = i)
 
-V lit(X* x) { DPUSH(x, *((I16*)(x->ip + 1))); x->ip += 3; }
-V word(X* x) { lit(x); T(x) += (I)x->d; call(x, 0); }
-  
-#define DDROP(x) (x->dp--)
-V swap(X* x) { I t = T(x); T(x) = N(x); N(x) = t; }
-V over(X* x) { DPUSH(x, N(x)); }
+#define TAIL(x) (x->ip >= MEM_SIZE || GET(x, x->ip + 1) == ']' || GET(x, x->ip + 1) == '}')
+V call(X* x) { L1(x, I, q); if (!TAIL(x)) x->r[x->rp++] = x->ip; x->ip = q; }
+V ret(X* x) { if (x->rp > 0) x->ip = x->r[--x->rp]; else x->ip = MEM_SIZE; }
+V eval(X* x, I q) { DPUSH(x, q); call(x); inner(x); }
+V quotation(X* x) { L1(x, I, n); DPUSH(x, x->ip); x->ip += n - 1; }
+
 V dup(X* x) { DPUSH(x, T(x)); }
+V over(X* x) { DPUSH(x, N(x)); }
+V swap(X* x) { I t = T(x); T(x) = N(x); N(x) = t; }
 V rot(X* x) { I t = NN(x); NN(x) = N(x); N(x) = T(x); T(x) = t; }
 
 #define OP2(x, op) N(x) = N(x) op T(x); DDROP(x)
@@ -86,46 +97,29 @@ V lt(X* x) { OP2(x, <); }
 V eq(X* x) { OP2(x, ==); }
 V gt(X* x) { OP2(x, >); }
 
+/*
 V istore(X* x) { L2(x, I*, a, I, v); *a = v; }
 V bstore(X* x) { L2(x, B*, a, B, v); *a = v; }
 V ifetch(X* x) { L1(x, I*, a); DPUSH(x, *a); }
 V bfetch(X* x) { L1(x, B*, a); DPUSH(x, *a); }
+*/
 
-V eval(X* x, B* q);
+V times(X* x) { L2(x, I, q, I, n); for(;n > 0; n--) eval(x, q); }
+V branch(X* x) { L3(x, I, f, I, t, I, b); b ? eval(x, t) : eval(x, f); }
 
-V times(X* x) { L2(x, B*, q, I, n); for(;n > 0; n--) eval(x, q); }
-V branch(X* x) { L3(x, B*, f, B*, t, I, b); b ? eval(x, t) : eval(x, f); }
-
-#define BLOCK(a, b) \
-  { \
-    I t = 1; \
-    while (t) { \
-      if ((a) == 0 || *(a) == 0) break; \
-      if (*(a) == '{') t++; \
-      if (*(a) == '}') t--; \
-      b; \
-      (a)++; \
-    } \
-  }
-
-V parse_quotation(X* x) { x->ip++; DPUSH(x, x->ip); BLOCK(x->ip, {}); }
- 
+/*
 #define S_pr(s, n, f, a) { C t; s += t = sprintf(s, f, a); n += t; }
               
-V dump_code(X* x, B* c) {
+V dump_code(X* x, I c) {
   I t = 1;
   while (t) {
-    if (c == 0 || *c == 0 || *c == 10) break;
-    if (*c == '{') t++;
-    if (*c == '}') t--;
-    if (*c == '#') { printf("#%d", *((I16*)(c+1))); c += 3; }
-    if (*c == '[') { printf("["); c += 3; }
-    else {
-      printf("%c", *c);
-      c++;
-    }
+    if (GET(x, c) == '[') t++;
+    if (GET(x, c) == ']') t--;
+    printf("%c", GET(x, c));
+    c++;
   }
 }
+
 V dump_context(X* x) {
   I i;
   B* t;
@@ -138,106 +132,188 @@ V dump_context(X* x) {
   }
   printf("\n");
 }
+*/
 
-V parse_symbol(X* x) {
-  L1(x, B**, i);
-  while (*i && **i && isspace(**i)) (*i)++;
-  DPUSH(x, *i);
-  while (*i && **i && !isspace(**i)) (*i)++;
-  DPUSH(x, *i - T(x));
+V parse_name(X* x) {
+	while (x->ipos < x->ilen && isspace(x->ibuf[x->ipos])) x->ipos++;
+	DPUSH(x, &x->ibuf[x->ipos]);
+	while (x->ipos < x->ilen && !isspace(x->ibuf[x->ipos])) x->ipos++;
+	DPUSH(x, &x->ibuf[x->ipos] - T(x));
 }
 
-V find_symbol(X* x) {
-  L2(x, I, l, B*, n);
-  S* s = x->l;
-  while (s) {
-    if (s->l == l && !strncmp(s->n, n, l)) break;
-    s = s->p;
-  }
-  DPUSH(x, s);
+V colon(X* x) {
+	parse_name(x);
+	if (T(x) == 0) { DDROP(x); DDROP(x); /* Error */ return; }
+	else {
+		L2(x, I, l, B*, n);
+		S* s = malloc(sizeof(S));
+		s->p = x->m->l;
+		x->m->l = s;
+		s->f = HIDDEN;
+		s->c = x->m->hp;
+		s->l = l;
+		strncpy(s->n, n, l);
+		s->n[l] = 0;
+		x->s = 1;
+	}
 }
 
-V create_symbol(X* x) {
-  L2(x, I, l, B*, n);
-  S* s = malloc(sizeof(S) + l);
-  s->p = x->l;
-  x->l = s;
-  s->f = 0;
-  s->c = 0;
-  s->l = l;
-  strncpy(s->n, n, l);
-  s->n[l] = 0;
+V semicolon(X* x) {
+	PUTB(x, x->m->hp++, ']');
+	x->s = 0;
+	x->m->l->f &= ~HIDDEN;
 }
 
-#define PEEK(x) (*x->ip)
-#define TOKEN(x) (*(x->ip++))
+V immediate(X* x) {
+	x->m->l->f |= IMMEDIATE;
+}
+
+#define PEEK(x) (GET(x, x->ip))
+#define TOKEN(x) (GET(x, x->ip++))
                 
 V step(X* x) {
-  dump_context(x);
-  switch (PEEK(x)) {
-    case '[': qjump(x); return;
-    case 0: case 10: 
-    case ']': case '}': 
-      ret(x); return;
-    case 'e': call(x, 1); return;
-    case '#': lit(x); return;
-    case '$': word(x); return;
-    case 'A': case 'B': 
-    case 'C': case 'D':
-    case 'E': case 'F': 
-    case 'G': case 'H':
-    case 'I': case 'J': 
-    case 'K': case 'L':
-    case 'M': case 'N': 
-    case 'O': case 'P':
-    case 'Q': case 'R': 
-    case 'S': case 'T':
-    case 'U': case 'V': 
-    case 'W': case 'X':
-    case 'Y': case 'Z':
-      EXT(x, TOKEN(x))(x);
-      break;
-    default:
-      switch (TOKEN(x)) {
-      case '{': parse_quotation(x); return;
-      case '\'': DPUSH(x, &x->ip); parse_symbol(x); return;
-      case 'f': find_symbol(x); break;
-      case 'c': create_symbol(x); break;
-      case '0': DPUSH(x, 0); break;
-      case '1': DPUSH(x, 1); break;
-      case '_': DDROP(x); break;
-      case 's': swap(x); break;
-      case 'o': over(x); break;
-      case 'd': dup(x); break;
-      case 'r': rot(x); break;
-      case '+': add(x); break;
-      case '-': sub(x); break;
-      case '*': mul(x); break;
-      case '/': division(x); break;
-      case '%': mod(x); break;
-      case '&': and(x); break;
-      case '|': or(x); break;
-      case '!': not(x); break;
-      case '^': xor(x); break;
-      case '~': inverse(x); break;
-      case '<': lt(x); break;
-      case '=': eq(x); break;
-      case '>': gt(x); break;
-      case ',': istore(x); break;
-      case ';': bstore(x); break;
-      case '.': ifetch(x); break;
-      case ':': bfetch(x); break;
-      case 't': times(x); break;
-      case '?': branch(x); break;
-      case 'x': /* context reflection */ break;
-    }
-  }
+	if (x->n) {
+		T(x) = (T(x) << 8) + TOKEN(x);
+		x->n--;
+	} else {
+		/*dump_context(x);*/
+  	switch (PEEK(x)) {
+  	  case 'A': case 'B': 
+  	  case 'C':	case 'D': 
+  	  case 'E': case 'F':
+  	  case 'G': case 'H':
+  	  case 'I': case 'J': 
+  	  case 'K': case 'L':
+  	  case 'M': case 'N': 
+  	  case 'O': case 'P':
+  	  case 'Q': case 'R': 
+  	  case 'S': case 'T':
+  	  case 'U': case 'V': 
+  	  case 'W': case 'X':
+  	  case 'Y': case 'Z':
+  	    EXT(x, TOKEN(x))(x);
+  	    break;
+			default:
+				switch (TOKEN(x)) {
+				case 'e': call(x); break;
+				case '[': quotation(x); break;
+  	  	case ']': case '}': ret(x); break;
+  		  case '0': DPUSH(x, 0); break;
+  		  case '1': DPUSH(x, 1); break;
+				case '#': x->n = 1; DPUSH(x, 0); break;
+ 				case '2': x->n = 2; DPUSH(x, 0); break;
+ 				case '3': x->n = 3; DPUSH(x, 0); break;
+ 				case '4': x->n = 4; DPUSH(x, 0); break;
+				case '5': x->n = 5; DPUSH(x, 0); break;
+ 				case '6': x->n = 6; DPUSH(x, 0); break;
+ 				case '7': x->n = 7; DPUSH(x, 0); break;
+ 				case '8': x->n = 8; DPUSH(x, 0); break;
+			  case '_': DDROP(x); break;
+  		  case 's': swap(x); break;
+  		  case 'o': over(x); break;
+  		  case 'd': dup(x); break;
+  		  case 'r': rot(x); break;
+  		  case '+': add(x); break;
+  		  case '-': sub(x); break;
+  		  case '*': mul(x); break;
+  		  case '/': division(x); break;
+  		  case '%': mod(x); break;
+  		  case '&': and(x); break;
+  		  case '|': or(x); break;
+  		  case '!': not(x); break;
+  		  case '^': xor(x); break;
+  		  case '~': inverse(x); break;
+  		  case '<': lt(x); break;
+  		  case '=': eq(x); break;
+  		  case '>': gt(x); break;
+				/*
+  		  case ',': istore(x); break;
+  		  case ';': bstore(x); break;
+  		  case '.': ifetch(x); break;
+  		  case ':': bfetch(x); break;
+				*/
+  		  case 't': times(x); break;
+  		  case '?': branch(x); break;
+				case ':': colon(x); break;
+				case ';': semicolon(x); break;
+				case 'i': immediate(x); break;
+			}
+  	}
+	}
 }
               
-V inner(X* x) { I rp = x->rp; while(x->rp >= rp && x->ip) step(x); }
-V eval(X* x, B* q) { DPUSH(x, q); call(x, 0); inner(x); }
+V inner(X* x) { I rp = x->rp; while(x->rp >= rp && x->ip < MEM_SIZE) { step(x); } }
 
-X* init_VM() { return malloc(sizeof(X)); }
+B _literal(X* x, I n) {
+	if (n == 0) return 0;
+	else 
+}
+
+V literal(X* x) {
+	L1(x, I, n);
+	if (n == 0) PUTB(x, x->m->hp++, '0');
+	else if (n == 1) PUTB(x, x->m->hp++, '1');
+	else	PUTB(x, x->m->hp++, _literal(x, n));
+}
+
+V find_name(X* x) {
+	L2(x, I, l, B*, t);
+	S* s = x->m->l;
+	while (s) {
+		if (s->l == l && !strncmp(s->n, t, l)) break;
+		s = s->p;
+	}
+	DPUSH(x, t);
+	DPUSH(x, l);
+	DPUSH(x, s);
+}
+
+V evaluate(X* x, B* s) {
+	x->ibuf = s;	
+	x->ilen = strlen(s);
+	x->ipos = 0;
+	while (x->ipos < x->ilen) {
+		parse_name(x);
+		if (T(x) == 0) { DDROP(x); DDROP(x); return; }
+		find_name(x);
+		if (T(x)) {
+			L3(x, S*, s, I, l, B*, t);
+			if (!x->s || (s->f & IMMEDIATE) == IMMEDIATE) {
+				eval(x, s->c);
+			} else {
+				/* TODO: Compile */
+			}
+		} else {
+			L3(x, S*, _, I, l, B*, t);
+			if (t[0] == '\\') {
+				int i;
+				for (i = 1; i < l; i++) {
+					PUTB(x, MEM_SIZE - l + i, t[i]);
+				}
+				eval(x, MEM_SIZE - l);
+			} else if (t[0] == '$') {
+				int i;
+				for (i = 1; i < l; i++) {
+					PUTB(x, x->m->hp++, t[i]);
+				}
+			} else {
+				char* end;
+				int n = strtol(t, &end, 10);
+				if (n == 0 && end == t) {
+					printf("Word not found [%.*s]\n", (int)l, t);
+				} else {
+					DPUSH(x, n);
+					if (x->s) {
+						literal(x);
+					}
+				}
+			}
+		}
+	}
+}
+
+X* init_VM(M* m) { X* x = malloc(sizeof(X)); x->m = m; }
 X* init_EXT(X* x) { x->x = malloc(26*sizeof(I)); return x; }
+M* init_MEM() { return malloc(sizeof(M)); }
 
 #endif
