@@ -13,6 +13,7 @@ add_executable (
 	src/sloth)
 
 target_include_directories (sloth PRIVATE src)
+# target_link_libraries (sloth duma)
 
 add_executable (
 	tests

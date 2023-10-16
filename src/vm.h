@@ -1,3 +1,6 @@
+/* TODO: if and similars where not working because 0branch was being called, not being compiled as a primitive. When calling, ip is modified but after return it does not make sense. */
+/* I really like the \asm $asm $$asm concept */
+
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -107,12 +110,15 @@ V word(X* x) {
 	PUTB(x, x->m->hp++, 'e');
 }
 
+V compile_byte(X* x) { PUTB(x, x->m->hp++, GETB(x, x->ip++)); }
+
 #define TAIL(x) (x->ip >= MEM_SIZE || GETB(x, x->ip + 1) == ']' || GETB(x, x->ip + 1) == '}')
 V call(X* x) { L1(x, C, q); if (!TAIL(x)) x->r[x->rp++] = x->ip; x->ip = q; }
 V ret(X* x) { if (x->rp > 0) x->ip = x->r[--x->rp]; else x->ip = MEM_SIZE; }
-V zjump(X* x) { L1(x, C, b); if (!b) x->ip = b; }
+V jump(X* x) { L1(x, C, d); x->ip += d - 1; }
+V zjump(X* x) { L2(x, C, d, C, b); if (!b) x->ip += d - 1; }
 V eval(X* x, C q) { DPUSH(x, q); call(x); inner(x); }
-V quotation(X* x) { L1(x, C, n); DPUSH(x, x->ip); x->ip += n - 1; }
+V quotation(X* x) { L1(x, C, d); DPUSH(x, x->ip); x->ip += d - 1; }
 
 V dup(X* x) { DPUSH(x, T(x)); }
 V over(X* x) { DPUSH(x, N(x)); }
@@ -150,6 +156,8 @@ V branch(X* x) { L3(x, C, f, C, t, C, b); b ? eval(x, t) : eval(x, f); }
 #define S_pr(s, n, f, a) { C t; s += t = sprintf(s, f, a); n += t; }
               
 V dump_code(X* x, C c) {
+	C n;
+	S* s;
   C t = 1;
 	B token;
   while (t && c < MEM_SIZE) {
@@ -157,16 +165,40 @@ V dump_code(X* x, C c) {
     if (token == '[') t++;
     if (token == ']') t--;
 		if (token == '#') {
-			printf("#%d", GETB(x, ++c));
-			c += 1;
+			if (GETB(x, c + 2) == 'e') {
+				C n = GETB(x, ++c);
+				s = x->m->l;
+				while (s) {
+					if (s->c == n) {
+						printf("%.*s ", (int)s->l, s->n);
+					}
+					s = s->p;
+				}
+				c += 2;
+			} else {
+				printf("#%d ", GETB(x, ++c));
+				c += 1;
+			}
 		} else if (token == '2') {
-		  printf("#%d", GETS(x, ++c));
-			c += 2;
+			if (GETB(x, c + 3) == 'e') {
+				C n = GETS(x, ++c);
+				s = x->m->l;
+				while (s) {
+					if (s->c == n) {
+						printf("%.*s ", (int)s->l, s->n);
+					}
+					s = s->p;
+				}
+				c += 3;
+			} else {
+				printf("#%d ", GETS(x, ++c));
+				c += 2;
+			}
 		} else if (token == '4') {
-		  printf("#%d", GETI(x, ++c));
+		  printf("#%d ", GETI(x, ++c));
 			c += 4;
 		} else if (token == '8') {
-		  printf("#%ld", GETL(x, ++c));
+		  printf("#%ld ", GETL(x, ++c));
 			c += 8;
 		} else {
 	    printf("%c", token);
@@ -227,7 +259,7 @@ V see(X* x) {
 	find_name(x); 
 	{ 
 		L3(x, S*, s, C, l, B*, t);
-		printf("[%d] : %.*s ", s->c, (int)l, t);
+		printf("[%ld] : %.*s ", s->c, (int)l, t);
 		dump_code(x, s->c); 
 		if ((s->f & IMMEDIATE) == IMMEDIATE) printf(" IMMEDIATE");
 		printf("\n");
@@ -239,7 +271,7 @@ V colon(X* x) {
 	if (T(x) == 0) { DDROP(x); DDROP(x); /* Error */ return; }
 	else {
 		L2(x, C, l, B*, n);
-		S* s = malloc(sizeof(S));
+		S* s = malloc(sizeof(S) + l);
 		s->p = x->m->l;
 		x->m->l = s;
 		s->f = HIDDEN;
@@ -262,35 +294,32 @@ V immediate(X* x) {	x->m->l->f |= IMMEDIATE; }
 V postpone(X* x) { 
 	parse_name(x); 
 	find_name(x); /* Error? */ 
-	nip(x); nip(x);
-	/* Compile word address to be pushed on the stack */
-	literal(x); 
-	/* Compile literal to compile top of the stack as a literal */
-	PUTB(x, x->m->hp++, 'l'); 
-	/* Compile e as a literal to be later compiled */
-	DPUSH(x, 'e');
-	literal(x);
-	PUTB(x, x->m->hp++, 'l');
-
-	/* Compile a call to word to be compiled */
+	{
+		L3(x, S*, s, C, _, B*, __);
+		DPUSH(x, s->c);
+		literal(x); 
+		PUTB(x, x->m->hp++, 'l'); 
+		PUTB(x, x->m->hp++, '$');
+		PUTB(x, x->m->hp++, 'e');
+	}
 }
 
 V recurse(X* x) { DPUSH(x, x->m->l->c); literal(x); PUTB(x, x->m->hp++, 'e'); }
 V ahead(X* x) { 
 	printf("AHEAD\n");
-	printf("Pushing here+1: %d\n", x->m->hp + 1);
+	printf("Pushing here+1: %ld\n", x->m->hp + 1);
 	DPUSH(x, x->m->hp + 1); 
 	printf("Saving 1024 for using 2 bytes\n");
 	DPUSH(x, 1024); 
 	literal(x); 
 	printf("Saved value: %d\n", GETS(x, T(x)));
-	printf("Current here: %d\n", x->m->hp);
+	printf("Current here: %ld\n", x->m->hp);
 }
 V resolve(X* x) { 
 	L1(x, C, a); 
 	printf("RESOLVE\n");
 	printf("Address to set jump: %ld\n", a);
-	C d = x->m->hp - a; 
+	C d = x->m->hp - a - 2; 
 	printf("Distance: %ld\n", d);
 	PUTS(x, a, d); 
 	printf("Value set to: %d\n", GETS(x, a));
@@ -322,29 +351,35 @@ V step(X* x) {
 				case 'e': call(x); break;
 				case '[': quotation(x); break;
   	  	case ']': case '}': ret(x); break;
+				case 'j': jump(x); break;
 				case 'z': zjump(x); break;
+
   		  case '0': DPUSH(x, 0); break;
   		  case '1': DPUSH(x, 1); break;
 				case '#': DPUSH(x, GETB(x, x->ip)); x->ip += 1; break;
  				case '2': DPUSH(x, GETS(x, x->ip)); x->ip += 2; break;
  				case '4': DPUSH(x, GETI(x, x->ip)); x->ip += 4; break;
  				case '8': DPUSH(x, GETL(x, x->ip)); x->ip += 8; break;
+
 			  case '_': DDROP(x); break;
   		  case 's': swap(x); break;
   		  case 'o': over(x); break;
   		  case 'd': dup(x); break;
   		  case '@': rot(x); break;
 				case 'n': nip(x); break;
+
   		  case '+': add(x); break;
   		  case '-': sub(x); break;
   		  case '*': mul(x); break;
   		  case '/': division(x); break;
   		  case '%': mod(x); break;
+
   		  case '&': and(x); break;
   		  case '|': or(x); break;
   		  case '!': not(x); break;
   		  case '^': xor(x); break;
   		  case '~': inverse(x); break;
+
   		  case '<': lt(x); break;
   		  case '=': eq(x); break;
   		  case '>': gt(x); break;
@@ -357,6 +392,8 @@ V step(X* x) {
   		  case 't': times(x); break;
   		  case '?': branch(x); break;
 
+				case '$': compile_byte(x); break;
+
 				case ':': colon(x); break;
 				case ';': semicolon(x); break;
 				case 'i': immediate(x); break;
@@ -366,6 +403,7 @@ V step(X* x) {
 
 				case '`': recurse(x); break;
 				case 'a': ahead(x); break;
+				/* I don't really like r as resolve, I prefer r as rot */
 				case 'r': resolve(x); break;
 				case 'c': compile(x); break;
 				case 'w':
@@ -427,15 +465,42 @@ V evaluate(X* x, B* s) {
 	}
 }
 
-X* init_VM(M* m) { X* x = malloc(sizeof(X)); x->m = m; }
+X* init_VM(M* m) { 
+	X* x = malloc(sizeof(X)); 
+	x->m = m; 
+
+	return x;
+}
+
 X* init_EXT(X* x) { x->x = malloc(26*sizeof(C)); return x; }
-M* init_MEM() { return malloc(sizeof(M)); }
+
+M* init_MEM() { 
+	M* m = malloc(sizeof(M));
+	m->l = 0;
+	m->hp = 0;
+	return m;
+}
 X* init_SLOTH(X* x) {
 	evaluate(x, "\\: : $: \\;");
 	evaluate(x, ": ; $; \\;i");
 
 	evaluate(x, ": immediate $i ;");
+
+	evaluate(x, ": if $a$z ; immediate");
+  evaluate(x, ": else $a$jsr ; immediate");
+	evaluate(x, ": then $r ; immediate");
+
 	evaluate(x, ": postpone $p ; immediate");
+
+	evaluate(x, ": recurse $` ; immediate");
+
+	evaluate(x, ": [ $a$[ ; immediate");
+	evaluate(x, ": ] $$]r ; immediate");
+	evaluate(x, ": choose $? ;");
+
+	evaluate(x, ": execute $e ;");
+	evaluate(x, ": 0branch $z ;");
+	evaluate(x, ": jump $j ;");
 
 	evaluate(x, ": drop $_ ;");
 	evaluate(x, ": dup $d ;");
@@ -468,11 +533,15 @@ X* init_SLOTH(X* x) {
 	/*
 	evaluate(x, ": compile $c ;");
 	*/
-	evaluate(x, ": 0branch $z ;");
+	/*
 	evaluate(x, ": if >mark postpone 0branch ; immediate");
+	evaluate(x, ": else >mark postpone jump swap >resolve ; immediate");
 	evaluate(x, ": then >resolve ; immediate");
+	*/
 
 	evaluate(x, ": see $ws ;");
+
+	evaluate(x, ": fib dup 1 > if 1 - dup 1 - recurse swap recurse + then ;");
 
 	return x;
 }
