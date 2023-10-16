@@ -99,6 +99,14 @@ V literal(X* x) {
   }
 }
 
+V word(X* x) {
+	L1(x, S*, s);
+	printf("Compiling %.*s\n", (int)s->l, s->n);
+	DPUSH(x, s->c);
+	literal(x);
+	PUTB(x, x->m->hp++, 'e');
+}
+
 #define TAIL(x) (x->ip >= MEM_SIZE || GETB(x, x->ip + 1) == ']' || GETB(x, x->ip + 1) == '}')
 V call(X* x) { L1(x, C, q); if (!TAIL(x)) x->r[x->rp++] = x->ip; x->ip = q; }
 V ret(X* x) { if (x->rp > 0) x->ip = x->r[--x->rp]; else x->ip = MEM_SIZE; }
@@ -110,6 +118,7 @@ V dup(X* x) { DPUSH(x, T(x)); }
 V over(X* x) { DPUSH(x, N(x)); }
 V swap(X* x) { C t = T(x); T(x) = N(x); N(x) = t; }
 V rot(X* x) { C t = NN(x); NN(x) = N(x); N(x) = T(x); T(x) = t; }
+V nip(X* x) { N(x) = T(x); DDROP(x); }
 
 #define OP2(x, op) N(x) = N(x) op T(x); DDROP(x)
 V add(X* x) { OP2(x, +); }
@@ -218,7 +227,7 @@ V see(X* x) {
 	find_name(x); 
 	{ 
 		L3(x, S*, s, C, l, B*, t);
-		printf(": %.*s ", (int)l, t);
+		printf("[%d] : %.*s ", s->c, (int)l, t);
 		dump_code(x, s->c); 
 		if ((s->f & IMMEDIATE) == IMMEDIATE) printf(" IMMEDIATE");
 		printf("\n");
@@ -249,6 +258,23 @@ V semicolon(X* x) {
 }
 
 V immediate(X* x) {	x->m->l->f |= IMMEDIATE; }
+/* Postpone must compile code to compile code, */
+V postpone(X* x) { 
+	parse_name(x); 
+	find_name(x); /* Error? */ 
+	nip(x); nip(x);
+	/* Compile word address to be pushed on the stack */
+	literal(x); 
+	/* Compile literal to compile top of the stack as a literal */
+	PUTB(x, x->m->hp++, 'l'); 
+	/* Compile e as a literal to be later compiled */
+	DPUSH(x, 'e');
+	literal(x);
+	PUTB(x, x->m->hp++, 'l');
+
+	/* Compile a call to word to be compiled */
+}
+
 V recurse(X* x) { DPUSH(x, x->m->l->c); literal(x); PUTB(x, x->m->hp++, 'e'); }
 V ahead(X* x) { 
 	printf("AHEAD\n");
@@ -308,6 +334,7 @@ V step(X* x) {
   		  case 'o': over(x); break;
   		  case 'd': dup(x); break;
   		  case '@': rot(x); break;
+				case 'n': nip(x); break;
   		  case '+': add(x); break;
   		  case '-': sub(x); break;
   		  case '*': mul(x); break;
@@ -329,9 +356,14 @@ V step(X* x) {
 				*/
   		  case 't': times(x); break;
   		  case '?': branch(x); break;
+
 				case ':': colon(x); break;
 				case ';': semicolon(x); break;
 				case 'i': immediate(x); break;
+				case 'p': postpone(x); break;
+
+				case 'l': literal(x); break;
+
 				case '`': recurse(x); break;
 				case 'a': ahead(x); break;
 				case 'r': resolve(x); break;
@@ -403,12 +435,14 @@ X* init_SLOTH(X* x) {
 	evaluate(x, ": ; $; \\;i");
 
 	evaluate(x, ": immediate $i ;");
+	evaluate(x, ": postpone $p ; immediate");
 
 	evaluate(x, ": drop $_ ;");
 	evaluate(x, ": dup $d ;");
 	evaluate(x, ": over $o ;");
 	evaluate(x, ": swap $s ;");
 	evaluate(x, ": rot $@ ;");
+	evaluate(x, ": nip $n ;");
 
 	evaluate(x, ": + $+ ;");
 	evaluate(x, ": - $- ;");
@@ -431,10 +465,11 @@ X* init_SLOTH(X* x) {
 	*/
 	evaluate(x, ": >mark $a ;");
 	evaluate(x, ": >resolve $r ;");
+	/*
 	evaluate(x, ": compile $c ;");
+	*/
 	evaluate(x, ": 0branch $z ;");
-	/* compile must compile into if ... WHAT THE FUCK ?! */
-	evaluate(x, ": if >mark compile 0branch ; immediate");
+	evaluate(x, ": if >mark postpone 0branch ; immediate");
 	evaluate(x, ": then >resolve ; immediate");
 
 	evaluate(x, ": see $ws ;");
