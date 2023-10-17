@@ -12,6 +12,14 @@
 #include<string.h> /* strncpy */
 #include<fcntl.h>  /* open, close, read, write, O_RDONLY, O_WRONLY */
 
+#define ERR_OK 0
+#define ERR_UNDEFINED_WORD -13
+#define ERR_ZERO_LEN_NAME -16
+#define ERR_SYMBOL_ALLOCATION -256
+
+#define DO(x, f) f(x); if (x->err) return
+#define ERR(x, c, e) if (c) { x->err = e; return; }
+
 typedef void V;
 typedef char B;
 typedef intptr_t C;
@@ -248,22 +256,28 @@ V see(X* x) {
 	} 
 }
 
+V create(X* x) {
+  DO(x, parse_name);
+  ERR(x, T(x) == 0, ERR_ZERO_LEN_NAME);
+  {
+    L2(x, C, l, B*, n);
+    S* s = malloc(sizeof(S) + l);
+    ERR(x, !s, ERR_SYMBOL_ALLOCATION);
+    s->p = x->m->l;
+    x->m->l = s;
+    s->f = 0;
+    s->cl = 0;
+    s->c = x->m->hp;
+    s->nl = l;
+    strncpy(s->n, n, l);
+    s->n[l] = 0;
+  }
+}
+  
 V colon(X* x) {
-	parse_name(x);
-	if (T(x) == 0) { DDROP(x); DDROP(x); /* Error */ return; }
-	else {
-		L2(x, C, l, B*, n);
-		S* s = malloc(sizeof(S) + l);
-		s->p = x->m->l;
-		x->m->l = s;
-		s->f = HIDDEN;
-		s->cl = 0;
-		s->c = x->m->hp;
-		s->nl = l;
-		strncpy(s->n, n, l);
-		s->n[l] = 0;
-		x->s = 1;
-	}
+  DO(x, create);
+  x->m->l->f = HIDDEN;
+  x->s = 1;
 }
 
 V semicolon(X* x) { COMMAB(x, ']');	x->s = 0;	x->m->l->f &= ~HIDDEN; x->m->l->cl = x->m->hp - x->m->l->c - 1; }
@@ -408,14 +422,9 @@ V evaluate(X* x, B* s) {
 			} else {
 				char* end;
 				int n = strtol(t, &end, 10);
-				if (n == 0 && end == t) {
-					printf("Word not found [%.*s]\n", (int)l, t);
-				} else {
-					DPUSH(x, n);
-					if (x->s) {
-						literal(x);
-					}
-				}
+        ERR(x, n == 0 && end == t, ERR_UNDEFINED_WORD);
+				DPUSH(x, n);
+				if (x->s) literal(x);
 			}
 		}
 	}
