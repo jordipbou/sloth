@@ -118,7 +118,7 @@ V jump(X* x) { L1(x, C, d); x->ip += d - 1; }
 V zjump(X* x) { L2(x, C, d, C, b); if (!b) x->ip += d - 1; }
 V eval(X* x, C q) { DPUSH(x, q); call(x); inner(x); }
 V quotation(X* x) { L1(x, C, d); DPUSH(x, x->ip); x->ip += d - 1; }
-V recurse(X* x) { DPUSH(x, x->m->l->c); literal(x); PUTB(x, x->m->hp++, 'e'); }
+V recurse(X* x) { DPUSH(x, x->m->l->c); literal(x); PUTB(x, x->m->hp++, 'x'); }
 V ahead(X* x) { DPUSH(x, x->m->hp + 1); DPUSH(x, 1024); literal(x); }
 V resolve(X* x) { L1(x, C, a); C d = x->m->hp - a - 2; PUTS(x, a, d); }
 
@@ -301,7 +301,7 @@ V postpone(X* x) {
 #define TOKEN(x) (GETB(x, x->ip++))
                 
 V step(X* x) {
-		/*dump_context(x);*/
+	/*dump_context(x);*/
   if (!x->err) {
   	switch (PEEK(x)) {
   	  case 'A': case 'B': 
@@ -402,9 +402,9 @@ V evaluate(X* x, B* s) {
 	x->ilen = strlen(s);
 	x->ipos = 0;
 	while (x->ipos < x->ilen && !x->err) {
-		parse_name(x);
-		if (T(x) == 0) { DDROP(x); DDROP(x); return; }
-		find_name(x);
+		DO(x, parse_name);
+    if (T(x) == 0) { DDROP(x); DDROP(x); return; }
+		DO(x, find_name);
 		if (T(x)) {
 			L3(x, S*, s, C, l, B*, t);
 			if (!x->s || (s->f & IMMEDIATE) == IMMEDIATE) {
@@ -434,6 +434,9 @@ V reset_context(X* x) {
 	x->err = 0;
 	x->dp = 0;
 	x->rp = 0;
+  x->ibuf = 0;
+  x->ipos = 0;
+  x->ilen = 0;
 }
 
 X* init_VM(M* m) { 
