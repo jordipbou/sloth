@@ -1,5 +1,6 @@
 /* TODO: Condition system !!! */
 /* TODO: Variables, constants, create >does */
+/* TODO: Quotations outside colon definitions */
 /* TODO: Maybe dual words? I don't need if I need them */
 /* TODO: Clean every line not needed */
 
@@ -44,8 +45,9 @@ typedef struct _Context {
   C r[RSTACK_SIZE]; 
   C rp; 
   C ip;
+  C err;
   C s;
-  C n;
+  C n; /* What's this? */
   M* m;
 	/* TODO: Take it out of context to memory? */
   V (**x)(struct _Context*);
@@ -283,6 +285,7 @@ V postpone(X* x) {
                 
 V step(X* x) {
 		/*dump_context(x);*/
+  if (!x->err) {
   	switch (PEEK(x)) {
   	  case 'A': case 'B': 
   	  case 'C':	case 'D': 
@@ -366,15 +369,16 @@ V step(X* x) {
 					break;
 			}
   	}
+  }
 }
               
-V inner(X* x) { C rp = x->rp; while(x->rp >= rp && x->ip < MEM_SIZE) { step(x); } }
+V inner(X* x) { C rp = x->rp; while(x->rp >= rp && x->ip < MEM_SIZE && !x->err) { step(x); } }
 
 V evaluate(X* x, B* s) {
 	x->ibuf = s;	
 	x->ilen = strlen(s);
 	x->ipos = 0;
-	while (x->ipos < x->ilen) {
+	while (x->ipos < x->ilen && !x->err) {
 		parse_name(x);
 		if (T(x) == 0) { DDROP(x); DDROP(x); return; }
 		find_name(x);
