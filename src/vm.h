@@ -120,6 +120,9 @@ V swap(X* x) { C t = T(x); T(x) = N(x); N(x) = t; }
 V rot(X* x) { C t = NN(x); NN(x) = N(x); N(x) = T(x); T(x) = t; }
 V nip(X* x) { N(x) = T(x); DDROP(x); }
 
+V to_r(X* x) { x->r[x->rp++] = x->d[--x->dp]; }
+V from_r(X* x) { x->d[x->dp++] = x->r[--x->rp]; }
+
 #define OP2(x, op) N(x) = N(x) op T(x); DDROP(x)
 V add(X* x) { OP2(x, +); }
 V sub(X* x) { OP2(x, -); }
@@ -315,11 +318,14 @@ V step(X* x) {
  				case '4': DPUSH(x, GETI(x, x->ip)); x->ip += 4; break;
  				case '8': DPUSH(x, GETL(x, x->ip)); x->ip += 8; break;
 
-				case 'e': call(x); break;
+				case 'x': call(x); break;
 				case '[': quotation(x); break;
-  	  	case ']': case '}': ret(x); break;
+  	  	case ']': case '\\': ret(x); break;
 				case 'j': jump(x); break;
 				case 'z': zjump(x); break;
+
+				case '{': { L1(x, C, e); x->err = e; }; break;
+				/*case '}': catch_error(x); break;*/
 
 				case ':': colon(x); break;
 				case ';': semicolon(x); break;
@@ -335,6 +341,9 @@ V step(X* x) {
   		  case 'd': dup(x); break;
   		  case 'r': rot(x); break;
 				case 'n': nip(x); break;
+
+				case '(': to_r(x); break;
+				case ')': from_r(x); break;
 
   		  case '+': add(x); break;
   		  case '-': sub(x); break;
@@ -412,6 +421,12 @@ V evaluate(X* x, B* s) {
 	}
 }
 
+V reset_context(X* x) {
+	x->err = 0;
+	x->dp = 0;
+	x->rp = 0;
+}
+
 X* init_VM(M* m) { 
 	X* x = malloc(sizeof(X)); 
 	x->m = m; 
@@ -434,7 +449,7 @@ X* init_SLOTH(X* x) {
 	evaluate(x, ": ; \\$; \\;i");
 
 	evaluate(x, ": immediate \\$i ;");
-	evaluate(x, ": execute \\$e ;");
+	evaluate(x, ": execute \\$x ;");
 
 	evaluate(x, ": recurse \\$` ; immediate");
 

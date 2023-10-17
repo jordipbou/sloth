@@ -111,11 +111,12 @@ Literals are stored in memory with a variable length encoding.
 
 ### ASCII ordered
 
+	  (< 32) -> noop
     (SPACE) -> noop
     ! -> not
     " -> 
-    # -> cell literal
-    $ -> call
+    # -> one byte literal
+    $ -> compile next byte
     % -> modulo
     & -> and
     ' -> 
@@ -123,27 +124,27 @@ Literals are stored in memory with a variable length encoding.
     ) -> pop from R
     * -> multiplication
     + -> addition
-    , -> store cell
+    , -> 
     - -> substraction
-    . -> fetch cell
+    . -> 
     / -> division
     0 -> literal 0
     1 -> literal 1
-    2 ->
+    2 -> 2 byte literal
     3 ->
-    4 ->
+    4 -> 4 byte literal
     5 ->
     6 ->
     7 ->
-    8 ->
+    8 -> 8 byte literal
     9 ->
-    : -> fetch byte
-    ; -> store byte
+    : -> colon (start definition)
+    ; -> semicolon (end definition)
     < -> less than
     = -> equal
     > -> greater than
-    ? -> branch
-    @ -> relative to IP byte literal
+    ? -> branch (combinator)
+    @ -> resolve
 		A -> C extension
 		B -> C extension
 		C -> C extension
@@ -171,39 +172,39 @@ Literals are stored in memory with a variable length encoding.
 		X -> C extension
 		Y -> C extension
 		Z -> C extension
-    [ -> 
-    \ -> find symbol from string
-    ] -> 
+    [ -> push next ip and jump
+    \ -> return
+    ] -> return
     ^ -> xor
     _ -> drop
-    ` -> 
-    a -> accept
-    b -> compile byte to dictionary
-		c -> size of cell
+    ` -> recurse
+    a -> ahead
+    b -> 
+		c -> 
     d -> dup
-    e -> emit
-    f -> free
+    e -> RESERVED FOR EMIT
+    f -> 
     g -> 
     h -> 
     i -> immediate
     j -> jump
-    k -> key
+    k -> RESERVED FOR KEY
     l -> 
-		m -> malloc
-    n -> 
+		m -> 
+    n -> nip
     o -> over
-    p -> 
-    q -> quit
+    p -> postpone 
+    q -> 
     r -> rot
     s -> swap
     t -> times (combinator)
     u -> 
     v -> 
-    w -> while (combinator)
-    x -> 
+    w -> 
+    x -> execute/call
     y -> 
-    z -> zjump (jump if zero)
-    { -> start quotation/push IP+1 
+    z -> jump if zero
+    { -> throw 
     | -> or
-    } -> return/end of quotation 
+    } -> catch
     ~ -> invert

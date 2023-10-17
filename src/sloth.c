@@ -13,10 +13,14 @@ int main(int argc, char** argv) {
     printf("> ");
 	  r = fgets(buf, 255, stdin);
     evaluate(x, buf);
-    /*dump_context(x);*/
-		for (i = 0; i < x->dp; i++) {
-		  printf("%ld ", x->d[i]);
+		if (!x->err) {
+			for (i = 0; i < x->dp; i++) {
+			  printf("%ld ", x->d[i]);
+			}
+			printf("Ok\n");
+		} else {
+			printf("ERROR: %ld\n", x->err);
+			reset_context(x);
 		}
-		printf("\n");
 	}
 }
