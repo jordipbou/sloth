@@ -1,5 +1,7 @@
-/* TODO: if and similars where not working because 0branch was being called, not being compiled as a primitive. When calling, ip is modified but after return it does not make sense. */
-/* I really like the \asm $asm $$asm concept */
+/* TODO: Condition system !!! */
+/* TODO: Variables, constants, create >does */
+/* TODO: Maybe dual words? I don't need if I need them */
+/* TODO: Clean every line not needed */
 
 #ifndef SLOTH_VM
 #define SLOTH_VM
@@ -19,8 +21,9 @@ typedef intptr_t C;
 typedef struct _Symbol {
   struct _Symbol* p;
   B f;
+	C cl;
   C c;
-  B l;
+  B nl;
   B n[1];
 } S;
 
@@ -68,57 +71,46 @@ V inner(X* x);
 #define N(x) (x->d[x->dp - 2])
 #define NN(x) (x->d[x->dp - 3])
 
-#define GETB(x, a) (x->m->h[a])
-#define GETS(x, a) (*((int16_t*)&x->m->h[a]))
-#define GETI(x, a) (*((int32_t*)&x->m->h[a]))
-#define GETL(x, a) (*((int64_t*)&x->m->h[a]))
-#define GETC(x, a) (*((C*)&x->m->h[a]))
+#define GETB(x, a) (x->m->h[(a)])
+#define GETS(x, a) (*((int16_t*)&x->m->h[(a)]))
+#define GETI(x, a) (*((int32_t*)&x->m->h[(a)]))
+#define GETL(x, a) (*((int64_t*)&x->m->h[(a)]))
+#define GETC(x, a) (*((C*)&x->m->h[(a)]))
 
-#define PUTB(x, a, b) (x->m->h[a] = b)
-#define PUTS(x, a, s) (*((int16_t*)&x->m->h[a]) = (int16_t)s)
-#define PUTI(x, a, w) (*((int32_t*)&x->m->h[a]) = (int32_t)w)
-#define PUTL(x, a, l) (*((int64_t*)&x->m->h[a]) = (int64_t)l)
-#define PUTC(x, a, i) (*((C*)&x->m->h[a]) = i)
+#define PUTB(x, a, b) (x->m->h[(a)] = (b))
+#define PUTS(x, a, s) (*((int16_t*)&x->m->h[(a)]) = (int16_t)(s))
+#define PUTI(x, a, w) (*((int32_t*)&x->m->h[(a)]) = (int32_t)(w))
+#define PUTL(x, a, l) (*((int64_t*)&x->m->h[(a)]) = (int64_t)(l))
+#define PUTC(x, a, i) (*((C*)&x->m->h[(a)]) = (i))
+
+#define COMMAB(x, b) { PUTB(x, x->m->hp, b); x->m->hp += 1; }
+#define COMMAS(x, w) { PUTS(x, x->m->hp, w); x->m->hp += 2; }
+#define COMMAI(x, i) { PUTI(x, x->m->hp, i); x->m->hp += 4; }
+#define COMMAL(x, l) { PUTL(x, x->m->hp, l); x->m->hp += 8; }
 
 V literal(X* x) {
 	L1(x, C, n);
-	if (n == 0) PUTB(x, x->m->hp++, '0');
-	else if (n == 1) PUTB(x, x->m->hp++, '1');
-  else if (n > INT8_MIN && n < INT8_MAX) {
-    PUTB(x, x->m->hp++, '#');
-    PUTB(x, x->m->hp++, n);
-  } else if (n > INT16_MIN && n < INT16_MAX) {
-    PUTB(x, x->m->hp++, '2');
-    PUTS(x, x->m->hp, n);
-		x->m->hp += 2;
-  } else if (n > INT32_MIN && n < INT32_MAX) {
-    PUTB(x, x->m->hp++, '4');
-    PUTI(x, x->m->hp, n);
- 		x->m->hp += 4;
- } else {
-    PUTB(x, x->m->hp++, '8');
-    PUTL(x, x->m->hp, n);
- 		x->m->hp += 8;
-  }
+	if (n == 0) { COMMAB(x, '0'); }
+	else if (n == 1) { COMMAB(x, '1'); }
+  else if (n > INT8_MIN && n < INT8_MAX) { COMMAB(x, '#'); COMMAB(x, n); }
+  else if (n > INT16_MIN && n < INT16_MAX) { COMMAB(x, '2'); COMMAS(x, n); }
+  else if (n > INT32_MIN && n < INT32_MAX) { COMMAB(x, '4'); COMMAI(x, n); }
+  else { COMMAB(x, '8'); COMMAI(x, n); }
 }
 
-V word(X* x) {
-	L1(x, S*, s);
-	printf("Compiling %.*s\n", (int)s->l, s->n);
-	DPUSH(x, s->c);
-	literal(x);
-	PUTB(x, x->m->hp++, 'e');
-}
+/* s->cl can be used to choose between inline or not inline...let's inline everything now */
+V compile(X* x) { L1(x, S*, s); int i; while (i < s->cl) { COMMAB(x, GETB(x, s->c + i++)); } }
 
-V compile_byte(X* x) { PUTB(x, x->m->hp++, GETB(x, x->ip++)); }
-
-#define TAIL(x) (x->ip >= MEM_SIZE || GETB(x, x->ip + 1) == ']' || GETB(x, x->ip + 1) == '}')
+#define TAIL(x) (x->ip >= MEM_SIZE || GETB(x, x->ip) == ']' || GETB(x, x->ip) == '}')
 V call(X* x) { L1(x, C, q); if (!TAIL(x)) x->r[x->rp++] = x->ip; x->ip = q; }
 V ret(X* x) { if (x->rp > 0) x->ip = x->r[--x->rp]; else x->ip = MEM_SIZE; }
 V jump(X* x) { L1(x, C, d); x->ip += d - 1; }
 V zjump(X* x) { L2(x, C, d, C, b); if (!b) x->ip += d - 1; }
 V eval(X* x, C q) { DPUSH(x, q); call(x); inner(x); }
 V quotation(X* x) { L1(x, C, d); DPUSH(x, x->ip); x->ip += d - 1; }
+V recurse(X* x) { DPUSH(x, x->m->l->c); literal(x); PUTB(x, x->m->hp++, 'e'); }
+V ahead(X* x) { DPUSH(x, x->m->hp + 1); DPUSH(x, 1024); literal(x); }
+V resolve(X* x) { L1(x, C, a); C d = x->m->hp - a - 2; PUTS(x, a, d); }
 
 V dup(X* x) { DPUSH(x, T(x)); }
 V over(X* x) { DPUSH(x, N(x)); }
@@ -170,7 +162,7 @@ V dump_code(X* x, C c) {
 				s = x->m->l;
 				while (s) {
 					if (s->c == n) {
-						printf("%.*s ", (int)s->l, s->n);
+						printf("%.*s ", (int)s->nl, s->n);
 					}
 					s = s->p;
 				}
@@ -185,7 +177,7 @@ V dump_code(X* x, C c) {
 				s = x->m->l;
 				while (s) {
 					if (s->c == n) {
-						printf("%.*s ", (int)s->l, s->n);
+						printf("%.*s ", (int)s->nl, s->n);
 					}
 					s = s->p;
 				}
@@ -211,10 +203,10 @@ V dump_context(X* x) {
   C i;
   B* t;
   for (i = 0; i < x->dp; i++) printf("%ld ", x->d[i]);
-  printf(": ");
+  printf("▢ ");
   dump_code(x, x->ip);
   for (i = x->rp - 1; i >= 0; i--) {
-    printf(" : ");
+    printf(" ▢ ");
     dump_code(x, x->r[i]); 
   }
   printf("\n");
@@ -231,7 +223,7 @@ V find_name(X* x) {
 	L2(x, C, l, B*, t);
 	S* s = x->m->l;
 	while (s) {
-		if (s->l == l && !strncmp(s->n, t, l)) break;
+		if (s->nl == l && !strncmp(s->n, t, l)) break;
 		s = s->p;
 	}
 	DPUSH(x, t);
@@ -239,21 +231,6 @@ V find_name(X* x) {
 	DPUSH(x, s);
 }
 
-/* TODO: Word could not be found! */
-V compile(X* x) { 
-	printf("Executing compile\n");
-	parse_name(x); 
-	find_name(x); 
-	{ 
-		L3(x, S*, s, C, l, B*, t); 
-		printf("Word being compiled: %.*s\n", (int)l, t);
-		DPUSH(x, s->c); 
-		literal(x); 
-		PUTB(x, x->m->hp++, 'e'); 
-	} 
-}
-
-V tick(X* x) { parse_name(x); find_name(x); { L3(x, S*, s, C, _, B*, __); DPUSH(x, s->c); } }
 V see(X* x) { 
 	parse_name(x); 
 	find_name(x); 
@@ -275,61 +252,37 @@ V colon(X* x) {
 		s->p = x->m->l;
 		x->m->l = s;
 		s->f = HIDDEN;
+		s->cl = 0;
 		s->c = x->m->hp;
-		s->l = l;
+		s->nl = l;
 		strncpy(s->n, n, l);
 		s->n[l] = 0;
 		x->s = 1;
 	}
 }
 
-V semicolon(X* x) {
-	PUTB(x, x->m->hp++, ']');
-	x->s = 0;
-	x->m->l->f &= ~HIDDEN;
-}
-
+V semicolon(X* x) { COMMAB(x, ']');	x->s = 0;	x->m->l->f &= ~HIDDEN; x->m->l->cl = x->m->hp - x->m->l->c - 1; }
 V immediate(X* x) {	x->m->l->f |= IMMEDIATE; }
-/* Postpone must compile code to compile code, */
+
+/* Postpone could not inline everything, but right now, it is. */
 V postpone(X* x) { 
 	parse_name(x); 
-	find_name(x); /* Error? */ 
+	find_name(x);
 	{
 		L3(x, S*, s, C, _, B*, __);
-		DPUSH(x, s->c);
-		literal(x); 
-		PUTB(x, x->m->hp++, 'l'); 
-		PUTB(x, x->m->hp++, '$');
-		PUTB(x, x->m->hp++, 'e');
+		int i;
+		for (i = 0; i < s->cl; i++) {
+			COMMAB(x, '$');
+			COMMAB(x, GETB(x, s->c + i));
+		}
 	}
-}
-
-V recurse(X* x) { DPUSH(x, x->m->l->c); literal(x); PUTB(x, x->m->hp++, 'e'); }
-V ahead(X* x) { 
-	printf("AHEAD\n");
-	printf("Pushing here+1: %ld\n", x->m->hp + 1);
-	DPUSH(x, x->m->hp + 1); 
-	printf("Saving 1024 for using 2 bytes\n");
-	DPUSH(x, 1024); 
-	literal(x); 
-	printf("Saved value: %d\n", GETS(x, T(x)));
-	printf("Current here: %ld\n", x->m->hp);
-}
-V resolve(X* x) { 
-	L1(x, C, a); 
-	printf("RESOLVE\n");
-	printf("Address to set jump: %ld\n", a);
-	C d = x->m->hp - a - 2; 
-	printf("Distance: %ld\n", d);
-	PUTS(x, a, d); 
-	printf("Value set to: %d\n", GETS(x, a));
 }
 
 #define PEEK(x) (GETB(x, x->ip))
 #define TOKEN(x) (GETB(x, x->ip++))
                 
 V step(X* x) {
-		dump_context(x);
+		/*dump_context(x);*/
   	switch (PEEK(x)) {
   	  case 'A': case 'B': 
   	  case 'C':	case 'D': 
@@ -348,11 +301,9 @@ V step(X* x) {
   	    break;
 			default:
 				switch (TOKEN(x)) {
-				case 'e': call(x); break;
-				case '[': quotation(x); break;
-  	  	case ']': case '}': ret(x); break;
-				case 'j': jump(x); break;
-				case 'z': zjump(x); break;
+				/*
+				case 'l': literal(x); break;
+				*/
 
   		  case '0': DPUSH(x, 0); break;
   		  case '1': DPUSH(x, 1); break;
@@ -361,11 +312,25 @@ V step(X* x) {
  				case '4': DPUSH(x, GETI(x, x->ip)); x->ip += 4; break;
  				case '8': DPUSH(x, GETL(x, x->ip)); x->ip += 8; break;
 
+				case 'e': call(x); break;
+				case '[': quotation(x); break;
+  	  	case ']': case '}': ret(x); break;
+				case 'j': jump(x); break;
+				case 'z': zjump(x); break;
+
+				case ':': colon(x); break;
+				case ';': semicolon(x); break;
+				case 'i': immediate(x); break;
+				case '$': COMMAB(x, GETB(x, x->ip++)); break;
+				case '`': recurse(x); break;
+				case 'a': ahead(x); break;
+				case '@': resolve(x); break;
+
 			  case '_': DDROP(x); break;
   		  case 's': swap(x); break;
   		  case 'o': over(x); break;
   		  case 'd': dup(x); break;
-  		  case '@': rot(x); break;
+  		  case 'r': rot(x); break;
 				case 'n': nip(x); break;
 
   		  case '+': add(x); break;
@@ -392,20 +357,8 @@ V step(X* x) {
   		  case 't': times(x); break;
   		  case '?': branch(x); break;
 
-				case '$': compile_byte(x); break;
-
-				case ':': colon(x); break;
-				case ';': semicolon(x); break;
-				case 'i': immediate(x); break;
 				case 'p': postpone(x); break;
 
-				case 'l': literal(x); break;
-
-				case '`': recurse(x); break;
-				case 'a': ahead(x); break;
-				/* I don't really like r as resolve, I prefer r as rot */
-				case 'r': resolve(x); break;
-				case 'c': compile(x); break;
 				case 'w':
 					switch (TOKEN(x)) {
 						case 's': see(x); break;
@@ -428,27 +381,17 @@ V evaluate(X* x, B* s) {
 		if (T(x)) {
 			L3(x, S*, s, C, l, B*, t);
 			if (!x->s || (s->f & IMMEDIATE) == IMMEDIATE) {
-				printf("INTERPRETING %.*s\n", (int)l, t);
 				eval(x, s->c);
 			} else {
-				printf("COMPILING %.*s\n", (int)l, t);
-				DPUSH(x, s->c);
-				literal(x);
-				PUTB(x, x->m->hp++, 'e');
+				DPUSH(x, s);
+				compile(x);
 			}
 		} else {
 			L3(x, S*, _, C, l, B*, t);
 			if (t[0] == '\\') {
 				int i;
-				for (i = 1; i < l; i++) {
-					PUTB(x, MEM_SIZE - l + i, t[i]);
-				}
-				eval(x, MEM_SIZE - l);
-			} else if (t[0] == '$') {
-				int i;
-				for (i = 1; i < l; i++) {
-					PUTB(x, x->m->hp++, t[i]);
-				}
+				for (i = 1; i < l; i++) { PUTB(x, MEM_SIZE - l + i, t[i]); }
+				eval(x, MEM_SIZE - l + 1);
 			} else {
 				char* end;
 				int n = strtol(t, &end, 10);
@@ -468,6 +411,7 @@ V evaluate(X* x, B* s) {
 X* init_VM(M* m) { 
 	X* x = malloc(sizeof(X)); 
 	x->m = m; 
+	x->ip = MEM_SIZE;
 
 	return x;
 }
@@ -480,66 +424,49 @@ M* init_MEM() {
 	m->hp = 0;
 	return m;
 }
+
 X* init_SLOTH(X* x) {
-	evaluate(x, "\\: : $: \\;");
-	evaluate(x, ": ; $; \\;i");
+	evaluate(x, "\\: : \\$: \\;");
+	evaluate(x, ": ; \\$; \\;i");
 
-	evaluate(x, ": immediate $i ;");
+	evaluate(x, ": immediate \\$i ;");
+	evaluate(x, ": execute \\$e ;");
 
-	evaluate(x, ": if $a$z ; immediate");
-  evaluate(x, ": else $a$jsr ; immediate");
-	evaluate(x, ": then $r ; immediate");
+	evaluate(x, ": recurse \\$` ; immediate");
 
-	evaluate(x, ": postpone $p ; immediate");
+	evaluate(x, ": >mark \\$a ;");
+	evaluate(x, ": >resolve \\$@ ;");
+	evaluate(x, ": 0branch \\$z ;");
+	evaluate(x, ": jump \\$j ;");
 
-	evaluate(x, ": recurse $` ; immediate");
+	evaluate(x, ": postpone \\$p ; immediate");
 
-	evaluate(x, ": [ $a$[ ; immediate");
-	evaluate(x, ": ] $$]r ; immediate");
-	evaluate(x, ": choose $? ;");
+	evaluate(x, ": drop \\$_ ;");
+	evaluate(x, ": dup \\$d ;");
+	evaluate(x, ": over \\$o ;");
+	evaluate(x, ": swap \\$s ;");
+	evaluate(x, ": rot \\$@ ;");
+	evaluate(x, ": nip \\$n ;");
 
-	evaluate(x, ": execute $e ;");
-	evaluate(x, ": 0branch $z ;");
-	evaluate(x, ": jump $j ;");
+	evaluate(x, ": + \\$+ ;");
+	evaluate(x, ": - \\$- ;");
+	evaluate(x, ": * \\$* ;");
+	evaluate(x, ": / \\$/ ;");
+	evaluate(x, ": mod \\$% ;");
 
-	evaluate(x, ": drop $_ ;");
-	evaluate(x, ": dup $d ;");
-	evaluate(x, ": over $o ;");
-	evaluate(x, ": swap $s ;");
-	evaluate(x, ": rot $@ ;");
-	evaluate(x, ": nip $n ;");
+	evaluate(x, ": < \\$< ;");
+	evaluate(x, ": = \\$= ;");
+	evaluate(x, ": > \\$> ;");
 
-	evaluate(x, ": + $+ ;");
-	evaluate(x, ": - $- ;");
-	evaluate(x, ": * $* ;");
-	evaluate(x, ": / $/ ;");
-	evaluate(x, ": mod $% ;");
+	evaluate(x, ": and \\$& ;");
+	evaluate(x, ": or \\$| ;");
+	evaluate(x, ": invert \\$~ ;");
+	
+	evaluate(x, ": see \\$w$s ;");
 
-	evaluate(x, ": < $< ;");
-	evaluate(x, ": = $= ;");
-	evaluate(x, ": > $> ;");
-
-	evaluate(x, ": and $& ;");
-	evaluate(x, ": or $| ;");
-	evaluate(x, ": invert $~ ;");
-
-	/* a must be executed, z must be compiled ?! */
-	/*
-	evaluate(x, ": if $az ; immediate");
-	evaluate(x, ": then $r ; immediate");
-	*/
-	evaluate(x, ": >mark $a ;");
-	evaluate(x, ": >resolve $r ;");
-	/*
-	evaluate(x, ": compile $c ;");
-	*/
-	/*
 	evaluate(x, ": if >mark postpone 0branch ; immediate");
 	evaluate(x, ": else >mark postpone jump swap >resolve ; immediate");
 	evaluate(x, ": then >resolve ; immediate");
-	*/
-
-	evaluate(x, ": see $ws ;");
 
 	evaluate(x, ": fib dup 1 > if 1 - dup 1 - recurse swap recurse + then ;");
 
