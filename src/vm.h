@@ -122,7 +122,8 @@ V eval(X* x, C q) { DPUSH(x, q); call(x); inner(x); }
 V quotation(X* x) { L1(x, C, d); DPUSH(x, x->ip); x->ip += d - 1; }
 V recurse(X* x) { DPUSH(x, x->m->l->c); literal(x); PUTB(x, x->m->hp++, 'x'); }
 V ahead(X* x) { DPUSH(x, x->m->hp + 1); DPUSH(x, 1024); literal(x); }
-V resolve(X* x) { L1(x, C, a); C d = x->m->hp - a - 2; PUTS(x, a, d); }
+V fresolve(X* x) { L1(x, C, a); C d = x->m->hp - a - 2; PUTS(x, a, d); }
+V bresolve(X* x) { L1(x, C, a); C d = a - x->m->hp + 3; DPUSH(x, a); literal(x); COMMAB(x, 'j'); }
 
 V dup(X* x) { DPUSH(x, T(x)); }
 V over(X* x) { DPUSH(x, N(x)); }
@@ -349,7 +350,9 @@ V step(X* x) {
 				case '$': COMMAB(x, GETB(x, x->ip++)); break;
 				case '`': recurse(x); break;
 				case 'a': ahead(x); break;
-				case '@': resolve(x); break;
+        case 'h': DPUSH(x, x->m->hp); break;
+				case 'f': fresolve(x); break;
+        case 'l': bresolve(x); break;
 
 			  case '_': DDROP(x); break;
   		  case 's': swap(x); break;
@@ -502,6 +505,12 @@ X* init_SLOTH(X* x) {
 	evaluate(x, ": then >resolve ; immediate");
 
 	evaluate(x, ": fib dup 1 > if 1 - dup 1 - recurse swap recurse + then ;");
+
+  evaluate(x, ": >r \\$( ;");
+  evaluate(x, ": r> \\$) ;");
+  evaluate(x, ": mark> \\$h ;");
+  evaluate(x, ": 2dup over over ;");
+  evaluate(x, ": 1+ 1 + ;");
 
 	return x;
 }
