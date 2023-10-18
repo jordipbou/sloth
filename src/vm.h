@@ -1,8 +1,8 @@
+/* TOOD: Add literal to step */
+/* TODO: Add create/colon/variable/constant and semicolon */
+
 /* LEARN BY MAKING PFORTH FTH CODE WORK ON DODO */
 /* - pForth is NOT case sensitive. I like that and will use that for now. */
-
-
-
 
 /* TODO: Use key/emit for input/output and for dumping context */
 /* TODO: Create tests based on key/emit and dump context */
@@ -20,6 +20,307 @@
 #include<string.h> /* strncpy */
 #include<fcntl.h>  /* open, close, read, write, O_RDONLY, O_WRONLY */
 
+typedef void V;
+typedef int8_t B;
+typedef intptr_t C;
+
+#define HIDDEN 1
+#define IMMEDIATE 2
+#define VARIABLE 4
+#define CONSTANT 8
+
+typedef struct _Symbol {
+	struct _Symbol* p;
+	C c;
+	B f;
+	B nl;
+	B n[1];
+} S;
+
+typedef struct _Context X;
+typedef V (*F)(X*);
+
+#define MEM_SIZE 65536
+
+typedef struct _Memory {
+	C s;
+	S* l;
+	C h;
+	F x[26];
+	B c;
+	B* ibuf;
+	C ilen;
+	C ipos;
+	B d[1];
+} M;
+
+#define DSTACK_SIZE 256
+#define RSTACK_SIZE 256
+
+struct _Context {
+  C d[DSTACK_SIZE];
+	C dp;
+	C r[RSTACK_SIZE];
+	C rp;
+	C ip;
+	C err;
+	M* m;
+};
+
+V reset_context(X* x) {
+	x->dp = 0;
+	x->rp = 0;
+	x->ip = MEM_SIZE;
+	x->err = 0;
+}
+
+X* init() {
+	X* x = malloc(sizeof(X));
+	if (!x) return 0;
+	x->m = malloc(sizeof(M) + MEM_SIZE);
+	if (!x->m) { free(x); return 0; }
+	reset_context(x);
+
+	return x;
+}
+
+/* Helpers */
+
+#define EXT(x, l) (x->m->x[l - 'A'])
+
+#define PUSH(x, v) (x->d[x->dp++] = (C)v)
+#define POP(x) (x->d[--x->dp])
+#define DROP(x) (--x->dp)
+
+#define T(x) (x->d[x->dp - 1])
+#define N(x) (x->d[x->dp - 2])
+#define NN(x) (x->d[x->dp - 3])
+
+#define L1(x, t, v) t v = (t)POP(x)
+#define L2(x, t1, v1, t2, v2) L1(x, t1, v1); L1(x, t2, v2)
+#define L3(x, t1, v1, t2, v2, t3, v3) L2(x, t1, v1, t2, v2); L1(x, t3, v3)
+
+#define DO(x, f) { f(x); if (x->err) return; }
+#define ERR(x, c, e) if (c) { x->err = e; return; }
+
+#define ERR_UNDEFINED_WORD -13
+
+V parse_name(X* x) {
+	while (x->m->ipos < x->m->ilen && isspace(x->m->ibuf[x->m->ipos])) x->m->ipos++;
+	PUSH(x, &x->m->ibuf[x->m->ipos]);
+	while (x->m->ipos < x->m->ilen && !isspace(x->m->ibuf[x->m->ipos])) x->m->ipos++;
+	PUSH(x, &x->m->ibuf[x->m->ipos] - T(x));
+}
+
+V find_name(X* x) {
+	L2(x, C, l, B*, t);
+	S* s = x->m->l;
+	while (s) {
+		if (s->nl == l && !strncmp((const char *)s->n, (const char*)t, (long unsigned int)l)) break;
+		s = s->p;
+	}
+	PUSH(x, t);
+	PUSH(x, l);
+	PUSH(x, s);
+}
+
+V literal(X* x) {
+	L1(x, C, v);
+	x->m->d[x->m->h++] = '#';
+	*((C*)(&x->m->d[x->m->h])) = v;
+	x->m->h += sizeof(C);
+}
+
+C code_length(X* x, S* s) {
+	int t = 1;
+	B* c = &x->m->d[s->c];
+	C n = 0;
+	while (t) {
+		if (*c == '[') t++;
+		if (*c == ']') t--;
+		c++;
+		n++;
+	}
+	return n - 1;
+}
+
+V compile(X* x) {
+	L1(x, S*, s);
+	C cl = code_length(x, s);
+	C i;
+	if (cl < sizeof(C) + 2) {
+		for (i = 0; i < cl; i++) x->m->d[x->m->h++] = x->m->d[s->c + i];
+	} else {
+		PUSH(x, s->c);
+		literal(x);
+		x->m->d[x->m->h++] = 'x';
+	}
+}
+
+/* Inner interpreter */
+
+V inner(X* x);
+
+#define TAIL(x) (x->ip >= MEM_SIZE || x->m->d[x->ip] == ']' || x->m->d[x->ip] == '}')
+V call(X* x) { L1(x, C, q); if (!TAIL(x)) x->r[x->rp++] = x->ip; x->ip = q; }
+V ret(X* x) { if (x->rp > 0) x->ip = x->r[--x->rp]; else x->ip = MEM_SIZE; }
+V jump(X* x) { L1(x, C, d); x->ip += d - 1; }
+V zjump(X* x) { L2(x, C, d, C, b); if (!b) x->ip += d - 1; }
+V eval(X* x, C q) { PUSH(x, q); call(x); inner(x); }
+
+V bfetch(X* x) { L1(x, B*, a); PUSH(x, *a); }
+V bstore(X* x) { L2(x, B*, a, B, v); *a = v; }
+V cfetch(X* x) { L1(x, C*, a); PUSH(x, *a); }
+V cstore(X* x) { L2(x, C*, a, C, v); *a = v; }
+
+V bcompile(X* x) { L1(x, B, v); x->m->d[x->m->h] = v; x->m->h += 1; }
+V ccompile(X* x) { L1(x, C, v); *((C*)&x->m->d[x->m->h]) = v, x->m->h += sizeof(C); }
+
+V dup(X* x) { PUSH(x, T(x)); }
+V over(X* x) { PUSH(x, N(x)); }
+V swap(X* x) { C t = T(x); T(x) = N(x); N(x) = t; }
+V rot(X* x) { C t = NN(x); NN(x) = N(x); N(x) = T(x); T(x) = t; }
+V nip(X* x) { N(x) = T(x); DROP(x); }
+
+V to_r(X* x) { x->r[x->rp++] = x->d[--x->dp]; }
+V from_r(X* x) { x->d[x->dp++] = x->r[--x->rp]; }
+
+#define OP2(x, op) N(x) = N(x) op T(x); DROP(x)
+V add(X* x) { OP2(x, +); }
+V sub(X* x) { OP2(x, -); }
+V mul(X* x) { OP2(x, *); }
+V division(X* x) { OP2(x, /); }
+V mod(X* x) { OP2(x, %); }
+
+V and(X* x) { OP2(x, &); }
+V or(X* x) { OP2(x, |);}
+V xor(X* x) { OP2(x, ^); }
+V not(X* x) { T(x) = !T(x); }
+V inverse(X* x) { T(x) = ~T(x); }
+
+V lt(X* x) { N(x) = (N(x) < T(x)) ? -1 : 0; x->dp--; }
+V eq(X* x) { N(x) = (N(x) == T(x)) ? -1 : 0; x->dp--; }
+V gt(X* x) { N(x) = (N(x) > T(x)) ? -1 : 0; x->dp--; }
+
+#define PEEK(x) (x->m->d[x->ip])
+#define TOKEN(x) (x->m->d[x->ip++])
+
+V step(X* x) {
+	switch (PEEK(x)) {
+  case 'A': case 'B': case 'C':	case 'D': 
+  case 'F': case 'G': case 'H': case 'I':
+	case 'J': case 'L': case 'M': case 'N': 
+	case 'O': case 'P': case 'Q': case 'R': 
+  case 'S': case 'T': case 'U': case 'V': 
+  case 'W': case 'X': case 'Y': case 'Z':
+    EXT(x, TOKEN(x))(x);
+    break;
+	default:
+		switch (TOKEN(x)) {
+		case 'k': EXT(x, 'K')(x); break;
+		case 'e': EXT(x, 'E')(x); break;
+
+		case 'x': call(x); break;
+		case ']': case '}': ret(x); break;
+		case 'j': jump(x); break;
+		case 'z': zjump(x); break;
+
+		case ':': bfetch(x); break;
+		case '.': bstore(x); break;
+		case ';': cfetch(x); break;
+		case ',': cstore(x); break;
+
+		case '\'': bcompile(x); break;
+		case '"': ccompile(x); break;
+
+	  case '_': DROP(x); break;
+	  case 's': swap(x); break;
+	  case 'o': over(x); break;
+	  case 'd': dup(x); break;
+	  case 'r': rot(x); break;
+		case 'n': nip(x); break;
+
+		case '(': to_r(x); break;
+		case ')': from_r(x); break;
+
+	  case '+': add(x); break;
+	  case '-': sub(x); break;
+	  case '*': mul(x); break;
+	  case '/': division(x); break;
+	  case '%': mod(x); break;
+
+	  case '&': and(x); break;
+	  case '|': or(x); break;
+	  case '!': not(x); break;
+	  case '^': xor(x); break;
+	  case '~': inverse(x); break;
+
+	  case '<': lt(x); break;
+	  case '=': eq(x); break;
+	  case '>': gt(x); break;
+
+/*
+		case 'h': PUSH(x, &x->m->d[x->m->h]); break;
+		case 'l': PUSH(x, &x->m->l); break;
+
+		case 'c': PUSH(x, sizeof(C)); break;
+*/
+		}
+	}
+}
+
+V inner(X* x) { 
+	C rp = x->rp; 
+	while(x->rp >= rp && x->ip < MEM_SIZE && !x->err) { 
+		step(x); 
+		/* TODO: Manage errors with handlers */
+	} 
+}
+
+/* Outer interpreter */
+
+V evaluate(X* x, B* s) {
+	x->m->ibuf = s;	
+	x->m->ilen = strlen((const char *)s);
+	x->m->ipos = 0;
+	while (x->m->ipos < x->m->ilen && !x->err) {
+		DO(x, parse_name);
+    if (T(x) == 0) { DROP(x); DROP(x); return; }
+		else {
+			DO(x, find_name);
+			if (T(x)) {
+				L3(x, S*, s, C, _, B*, __);
+				if ((s->f & VARIABLE) == VARIABLE) {
+					PUSH(x, &x->m->d[s->c]);
+					if (x->m->c) literal(x);
+				} else if ((s->f & CONSTANT) == CONSTANT) {
+					PUSH(x, *((C*)(&x->m->d[s->c])));
+					if (x->m->c) literal(x);
+				} else if (!x->m->c || (s->f & IMMEDIATE) == IMMEDIATE) {
+					eval(x, s->c);
+				} else { 
+					PUSH(x, s); 
+					compile(x); 
+				}
+			} else {
+			  L3(x, S*, _, C, l, B*, t);
+				if (t[0] == '\\') {
+					int i;
+					for (i = 1; i < l; i++) { x->m->d[MEM_SIZE - l + i] = t[i]; }
+					eval(x, MEM_SIZE - l + 1);
+				} else {
+					char * end;
+					int n = strtol((char*)t, &end, 10);
+					ERR(x, n == 0 && end == (char *)t, ERR_UNDEFINED_WORD);
+					PUSH(x, n);
+					if (x->m->c) literal(x);
+				}
+			}
+		}
+	}
+}
+
+/*
 #define ERR_OK 0
 #define ERR_UNDEFINED_WORD -13
 #define ERR_ZERO_LEN_NAME -16
@@ -63,11 +364,9 @@ typedef struct _Context {
   C ip;
   C err;
   C s;
-  C n; /* What's this? */
+  C n;
   M* m;
-	/* TODO: Take it out of context to memory? */
   V (**x)(struct _Context*);
-	/* TODO: Should ibuf be shared between contexts? Move to memory in that case */
 	B* ibuf;
 	C ilen;
 	C ipos;
@@ -116,7 +415,6 @@ V literal(X* x) {
   else { COMMAB(x, '8'); COMMAI(x, n); }
 }
 
-/* s->cl can be used to choose between inline or not inline...let's inline everything now */
 V compile(X* x) { 
 	L1(x, S*, s); 
 	int i; 
@@ -296,7 +594,6 @@ V colon(X* x) {
 V semicolon(X* x) { COMMAB(x, ']');	x->s = 0;	x->m->l->f &= ~HIDDEN; x->m->l->cl = x->m->hp - x->m->l->c - 1; }
 V immediate(X* x) {	x->m->l->f |= IMMEDIATE; }
 
-/* Postpone could not inline everything, but right now, it is. */
 V postpone(X* x) { 
 	parse_name(x); 
 	find_name(x);
@@ -334,9 +631,6 @@ V step(X* x) {
   	    break;
 			default:
 				switch (TOKEN(x)) {
-				/*
-				case 'l': literal(x); break;
-				*/
 
   		  case '0': DPUSH(x, 0); break;
   		  case '1': DPUSH(x, 1); break;
@@ -352,7 +646,6 @@ V step(X* x) {
 				case 'z': zjump(x); break;
 
 				case '{': { L1(x, C, e); x->err = e; }; break;
-				/*case '}': catch_error(x); break;*/
 
 				case ':': colon(x); break;
 				case ';': semicolon(x); break;
@@ -389,25 +682,18 @@ V step(X* x) {
   		  case '<': lt(x); break;
   		  case '=': eq(x); break;
   		  case '>': gt(x); break;
-				/*
   		  case ',': istore(x); break;
   		  case ';': bstore(x); break;
   		  case '.': ifetch(x); break;
   		  case ':': bfetch(x); break;
-				*/
   		  case 't': times(x); break;
   		  case '?': branch(x); break;
-
-				/*
-				case 'p': postpone(x); break;
-				*/
 
 				case 'w':
 					switch (TOKEN(x)) {
 						case 's': see(x); break;
 					}
 					break;
-				/* BYTECODES FOR PFORTH (LET'S SEE LATER WHAT'S NEEDED AND HOW) */
 				case 'p': 
 					switch (TOKEN(x)) {
 					case '@': cstore(x); break;
@@ -421,7 +707,6 @@ V step(X* x) {
               
 V inner(X* x) { C rp = x->rp; while(x->rp >= rp && x->ip < MEM_SIZE && !x->err) { step(x); } }
 
-/* TODO: Make the reader case insensitive !!! */
 V evaluate(X* x, B* s) {
 	x->ibuf = s;	
 	x->ilen = strlen(s);
@@ -533,13 +818,11 @@ X* init_SLOTH(X* x) {
   evaluate(x, ": 2dup over over ;");
   evaluate(x, ": 1+ 1 + ;");
 
-/*
 	evaluate(x, ": do postpone swap postpone >r postpone >r mark> ; immediate");
 	evaluate(x, ": i r> dup >r ;");
 	evaluate(x, ": loop postpone r> postpone 1+ postpone r> postpone 2dup postpone >r postpone >r postpone = postpone if resolve> postpone jump postpone then postpone r> postpone r> ; immediate");
-*/
 
 	return x;
 }
-
+*/
 #endif

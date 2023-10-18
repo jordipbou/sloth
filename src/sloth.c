@@ -4,13 +4,38 @@
 
 int main(int argc, char** argv) {
 	char* r;
+	char buf[255];
+	C i;
+
+	X* x = init();
+	if (!x) exit(EXIT_FAILURE);
+
+	printf("SLOTH v0.1\n");
+	while (1) {
+	  r = fgets(buf, 255, stdin);
+    evaluate(x, (B*)buf);
+		if (!x->err) {
+			for (i = 0; i < x->dp; i++) {
+			  printf("%ld ", x->d[i]);
+			}
+			printf("Ok\n");
+		} else {
+			printf("ERROR: %ld\n", x->err);
+			reset_context(x);
+		}
+	}
+		
+}
+
+/*
+int main(int argc, char** argv) {
+	char* r;
   int i;
   B buf[255];
 
 	X* x = init_VM(init_MEM());
 
 	if (argc == 2) {
-		/* Load file */
 		FILE *f = fopen(argv[1], "r");
 		if (!f) {
 			exit(EXIT_FAILURE);
@@ -54,3 +79,4 @@ int main(int argc, char** argv) {
 		}
 	}
 }
+*/
