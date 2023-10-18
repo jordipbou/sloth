@@ -1,14 +1,44 @@
 #include<stdio.h>
+#include<stdlib.h>
 #include"vm.h"
-
-V hello(X* x) { printf("Hello world!\n"); }
 
 int main(int argc, char** argv) {
 	char* r;
   int i;
   B buf[255];
-	X* x = init_SLOTH(init_VM(init_MEM()));
-  /*EXT(x, 'H') = &hello;*/
+
+	X* x = init_VM(init_MEM());
+
+	if (argc == 2) {
+		/* Load file */
+		FILE *f = fopen(argv[1], "r");
+		if (!f) {
+			exit(EXIT_FAILURE);
+		} else {
+			char* line = 0;
+			size_t len = 0;
+			size_t read;
+
+			while ((read = getline(&line, &len, f)) != -1) {
+				printf("--> %s\n", line);
+				evaluate(x, line);
+				if (x->err) {
+					printf("ERROR: %ld\n", x->err);
+					if (x->err == -13) {
+						printf("UNDEFINED WORD::IBUF: %s\n", x->ibuf);
+					}
+					if (x->err == -16) {
+						printf("ZERO LENGTH NAME::IBUF: %s\n", x->ibuf);
+					}
+					exit(EXIT_FAILURE);
+				}
+			}
+
+			fclose(f);
+			if (line) free(line);
+		}
+	}
+
 	while (1) {
     printf("> ");
 	  r = fgets(buf, 255, stdin);

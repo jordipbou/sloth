@@ -1,3 +1,9 @@
+/* LEARN BY MAKING PFORTH FTH CODE WORK ON DODO */
+/* - pForth is NOT case sensitive. I like that and will use that for now. */
+
+
+
+
 /* TODO: Use key/emit for input/output and for dumping context */
 /* TODO: Create tests based on key/emit and dump context */
 /* TODO: Errors */
@@ -157,12 +163,10 @@ V lt(X* x) { OP2(x, <); }
 V eq(X* x) { OP2(x, ==); }
 V gt(X* x) { OP2(x, >); }
 
-/*
-V istore(X* x) { L2(x, I*, a, I, v); *a = v; }
+V cstore(X* x) { L2(x, C*, a, C, v); *a = v; }
 V bstore(X* x) { L2(x, B*, a, B, v); *a = v; }
-V ifetch(X* x) { L1(x, I*, a); DPUSH(x, *a); }
+V cfetch(X* x) { L1(x, C*, a); DPUSH(x, *a); }
 V bfetch(X* x) { L1(x, B*, a); DPUSH(x, *a); }
-*/
 
 V times(X* x) { L2(x, C, q, C, n); for(;n > 0; n--) eval(x, q); }
 V branch(X* x) { L3(x, C, f, C, t, C, b); b ? eval(x, t) : eval(x, f); }
@@ -394,11 +398,20 @@ V step(X* x) {
   		  case 't': times(x); break;
   		  case '?': branch(x); break;
 
+				/*
 				case 'p': postpone(x); break;
+				*/
 
 				case 'w':
 					switch (TOKEN(x)) {
 						case 's': see(x); break;
+					}
+					break;
+				/* BYTECODES FOR PFORTH (LET'S SEE LATER WHAT'S NEEDED AND HOW) */
+				case 'p': 
+					switch (TOKEN(x)) {
+					case '@': cstore(x); break;
+					case 'x': DPUSH(x, &x->m->l); break;
 					}
 					break;
 			}
@@ -408,6 +421,7 @@ V step(X* x) {
               
 V inner(X* x) { C rp = x->rp; while(x->rp >= rp && x->ip < MEM_SIZE && !x->err) { step(x); } }
 
+/* TODO: Make the reader case insensitive !!! */
 V evaluate(X* x, B* s) {
 	x->ibuf = s;	
 	x->ilen = strlen(s);
