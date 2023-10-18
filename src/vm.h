@@ -1,7 +1,9 @@
-/* TODO: Condition system !!! */
+/* TODO: Use key/emit for input/output and for dumping context */
+/* TODO: Create tests based on key/emit and dump context */
+/* TODO: Errors */
 /* TODO: Variables, constants, create >does */
 /* TODO: Quotations outside colon definitions */
-/* TODO: Maybe dual words? I don't need if I need them */
+/* TODO: Maybe dual words? I don't know if I need them */
 /* TODO: Clean every line not needed */
 
 #ifndef SLOTH_VM
