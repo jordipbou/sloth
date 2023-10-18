@@ -103,7 +103,10 @@ X* init() {
 #define DO(x, f) { f(x); if (x->err) return; }
 #define ERR(x, c, e) if (c) { x->err = e; return; }
 
+#define ERR_OK 0
 #define ERR_UNDEFINED_WORD -13
+#define ERR_ZERO_LEN_NAME -16
+#define ERR_SYMBOL_ALLOCATION -256
 
 V parse_name(X* x) {
 	while (x->m->ipos < x->m->ilen && isspace(x->m->ibuf[x->m->ipos])) x->m->ipos++;
@@ -157,6 +160,53 @@ V compile(X* x) {
 	}
 }
 
+V create(X* x) {
+  DO(x, parse_name);
+  ERR(x, T(x) == 0, ERR_ZERO_LEN_NAME);
+  {
+    L2(x, C, l, B*, n);
+    S* s = malloc(sizeof(S) + l);
+    ERR(x, !s, ERR_SYMBOL_ALLOCATION);
+    s->p = x->m->l;
+    x->m->l = s;
+    s->f = 0;
+    s->c = x->m->h;
+    s->nl = l;
+    strncpy(s->n, n, l);
+    s->n[l] = 0;
+  }
+}
+
+V variable(X* x) {
+  DO(x, create);
+  x->m->l->f = VARIABLE;
+  x->m->h += sizeof(C);
+  x->m->d[x->m->h++] = ']';
+}
+
+V constant(X* x) {
+  DO(x, create);
+  x->m->l->f = CONSTANT;
+  literal(x);
+  x->m->d[x->m->h++] = ']';
+}
+  
+V colon(X* x) {
+  DO(x, create);
+  x->m->l->f = HIDDEN;
+  x->m->c = 1;
+}
+
+V semicolon(X* x) {
+  x->m->d[x->m->h++] = ']';
+  x->m->c = 0;	
+  x->m->l->f &= ~HIDDEN; 
+}
+  
+V immediate(X* x) {	
+  x->m->l->f |= IMMEDIATE;
+}
+  
 /* Inner interpreter */
 
 V inner(X* x);
@@ -220,14 +270,21 @@ V step(X* x) {
 		case 'k': EXT(x, 'K')(x); break;
 		case 'e': EXT(x, 'E')(x); break;
 
+    case '#': PUSH(x, *((C*)(&x->m->d[x->ip]))); x->ip += 8; break;
+
+    case '{': colon(x); break;
+    case '}': semicolon(x); break;
+    case 'v': variable(x); break;
+    case 'c': constant(x); break;
+      
 		case 'x': call(x); break;
-		case ']': case '}': ret(x); break;
+		case ']': case '@': ret(x); break;
 		case 'j': jump(x); break;
 		case 'z': zjump(x); break;
 
 		case ':': bfetch(x); break;
-		case '.': bstore(x); break;
-		case ';': cfetch(x); break;
+		case ';': bstore(x); break;
+		case '.': cfetch(x); break;
 		case ',': cstore(x); break;
 
 		case '\'': bcompile(x); break;
@@ -294,7 +351,7 @@ V evaluate(X* x, B* s) {
 					PUSH(x, &x->m->d[s->c]);
 					if (x->m->c) literal(x);
 				} else if ((s->f & CONSTANT) == CONSTANT) {
-					PUSH(x, *((C*)(&x->m->d[s->c])));
+					PUSH(x, *((C*)(&x->m->d[s->c + 1])));
 					if (x->m->c) literal(x);
 				} else if (!x->m->c || (s->f & IMMEDIATE) == IMMEDIATE) {
 					eval(x, s->c);
