@@ -111,7 +111,13 @@ V literal(X* x) {
 }
 
 /* s->cl can be used to choose between inline or not inline...let's inline everything now */
-V compile(X* x) { L1(x, S*, s); int i; while (i < s->cl) { COMMAB(x, GETB(x, s->c + i++)); } }
+V compile(X* x) { 
+	L1(x, S*, s); 
+	int i; 
+	while (i < s->cl) { 
+		COMMAB(x, GETB(x, s->c + i++)); 
+	} 
+}
 
 #define TAIL(x) (x->ip >= MEM_SIZE || GETB(x, x->ip) == ']' || GETB(x, x->ip) == '}')
 V call(X* x) { L1(x, C, q); if (!TAIL(x)) x->r[x->rp++] = x->ip; x->ip = q; }
@@ -304,7 +310,7 @@ V postpone(X* x) {
 #define TOKEN(x) (GETB(x, x->ip++))
                 
 V step(X* x) {
-	/*dump_context(x);*/
+	dump_context(x);
   if (!x->err) {
   	switch (PEEK(x)) {
   	  case 'A': case 'B': 
@@ -471,7 +477,9 @@ X* init_SLOTH(X* x) {
 	evaluate(x, ": recurse \\$` ; immediate");
 
 	evaluate(x, ": >mark \\$a ;");
-	evaluate(x, ": >resolve \\$@ ;");
+	evaluate(x, ": >resolve \\$f ;");
+  evaluate(x, ": mark> \\$h ;");
+	evaluate(x, ": resolve> \\$l ;");
 	evaluate(x, ": 0branch \\$z ;");
 	evaluate(x, ": jump \\$j ;");
 
@@ -508,9 +516,14 @@ X* init_SLOTH(X* x) {
 
   evaluate(x, ": >r \\$( ;");
   evaluate(x, ": r> \\$) ;");
-  evaluate(x, ": mark> \\$h ;");
   evaluate(x, ": 2dup over over ;");
   evaluate(x, ": 1+ 1 + ;");
+
+/*
+	evaluate(x, ": do postpone swap postpone >r postpone >r mark> ; immediate");
+	evaluate(x, ": i r> dup >r ;");
+	evaluate(x, ": loop postpone r> postpone 1+ postpone r> postpone 2dup postpone >r postpone >r postpone = postpone if resolve> postpone jump postpone then postpone r> postpone r> ; immediate");
+*/
 
 	return x;
 }
