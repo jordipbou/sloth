@@ -178,18 +178,18 @@ Literals are stored in memory with a variable length encoding.
     ^ -> xor
     _ -> drop
     ` -> RESERVED FOR RECURSE
-    a -> 
-    b -> 
-		c -> 
+    a -> allot
+    b -> set body of latest word (does>)
+		c -> sizeof cell
     d -> dup
     e -> RESERVED FOR EMIT
     f -> 
     g -> 
-    h -> 
-    i -> 
+    h -> here
+    i -> immediate
     j -> jump
     k -> RESERVED FOR KEY
-    l -> 
+    l -> address of latest variable
 		m -> 
     n -> nip
     o -> over
@@ -198,21 +198,13 @@ Literals are stored in memory with a variable length encoding.
     r -> rot
     s -> swap
     t -> RESERVED FOR times (combinator)
-    u -> 
-    v -> 
-    w -> word creation related bytecodes
-			c -> create word
-			d -> does>
-			h -> hide last created definition
-			i -> set last created definition as immediate
-			l -> address of latest variable
-			r -> reset state to 0
-			s -> set state to -1
-			u -> unhide last created definition
+    u -> unhide
+    v -> veil (hide)
+    w -> create word
     x -> execute/call
     y -> 
     z -> jump if zero
-    { -> 
+    { -> set compilation state
     | -> or
-    } -> 
+    } -> set interpretation state
     ~ -> invert

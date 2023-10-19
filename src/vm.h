@@ -1,4 +1,4 @@
-/* TOOD: Add literal to step */
+/* TODO: Add literal to step */
 /* TODO: Add create/colon/variable/constant and semicolon */
 
 /* LEARN BY MAKING PFORTH FTH CODE WORK ON DODO */
@@ -87,6 +87,7 @@ struct _Context {
 #define ERR(x, c, e) if (c) { x->err = e; return; }
 
 #define ERR_OK 0
+#define ERR_DICT_OVERFLOW -8
 #define ERR_UNDEFINED_WORD -13
 #define ERR_ZERO_LEN_NAME -16
 #define ERR_SYMBOL_ALLOCATION -256
@@ -217,7 +218,7 @@ V create(X* x) {
 		printf("Creating header for name: [%.*s]\n", l, n);
     s->p = x->m->l;
     x->m->l = s;
-    s->f = 0;
+    s->f = VARIABLE;
     s->c = x->m->h;
     s->nl = l;
     strncpy((char*)s->n, (char*)n, l);
@@ -228,14 +229,20 @@ V create(X* x) {
 V does(X* x) { x->m->l->c = x->m->h; }
 V end(X* x) { x->m->d[x->m->h++] = ']'; }
 
-V hide(X* x) { x->m->l->f |= HIDDEN; }
+V hide(X* x) { x->m->l->f = HIDDEN; }
 V unhide(X* x) { x->m->l->f &= ~HIDDEN; }
 V immediate(X* x) { x->m->l->f |= IMMEDIATE; }
-V variable(X* x) { x->m->l->f |= VARIABLE; }
+/*V variable(X* x) { x->m->l->f |= VARIABLE; }*/
+
+/*
 V constant(X* x) { L1(x, C, v); create(x); x->m->l->c = v; x->m->l->f = CONSTANT; }
+*/
 
 V compilation(X* x) { x->m->c = -1; }
 V interpretation(X* x) { x->m->c = 0; }
+
+V allot(X* x) { L1(x, C, v); ERR(x, x->m->h + v >= x->m->s, ERR_DICT_OVERFLOW); x->m->h += v; }
+V here(X* x) { PUSH(x, &x->m->d[x->m->h]); }
 
 /*
 V variable(X* x) {
@@ -390,14 +397,30 @@ V step(X* x) {
 	  case '=': eq(x); break;
 	  case '>': gt(x); break;
 
+		case 'c': PUSH(x, sizeof(C)); break;
+		case 'l': PUSH(x, &x->m->l); break;
+
+		case '{': compilation(x); break;
+		case '}': interpretation(x); break;
+		case 'w': create(x); break;
+		case 'v': hide(x); break;
+		case 'u': unhide(x); break;
+		case 'i': immediate(x); break;
+
+		case 'a': allot(x); break;
+		case 'h': here(x); break;
 		/*
 		case 'l': PUSH(x, &x->m->l); break;
 		*/
+		/*
 		case '{': create(x); hide(x); compilation(x); break;
 		case '}': end(x); interpretation(x); unhide(x); break;
-		case 'i': immediate(x); break;
+		*/
+		/*
 		case 'c': constant(x); break;
 		case 'v': variable(x); break;
+		*/
+		/*
 		case 'w':
 			switch (TOKEN(x)) {
 			case 'c': create(x); break;
@@ -410,7 +433,7 @@ V step(X* x) {
 			case 'u': x->m->l->f &= ~HIDDEN; break;
 			}
 			break;
-
+		*/
 /*
 		case 'h': PUSH(x, &x->m->d[x->m->h]); break;
 
@@ -447,7 +470,6 @@ V evaluate(X* x, B* s) {
 				printf("\n");
 				PUSH(x, s->c);
 				if (x->m->c && (s->f & IMMEDIATE) != IMMEDIATE) { printf("Compiling word %s\n", s->n); compile(x); }
-				else if ((s->f & CONSTANT) == CONSTANT) { /* Do nothing */ }
 				else if ((s->f & VARIABLE) == VARIABLE) { T(x) += (C)x->m->d; }
 				else { printf("Executing word %s\n", s->n); call(x); inner(x); } 
 			} else {
@@ -484,11 +506,16 @@ X* init() {
 	if (!x) return 0;
 	x->m = malloc(sizeof(M) + MEM_SIZE);
 	if (!x->m) { free(x); return 0; }
+	x->m->s = MEM_SIZE;
+	x->m->l = 0;
 	reset_context(x);
 
-	evaluate(x, "\\{ : \\${ \\}");
-	evaluate(x, ": ; \\$} \\}i");
+	evaluate(x, "\\wv{ : \\$w$v${ \\$]}u");
+	evaluate(x, ": ; \\$}$u$$$] \\$]}ui");
+
+/*
 	evaluate(x, ": dup \\$d ;");
+*/
 
 	return x;
 }
