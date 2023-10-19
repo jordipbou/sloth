@@ -180,15 +180,13 @@ V create(X* x) {
 V variable(X* x) {
   DO(x, create);
   x->m->l->f = VARIABLE;
-  x->m->h += sizeof(C);
-  x->m->d[x->m->h++] = ']';
 }
 
 V constant(X* x) {
+  L1(x, C, v);
   DO(x, create);
   x->m->l->f = CONSTANT;
-  literal(x);
-  x->m->d[x->m->h++] = ']';
+  x->m->l->c = v;
 }
   
 V colon(X* x) {
@@ -348,10 +346,10 @@ V evaluate(X* x, B* s) {
 			if (T(x)) {
 				L3(x, S*, s, C, _, B*, __);
 				if ((s->f & VARIABLE) == VARIABLE) {
-					PUSH(x, &x->m->d[s->c]);
+					PUSH(x, &s->c);
 					if (x->m->c) literal(x);
 				} else if ((s->f & CONSTANT) == CONSTANT) {
-					PUSH(x, *((C*)(&x->m->d[s->c + 1])));
+					PUSH(x, s->c);
 					if (x->m->c) literal(x);
 				} else if (!x->m->c || (s->f & IMMEDIATE) == IMMEDIATE) {
 					eval(x, s->c);
