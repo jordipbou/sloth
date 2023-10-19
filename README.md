@@ -114,37 +114,37 @@ Literals are stored in memory with a variable length encoding.
 	  (< 32) -> noop
     (SPACE) -> noop
     ! -> not
-    " -> 
-    # -> one byte literal
+    " -> comma (,)
+    # -> cell literal
     $ -> compile next byte
     % -> modulo
     & -> and
-    ' -> 
+    ' -> character comma (c,)
     ( -> push to R
     ) -> pop from R
     * -> multiplication
     + -> addition
-    , -> 
+    , -> store cell
     - -> substraction
-    . -> 
+    . -> fetch cell
     / -> division
     0 -> literal 0
     1 -> literal 1
-    2 -> 2 byte literal
+    2 -> 
     3 ->
-    4 -> 4 byte literal
+    4 -> 
     5 ->
     6 ->
     7 ->
-    8 -> 8 byte literal
+    8 -> 
     9 ->
-    : -> colon (start definition)
-    ; -> semicolon (end definition)
+    : -> fetch byte
+    ; -> store byte
     < -> less than
     = -> equal
     > -> greater than
-    ? -> branch (combinator)
-    @ -> resolve
+    ? -> RESERVED for branch (combinator)
+    @ -> exit (return) 
 		A -> C extension
 		B -> C extension
 		C -> C extension
@@ -172,13 +172,13 @@ Literals are stored in memory with a variable length encoding.
 		X -> C extension
 		Y -> C extension
 		Z -> C extension
-    [ -> push next ip and jump
-    \ -> return
-    ] -> return
+    [ -> push next ip and jump (quotation start)
+    \ -> parse until character 
+    ] -> return (quotation end)
     ^ -> xor
     _ -> drop
-    ` -> recurse
-    a -> ahead
+    ` -> RESERVED FOR RECURSE
+    a -> 
     b -> 
 		c -> 
     d -> dup
@@ -186,25 +186,33 @@ Literals are stored in memory with a variable length encoding.
     f -> 
     g -> 
     h -> 
-    i -> immediate
+    i -> 
     j -> jump
     k -> RESERVED FOR KEY
     l -> 
 		m -> 
     n -> nip
     o -> over
-    p -> postpone 
+    p -> RESERVED FOR POSTPONE
     q -> 
     r -> rot
     s -> swap
-    t -> times (combinator)
+    t -> RESERVED FOR times (combinator)
     u -> 
     v -> 
-    w -> 
+    w -> word creation related bytecodes
+			c -> create word
+			d -> does>
+			h -> hide last created definition
+			i -> set last created definition as immediate
+			l -> address of latest variable
+			r -> reset state to 0
+			s -> set state to -1
+			u -> unhide last created definition
     x -> execute/call
     y -> 
     z -> jump if zero
-    { -> throw 
+    { -> 
     | -> or
-    } -> catch
+    } -> 
     ~ -> invert

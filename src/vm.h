@@ -24,9 +24,9 @@ typedef void V;
 typedef int8_t B;
 typedef intptr_t C;
 
-#define HIDDEN 1
-#define IMMEDIATE 2
-#define VARIABLE 4
+#define VARIABLE 1
+#define HIDDEN 2
+#define IMMEDIATE 4
 #define CONSTANT 8
 
 typedef struct _Symbol {
@@ -67,23 +67,6 @@ struct _Context {
 	M* m;
 };
 
-V reset_context(X* x) {
-	x->dp = 0;
-	x->rp = 0;
-	x->ip = MEM_SIZE;
-	x->err = 0;
-}
-
-X* init() {
-	X* x = malloc(sizeof(X));
-	if (!x) return 0;
-	x->m = malloc(sizeof(M) + MEM_SIZE);
-	if (!x->m) { free(x); return 0; }
-	reset_context(x);
-
-	return x;
-}
-
 /* Helpers */
 
 #define EXT(x, l) (x->m->x[l - 'A'])
@@ -120,11 +103,39 @@ V parse_name(X* x) {
 	PUSH(x, &x->m->ibuf[x->m->ipos] - T(x));
 }
 
+V to_upper(X* x) {
+	L2(x, C, l, B*, t);
+	C i;
+	for (i = 0; i < l; i++) {
+		if (t[i] >= 97 && t[i] <= 122) t[i] = t[i] - 32;
+	}
+	PUSH(x, t);
+	PUSH(x, l);
+}
+
 V find_name(X* x) {
 	L2(x, C, l, B*, t);
 	S* s = x->m->l;
+	printf("Searching for name [%.*s]\n", (int)l, t);
 	while (s) {
-		if (s->nl == l && !strncmp((const char *)s->n, (const char*)t, (long unsigned int)l)) break;
+		if (s->nl == l) {
+			C i;
+			C f = 1;
+			printf("Comparing to [%s]\n", s->n);
+			for (i = 0; i < l; i++) {
+				if (t[i] >= 97 && t[i] <= 122) {
+					printf("Comparing %c [%d] to %c [%d] and %c [%d]\n", t[i], t[i], s->n[i], s->n[i], s->n[i] + 32, s->n[i] + 32);
+					if (t[i] != s->n[i] && t[i] != (s->n[i] + 32)) { f = 0; break; }
+				} else if (t[i] >= 65 && t[i] <= 90) {
+					if (t[i] != s->n[i] && t[i] != (s->n[i] - 32)) { f = 0; break; }
+				} else {
+					printf("Comparing %c [%d] to %c [%d]\n", t[i], t[i], s->n[i], s->n[i]);
+					if (t[i] != s->n[i]) { f = 0; break; }
+				}
+			}
+			if (f) { printf("Name [%.*s] found as [%s]\n", (int)l, t, s->n); break; }
+			else { printf("Name [%.*s] NOT found as[%s]\n", (int)l, t, s->n); }
+		}
 		s = s->p;
 	}
 	PUSH(x, t);
@@ -139,6 +150,20 @@ V literal(X* x) {
 	x->m->h += sizeof(C);
 }
 
+C code_length(X* x, B* c) {
+	int t = 1;
+	C n = 0;
+	/* TODO: This will have problems with literals */
+	while (t) {
+		if (*c == '[') t++;
+		if (*c == ']') t--;
+		c++;
+		n++;
+	}
+	return n - 1;
+}
+
+/*
 C code_length(X* x, S* s) {
 	int t = 1;
 	B* c = &x->m->d[s->c];
@@ -151,7 +176,23 @@ C code_length(X* x, S* s) {
 	}
 	return n - 1;
 }
+*/
 
+V compile(X* x) {
+	L1(x, C, c);
+	C cl = code_length(x, &x->m->d[c]);
+	if (cl < sizeof(C) + 2) {
+		C i;
+		for (i = 0; i < cl; i++) 
+			x->m->d[x->m->h++] = x->m->d[c + i];
+	} else {
+		PUSH(x, c);
+		literal(x);
+		x->m->d[x->m->h++] = 'x';
+	}
+}
+
+/*
 V compile(X* x) {
 	L1(x, S*, s);
 	C cl = code_length(x, s);
@@ -164,6 +205,7 @@ V compile(X* x) {
 		x->m->d[x->m->h++] = 'x';
 	}
 }
+*/
 
 V create(X* x) {
   DO(x, parse_name);
@@ -172,16 +214,30 @@ V create(X* x) {
     L2(x, C, l, B*, n);
     S* s = malloc(sizeof(S) + l);
     ERR(x, !s, ERR_SYMBOL_ALLOCATION);
+		printf("Creating header for name: [%.*s]\n", l, n);
     s->p = x->m->l;
     x->m->l = s;
     s->f = 0;
     s->c = x->m->h;
     s->nl = l;
-    strncpy(s->n, n, l);
+    strncpy((char*)s->n, (char*)n, l);
     s->n[l] = 0;
   }
 }
 
+V does(X* x) { x->m->l->c = x->m->h; }
+V end(X* x) { x->m->d[x->m->h++] = ']'; }
+
+V hide(X* x) { x->m->l->f |= HIDDEN; }
+V unhide(X* x) { x->m->l->f &= ~HIDDEN; }
+V immediate(X* x) { x->m->l->f |= IMMEDIATE; }
+V variable(X* x) { x->m->l->f |= VARIABLE; }
+V constant(X* x) { L1(x, C, v); create(x); x->m->l->c = v; x->m->l->f = CONSTANT; }
+
+V compilation(X* x) { x->m->c = -1; }
+V interpretation(X* x) { x->m->c = 0; }
+
+/*
 V variable(X* x) {
   DO(x, create);
   x->m->l->f = VARIABLE;
@@ -213,7 +269,8 @@ V semicolon(X* x) {
 V immediate(X* x) {	
   x->m->l->f |= IMMEDIATE;
 }
-  
+*/
+
 /* Inner interpreter */
 
 V inner(X* x);
@@ -263,6 +320,7 @@ V gt(X* x) { N(x) = (N(x) > T(x)) ? -1 : 0; x->dp--; }
 #define TOKEN(x) (x->m->d[x->ip++])
 
 V step(X* x) {
+	printf("STEP::EXECUTING %c\n", PEEK(x));
 	switch (PEEK(x)) {
   case 'A': case 'B': case 'C':	case 'D': 
   case 'F': case 'G': case 'H': case 'I':
@@ -282,16 +340,21 @@ V step(X* x) {
 
     case '\\': parse(x); break;
 
+		/*
     case '{': colon(x); break;
     case '}': semicolon(x); break;
     case 'v': variable(x); break;
     case 'c': constant(x); break;
+		*/
       
 		case 'x': call(x); break;
 		case ']': case '@': ret(x); break;
 		case 'j': jump(x); break;
 		case 'z': zjump(x); break;
+
+		/*
     case 'i': immediate(x); break;
+		*/
 
 		case ':': bfetch(x); break;
 		case ';': bstore(x); break;
@@ -327,9 +390,29 @@ V step(X* x) {
 	  case '=': eq(x); break;
 	  case '>': gt(x); break;
 
+		/*
+		case 'l': PUSH(x, &x->m->l); break;
+		*/
+		case '{': create(x); hide(x); compilation(x); break;
+		case '}': end(x); interpretation(x); unhide(x); break;
+		case 'i': immediate(x); break;
+		case 'c': constant(x); break;
+		case 'v': variable(x); break;
+		case 'w':
+			switch (TOKEN(x)) {
+			case 'c': create(x); break;
+			case 'd': does(x); break;
+			case 'h': x->m->l->f |= HIDDEN; break;
+			case 'i': x->m->l->f |= IMMEDIATE; break;
+			case 'l': PUSH(x, &x->m->l); break;
+			case 'r': x->m->c = 0; break;
+			case 's': x->m->c = -1; break;
+			case 'u': x->m->l->f &= ~HIDDEN; break;
+			}
+			break;
+
 /*
 		case 'h': PUSH(x, &x->m->d[x->m->h]); break;
-		case 'l': PUSH(x, &x->m->l); break;
 
 		case 'c': PUSH(x, sizeof(C)); break;
 */
@@ -358,22 +441,21 @@ V evaluate(X* x, B* s) {
 			DO(x, find_name);
 			if (T(x)) {
 				L3(x, S*, s, C, _, B*, __);
-				if ((s->f & VARIABLE) == VARIABLE) {
-					PUSH(x, &s->c);
-					if (x->m->c) literal(x);
-				} else if ((s->f & CONSTANT) == CONSTANT) {
-					PUSH(x, s->c);
-					if (x->m->c) literal(x);
-				} else if (!x->m->c || (s->f & IMMEDIATE) == IMMEDIATE) {
-					eval(x, s->c);
-				} else { 
-					PUSH(x, s); 
-					compile(x); 
-				}
+				C i;
+				printf("Pushing %s->code %ld to stack\n", s->n, s->c);
+				for (i = 0; i < x->dp; i++) printf("%ld ", x->d[i]);
+				printf("\n");
+				PUSH(x, s->c);
+				if (x->m->c && (s->f & IMMEDIATE) != IMMEDIATE) { printf("Compiling word %s\n", s->n); compile(x); }
+				else if ((s->f & CONSTANT) == CONSTANT) { /* Do nothing */ }
+				else if ((s->f & VARIABLE) == VARIABLE) { T(x) += (C)x->m->d; }
+				else { printf("Executing word %s\n", s->n); call(x); inner(x); } 
 			} else {
 			  L3(x, S*, _, C, l, B*, t);
+				printf("Assembler or number or undefined word\n");
 				if (t[0] == '\\') {
 					int i;
+					printf("Assembler: [%.*s]\n", l - 1, t + 1);
 					for (i = 1; i < l; i++) { x->m->d[MEM_SIZE - l + i] = t[i]; }
 					eval(x, MEM_SIZE - l + 1);
 				} else {
@@ -387,6 +469,30 @@ V evaluate(X* x, B* s) {
 		}
 	}
 }
+
+/* Initialization */
+
+V reset_context(X* x) {
+	x->dp = 0;
+	x->rp = 0;
+	x->ip = MEM_SIZE;
+	x->err = 0;
+}
+
+X* init() {
+	X* x = malloc(sizeof(X));
+	if (!x) return 0;
+	x->m = malloc(sizeof(M) + MEM_SIZE);
+	if (!x->m) { free(x); return 0; }
+	reset_context(x);
+
+	evaluate(x, "\\{ : \\${ \\}");
+	evaluate(x, ": ; \\$} \\}i");
+	evaluate(x, ": dup \\$d ;");
+
+	return x;
+}
+
 
 /*
 #define ERR_OK 0
