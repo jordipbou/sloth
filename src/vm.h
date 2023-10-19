@@ -108,6 +108,11 @@ X* init() {
 #define ERR_ZERO_LEN_NAME -16
 #define ERR_SYMBOL_ALLOCATION -256
 
+V parse(X* x) {
+  L1(x, C, v);
+  while (x->m->ipos < x->m->ilen && x->m->ibuf[x->m->ipos++] != v) {}
+}
+
 V parse_name(X* x) {
 	while (x->m->ipos < x->m->ilen && isspace(x->m->ibuf[x->m->ipos])) x->m->ipos++;
 	PUSH(x, &x->m->ibuf[x->m->ipos]);
@@ -197,8 +202,12 @@ V colon(X* x) {
 
 V semicolon(X* x) {
   x->m->d[x->m->h++] = ']';
+  x->m->d[x->m->h++] = 0;
   x->m->c = 0;	
-  x->m->l->f &= ~HIDDEN; 
+  x->m->l->f &= ~HIDDEN;
+  printf("Created %s\n", x->m->l->n);
+  printf("Code %s\n", x->m->d + x->m->l->c);
+  printf("Flags %ld\n", x->m->l->f);
 }
   
 V immediate(X* x) {	
@@ -269,6 +278,9 @@ V step(X* x) {
 		case 'e': EXT(x, 'E')(x); break;
 
     case '#': PUSH(x, *((C*)(&x->m->d[x->ip]))); x->ip += 8; break;
+    case '$': x->m->d[x->m->h++] = TOKEN(x); break;
+
+    case '\\': parse(x); break;
 
     case '{': colon(x); break;
     case '}': semicolon(x); break;
@@ -279,6 +291,7 @@ V step(X* x) {
 		case ']': case '@': ret(x); break;
 		case 'j': jump(x); break;
 		case 'z': zjump(x); break;
+    case 'i': immediate(x); break;
 
 		case ':': bfetch(x); break;
 		case ';': bstore(x); break;
