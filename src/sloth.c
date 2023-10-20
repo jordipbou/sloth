@@ -1,6 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
-#include"vm.h"
+/*#include"vm.h"*/
+#include"sloth.h"
 
 void do_error(X* x) {
 /*
@@ -9,17 +10,23 @@ void do_error(X* x) {
 	} else if (x->err == -16) {
 		printf("ZERO LENGTH NAME::IBUF: %s\n", &x->m->ibuf[x->m->ipos]);
 	} else {
+*/
 		printf("ERROR: %ld\n", x->err);
+/*
 	}
 */
 }
+
+V emit(X* x) { L1(x, C, c); printf("%c", c); }
 
 int main(int argc, char** argv) {
 	char* r;
 	char buf[255];
 	C i;
 
-	X* x = init();
+	/*X* x = init();*/
+	X* x = init_SLOTH();
+	EXT(x, 'E') = &emit;
 	/*X* x = init_pForth();*/
 	if (!x) exit(EXIT_FAILURE);
 
@@ -33,7 +40,7 @@ int main(int argc, char** argv) {
 			size_t read;
 
 			while ((read = getline(&line, &len, f)) != -1) {
-				printf("--> %s\n", line);
+				printf("--> %s", line);
 				evaluate(x, line);
 				if (x->err) {
 					do_error(x);
@@ -54,12 +61,10 @@ int main(int argc, char** argv) {
 			for (i = 0; i < x->dp; i++) {
 			  printf("%ld ", x->d[i]);
 			}
-			printf("Ok\n");
+			printf(" Ok\n");
 		} else {
 			do_error(x);
-			/*
 			reset_context(x);
-			*/
 		}
 	}
 		

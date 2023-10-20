@@ -1,22 +1,56 @@
-\wv{ : \$w$v${$] \}u
-: ; \$$$]$}$u$] \}ui
+\S: : $S: \S;
+: ; $S; \S;Si
 
-: immediate \$i ;
+: IMMEDIATE $Si ;
 
-: parse \$\ ;
-: \ 10 parse ;
+: PARSE $Sp ;
 
-: ABORT \$q ;
-\ TODO: ABORT" needs compilation of a string to work, leave it for later
-: ABORT" ;
+: \ 10 parse ; 
+: ( 41 parse ; IMMEDIATE
 
-: DUP \$d ;
+\ SLOTH primitives
 
-: < \$< ;
-: 0< 0 < ;
+: DROP $_ ;
+: DUP $d ;
+: OVER $o ;
+: SWAP $s ;
+: ROT $r ;
+: NIP $n ;
 
-\ TODO: IF ... mark resolve and all that jazz
-: IF ;
+: + $+ ;
+: - $- ;
+: * $* ;
+: / $/ ;
+: MOD $% ;
 
-: ABS dup 0< if negate then ;
+: < $< ;
+: = $= ;
+: > $> ;
 
+: ! $, ;
+: @ $. ;
+: C! $; ;
+: C@ $: ;
+
+\ BLOCK variables
+
+: BLOCK-HEADER $b @ ;
+
+: REL>ABS block-header + ;
+: ABS>REL block-header - ;
+
+: BLOCK-SIZE block-header @ ;
+
+: CELL $c ;
+: CELLS cell * ;
+
+: LATEST block-header cell + @ rel>abs ;
+
+\ WORD
+
+: PREVIOUS @ rel>abs dup block-header = ${_0}{}? ;
+: CODE cell + @ rel>abs ;
+: FLAGS 2 cells + c@ ;
+: NAME>STRING 2 cells + 1 + 1 + dup 1 - c@ ; 
+
+: TYPE ( c-addr u -- ) ${d:e1+}t_ ;

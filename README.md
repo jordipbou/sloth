@@ -114,12 +114,12 @@ Literals are stored in memory with a variable length encoding.
 	  (< 32) -> noop
     (SPACE) -> noop
     ! -> not
-    " -> comma (,)
-    # -> cell literal
-    $ -> compile next byte
+    " -> 
+    # -> byte literal
+    $ -> 
     % -> modulo
     & -> and
-    ' -> character comma (c,)
+    ' -> 
     ( -> push to R
     ) -> pop from R
     * -> multiplication
@@ -130,13 +130,13 @@ Literals are stored in memory with a variable length encoding.
     / -> division
     0 -> literal 0
     1 -> literal 1
-    2 -> 
+    2 -> short literal (16 bit)
     3 ->
-    4 -> 
+    4 -> int literal (32 bit)
     5 ->
     6 ->
     7 ->
-    8 -> 
+    8 -> long literal (64 bit)
     9 ->
     : -> fetch byte
     ; -> store byte
@@ -144,7 +144,7 @@ Literals are stored in memory with a variable length encoding.
     = -> equal
     > -> greater than
     ? -> RESERVED for branch (combinator)
-    @ -> exit (return) 
+    @ -> push context address
 		A -> C extension
 		B -> C extension
 		C -> C extension
@@ -173,38 +173,38 @@ Literals are stored in memory with a variable length encoding.
 		Y -> C extension
 		Z -> C extension
     [ -> push next ip and jump (quotation start)
-    \ -> parse until character 
+    \ -> 
     ] -> return (quotation end)
     ^ -> xor
     _ -> drop
-    ` -> RESERVED FOR RECURSE
-    a -> allot
-    b -> set body of latest word (does>)
+    ` -> 
+    a -> 
+    b -> push block variable address
 		c -> sizeof cell
     d -> dup
     e -> RESERVED FOR EMIT
     f -> 
     g -> 
-    h -> here
-    i -> immediate
+    h -> 
+    i -> 
     j -> jump
     k -> RESERVED FOR KEY
-    l -> address of latest variable
+    l -> 
 		m -> 
     n -> nip
     o -> over
-    p -> RESERVED FOR POSTPONE
+    p -> 
     q -> 
     r -> rot
     s -> swap
-    t -> RESERVED FOR times (combinator)
-    u -> unhide
-    v -> veil (hide)
-    w -> create word
+    t -> times (combinator)
+    u -> 
+    v -> 
+    w -> 
     x -> execute/call
     y -> 
     z -> jump if zero
-    { -> set compilation state
+    { -> start quotation (non nestable)
     | -> or
-    } -> set interpretation state
+    } -> end quotation (return)
     ~ -> invert
