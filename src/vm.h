@@ -71,6 +71,7 @@ V inner(X*);
 #define ERR_DICT_OVERFLOW -8
 #define ERR_UNDEFINED_WORD -13
 #define ERR_ZERO_LEN_NAME -16
+#define ERR_CONTROL_STRUCTURE_MISMATCH -22
 #define ERR_SYMBOL_ALLOCATION -256
 
 typedef struct _Header {
@@ -156,12 +157,11 @@ V parse_name(X* x) {
 	PUSH(x, ((P)(&IBUF(x)[IPOS(x)])) - T(x));
 }
 
-V create(X* x) {
+V colon(X* x) {
 	parse_name(x);
 	ERR(x, T(x) == 0, ERR_ZERO_LEN_NAME);
 	{
 		L2(x, P, l, C*, n);
-		/* Check if there's enough space */
 		W* w = REL_TO_ABS(x, HERE(x));
 		w->p = LATEST(x);
 		LATEST(x) = HERE(x);
@@ -171,14 +171,16 @@ V create(X* x) {
 		w->l = l;
 		strncpy(w->n, n, l);
 		w->n[l] = 0;
+    STATE(x) = 1;
 	}
 }
 
-V reveal(X* x) {
-	if (LATEST(x)) {
-		W* l = REL_TO_ABS(x, LATEST(x));
-		l->f &= ~HIDDEN;
-	}
+V semicolon(X* x) {
+  ERR(x, LATEST(x) == 0, ERR_CONTROL_STRUCTURE_MISMATCH);
+	W* l = REL_TO_ABS(x, LATEST(x));
+	l->f &= ~HIDDEN;
+  x->b[HERE(x)] = ']';
+  STATE(x) = 0;
 }
 
 #define PEEK(x) (x->b[x->ip])
@@ -246,7 +248,8 @@ V step(X* x) {
 		case '4': PUSH(x, *((I*)(x->b + x->ip))); x->ip += 4; break;
 		case '8': PUSH(x, *((L*)(x->b + x->ip))); x->ip += 8; break;
 
-		case 'w': create(x); break;
+		case '{': colon(x); break;
+    case '}': semicolon(x); break;
 		}
 	}
 }
@@ -305,6 +308,11 @@ V evaluate(X* x, C* s) {
 		find_name(x);
 		if (T(x)) {
 			L3(x, W*, w, P, _, C*, __);
+      if (!STATE(x) || (w->f & IMMEDIATE) == IMMEDIATE) {
+        eval(x, w->c);
+      } else {
+        /* compile */
+      }
 		} else {
 			L3(x, W*, _, P, l, C*, t);
 			if (t[0] == '\\') {
