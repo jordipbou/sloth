@@ -1,5 +1,5 @@
 compile = "cmake --log-level=WARNING -DCMAKE_BUILD_TYPE=Debug -B/tmp/build . && make -s -C /tmp/build"
-run = "/tmp/build/tests && /tmp/build/sloth"
+run = "/tmp/build/tests && /tmp/build/sloth src/ans.fth"
 hidden = ["main", "main-debug", "**/*.o", "**/*.d", ".ccls-cache", "Makefile"]
 
 [nix]

@@ -51,7 +51,7 @@ V inner(X*);
 #define DO(x, f) { f(x); if (x->err) return; }
 #define ERR(x, c, e) if (c) { x->err = e; return; }
 
-V dup(X* x) { PUSH(x, T(x)); }
+V duplicate(X* x) { PUSH(x, T(x)); }
 V over(X* x) { PUSH(x, N(x)); }
 V swap(X* x) { P t = T(x); T(x) = N(x); N(x) = t; }
 V rot(X* x) { P t = NN(x); NN(x) = N(x); N(x) = T(x); T(x) = t; }
@@ -103,13 +103,11 @@ V step(X* x) {
 	case 'O': case 'P': case 'Q': case 'R':
 	case 'S': case 'T': case 'U': case 'V':
 	case 'W': case 'X': case 'Y': case 'Z':
+  case 'E': case 'K':
 		EXT(x, TOKEN(x))(x);
 		break;
 	default:
 		switch (TOKEN(x)) {
-		case 'e': EXT(x, 'E')(x); break;
-		case 'k': EXT(x, 'K')(x); break;
-
 		case '0': PUSH(x, 0); break;
 		case '1': PUSH(x, 1); break;
 		case '#': PUSH(x, *((B*)(x->b + x->ip))); x->ip += 1; break;
@@ -118,7 +116,7 @@ V step(X* x) {
 		case '8': PUSH(x, *((L*)(x->b + x->ip))); x->ip += 8; break;
 
 		case '_': DROP(x); break;
-		case 'd': dup(x); break;
+		case 'd': duplicate(x); break;
 		case 'o': over(x); break;
 		case 's': swap(x); break;
 		case 'r': rot(x); break;

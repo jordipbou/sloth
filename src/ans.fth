@@ -53,4 +53,5 @@
 : FLAGS 2 cells + c@ ;
 : NAME>STRING 2 cells + 1 + 1 + dup 1 - c@ ; 
 
-: TYPE ( c-addr u -- ) ${d:e1+}t_ ;
+: TYPE ( c-addr u -- ) ${d:E1+}t_ ;
+: ACCEPT ( c-addr n -- n ) ( TODO ) ;
