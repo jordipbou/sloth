@@ -57,24 +57,32 @@ V parse_name(X* x) {
 	PUSH(x, ((P)(&IBUF(x)[IPOS(x)])) - T(x));
 }
 
+V create(X* x) {
+  parse_name(x);
+  ERR(x, T(x) == 0, ERR_ZERO_LEN_NAME);
+  {
+    L2(x, P, l, C*, n);
+    W* w = REL_TO_ABS(x, HERE(x));
+    w->p = LATEST(x);
+    LATEST(x) = HERE(x);
+    HERE(x) += sizeof(W) + l;
+    printf("Created word [%.*s] at [%ld] with code at [%ld]\n", (int)l, n, ABS_TO_REL(x, w), HERE(x));
+    w->c = HERE(x);
+    w->f = VARIABLE;
+    w->l = l;
+    strncpy(w->n, n, l);
+    w->n[l] = 0;
+  }
+}
+
+V hide(X* x) { W* w = (W*)REL_TO_ABS(x, LATEST(x)); w->f = HIDDEN; }
+V unhide(X* x) { W* w = (W*)REL_TO_ABS(x, LATEST(x)); w->f = 0; }
+
 V colon(X* x) {
 	printf("On colon...\n");
-	parse_name(x);
-	ERR(x, T(x) == 0, ERR_ZERO_LEN_NAME);
-	{
-		L2(x, P, l, C*, n);
-		W* w = REL_TO_ABS(x, HERE(x));
-		w->p = LATEST(x);
-		LATEST(x) = HERE(x);
-		HERE(x) += sizeof(W) + l;
-		printf("Created word [%.*s] at [%ld] with code at [%ld]\n", (int)l, n, ABS_TO_REL(x, w), HERE(x));
-		w->c = HERE(x);
-		w->f = HIDDEN;
-		w->l = l;
-		strncpy(w->n, n, l);
-		w->n[l] = 0;
-    STATE(x) = 1;
-	}
+  DO(x, create);
+  hide(x);
+  STATE(x) = 1;
 }
 
 V semicolon(X* x) {
@@ -158,6 +166,12 @@ V find_name(X* x) {
 	PUSH(x, wp);
 }
 
+V allot(X* x) {
+  L1(x, P, n);
+  ERR(x, HERE(x) + n >= SIZE(x), ERR_DICT_OVERFLOW);
+  HERE(x) += n;
+}
+  
 V sloth_ext(X* x) {
 	switch (TOKEN(x)) {
 	case '$': PUSH(x, x->b[x->ip++]); bcompile(x); break;
@@ -168,6 +182,9 @@ V sloth_ext(X* x) {
 
 	case 't': x->err = POP(x); break;
 	case 'p': parse(x); break;
+
+  case 'a': allot(x); break;
+  case 'c': create(x); break;
 	}
 }
 
@@ -183,7 +200,10 @@ V evaluate(X* x, C* s) {
 			L3(x, P, wp, P, _, C*, __);
 			W* w = (W*)REL_TO_ABS(x, wp);
 			printf("Word found [%.*s] at [%ld]\n", (int)_, __, wp);
-      if (!STATE(x) || (w->f & IMMEDIATE) == IMMEDIATE) {
+      if ((w->f & VARIABLE) == VARIABLE) {
+        PUSH(x, REL_TO_ABS(x, w->c));
+        if (STATE(x)) literal(x);
+      } else if (!STATE(x) || (w->f & IMMEDIATE) == IMMEDIATE) {
 				printf("Evaluating [%ld]\n", w->c);
         eval(x, w->c);
       } else {

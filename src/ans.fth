@@ -1,3 +1,6 @@
+\Sc IBUF 255 \Sa
+\Sc PAD 255 \Sa
+
 \S: : $S: \S;
 : ; $S; \S;Si
 
