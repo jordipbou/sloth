@@ -30,10 +30,20 @@
 : = $= ;
 : > $> ;
 
+: AND $& ;
+: OR $| ;
+: INVERT $~ ;
+
 : ! $, ;
 : @ $. ;
 : C! $; ;
 : C@ $: ;
+
+: , $Sc ;
+: C, $Sb ;
+
+: EMIT $E ;
+: KEY $K ;
 
 \ BLOCK variables
 
@@ -55,6 +65,20 @@
 : CODE cell + @ rel>abs ;
 : FLAGS 2 cells + c@ ;
 : NAME>STRING 2 cells + 1 + 1 + dup 1 - c@ ; 
+
+: HERE $Sh ;
+
+: >MARK here 0 , ;
+: >RESOLVE here over - abs>rel swap ! ;
+: <MARK here ;
+: <RESOlVE here - , ;
+
+: POSTPONE $S^ ;
+
+: 0BRANCH $z ;
+
+: IF >mark postpone 0branch ; immediate
+: THEN >resolve ; immediate
 
 : TYPE ( c-addr u -- ) ${d:E1+}t_ ;
 : ACCEPT ( c-addr n -- n ) ( TODO ) ;

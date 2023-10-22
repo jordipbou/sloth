@@ -46,6 +46,7 @@ typedef struct _Word {
 #define CONSTANT 8
 
 V bcompile(X* x) { L1(x, C, c); x->b[HERE(x)++] = c; }
+V ccompile(X* x) { L1(x, P, p); *((P*)(&x->b[HERE(x)])) = p; HERE(x) += sizeof(P); }
 
 V parse_spaces(X* x) { while (IPOS(x) < ILEN(x) && isspace(IBUF(x)[IPOS(x)])) IPOS(x)++; }
 V parse(X* x) { L1(x, C, c); while (IPOS(x) < ILEN(x) && IBUF(x)[IPOS(x)] != c) IPOS(x)++; IPOS(x)++; }
@@ -166,6 +167,20 @@ V find_name(X* x) {
 	PUSH(x, wp);
 }
 
+V postpone(X* x) {
+	/* Postpone has to compile bytecode for compiling something later */
+	/* like, push word ip, compile */
+	parse_name(x);
+	find_name(x);
+	/* Right now we have the word nt at the stack */
+	literal(x);
+	/* Now it will be pushed on the stack when calling the word */
+	x->b[HERE(x)++] = 'S';
+	x->b[HERE(x)++] = 'l';
+	x->b[HERE(x)++] = '$';
+	x->b[HERE(x)++] = 'x';
+}
+
 V allot(X* x) {
   L1(x, P, n);
   ERR(x, HERE(x) + n >= SIZE(x), ERR_DICT_OVERFLOW);
@@ -185,6 +200,15 @@ V sloth_ext(X* x) {
 
   case 'a': allot(x); break;
   case 'c': create(x); break;
+
+	case ',': ccompile(x); break;
+	case 'b': bcompile(x); break;
+
+	case 'h': PUSH(x, REL_TO_ABS(x, HERE(x))); break;
+
+	case '^': postpone(x); break;
+
+	case 'l': literal(x); break;
 	}
 }
 

@@ -92,6 +92,7 @@ int main(int argc, char** argv) {
 	while (1) {
 	  r = fgets(buf, 255, stdin);
     evaluate(x, buf);
+		/*execute(x, strlen(buf), buf);*/
 		if (!x->err) {
 			for (i = 0; i < x->dp; i++) {
 			  printf("%ld ", x->d[i]);
