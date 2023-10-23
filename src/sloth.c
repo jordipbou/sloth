@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
-/*#include"vm.h"*/
-#include"sloth.h"
+#include"vm.h"
+/*#include"sloth.h"*/
 
 #ifdef _WIN32
   #include <conio.h>
@@ -10,7 +10,7 @@
   #include <termios.h>
 #endif
 
-void do_error(X* x) {
+void do_error(M* m) {
 /*
 	if (x->err == -13) {
 		printf("UNDEFINED WORD [%.*s]\n", (int)T(x), (char *)N(x));
@@ -18,7 +18,7 @@ void do_error(X* x) {
 		printf("ZERO LENGTH NAME::IBUF: %s\n", &x->m->ibuf[x->m->ipos]);
 	} else {
 */
-		printf("ERROR: %ld\n", x->err);
+		printf("ERROR: %ld\n", m->err);
 /*
 	}
 */
@@ -50,19 +50,45 @@ int _getch ()
 }
 #endif
 
-V key(X* x) { PUSH(x, _getch()); }
-V emit(X* x) { L1(x, C, c); printf("%c", c); }
+V key(M* m) { PUSH(m, _getch()); }
+V emit(M* m) { L1(m, B, c); printf("%c", c); }
 
 int main(int argc, char** argv) {
 	char* r;
 	char buf[255];
 	C i;
 
-	/*X* x = init();*/
-	X* x = init_SLOTH();
+	M* m = init();
+	EXT(m, 'E') = &emit;
+  EXT(m, 'K') = &key;
+	if (!m) exit(EXIT_FAILURE);
+
+	printf("SLOTH v0.1\n");
+	while (1) {
+	  r = fgets(buf, 255, stdin);
+    /*asm_exec(m, strlen(buf), buf);*/
+		evaluate(m, buf);
+		if (!m->err) {
+			for (i = 0; i < m->dp; i++) {
+			  printf("%ld ", m->d[i]);
+			}
+			printf(" Ok\n");
+		} else {
+			do_error(m);
+			reset_context(m);
+		}
+	}
+}
+
+/*
+int main(int argc, char** argv) {
+	char* r;
+	char buf[255];
+	C i;
+
+	X* x = init();
 	EXT(x, 'E') = &emit;
   EXT(x, 'K') = &key;
-	/*X* x = init_pForth();*/
 	if (!x) exit(EXIT_FAILURE);
 
 	if (argc == 2) {
@@ -92,7 +118,6 @@ int main(int argc, char** argv) {
 	while (1) {
 	  r = fgets(buf, 255, stdin);
     evaluate(x, buf);
-		/*execute(x, strlen(buf), buf);*/
 		if (!x->err) {
 			for (i = 0; i < x->dp; i++) {
 			  printf("%ld ", x->d[i]);
@@ -100,60 +125,6 @@ int main(int argc, char** argv) {
 			printf(" Ok\n");
 		} else {
 			do_error(x);
-			reset_context(x);
-		}
-	}
-		
-}
-
-/*
-int main(int argc, char** argv) {
-	char* r;
-  int i;
-  B buf[255];
-
-	X* x = init_VM(init_MEM());
-
-	if (argc == 2) {
-		FILE *f = fopen(argv[1], "r");
-		if (!f) {
-			exit(EXIT_FAILURE);
-		} else {
-			char* line = 0;
-			size_t len = 0;
-			size_t read;
-
-			while ((read = getline(&line, &len, f)) != -1) {
-				printf("--> %s\n", line);
-				evaluate(x, line);
-				if (x->err) {
-					printf("ERROR: %ld\n", x->err);
-					if (x->err == -13) {
-						printf("UNDEFINED WORD::IBUF: %s\n", x->ibuf);
-					}
-					if (x->err == -16) {
-						printf("ZERO LENGTH NAME::IBUF: %s\n", x->ibuf);
-					}
-					exit(EXIT_FAILURE);
-				}
-			}
-
-			fclose(f);
-			if (line) free(line);
-		}
-	}
-
-	while (1) {
-    printf("> ");
-	  r = fgets(buf, 255, stdin);
-    evaluate(x, buf);
-		if (!x->err) {
-			for (i = 0; i < x->dp; i++) {
-			  printf("%ld ", x->d[i]);
-			}
-			printf("Ok\n");
-		} else {
-			printf("ERROR: %ld\n", x->err);
 			reset_context(x);
 		}
 	}
