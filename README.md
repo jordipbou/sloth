@@ -113,9 +113,9 @@ Literals are stored in memory with a variable length encoding.
 
 	  (< 32) -> noop
     (SPACE) -> noop
-    ! -> not
+    ! -> store cell
     " -> 
-    # -> byte literal
+    # -> fetch byte
     $ -> 
     % -> modulo
     & -> and
@@ -124,9 +124,9 @@ Literals are stored in memory with a variable length encoding.
     ) -> pop from R
     * -> multiplication
     + -> addition
-    , -> store cell
+    , -> compile cell
     - -> substraction
-    . -> fetch cell
+    . -> compile byte
     / -> division
     0 -> literal 0
     1 -> literal 1
@@ -138,13 +138,13 @@ Literals are stored in memory with a variable length encoding.
     7 ->
     8 -> long literal (64 bit)
     9 ->
-    : -> fetch byte
-    ; -> store byte
+    : -> colon
+    ; -> semicolon
     < -> less than
     = -> equal
     > -> greater than
     ? -> RESERVED for branch (combinator)
-    @ -> push context address
+    @ -> fetch cell
 		A -> C extension
 		B -> C extension
 		C -> C extension
@@ -172,7 +172,7 @@ Literals are stored in memory with a variable length encoding.
 		X -> C extension
 		Y -> C extension
 		Z -> C extension
-    [ -> push next ip and jump (quotation start)
+    [ -> quotation (push ip and jump)
     \ -> 
     ] -> return (quotation end)
     ^ -> xor
@@ -197,9 +197,9 @@ Literals are stored in memory with a variable length encoding.
     q -> 
     r -> rot
     s -> swap
-    t -> times (combinator)
+    t -> RESERVED for times combinator
     u -> 
-    v -> 
+    v -> create (variable)
     w -> 
     x -> execute/call
     y -> 

@@ -16,12 +16,207 @@
 
 typedef void V;
 typedef int8_t B;
-typedef int16_t W;
-typedef int32_t L;
-#if defined (BITS_64)
-typedef int64_t X;
-#endif
+typedef int16_t S;
+typedef int32_t I;
+typedef int64_t L;
 typedef intptr_t C;
+
+#if defined (BITS_64)
+#define ALIGN(a) (a + 7) & ~(7)
+#else
+#define ALIGN(a) (a + 3) & ~(3)
+#endif
+
+#define VARIABLE 32
+#define HIDDEN 64 
+#define IMMEDIATE 128 
+
+#define FLAGS(w) (*((B*)(w + 2)))
+#define SET_VARIABLE(w)	(FLAGS(w) = FLAGS(w) | VARIABLE)
+#define SET_HIDDEN(w) (FLAGS(w) = FLAGS(w) | HIDDEN)
+#define SET_IMMEDIATE(w) (FLAGS(w) = FLAGS(w) | IMMEDIATE)
+#define UNSET_VARIABLE(w) (FLAGS(w) = FLAGS(w) & ~VARIABLE)
+#define UNSET_HIDDEN(w) (FLAGS(w) = FLAGS(w) & ~HIDDEN)
+#define UNSET_IMMEDIATE(w) (FLAGS(w) = FLAGS(w) & ~IMMEDIATE)
+#define IS_IMMEDIATE(w) ((FLAGS(w) & IMMEDIATE) == IMMEDIATE)
+#define IS_HIDDEN(w) ((FLAGS(w) & HIDDEN) == HIDDEN)
+#define IS_VARIABLE(w) ((FLAGS(w) & VARIABLE) == VARIABLE)
+#define NAME_LENGTH(w) (FLAGS(w) & 0x1F)
+#define NAME(w) (w + 3)
+
+#define CODE(w) (ALIGN(w + NAME_LENGTH(w) + 1))
+
+#define GET_AT(m, t, p) (*((t*)(m->s->b + p)))
+#define PUT_AT(m, t, p, v) (*((t*)(m->s->b + p)) = (t)(v))
+
+#define HERE(m) (*((C*)(m->s->b)))
+#define SIZE(m) (*((C*)(m->s->b + sizeof(C)))
+#define LATEST(m) (*((C*)(m->s->b + 2*sizeof(C))))
+
+#define COMPILE(m, t, v) { *((t*)(m->s->b + HERE(m))) = (t)(v); HERE(m) = HERE(m) + sizeof(t); }
+
+#define ABUF(m) (m->s->b + SIZE(m) - 64)
+#define IBUF(m) (ABUF(m) - 256)
+
+struct _System {
+	V (*x[26])(M*);
+	B* b;
+};
+
+#define EXT(m, l) (m->s->x[l - 'A'])
+
+struct _Machine {
+  C d[DSTACK_SIZE];
+	C dp;
+	C r[RSTACK_SIZE];
+	C rp;
+	C ip;
+	C err;
+	struct _System* s;
+} M;
+
+V inner(M*);
+
+#define PUSH(m, v) (m->d[m->dp++] = (C)(v))
+#define POP(m) (m->d[--m->dp])
+#define DROP(m) (--m->dp)
+
+#define T(m) (m->d[m->dp - 1])
+#define N(m) (m->d[m->dp - 2])
+#define NN(m) (m->d[m->dp - 3])
+
+#define L1(m, t, v) t v = (t)POP(m)
+#define L2(m, t1, v1, t2, v2) L1(m, t1, v1); L1(m, t2, v2)
+#define L3(m, t1, v1, t2, v2, t3, v3) L2(m, t1, v1, t2, v2); L1(m, t3, v3)
+#define L4(m, t1, v1, t2, v2, t3, v3, t4, v4) L3(m, t1, v1, t2, v2, t3, v3); L1(m, t4, v4)
+
+#define DO(m, f) { f(m); if (m->err) return; }
+#define ERR(m, c, e) if (c) { m->err = e; return; }
+
+V duplicate(M* m) { PUSH(m, T(m)); }
+V over(M* m) { PUSH(m, N(m)); }
+V swap(M* m) { C t = T(m); T(m) = N(m); N(m) = t; }
+V rot(M* m) { C t = NN(m); NN(m) = N(m); N(m) = T(m); T(m) = t; }
+V nip(M* m) { N(m) = T(m); DROP(m); }
+
+V to_r(M* m) { m->r[m->rp++] = m->d[--m->dp]; }
+V from_r(M* m) { m->d[m->dp++] = m->r[--m->rp]; }
+
+V add(M* m) { N(m) = N(m) + T(m); DROP(m); }
+V sub(M* m) { N(m) = N(m) - T(m); DROP(m); }
+V mul(M* m) { N(m) = N(m) * T(m); DROP(m); }
+V division(M* m) { N(m) = N(m) / T(m); DROP(m); }
+V mod(M* m) { N(m) = N(m) % T(m); DROP(m); }
+
+V and(M* m) { N(m) = N(m) & T(m); DROP(m); }
+V or(M* m) { N(m) = N(m) | T(m); DROP(m); }
+V xor(M* m) { N(m) = N(m) ^ T(m); DROP(m); }
+V not(M* m) { T(m) = !T(m); }
+V invert(M* m) { T(m) = ~T(m); }
+
+V lt(M* m) { N(m) = (N(m) < T(m)) ? -1 : 0; DROP(m); }
+V eq(M* m) { N(m) = (N(m) == T(m)) ? -1 : 0; DROP(m); }
+V gt(M* m) { N(m) = (N(m) > T(m)) ? -1 : 0; DROP(m); }
+
+V pstore(M* m) { L2(m, C*, a, C, b); *a = b; }
+V pfetch(M* m) { L1(m, C*, a); PUSH(m, *a); }
+V bstore(M* m) { L2(m, B*, a, B, b); *a = b; }
+V bfetch(M* m) { L1(m, B*, a); PUSH(m, *a); }
+
+/* This have to be correctly tested and understood */
+
+#define TAIL(m) (m->ip >= SIZE(m) || m->s->b[m->ip] == ']')
+V call(M* m) { L1(m, B*, q); if (!TAIL(m)) m->r[m->rp++] = (C)m->ip; m->ip = q; }
+V ret(M* m) { m->ip = (m->rp > 0) ? (B*)m->r[--m->rp] : 0; }
+V jump(M* m) { L1(m, C, d); m->ip += d - 1; }
+V zjump(M* m) { L2(m, C, d, C, b); if (!b) m->ip += d - 1; }
+V quot(M* m) { L1(m, C, d); PUSH(m, m->ip); m->ip += d; }
+V eval(M* m, B* q) { PUSH(m, q); call(m); inner(m); }
+
+#define PEEK(x) (m->s->b[m->ip])
+#define TOKEN(x) (m->s->b[m->ip++])
+
+V step(M* m) {
+	switch (PEEK(m)) {
+	case 'A': case 'B': case 'C': case 'D':
+	case 'F': case 'G': case 'H': case 'I':
+	case 'J': case 'L': case 'M': case 'N':
+	case 'O': case 'P': case 'Q': case 'R':
+	case 'S': case 'T': case 'U': case 'V':
+	case 'W': case 'X': case 'Y': case 'Z':
+  case 'E': case 'K':
+		EXT(m, TOKEN(m))(m);
+		break;
+	default:
+		switch (TOKEN(m)) {
+		case '0': PUSH(m, 0); break;
+		case '1': PUSH(m, 1); break;
+		/*
+		case 'b': PUSH(m, TOKEN(x)); break;
+		case 'w': PUSH(m, *((W*)m->ip)); m->ip += 2; break;
+		case 'l': PUSH(m, *((L*)m->ip)); m->ip += 4; break;
+#if defined (BITS_64)
+		case 'x': PUSH(m, *((X*)m->ip)); m->ip += 8; break;
+#endif
+		*/
+
+		case '_': DROP(m); break;
+		case 'd': duplicate(m); break;
+		case 'o': over(m); break;
+		case 's': swap(m); break;
+		case 'r': rot(m); break;
+		case 'n': nip(m); break;
+
+		case '(': to_r(m); break;
+		case ')': from_r(m); break;
+
+		case '+': add(m); break;
+		case '-': sub(m); break;
+		case '*': mul(m); break;
+		case '/': division(m); break;
+		case '%': mod(m); break;
+
+		case '&': and(m); break;
+		case '|': or(m); break;
+		case '^': xor(m); break;
+		case '!': not(m); break;
+		case '~': invert(m); break;
+
+		case '<': lt(m); break;
+		case '=': eq(m); break;
+		case '>': gt(m); break;
+
+		case ',': pstore(m); break;
+		case '.': pfetch(m); break;
+		case ';': bstore(m); break;
+		case ':': bfetch(m); break;
+
+		case 'e': call(m); break;
+		case 'j': jump(m); break;
+		case 'z': zjump(m); break;
+		case '[': quot(m); break;
+		case ']': ret(m); break;
+
+		case 'c': PUSH(m, sizeof(C)); break;
+		case '@': PUSH(m, m); break;
+
+		case 'v': create(m); break;
+		case 'w': colon(m); break;
+		case 'e': semicolon(m); break;
+		}
+	}
+}
+
+V inner(M* m) { 
+	C rp = m->rp; 
+	while(m->rp >= rp && m->ip && !m->err) { 
+		step(m); 
+	} 
+}
+
+
+
+/*
 
 typedef struct _Machine M;
 
@@ -31,7 +226,7 @@ typedef struct _Machine M;
 typedef struct _System {
 	C hs;
 	C hp;
-	C l;
+	N* l;
 	V (*x[26])(M*);
 	B h[DICT_SIZE];
 } S;
@@ -43,6 +238,9 @@ typedef struct _System {
 #define clong(s, l) *((L*)((s)->h + (s)->hp)) = (l); (s)->hp += 4
 #if defined (BITS_64)
 #define cextra(s, x) { *((X*)((s)->h + (s)->hp)) = (x); (s)->hp += 8; }
+#define ccell(s, n) cextra(s, n)
+#else
+#define ccell(s, n) clong(s, n)
 #endif
 
 #define DSTACK_SIZE 64 
@@ -51,10 +249,11 @@ typedef struct _System {
 struct _Machine {
 	C dp;
 	C rp;
-	C ip;
+	B* ip;
 	C err;
+	C st;
 	S* s;
-	B* ibuf;
+	char* ibuf;
 	C ilen;
 	C ipos;
   C d[DSTACK_SIZE];
@@ -125,16 +324,57 @@ V compile(M* m) {
 V interpret(M* m) {
 }
 
-#define PEEK(x) (m->s->h[m->ip])
-#define TOKEN(x) (m->s->h[m->ip++])
-
-#define TAIL(m) (m->ip >= DICT_SIZE || PEEK(m) == ']')
-V call(M* m) { L1(m, C, q); if (!TAIL(m)) m->r[m->rp++] = m->ip; m->ip = q; }
-V ret(M* m) { m->ip = (m->rp > 0) ? m->r[--m->rp] : DICT_SIZE; }
+V call(M* m) { L1(m, B*, q); if (*q != ']') m->r[m->rp++] = (C)m->ip; m->ip = q; }
+V ret(M* m) { m->ip = (m->rp > 0) ? (B*)m->r[--m->rp] : 0; }
 V jump(M* m) { L1(m, C, d); m->ip += d - 1; }
 V zjump(M* m) { L2(m, C, d, C, b); if (!b) m->ip += d - 1; }
 V quot(M* m) { L1(m, C, d); PUSH(m, m->ip); m->ip += d; }
-V eval(M* m, C q) { PUSH(m, q); call(m); inner(m); }
+V eval(M* m, B* q) { PUSH(m, q); call(m); inner(m); }
+
+V align(M* m) {
+#if defined (BITS_64)
+	m->s->hp = (m->s->hp + 7) & 7;
+#else
+	m->s->hp = (m->s->hp + 3) & 3;
+#endif
+}
+
+V parse_spaces(M* m) { while (m->ipos < m->ilen && isspace(m->ibuf[m->ipos]))	m->ipos++; }
+V parse(M* m) { L1(m, C, c); while (m->ipos < m->ilen && m->ibuf[m->ipos] != c) m->ipos++; m->ipos++; }
+V parse_non_spaces(M* m) { while (m->ipos < m->ilen && !isspace(m->ibuf[m->ipos])) m->ipos++; }
+V parse_name(M* m) {
+	parse_spaces(m);
+	PUSH(m, m->ibuf + m->ipos);
+	parse_non_spaces(m);
+	PUSH(m, (m->ibuf + m->ipos) - T(m));
+}
+
+V colon(M* m) {
+	parse_name(m);
+	{
+		L2(m, C, l, B*, t);
+		N* n = (N*)(m->s->h + m->s->hp);
+		printf("Creating new word at %ld\n", n);
+		printf("m->s->l %ld\n", m->s->l);
+		n->p = m->s->l;
+		m->s->l = n;
+		n->f = HIDDEN;
+		n->l = l;
+		strncpy((char*)n->n, (char*)t, l);
+		n->n[l] = 0;
+		align(m);
+		n->c = m->s->h + m->s->hp;
+		m->st = 1;
+	}
+}
+
+V semicolon(M* m) {
+	m->s->l->f &= ~HIDDEN;
+	m->st = 0;
+}
+
+#define PEEK(x) (*m->ip)
+#define TOKEN(x) (*m->ip++)
 
 V step(M* m) {
 	switch (PEEK(m)) {
@@ -152,12 +392,14 @@ V step(M* m) {
 		case '0': PUSH(m, 0); break;
 		case '1': PUSH(m, 1); break;
 		case 'b': PUSH(m, TOKEN(x)); break;
-		case 'w': PUSH(m, *((W*)(m->s->h + m->ip))); m->ip += 2; break;
-		case 'l': PUSH(m, *((L*)(m->s->h + m->ip))); m->ip += 4; break;
+		case 'w': PUSH(m, *((W*)m->ip)); m->ip += 2; break;
+		case 'l': PUSH(m, *((L*)m->ip)); m->ip += 4; break;
 #if defined (BITS_64)
-		case 'x': PUSH(m, *((X*)(m->s->h + m->ip))); m->ip += 8; break;
+		case 'x': PUSH(m, *((X*)m->ip)); m->ip += 8; break;
 #endif
-		/*case '"': string(x); break;*/
+
+		case 'h': colon(m); break;
+		case 'v': semicolon(m); break;
 
 		case '_': DROP(m); break;
 		case 'd': duplicate(m); break;
@@ -196,86 +438,57 @@ V step(M* m) {
 		case '[': quot(m); break;
 		case ']': ret(m); break;
 
-	/*
-		case '{': block(x); break;
-		case '}': ret(x); break;
-	*/
-
 		case 'c': PUSH(m, sizeof(C)); break;
 		case '@': PUSH(m, m); break;
-
-	/*
-		case 't': times(x); break;
-		case '?': choose(x); break;
-	*/
 		}
 	}
 }
 
 V inner(M* m) { 
 	C rp = m->rp; 
-	while(m->rp >= rp && m->ip >= 0 && m->ip < DICT_SIZE && !m->err) { 
+	while(m->rp >= rp && m->ip && !m->err) { 
 		step(m); 
 	} 
-}
-
-V asm_exec(M* m, C l, char* s) {
-	strncpy((char*)m->s->h, s, l);
-	m->s->h[l] = ']'; 
-	m->ip = 0;
-	inner(m);
 }
 
 V reset_context(M* m) {
 	m->dp = 0;
 	m->rp = 0;
-	m->ip = DICT_SIZE;
+	m->ip = 0;
 	m->err = 0;
 }
 
 M* init() {
 	M* m = malloc(sizeof(M));
 	m->s = malloc(sizeof(S));
-	m->s->hp = ASM_BUFFER_SIZE;
+	m->s->l = 0;
 	reset_context(m);
 
 	return m;
 }
 
-#define FLAG_IMMEDIATE 128
-#define FLAG_HIDDEN 64
-#define FLAG_VARIABLE 32
-
-#define FLAGS(w) (m->s->h[w])
-
-#define IMMEDIATE(w) ((FLAGS(w) & FLAG_IMMEDIATE) == FLAG_IMMEDIATE)
-#define HIDDEN(w) ((FLAGS(w) & FLAG_HIDDEN) == FLAG_HIDDEN)
-#define VARIABLE(w) ((FLAGS(w) & FLAG_VARIABLE) == FLAG_VARIABLE)
-
-#define NAMELEN(w) (m->s->h[w] & 0x1F)
-#define NAME(w) (w + 1)
-
-#if defined (BITS_64)
-#define ALIGN(a) ((a + 7) & ~7)
-#else
-#define ALIGN(a) ((a + 3) & ~3)
-#endif
-
-#define CODE(w) (ALIGN(NAME(w) + NAMELEN(w) + 1))
-
-V parse_spaces(M* m) { while (m->ipos < m->ilen && isspace(m->ibuf[m->ipos]))	m->ipos++; }
-V parse(M* m) { L1(m, C, c); while (m->ipos < m->ilen && m->ibuf[m->ipos] != c) m->ipos++; m->ipos++; }
-V parse_non_spaces(M* m) { while (m->ipos < m->ilen && !isspace(m->ibuf[m->ipos])) m->ipos++; }
-V parse_name(M* m) {
-	parse_spaces(m);
-	PUSH(m, m->ibuf + m->ipos);
-	parse_non_spaces(m);
-	PUSH(m, (m->ibuf + m->ipos) - T(m));
+V find_name(M* m) { 
+	L2(m, C, l, B*, t);
+	N* n = m->s->l;
+	while (n) {
+		printf("Searching for name [%.*s] with name %ld [%.*s]\n", (int)l, t, n, (int)n->l, n->n);
+		if (n->l == l && !strncmp((char*)n->n, (char*)t, l)) break;
+		n = n->p;
+		printf("n is now: %ld\n", n);
+	}
+	printf("After while...\n");
+	PUSH(m, t);
+	PUSH(m, l);
+	PUSH(m, n);
 }
 
-V find_name(M* m) { PUSH(m, 0); }
-
-V asm_comp(M* m, C l, char* t) { }
+V asm_comp(M* m, C l, char* t) { 
+	C i;
+	printf("Compiling assembler l: %ld\n", l);
+	for (i = 0;i < l; i++) {
+		cbyte(m->s, t[i]);
+	}
+}
 
 V to_number(M* m, C l, char* t) {
 	char * end;
@@ -290,24 +503,33 @@ V to_number(M* m, C l, char* t) {
 }
 
 V evaluate(M* m, char* s) {
-	m->ibuf = (B*)s;
+	m->ibuf = s;
 	m->ilen = strlen(s);
 	m->ipos = 0;
 	while (!m->err && m->ipos < m->ilen) {
+		printf("m->ipos %ld m->ilen %d\n", m->ipos, m->ilen);
 		parse_name(m);
+		printf("...m->ipos %ld m->ilen %d\n", m->ipos, m->ilen);
+		printf("Stack depth: %ld\n", m->dp);
+		printf("T(m) %ld N(m) %ld\n", T(m), N(m));
 		if (!T(m)) { DROP(m); DROP(m); return; }
+		printf("Pre find name\n");
 		find_name(m);
+		printf("....Stack depth: %ld\n", m->dp);
+		printf("T(m) %ld N(m) %ld NN(m) %ld\n", T(m), N(m), NN(m));
 		if (T(m)) {
-			L3(m, C, wp, C, _, char*, __);
+			L3(m, N*, nt, C, _, char*, __);
+			if (!m->st || (nt->f & IMMEDIATE) == IMMEDIATE) eval(m, nt->c);
+			else { PUSH(m, nt->c); compile(m); }
 		} else {
-			L3(m, C, _, C, l, char*, t);			
-			if (t[0] == '\\') asm_exec(m, l - 1, t + 1);
+			L3(m, N*, _, C, l, char*, t);
+			if (t[0] == '\\' && t[l - 1] == ']') eval(m, (B*)(t + 1)); 
 			else if (t[0] == '$') asm_comp(m, l - 1, t + 1);
 			else to_number(m, l, t);
 		}
 	}
 }
-
+*/
 /*
 V times(X*P* p) { L2(x, C, q, C, n); for (;n > 0; n--) eval(x, q); }
 V choose(X*P* p) { L3(x, C, f, C, t, C, b); if (b) eval(x, t); else eval(x, f); }
