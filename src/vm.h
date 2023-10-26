@@ -50,7 +50,7 @@ typedef intptr_t C;
 #define PUT_AT(m, t, p, v) (*((t*)(m->s->b + p)) = (t)(v))
 
 #define HERE(m) (*((C*)(m->s->b)))
-#define SIZE(m) (*((C*)(m->s->b + sizeof(C)))
+#define SIZE(m) (*((C*)(m->s->b + sizeof(C))))
 #define LATEST(m) (*((C*)(m->s->b + 2*sizeof(C))))
 
 #define COMPILE(m, t, v) { *((t*)(m->s->b + HERE(m))) = (t)(v); HERE(m) = HERE(m) + sizeof(t); }
@@ -58,12 +58,17 @@ typedef intptr_t C;
 #define ABUF(m) (m->s->b + SIZE(m) - 64)
 #define IBUF(m) (ABUF(m) - 256)
 
-struct _System {
+typedef struct _Machine M; 
+
+typedef struct _System {
 	V (*x[26])(M*);
 	B* b;
-};
+} SYS;
 
 #define EXT(m, l) (m->s->x[l - 'A'])
+
+#define DSTACK_SIZE 256
+#define RSTACK_SIZE 256
 
 struct _Machine {
   C d[DSTACK_SIZE];
@@ -73,7 +78,7 @@ struct _Machine {
 	C ip;
 	C err;
 	struct _System* s;
-} M;
+};
 
 V inner(M*);
 
@@ -125,9 +130,9 @@ V bfetch(M* m) { L1(m, B*, a); PUSH(m, *a); }
 
 /* This have to be correctly tested and understood */
 
-#define TAIL(m) (m->ip >= SIZE(m) || m->s->b[m->ip] == ']')
-V call(M* m) { L1(m, B*, q); if (!TAIL(m)) m->r[m->rp++] = (C)m->ip; m->ip = q; }
-V ret(M* m) { m->ip = (m->rp > 0) ? (B*)m->r[--m->rp] : 0; }
+#define TAIL(m) (m->ip >= (SIZE(m)) || m->s->b[m->ip] == ']')
+V call(M* m) { L1(m, C, q); if (!TAIL(m)) { m->r[m->rp++] = m->ip; } m->ip = q; }
+V ret(M* m) { m->ip = (m->rp > 0) ? m->r[--m->rp] : 0; }
 V jump(M* m) { L1(m, C, d); m->ip += d - 1; }
 V zjump(M* m) { L2(m, C, d, C, b); if (!b) m->ip += d - 1; }
 V quot(M* m) { L1(m, C, d); PUSH(m, m->ip); m->ip += d; }
@@ -191,7 +196,7 @@ V step(M* m) {
 		case ';': bstore(m); break;
 		case ':': bfetch(m); break;
 
-		case 'e': call(m); break;
+		case 'x': call(m); break;
 		case 'j': jump(m); break;
 		case 'z': zjump(m); break;
 		case '[': quot(m); break;
@@ -199,22 +204,42 @@ V step(M* m) {
 
 		case 'c': PUSH(m, sizeof(C)); break;
 		case '@': PUSH(m, m); break;
-
+/*
 		case 'v': create(m); break;
 		case 'w': colon(m); break;
 		case 'e': semicolon(m); break;
+  */
 		}
 	}
 }
 
 V inner(M* m) { 
 	C rp = m->rp; 
-	while(m->rp >= rp && m->ip && !m->err) { 
+	while(m->rp >= rp && !m->err && m->ip < SIZE(m)) { 
 		step(m); 
 	} 
+)
+
+V evaluate(M* m, B* s) {
+  
 }
 
-
+V reset(M* m) {
+  m->ip = SIZE(m);
+  m->dp = 0;
+  m->rp = 0;
+}
+                
+M* init() {
+  M* m = malloc(sizeof(M));
+  m->s = malloc(sizeof(SYS));
+  m->s->b = malloc(65536);
+  SIZE(m) = 65536;
+  LATEST(m) = 0;
+  HERE(m) = 3*sizeof(C);
+  reset(m);
+  return m;
+}
 
 /*
 

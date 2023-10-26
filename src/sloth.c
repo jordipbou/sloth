@@ -61,13 +61,20 @@ int main(int argc, char** argv) {
 	M* m = init();
 	EXT(m, 'E') = &emit;
   EXT(m, 'K') = &key;
-	if (!m) exit(EXIT_FAILURE);
+  /*
+	if (!m) {
+    printf("Init error\n");
+    exit(EXIT_FAILURE);
+  }
+  */
 
-	printf("SLOTH v0.1\n");
+  printf("SLOTH v0.1\n");
+  
 	while (1) {
 	  r = fgets(buf, 255, stdin);
     /*asm_exec(m, strlen(buf), buf);*/
-		evaluate(m, buf);
+		/*evaluate(m, buf);*/
+    isolated(m, buf);
 		if (!m->err) {
 			for (i = 0; i < m->dp; i++) {
 			  printf("%ld ", m->d[i]);
@@ -75,7 +82,7 @@ int main(int argc, char** argv) {
 			printf(" Ok\n");
 		} else {
 			do_error(m);
-			reset_context(m);
+			reset(m);
 		}
 	}
 }

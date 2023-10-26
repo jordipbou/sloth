@@ -12,18 +12,32 @@ Features:
 
 * C89. Very easily embedabble in a C/C++ application.
 * String based human readable bytecode (ASCII 32-126).
-* Relatively fast interpreter.
+* Relatively fast interpreter meant to be extended.
 * Ability to add C functions thru bytecode extensions (bytecodes A-Z).
 
 ### EXTENSIBILITY
 
 There are two interpreters (as in Forth), the inner and the outer interpreter.
 The outer interpreter is the one that allows Forth/Sloth to be extensible, it parses the input string word by word and if its found in the dictionary its evaluated/compiled.
-Only : ; \<asm> are hardcoded in the outer interpreter, but they happen after trying to find a word. If the word its found, its executed. This allows full extensibility of the system just by redefining any possible word.
+Only : ; \<asm> &<asm> are hardcoded in the outer interpreter, but they happen after trying to find a word. If the word its found, its executed. This allows full extensibility of the system just by redefining any possible word.
 
 ### LITERALS ENCODING
 
-Literals are stored in memory with a variable length encoding.
+There are 3 types of literals:
+
+#### SMALL LITERAL
+
+-1 0 1 represented as bytecodes 2 0 1
+
+#### UNSIGNED 16 BIT LITERAL
+
+Used for addresses of words.
+
+Words and code are always aligned, so with 16 bit it's possible to use 65536 cells of memory. On 32 bits that's 256kb and on 64 bits that's 512kb.
+
+#### CELL LITERAL
+
+
 
 ### ARCHITECTURE
 
