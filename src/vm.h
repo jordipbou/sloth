@@ -33,6 +33,9 @@ typedef struct _Dictionary {
 	B* b;
 	C s;
 	V (*x[26])(M*);
+  B* ibuf;
+  C ipos;
+  C ilen;
 } D;
 
 #define EXT(m, l) (m->d->x[l - 'A'])
@@ -93,10 +96,10 @@ V lt(M* m) { N(m) = (N(m) < T(m)) ? -1 : 0; DROP(m); }
 V eq(M* m) { N(m) = (N(m) == T(m)) ? -1 : 0; DROP(m); }
 V gt(M* m) { N(m) = (N(m) > T(m)) ? -1 : 0; DROP(m); }
 
-V pstore(M* m) { L2(m, C*, a, C, b); *a = b; }
-V pfetch(M* m) { L1(m, C*, a); PUSH(m, *a); }
-V bstore(M* m) { L2(m, B*, a, B, b); *a = b; }
-V bfetch(M* m) { L1(m, B*, a); PUSH(m, *a); }
+V cstore(M* m) { L2(m, C*, a, C, b); *a = b; }
+V cfetch(M* m) { L1(m, C*, a); PUSH(m, *a); }
+V cstore(M* m) { L2(m, B*, a, B, b); *a = b; }
+V cfetch(M* m) { L1(m, B*, a); PUSH(m, *a); }
 
 V reset(M* m) { m->ip = 0; m->rp = 0; m->sp = 0; }
 
@@ -178,8 +181,8 @@ V step(M* m) {
 		case '=': eq(m); break;
 		case '>': gt(m); break;
 
-		case ',': pstore(m); break;
-		case '.': pfetch(m); break;
+		case ',': cstore(m); break;
+		case '.': cfetch(m); break;
 		case ';': bstore(m); break;
 		case ':': bfetch(m); break;
 
@@ -188,8 +191,9 @@ V step(M* m) {
 		case 'x': execute(m); break;
 
 		case 't': times(m); break;
-
+/*
 		case '$': reset(m); break;
+*/
 /*
 		case 'x': call(m); break;
 		case 'j': jump(m); break;
@@ -219,11 +223,34 @@ V isolated(M* m, char* s) {
 	inner(m);
 }
 
+#define IBUF(m) (m->d->ibuf)
+#define IPOS(m) (m->d->ipos)
+#define ILEN(m) (m->d->ilen)
+                
+V evaluate(M* m, char* s) {
+  IBUF(m) = s;
+  ILEN(m) = strlen(s);
+  IPOS(m) = 0;
+  while (IPOS(m) < ILEN(m)) {
+    parse_name(m);
+    if (!T(m)) { DROP(m); DROP(m); return; }
+    find_name(m);
+    {
+      L3(m, C, w, C, l, B*, t);
+    if (w) {
+      
+    } else {
+      
+    }
+  }
+}
+                
 D* init_DICT(int block_size) {
 	D* d = malloc(sizeof(D));
 	if (!d) return 0;
 	if (block_size) {
 		d->b = malloc(block_size);
+    if (!d->b) { free(d); return 0; }
 		d->s = block_size;
 	} else {
 		d->b = 0;
@@ -231,7 +258,6 @@ D* init_DICT(int block_size) {
 	}
 
 	return d;
-	
 }
 
 M* init_VM(D* d) {
