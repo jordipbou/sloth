@@ -27,6 +27,225 @@ typedef intptr_t C;
 #define ALIGN(a) (a + 3) & ~(3)
 #endif
 
+typedef struct _Machine M;
+
+typedef struct _Dictionary {
+	B* b;
+	C s;
+	V (*x[26])(M*);
+} D;
+
+#define EXT(m, l) (m->d->x[l - 'A'])
+
+#define DSTACK_SIZE 256
+#define RSTACK_SIZE 256
+
+struct _Machine {
+	C sp;
+	C rp;
+	C ip;
+	C err;
+	C s[DSTACK_SIZE];
+	C r[RSTACK_SIZE];
+	D* d;
+};
+
+V inner(M*);
+
+#define PUSH(m, v) (m->s[m->sp++] = (C)(v))
+#define POP(m) (m->s[--m->sp])
+#define DROP(m) (--m->sp)
+
+#define T(m) (m->s[m->sp - 1])
+#define N(m) (m->s[m->sp - 2])
+#define NN(m) (m->s[m->sp - 3])
+
+#define L1(m, t, v) t v = (t)POP(m)
+#define L2(m, t1, v1, t2, v2) L1(m, t1, v1); L1(m, t2, v2)
+#define L3(m, t1, v1, t2, v2, t3, v3) L2(m, t1, v1, t2, v2); L1(m, t3, v3)
+#define L4(m, t1, v1, t2, v2, t3, v3, t4, v4) L3(m, t1, v1, t2, v2, t3, v3); L1(m, t4, v4)
+
+#define DO(m, f) { f(m); if (m->err) return; }
+#define ERR(m, c, e) if (c) { m->err = e; return; }
+
+V duplicate(M* m) { PUSH(m, T(m)); }
+V over(M* m) { PUSH(m, N(m)); }
+V swap(M* m) { C t = T(m); T(m) = N(m); N(m) = t; }
+V rot(M* m) { C t = NN(m); NN(m) = N(m); N(m) = T(m); T(m) = t; }
+V nip(M* m) { N(m) = T(m); DROP(m); }
+
+V to_r(M* m) { m->r[m->rp++] = m->s[--m->sp]; }
+V from_r(M* m) { m->s[m->sp++] = m->r[--m->rp]; }
+
+V add(M* m) { N(m) = N(m) + T(m); DROP(m); }
+V sub(M* m) { N(m) = N(m) - T(m); DROP(m); }
+V mul(M* m) { N(m) = N(m) * T(m); DROP(m); }
+V division(M* m) { N(m) = N(m) / T(m); DROP(m); }
+V mod(M* m) { N(m) = N(m) % T(m); DROP(m); }
+
+V and(M* m) { N(m) = N(m) & T(m); DROP(m); }
+V or(M* m) { N(m) = N(m) | T(m); DROP(m); }
+V xor(M* m) { N(m) = N(m) ^ T(m); DROP(m); }
+V not(M* m) { T(m) = !T(m); }
+V invert(M* m) { T(m) = ~T(m); }
+
+V lt(M* m) { N(m) = (N(m) < T(m)) ? -1 : 0; DROP(m); }
+V eq(M* m) { N(m) = (N(m) == T(m)) ? -1 : 0; DROP(m); }
+V gt(M* m) { N(m) = (N(m) > T(m)) ? -1 : 0; DROP(m); }
+
+V pstore(M* m) { L2(m, C*, a, C, b); *a = b; }
+V pfetch(M* m) { L1(m, C*, a); PUSH(m, *a); }
+V bstore(M* m) { L2(m, B*, a, B, b); *a = b; }
+V bfetch(M* m) { L1(m, B*, a); PUSH(m, *a); }
+
+V reset(M* m) { m->ip = 0; m->rp = 0; m->sp = 0; }
+
+#define PEEK(m) (m->d->b[m->ip])
+#define TOKEN(m) (m->d->b[m->ip++])
+#define IN(m, p) (p >= 0 && p < m->d->s)
+#define TAIL(m) (!(IN(m, m->ip)) || PEEK(m) == ']' || PEEK(m) =='}')
+
+V execute(M* m) { L1(m, C, q); if (!TAIL(m)) { m->r[m->rp++] = m->ip; } m->ip = q; }
+V ret(M* m) { m->ip = (m->rp > 0) ? m->r[--m->rp] : m->d->s; }
+
+#define BLOCK(m, ip) { \
+	C t = 1; \
+	while (t && IN(m, ip)) { \
+		switch (m->d->b[ip++]) { \
+		case '{': case '[': t++; break; \
+		case '}': case ']': t--; break; \
+		} \
+	} \
+}
+
+V block(M* m) { C t = 1; PUSH(m, m->ip); BLOCK(m, m->ip); }
+
+V dc(M* m, C ip) { 
+	C t = ip;
+	B c;
+	BLOCK(m, ip);
+	printf(" : ");
+	for(;t < ip; c = m->d->b[t], t++) { 
+		if (c != 10) printf("%c", c); 
+	}
+}
+V ds(M* m) { C i; for(i = 0; i < m->sp; i++) { printf("%ld ", m->s[i]); } }
+V dr(M* m) { C i; dc(m, m->ip); for(i = 0; i < m->rp; i++) { dc(m, m->r[i]); } }
+V trace(M* m) { ds(m); dr(m); }
+
+V times(M* m) { L2(m, C, q, C, n); while (n-- > 0) { PUSH(m, q); execute(m); DO(m, inner); } }
+
+V step(M* m) {
+	trace(m); printf("\n");
+	switch (PEEK(m)) {
+	case 'A': case 'B': case 'C': case 'D':
+	case 'F': case 'G': case 'H': case 'I':
+	case 'J': case 'L': case 'M': case 'N':
+	case 'O': case 'P': case 'Q': case 'R':
+	case 'S': case 'T': case 'U': case 'V':
+	case 'W': case 'X': case 'Y': case 'Z':
+  case 'E': case 'K':
+		EXT(m, TOKEN(m))(m);
+		break;
+	default:
+		switch (TOKEN(m)) {
+		case '0': PUSH(m, 0); break;
+		case '1': PUSH(m, 1); break;
+
+		case '_': DROP(m); break;
+		case 'd': duplicate(m); break;
+		case 'o': over(m); break;
+		case 's': swap(m); break;
+		case 'r': rot(m); break;
+		case 'n': nip(m); break;
+
+		case '(': to_r(m); break;
+		case ')': from_r(m); break;
+
+		case '+': add(m); break;
+		case '-': sub(m); break;
+		case '*': mul(m); break;
+		case '/': division(m); break;
+		case '%': mod(m); break;
+
+		case '&': and(m); break;
+		case '|': or(m); break;
+		case '^': xor(m); break;
+		case '!': not(m); break;
+		case '~': invert(m); break;
+
+		case '<': lt(m); break;
+		case '=': eq(m); break;
+		case '>': gt(m); break;
+
+		case ',': pstore(m); break;
+		case '.': pfetch(m); break;
+		case ';': bstore(m); break;
+		case ':': bfetch(m); break;
+
+		case '{': block(m); break;
+		case '}': ret(m); break;
+		case 'x': execute(m); break;
+
+		case 't': times(m); break;
+
+		case '$': reset(m); break;
+/*
+		case 'x': call(m); break;
+		case 'j': jump(m); break;
+		case 'z': zjump(m); break;
+		case '[': quot(m); break;
+		case ']': ret(m); break;
+
+		case 'c': PUSH(m, sizeof(C)); break;
+		case '@': PUSH(m, m); break;
+*/
+		}
+	}
+}
+
+V inner(M* m) {
+	C t = m->rp;
+	while (m->rp >= t && IN(m, m->ip)) {
+		step(m);
+		/* Manage errors */
+	}
+}
+
+V isolated(M* m, char* s) {
+	m->d->b = (B*)s;
+	m->d->s = strlen(s);
+	m->ip = 0;
+	inner(m);
+}
+
+D* init_DICT(int block_size) {
+	D* d = malloc(sizeof(D));
+	if (!d) return 0;
+	if (block_size) {
+		d->b = malloc(block_size);
+		d->s = block_size;
+	} else {
+		d->b = 0;
+		d->s = 0;
+	}
+
+	return d;
+	
+}
+
+M* init_VM(D* d) {
+	M* m;
+
+	if (!d) return 0;
+	m = malloc(sizeof(M));
+	if (!m) return 0;
+	m->d = d;
+
+	return m;
+}
+
+/*
 #define VARIABLE 32
 #define HIDDEN 64 
 #define IMMEDIATE 128 
@@ -60,9 +279,10 @@ typedef intptr_t C;
 
 typedef struct _Machine M; 
 
-typedef struct _System {
+typedef struct _Dictionary {
 	V (*x[26])(M*);
 	B* b;
+	C s;
 } SYS;
 
 #define EXT(m, l) (m->s->x[l - 'A'])
@@ -128,8 +348,6 @@ V pfetch(M* m) { L1(m, C*, a); PUSH(m, *a); }
 V bstore(M* m) { L2(m, B*, a, B, b); *a = b; }
 V bfetch(M* m) { L1(m, B*, a); PUSH(m, *a); }
 
-/* This have to be correctly tested and understood */
-
 #define TAIL(m) (m->ip >= (SIZE(m)) || m->s->b[m->ip] == ']')
 V call(M* m) { L1(m, C, q); if (!TAIL(m)) { m->r[m->rp++] = m->ip; } m->ip = q; }
 V ret(M* m) { m->ip = (m->rp > 0) ? m->r[--m->rp] : 0; }
@@ -156,14 +374,6 @@ V step(M* m) {
 		switch (TOKEN(m)) {
 		case '0': PUSH(m, 0); break;
 		case '1': PUSH(m, 1); break;
-		/*
-		case 'b': PUSH(m, TOKEN(x)); break;
-		case 'w': PUSH(m, *((W*)m->ip)); m->ip += 2; break;
-		case 'l': PUSH(m, *((L*)m->ip)); m->ip += 4; break;
-#if defined (BITS_64)
-		case 'x': PUSH(m, *((X*)m->ip)); m->ip += 8; break;
-#endif
-		*/
 
 		case '_': DROP(m); break;
 		case 'd': duplicate(m); break;
@@ -204,11 +414,6 @@ V step(M* m) {
 
 		case 'c': PUSH(m, sizeof(C)); break;
 		case '@': PUSH(m, m); break;
-/*
-		case 'v': create(m); break;
-		case 'w': colon(m); break;
-		case 'e': semicolon(m); break;
-  */
 		}
 	}
 }
@@ -240,7 +445,7 @@ M* init() {
   reset(m);
   return m;
 }
-
+*/
 /*
 
 typedef struct _Machine M;

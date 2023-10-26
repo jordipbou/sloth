@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
 	char buf[255];
 	C i;
 
-	M* m = init();
+	M* m = init_VM(init_DICT(0));
 	EXT(m, 'E') = &emit;
   EXT(m, 'K') = &key;
   /*
@@ -76,9 +76,7 @@ int main(int argc, char** argv) {
 		/*evaluate(m, buf);*/
     isolated(m, buf);
 		if (!m->err) {
-			for (i = 0; i < m->dp; i++) {
-			  printf("%ld ", m->d[i]);
-			}
+			trace(m);
 			printf(" Ok\n");
 		} else {
 			do_error(m);
