@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
 	char buf[255];
 	C i;
 
-	M* m = init_VM(init_DICT(0));
+	M* m = init_VM(init_DICT(65536));
 	EXT(m, 'E') = &emit;
   EXT(m, 'K') = &key;
   /*
@@ -73,8 +73,8 @@ int main(int argc, char** argv) {
 	while (1) {
 	  r = fgets(buf, 255, stdin);
     /*asm_exec(m, strlen(buf), buf);*/
-		/*evaluate(m, buf);*/
-    isolated(m, buf);
+		evaluate(m, buf);
+    /*isolated(m, buf);*/
 		if (!m->err) {
 			trace(m);
 			printf(" Ok\n");

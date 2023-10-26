@@ -1,3 +1,8 @@
+/* TODO: Compile literal */
+/* TODO: jump, zjump, quotation */
+/* TODO: immediate */
+/* TODO: Decide how to use int16_t for addresses and jumps @ for relative literal? (16 bit) */
+
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -15,23 +20,47 @@
 #endif
 
 typedef void V;
-typedef int8_t B;
+typedef char B;
+/*
 typedef int16_t S;
 typedef int32_t I;
 typedef int64_t L;
+*/
 typedef intptr_t C;
 
-#if defined (BITS_64)
-#define ALIGN(a) (a + 7) & ~(7)
-#else
-#define ALIGN(a) (a + 3) & ~(3)
-#endif
+#define ALIGNED(a) (a + (sizeof(C) - 1)) & ~(sizeof(C) - 1)
+
+#define ABS_TO_REL(m, a) (((C)a) - ((C)m->d->b))
+#define REL_TO_ABS(m, a) (((C)a) + ((C)m->d->b))
+
+#define VARIABLE 32
+#define HIDDEN 64 
+#define IMMEDIATE 128 
 
 typedef struct _Machine M;
 
+typedef struct _Word {
+	C p;
+	C c;
+	B f;
+	B l;
+	B n[1];
+} W;
+
+/*
+#define PREVIOUS(m, w) (*((S*)(m->d->b + w)))
+#define FLAGS(m, w) (*((B*)(m->d->b + w + 2)))
+#define NAME_LENGTH(m, w) (*((B*)(m->d->b + w + 3)))
+#define NAME(m, w) ((char*)(m->d->b + w + 4))
+#define CODE(m, w) ((B*)(ALIGNED(w + 4 + NAME_LENGTH(m, w))))
+*/
+
 typedef struct _Dictionary {
 	B* b;
+	C h;
 	C s;
+	C l;
+	C st;
 	V (*x[26])(M*);
   B* ibuf;
   C ipos;
@@ -39,6 +68,10 @@ typedef struct _Dictionary {
 } D;
 
 #define EXT(m, l) (m->d->x[l - 'A'])
+
+#define GET_AT(m, t, p) (*((t*)(m->d->b + p)))
+#define PUT_AT(m, t, p, v) (*((t*)(m->d->b + p)) = (t)(v))
+#define PUT(m, t, v) { *((t*)(m->d->b + m->d->h)) = v; m->d->h += sizeof(t); }
 
 #define DSTACK_SIZE 256
 #define RSTACK_SIZE 256
@@ -98,23 +131,25 @@ V gt(M* m) { N(m) = (N(m) > T(m)) ? -1 : 0; DROP(m); }
 
 V cstore(M* m) { L2(m, C*, a, C, b); *a = b; }
 V cfetch(M* m) { L1(m, C*, a); PUSH(m, *a); }
-V cstore(M* m) { L2(m, B*, a, B, b); *a = b; }
-V cfetch(M* m) { L1(m, B*, a); PUSH(m, *a); }
+V bstore(M* m) { L2(m, B*, a, B, b); *a = b; }
+V bfetch(M* m) { L1(m, B*, a); PUSH(m, *a); }
 
-V reset(M* m) { m->ip = 0; m->rp = 0; m->sp = 0; }
+V reset(M* m) { m->ip = m->d->s; m->rp = 0; m->sp = 0; }
 
-#define PEEK(m) (m->d->b[m->ip])
-#define TOKEN(m) (m->d->b[m->ip++])
+#define PEEK(m) (GET_AT(m, B, m->ip))
+#define TOKEN(m) (GET_AT(m, B, m->ip++))
 #define IN(m, p) (p >= 0 && p < m->d->s)
 #define TAIL(m) (!(IN(m, m->ip)) || PEEK(m) == ']' || PEEK(m) =='}')
 
 V execute(M* m) { L1(m, C, q); if (!TAIL(m)) { m->r[m->rp++] = m->ip; } m->ip = q; }
 V ret(M* m) { m->ip = (m->rp > 0) ? m->r[--m->rp] : m->d->s; }
 
+V eval(M* m, C q) { PUSH(m, q); execute(m); inner(m); }
+
 #define BLOCK(m, ip) { \
 	C t = 1; \
 	while (t && IN(m, ip)) { \
-		switch (m->d->b[ip++]) { \
+		switch (GET_AT(m, B, ip++)) { \
 		case '{': case '[': t++; break; \
 		case '}': case ']': t--; break; \
 		} \
@@ -128,7 +163,8 @@ V dc(M* m, C ip) {
 	B c;
 	BLOCK(m, ip);
 	printf(" : ");
-	for(;t < ip; c = m->d->b[t], t++) { 
+	for(;t <= ip; t++) { 
+		c = GET_AT(m, B, t);
 		if (c != 10) printf("%c", c); 
 	}
 }
@@ -137,6 +173,8 @@ V dr(M* m) { C i; dc(m, m->ip); for(i = 0; i < m->rp; i++) { dc(m, m->r[i]); } }
 V trace(M* m) { ds(m); dr(m); }
 
 V times(M* m) { L2(m, C, q, C, n); while (n-- > 0) { PUSH(m, q); execute(m); DO(m, inner); } }
+
+V align(M* m) { m->d->h = ALIGNED(m->d->h); }
 
 V step(M* m) {
 	trace(m); printf("\n");
@@ -154,6 +192,7 @@ V step(M* m) {
 		switch (TOKEN(m)) {
 		case '0': PUSH(m, 0); break;
 		case '1': PUSH(m, 1); break;
+		case '#': PUSH(m, *((C*)(m->d->b + m->ip))); m->ip += sizeof(C); break;
 
 		case '_': DROP(m); break;
 		case 'd': duplicate(m); break;
@@ -187,7 +226,7 @@ V step(M* m) {
 		case ':': bfetch(m); break;
 
 		case '{': block(m); break;
-		case '}': ret(m); break;
+		case '}': case ']': ret(m); break;
 		case 'x': execute(m); break;
 
 		case 't': times(m); break;
@@ -226,9 +265,29 @@ V isolated(M* m, char* s) {
 #define IBUF(m) (m->d->ibuf)
 #define IPOS(m) (m->d->ipos)
 #define ILEN(m) (m->d->ilen)
-                
+
+V parse_name(M* m) {
+	while (IPOS(m) < ILEN(m) && isspace(IBUF(m)[IPOS(m)])) IPOS(m)++; 
+	PUSH(m, IBUF(m) + IPOS(m));
+	while (IPOS(m) < ILEN(m) && !isspace(IBUF(m)[IPOS(m)])) IPOS(m)++; 
+	PUSH(m, (IBUF(m) + IPOS(m)) - T(m));
+}
+
+V find_name(M* m) {
+	L2(m, C, l, B*, t);
+	C wp = m->d->l;
+	while (wp != -1) {
+		W* w = (W*)REL_TO_ABS(m, wp);
+		if (w->l == l && !strncmp(w->n, t, l) && (w->f & HIDDEN) != HIDDEN) break;
+		wp = w->p;
+	}
+	PUSH(m, t);
+	PUSH(m, l);
+	PUSH(m, wp);
+}
+
 V evaluate(M* m, char* s) {
-  IBUF(m) = s;
+  IBUF(m) = (B*)s;
   ILEN(m) = strlen(s);
   IPOS(m) = 0;
   while (IPOS(m) < ILEN(m)) {
@@ -236,12 +295,68 @@ V evaluate(M* m, char* s) {
     if (!T(m)) { DROP(m); DROP(m); return; }
     find_name(m);
     {
-      L3(m, C, w, C, l, B*, t);
-    if (w) {
-      
-    } else {
-      
-    }
+      L3(m, C, wp, C, l, B*, t);
+			if (wp != -1) {
+				W* w = (W*)REL_TO_ABS(m, wp);
+				if (!m->d->st || (w->f & IMMEDIATE) == IMMEDIATE) {
+					eval(m, w->c);
+				} else {
+					C c = w->c;
+					C l;
+					BLOCK(m, c);
+					l = c - w->c;
+					if (l < (2 + sizeof(C))) {
+						for (c = 0; c < l - 1; c++) PUT(m, B, GET_AT(m, B, w->c + c));
+					} else {
+						PUT(m, B, '#');
+						PUT(m, C, w->c);
+						PUT(m, B, 'x');
+					}
+				}
+    	} else {
+				if (l == 1 && *t == ':') {
+					parse_name(m);
+					{
+						L2(m, C, l, B*, t);
+						W* w;
+						align(m);
+						w = (W*)REL_TO_ABS(m, m->d->h);
+						w->p = m->d->l;
+						m->d->l = ABS_TO_REL(m, w);
+						w->f = HIDDEN;
+						w->l = l;
+						strncpy(w->n, t, l);
+						m->d->h += sizeof(W) + l - 1;
+						align(m);
+						w->c = m->d->h;
+						m->d->st = 1;
+					}
+				} else if (l == 1 && *t == ';') {
+					PUT(m, B, ']');
+					align(m);
+					((W*)(REL_TO_ABS(m, m->d->l)))->f = 0;
+					m->d->st = 0;
+				} else if (*t == '\\') {
+					strncpy((char*)(m->d->b + m->d->s - l), (char*)(t + 1), l - 1);
+					PUSH(m, m->d->s - l);
+					execute(m);
+					inner(m);
+				} else if (*t == '$') {
+					strncpy((char*)(m->d->b + m->d->h), (char*)(t + 1), l - 1);
+					m->d->h += l - 1;
+				} else {
+					char * end;
+					int n = strtol((char*)t, &end, 10);
+					if ((n == 0 && end == (char*)t) || end < ((char*)t + l)) {
+						PUSH(m, t);
+						PUSH(m, l);
+						m->err = -13;
+						return;
+					}
+					PUSH(m, n);
+				}
+    	}
+		}
   }
 }
                 
@@ -251,10 +366,14 @@ D* init_DICT(int block_size) {
 	if (block_size) {
 		d->b = malloc(block_size);
     if (!d->b) { free(d); return 0; }
+		d->l = -1;
+		d->h = 0;
 		d->s = block_size;
 	} else {
 		d->b = 0;
 		d->s = 0;
+		d->h = 0;
+		d->l = 0;
 	}
 
 	return d;
@@ -267,6 +386,10 @@ M* init_VM(D* d) {
 	m = malloc(sizeof(M));
 	if (!m) return 0;
 	m->d = d;
+
+	printf("After init, latest: %d\n", m->d->l);
+
+	reset(m);
 
 	return m;
 }
