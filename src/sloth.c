@@ -61,12 +61,33 @@ int main(int argc, char** argv) {
 	M* m = init_VM(init_DICT(65536));
 	EXT(m, 'E') = &emit;
   EXT(m, 'K') = &key;
-  /*
 	if (!m) {
     printf("Init error\n");
     exit(EXIT_FAILURE);
   }
-  */
+
+	if (argc == 2) {
+		FILE *f = fopen(argv[1], "r");
+		if (!f) {
+			exit(EXIT_FAILURE);
+		} else {
+			char* line = 0;
+			size_t len = 0;
+			size_t read;
+
+			while ((read = getline(&line, &len, f)) != -1) {
+				printf("--> %s", line);
+				evaluate(m, line);
+				if (m->err) {
+					do_error(m);
+					exit(EXIT_FAILURE);
+				}
+			}
+
+			fclose(f);
+			if (line) free(line);
+		}
+	}
 
   printf("SLOTH v0.1\n");
   

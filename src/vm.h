@@ -1,7 +1,5 @@
-/* TODO: Compile literal */
-/* TODO: jump, zjump, quotation */
-/* TODO: immediate */
-/* TODO: Decide how to use int16_t for addresses and jumps @ for relative literal? (16 bit) */
+/* TODO: Everything needed in forth as an extension to not fill basic bytecode? */
+/* TODO: immediate -> do it in forth */
 
 #ifndef SLOTH_VM
 #define SLOTH_VM
@@ -10,14 +8,6 @@
 #include<stdlib.h> /* malloc, free */
 #include<string.h> /* strncpy */
 #include<fcntl.h>  /* open, close, read, write, O_RDONLY, O_WRONLY */
-
-#if INTPTR_MAX == INT32_MAX
-    #define BITS_32
-#elif INTPTR_MAX == INT64_MAX
-    #define BITS_64
-#else
-    #error "Environment not 32 or 64-bit."
-#endif
 
 typedef void V;
 typedef char B;
@@ -31,9 +21,9 @@ typedef intptr_t C;
 #define ABS_TO_REL(m, a) (((C)a) - ((C)m->d->b))
 #define REL_TO_ABS(m, a) (((C)a) + ((C)m->d->b))
 
-#define VARIABLE 32
-#define HIDDEN 64 
-#define IMMEDIATE 128 
+#define VARIABLE 1
+#define HIDDEN 2
+#define IMMEDIATE 4
 
 typedef struct _Machine M;
 
@@ -44,14 +34,6 @@ typedef struct _Word {
 	B l;
 	B n[1];
 } W;
-
-/*
-#define PREVIOUS(m, w) (*((S*)(m->d->b + w)))
-#define FLAGS(m, w) (*((B*)(m->d->b + w + 2)))
-#define NAME_LENGTH(m, w) (*((B*)(m->d->b + w + 3)))
-#define NAME(m, w) ((char*)(m->d->b + w + 4))
-#define CODE(m, w) ((B*)(ALIGNED(w + 4 + NAME_LENGTH(m, w))))
-*/
 
 typedef struct _Dictionary {
 	B* b;
@@ -71,6 +53,10 @@ typedef struct _Dictionary {
 #define PUT_AT(m, t, p, v) (*((t*)(m->d->b + p)) = (t)(v))
 #define PUT(m, t, v) { *((t*)(m->d->b + m->d->h)) = v; m->d->h += sizeof(t); }
 
+#define IBUF(m) (m->d->ibuf)
+#define IPOS(m) (m->d->ipos)
+#define ILEN(m) (m->d->ilen)
+
 #define DSTACK_SIZE 256
 #define RSTACK_SIZE 256
 
@@ -79,9 +65,9 @@ struct _Machine {
 	C rp;
 	C ip;
 	C err;
+	D* d;
 	C s[DSTACK_SIZE];
 	C r[RSTACK_SIZE];
-	D* d;
 };
 
 V inner(M*);
@@ -167,7 +153,11 @@ V dc(M* m, C ip) {
 	printf(" : ");
 	for(;t <= ip; t++) { 
 		c = GET_AT(m, B, t);
-		if (c != 10) printf("%c", c); 
+		if (c == '#') { printf("#%d", GET_AT(m, B, t + 1)); t += 1; }
+		else if (c == '2') { printf("#%d", GET_AT(m, S, t + 1)); t += 2; }
+		else if (c == '4') { printf("#%d", GET_AT(m, I, t + 1)); t += 4; }
+		else if (c == '8') { printf("#%ld", GET_AT(m, L, t + 1)); t += 8; }
+		else if (c != 10) printf("%c", c); 
 	}
 }
 V ds(M* m) { C i; for(i = 0; i < m->sp; i++) { printf("%ld ", m->s[i]); } }
@@ -175,8 +165,6 @@ V dr(M* m) { C i; dc(m, m->ip); for(i = 0; i < m->rp; i++) { dc(m, m->r[i]); } }
 V trace(M* m) { ds(m); dr(m); }
 
 V times(M* m) { L2(m, C, q, C, n); while (n-- > 0) { PUSH(m, q); execute(m); DO(m, inner); } }
-
-V align(M* m) { m->d->h = ALIGNED(m->d->h); }
 
 V step(M* m) {
 	trace(m); printf("\n");
@@ -238,6 +226,10 @@ V step(M* m) {
 		case '[': quotation(m); break;
 
 		case 't': times(m); break;
+
+		case 'b': PUSH(m, m); break;
+		case 'c': PUSH(m, sizeof(C)); break;
+		case 'l': PUSH(m, REL_TO_ABS(m, m->d->l)); break;
 		}
 	}
 }
@@ -257,9 +249,7 @@ V isolated(M* m, char* s) {
 	inner(m);
 }
 
-#define IBUF(m) (m->d->ibuf)
-#define IPOS(m) (m->d->ipos)
-#define ILEN(m) (m->d->ilen)
+V align(M* m) { m->d->h = ALIGNED(m->d->h); }
 
 V parse_name(M* m) {
 	while (IPOS(m) < ILEN(m) && isspace(IBUF(m)[IPOS(m)])) IPOS(m)++; 
@@ -279,6 +269,24 @@ V find_name(M* m) {
 	PUSH(m, t);
 	PUSH(m, l);
 	PUSH(m, wp);
+}
+
+V create(M* m) {
+	parse_name(m);
+	{
+		L2(m, C, l, B*, t);
+		W* w;
+		align(m);
+		w = (W*)REL_TO_ABS(m, m->d->h);
+		w->p = m->d->l;
+		m->d->l = ABS_TO_REL(m, w);
+		w->f = HIDDEN;
+		w->l = l;
+		strncpy(w->n, t, l);
+		m->d->h += sizeof(W) + l - 1;
+		align(m);
+		w->c = m->d->h;
+	}
 }
 
 C literal_size(C n) {
@@ -334,22 +342,9 @@ V evaluate(M* m, char* s) {
 				}
     	} else {
 				if (l == 1 && *t == ':') {
-					parse_name(m);
-					{
-						L2(m, C, l, B*, t);
-						W* w;
-						align(m);
-						w = (W*)REL_TO_ABS(m, m->d->h);
-						w->p = m->d->l;
-						m->d->l = ABS_TO_REL(m, w);
-						w->f = HIDDEN;
-						w->l = l;
-						strncpy(w->n, t, l);
-						m->d->h += sizeof(W) + l - 1;
-						align(m);
-						w->c = m->d->h;
-						m->d->st = 1;
-					}
+					create(m);
+					((W*)(REL_TO_ABS(m, m->d->l)))->f = HIDDEN;
+					m->d->st = 1;
 				} else if (l == 1 && *t == ';') {
 					PUT(m, B, ']');
 					align(m);
@@ -406,8 +401,6 @@ M* init_VM(D* d) {
 	m = malloc(sizeof(M));
 	if (!m) return 0;
 	m->d = d;
-
-	printf("After init, latest: %d\n", m->d->l);
 
 	reset(m);
 

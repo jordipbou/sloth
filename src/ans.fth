@@ -1,84 +1,43 @@
-\Sc IBUF 255 \Sa
-\Sc PAD 255 \Sa
+: context $b ;
 
-\S: : $S: \S;
-: ; $S; \S;Si
-
-: IMMEDIATE $Si ;
-
-: PARSE $Sp ;
-
-: \ 10 parse ; 
-: ( 41 parse ; IMMEDIATE
-
-\ SLOTH primitives
-
-: DROP $_ ;
-: DUP $d ;
-: OVER $o ;
-: SWAP $s ;
-: ROT $r ;
-: NIP $n ;
+: drop $_ ;
+: dup $d ;
+: over $o ;
+: swap $s ;
+: rot $r ;
+: nip $n ;
 
 : + $+ ;
 : - $- ;
 : * $* ;
 : / $/ ;
-: MOD $% ;
+: mod $% ;
 
-: < $< ;
-: = $= ;
-: > $> ;
+: or $| ;
 
-: AND $& ;
-: OR $| ;
-: INVERT $~ ;
-
-: ! $, ;
 : @ $. ;
-: C! $; ;
-: C@ $: ;
+: ! $, ;
+: c@ $: ;
+: c! $; ;
 
-: , $Sc ;
-: C, $Sb ;
+: cell $c ;
+: cells cell * ;
 
-: EMIT $E ;
-: KEY $K ;
+: sp@ context ;
+: rp@ context cell + ;
+: ip context 2 cells + ;
+: err context 3 cells + ;
+: dictionary context 4 cells + @ ;
 
-\ BLOCK variables
+: rel>abs dictionary + ;
+: abs>rel dictionary - ;
 
-: BLOCK-HEADER $b @ ;
+: latest dictionary 3 cells + @ rel>abs ;
 
-: REL>ABS block-header + ;
-: ABS>REL block-header - ;
+: nt>flags 2 cells + ;
+: nt>length name>flags 1 + ;
+: nt>name dup name>length c@ swap name>length 1 + swap ;
 
-: BLOCK-SIZE block-header @ ;
+: flag-immediate 4 ;
 
-: CELL $c ;
-: CELLS cell * ;
-
-: LATEST block-header cell + @ rel>abs ;
-
-\ WORD
-
-: PREVIOUS @ rel>abs dup block-header = ${_0}{}? ;
-: CODE cell + @ rel>abs ;
-: FLAGS 2 cells + c@ ;
-: NAME>STRING 2 cells + 1 + 1 + dup 1 - c@ ; 
-
-: HERE $Sh ;
-
-: >MARK here 0 , ;
-: >RESOLVE here over - abs>rel swap ! ;
-: <MARK here ;
-: <RESOlVE here - , ;
-
-: POSTPONE $S^ ;
-
-: 0BRANCH $z ;
-
-: IF >mark postpone 0branch ; immediate
-: THEN >resolve ; immediate
-
-: TYPE ( c-addr u -- ) ${d:E1+}t_ ;
-: ACCEPT ( c-addr n -- n ) ( TODO ) ;
+: immediate latest name>flags dup c@ flag-immediate or swap c! ;
