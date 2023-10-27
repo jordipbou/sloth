@@ -21,11 +21,9 @@
 
 typedef void V;
 typedef char B;
-/*
 typedef int16_t S;
 typedef int32_t I;
 typedef int64_t L;
-*/
 typedef intptr_t C;
 
 #define ALIGNED(a) (a + (sizeof(C) - 1)) & ~(sizeof(C) - 1)
@@ -134,7 +132,7 @@ V cfetch(M* m) { L1(m, C*, a); PUSH(m, *a); }
 V bstore(M* m) { L2(m, B*, a, B, b); *a = b; }
 V bfetch(M* m) { L1(m, B*, a); PUSH(m, *a); }
 
-V reset(M* m) { m->ip = m->d->s; m->rp = 0; m->sp = 0; }
+V reset(M* m) { m->ip = m->d->s; m->rp = 0; m->sp = 0; m->err = 0; }
 
 #define PEEK(m) (GET_AT(m, B, m->ip))
 #define TOKEN(m) (GET_AT(m, B, m->ip++))
@@ -145,6 +143,10 @@ V execute(M* m) { L1(m, C, q); if (!TAIL(m)) { m->r[m->rp++] = m->ip; } m->ip = 
 V ret(M* m) { m->ip = (m->rp > 0) ? m->r[--m->rp] : m->d->s; }
 
 V eval(M* m, C q) { PUSH(m, q); execute(m); inner(m); }
+
+V jump(M* m) { S d = *((S*)(m->d->b + m->ip)); m->ip += d + 2; }
+V zjump(M* m) { L1(m, C, b); S d = *((S*)(m->d->b + m->ip)); m->ip += 2; if (!b) m->ip += d; }
+V quotation(M* m) { S d; PUSH(m, m->ip + 2); d = *((S*)(m->d->b + m->ip)); m->ip += d + 2; }
 
 #define BLOCK(m, ip) { \
 	C t = 1; \
@@ -192,7 +194,10 @@ V step(M* m) {
 		switch (TOKEN(m)) {
 		case '0': PUSH(m, 0); break;
 		case '1': PUSH(m, 1); break;
-		case '#': PUSH(m, *((C*)(m->d->b + m->ip))); m->ip += sizeof(C); break;
+		case '#': PUSH(m, *((B*)(m->d->b + m->ip))); m->ip += sizeof(B); break;
+		case '2': PUSH(m, *((S*)(m->d->b + m->ip))); m->ip += sizeof(S); break;
+		case '4': PUSH(m, *((I*)(m->d->b + m->ip))); m->ip += sizeof(I); break;
+		case '8': PUSH(m, *((L*)(m->d->b + m->ip))); m->ip += sizeof(L); break;
 
 		case '_': DROP(m); break;
 		case 'd': duplicate(m); break;
@@ -228,21 +233,11 @@ V step(M* m) {
 		case '{': block(m); break;
 		case '}': case ']': ret(m); break;
 		case 'x': execute(m); break;
-
-		case 't': times(m); break;
-/*
-		case '$': reset(m); break;
-*/
-/*
-		case 'x': call(m); break;
 		case 'j': jump(m); break;
 		case 'z': zjump(m); break;
-		case '[': quot(m); break;
-		case ']': ret(m); break;
+		case '[': quotation(m); break;
 
-		case 'c': PUSH(m, sizeof(C)); break;
-		case '@': PUSH(m, m); break;
-*/
+		case 't': times(m); break;
 		}
 	}
 }
@@ -286,6 +281,30 @@ V find_name(M* m) {
 	PUSH(m, wp);
 }
 
+C literal_size(C n) {
+	if (n >= INT8_MIN && n <= INT8_MAX) { return 1; }
+	else if (n >= INT16_MIN && n <= INT16_MAX) { return 2; }
+	else if (n >= INT32_MIN && n <= INT32_MAX) { return 4; }
+	else { return 8; }
+}
+
+V literal(M* m) {
+	L1(m, C, n);
+	if (n >= INT8_MIN && n <= INT8_MAX) {
+		PUT(m, B, '#');
+		PUT(m, B, n);
+	} else if (n >= INT16_MIN && n <= INT16_MAX) {
+		PUT(m, B, '2');
+		PUT(m, S, n);
+	} else if (n >= INT32_MIN && n <= INT32_MAX) {
+		PUT(m, B, '4');
+		PUT(m, I, n);
+	} else {
+		PUT(m, B, '8');
+		PUT(m, L, n);
+	}
+}
+
 V evaluate(M* m, char* s) {
   IBUF(m) = (B*)s;
   ILEN(m) = strlen(s);
@@ -305,11 +324,11 @@ V evaluate(M* m, char* s) {
 					C l;
 					BLOCK(m, c);
 					l = c - w->c;
-					if (l < (2 + sizeof(C))) {
+					if (l < (literal_size(w->c) + 2)) {
 						for (c = 0; c < l - 1; c++) PUT(m, B, GET_AT(m, B, w->c + c));
 					} else {
-						PUT(m, B, '#');
-						PUT(m, C, w->c);
+						PUSH(m, w->c);
+						literal(m);
 						PUT(m, B, 'x');
 					}
 				}
@@ -354,6 +373,7 @@ V evaluate(M* m, char* s) {
 						return;
 					}
 					PUSH(m, n);
+					if (m->d->st) literal(m);
 				}
     	}
 		}
