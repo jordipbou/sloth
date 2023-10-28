@@ -35,9 +35,9 @@
 : latest dictionary 3 cells + @ rel>abs ;
 
 : nt>flags 2 cells + ;
-: nt>length name>flags 1 + ;
-: nt>name dup name>length c@ swap name>length 1 + swap ;
+: nt>length nt>flags 1 + ;
+: nt>name dup nt>length c@ swap nt>length 1 + swap ;
 
 : flag-immediate 4 ;
 
-: immediate latest name>flags dup c@ flag-immediate or swap c! ;
+: immediate latest nt>flags dup c@ flag-immediate or swap c! ;
