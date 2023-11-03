@@ -1,6 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include"vm.h"
+#include"combinators.h"
 /*#include"sloth.h"*/
 
 #ifdef _WIN32
@@ -61,6 +62,7 @@ int main(int argc, char** argv) {
 	M* m = init_VM(init_DICT(65536));
 	EXT(m, 'E') = &emit;
   EXT(m, 'K') = &key;
+	EXT(m, 'C') = &combinators_ext;
 	if (!m) {
     printf("Init error\n");
     exit(EXIT_FAILURE);
