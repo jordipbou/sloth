@@ -1,6 +1,3 @@
-/* TODO: Everything needed in forth as an extension to not fill basic bytecode? */
-/* TODO: immediate -> do it in forth */
-
 #ifndef SLOTH_VM
 #define SLOTH_VM
 
@@ -106,7 +103,7 @@ V mod(M* m) { N(m) = N(m) % T(m); DROP(m); }
 V and(M* m) { N(m) = N(m) & T(m); DROP(m); }
 V or(M* m) { N(m) = N(m) | T(m); DROP(m); }
 V xor(M* m) { N(m) = N(m) ^ T(m); DROP(m); }
-V not(M* m) { T(m) = !T(m); }
+/*V not(M* m) { T(m) = !T(m); }*/
 V invert(M* m) { T(m) = ~T(m); }
 
 V lt(M* m) { N(m) = (N(m) < T(m)) ? -1 : 0; DROP(m); }
@@ -117,7 +114,11 @@ V cstore(M* m) { L2(m, C*, a, C, b); *a = b; }
 V cfetch(M* m) { L1(m, C*, a); PUSH(m, *a); }
 V bstore(M* m) { L2(m, B*, a, B, b); *a = b; }
 V bfetch(M* m) { L1(m, B*, a); PUSH(m, *a); }
-
+V sstore(M* m) { L2(m, S*, a, S, b); *a = b; }
+V sfetch(M* m) { L1(m, S*, a); PUSH(m, *a); }
+V istore(M* m) { L2(m, I*, a, I, b); *a = b; }
+V ifetch(M* m) { L1(m, I*, a); PUSH(m, *a); }
+                
 V reset(M* m) { m->ip = m->d->s; m->rp = 0; m->sp = 0; m->err = 0; }
 
 #define PEEK(m) (GET_AT(m, B, m->ip))
@@ -166,6 +167,23 @@ V trace(M* m) { ds(m); dr(m); }
 
 V times(M* m) { L2(m, C, q, C, n); while (n-- > 0) { PUSH(m, q); execute(m); DO(m, inner); } }
 
+V literal(M* m) {
+  L1(m, C, n);
+  if (n >= INT8_MIN && n <= INT8_MAX) {
+    PUT(m, B, '#');
+    PUT(m, B, n);
+  } else if (n >= INT16_MIN && n <= INT16_MAX) {
+    PUT(m, B, '2');
+    PUT(m, S, n);
+  } else if (n >= INT32_MIN && n <= INT32_MAX) {
+    PUT(m, B, '4');
+    PUT(m, I, n);
+  } else {
+    PUT(m, B, '8');
+    PUT(m, L, n);
+  }
+}
+                
 V step(M* m) {
 	trace(m); printf("\n");
 	switch (PEEK(m)) {
@@ -206,17 +224,21 @@ V step(M* m) {
 		case '&': and(m); break;
 		case '|': or(m); break;
 		case '^': xor(m); break;
-		case '!': not(m); break;
+		/*case '!': not(m); break;*/
 		case '~': invert(m); break;
 
 		case '<': lt(m); break;
 		case '=': eq(m); break;
 		case '>': gt(m); break;
 
-		case ',': cstore(m); break;
-		case '.': cfetch(m); break;
+    case '!': cstore(m); break;
+    case '@': cfetch(m); break;
+		case ',': istore(m); break;
+		case '.': ifetch(m); break;
 		case ';': bstore(m); break;
 		case ':': bfetch(m); break;
+    case '\'': sstore(m); break;
+    case '"': sfetch(m); break;
 
 		case '{': block(m); break;
 		case '}': case ']': ret(m); break;
@@ -229,7 +251,9 @@ V step(M* m) {
 
 		case 'b': PUSH(m, m); break;
 		case 'c': PUSH(m, sizeof(C)); break;
-		case 'l': PUSH(m, REL_TO_ABS(m, m->d->l)); break;
+		/*case 'l': PUSH(m, REL_TO_ABS(m, m->d->l)); break;*/
+
+    case 'l': literal(m); break;
 		}
 	}
 }
@@ -296,22 +320,7 @@ C literal_size(C n) {
 	else { return 8; }
 }
 
-V literal(M* m) {
-	L1(m, C, n);
-	if (n >= INT8_MIN && n <= INT8_MAX) {
-		PUT(m, B, '#');
-		PUT(m, B, n);
-	} else if (n >= INT16_MIN && n <= INT16_MAX) {
-		PUT(m, B, '2');
-		PUT(m, S, n);
-	} else if (n >= INT32_MIN && n <= INT32_MAX) {
-		PUT(m, B, '4');
-		PUT(m, I, n);
-	} else {
-		PUT(m, B, '8');
-		PUT(m, L, n);
-	}
-}
+
 
 V evaluate(M* m, char* s) {
   IBUF(m) = (B*)s;

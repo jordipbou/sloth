@@ -46,101 +46,24 @@ Words and code are always aligned, so with 16 bit it's possible to use 65536 cel
   
 ### BYTECODE
 
-#### Ordered by use
-
-##### Stack operations
-
-    _ -> drop
-    s -> swap
-    d -> dup
-    o -> over
-    r -> rot
-    ( -> push
-    ) -> pop
-
-##### Arithmetic operations
-
-    + -> addition
-    - -> substraction
-    * -> multiplication
-    / -> division
-    % -> modulo
-
-##### Bitwise operations
-
-    ! -> not
-    ~ -> invert
-    & -> and
-    | -> or
-    ^ -> xor
-
-##### Comparison operations
-
-    < -> less than
-    = -> equal
-    > -> greater than
-    
-##### Execution operations
-
-    ]/}/0 -> return
-    $ -> call
-    j -> jump
-    z -> zjump
-    y -> yield
-    
-##### Helpers
-
-    ? -> branch (combinator)
-    t -> times (combinator)
-    w -> while (combinator)
-    u -> unview traces
-    v -> view traces
-    [ n -> string to number ]
-
-##### Memory operations
-
-    m -> malloc
-    f -> free
-
-    . -> fetch cell
-    : -> fetch byte
-    , -> store cell
-    ; -> store byte
-
-    c -> size of cell in bytes
-
-    [ { -> inspect memory ]
-
-##### Dictionary
-
-    h -> header (create label)
-    i -> set latest word as immediate
-    b -> compile byte
-
-##### Input/Output
-
-    e -> emit
-    k -> key
-    [ l -> load and eval file ]
-
 ### ASCII ordered
 
 	  (< 32) -> noop
     (SPACE) -> noop
     ! -> store cell
-    " -> 
+    " -> short fetch
     # -> fetch byte
     $ -> 
     % -> modulo
     & -> and
-    ' -> 
+    ' -> short store
     ( -> push to R
     ) -> pop from R
     * -> multiplication
     + -> addition
-    , -> compile cell
+    , -> cell store
     - -> substraction
-    . -> compile byte
+    . -> cell fetch
     / -> division
     0 -> literal 0
     1 -> literal 1
@@ -152,13 +75,13 @@ Words and code are always aligned, so with 16 bit it's possible to use 65536 cel
     7 ->
     8 -> long literal (64 bit)
     9 ->
-    : -> colon
-    ; -> semicolon
+    : -> byte fetch
+    ; -> byte store
     < -> less than
     = -> equal
     > -> greater than
     ? -> RESERVED for branch (combinator)
-    @ -> fetch cell
+    @ -> 
 		A -> C extension
 		B -> C extension
 		C -> C extension
@@ -213,9 +136,9 @@ Words and code are always aligned, so with 16 bit it's possible to use 65536 cel
     s -> swap
     t -> RESERVED for times combinator
     u -> 
-    v -> create (variable)
+    v -> 
     w -> 
-    x -> execute/call
+    x -> execute
     y -> 
     z -> jump if zero
     { -> start quotation (non nestable)
