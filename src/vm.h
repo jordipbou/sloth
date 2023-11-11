@@ -62,6 +62,7 @@ struct _Machine {
 	C rp;
 	C ip;
 	C err;
+	C tr;
 	D* d;
 	C s[DSTACK_SIZE];
 	C r[RSTACK_SIZE];
@@ -154,7 +155,7 @@ V dc(M* m, C ip) {
 	printf(" : ");
 	for(;t <= ip; t++) { 
 		c = GET_AT(m, B, t);
-		if (c == '#') { printf("#%d", GET_AT(m, B, t + 1)); t += 1; }
+		if (c == '\'') { printf("#%d", GET_AT(m, B, t + 1)); t += 1; }
 		else if (c == '2') { printf("#%d", GET_AT(m, S, t + 1)); t += 2; }
 		else if (c == '4') { printf("#%d", GET_AT(m, I, t + 1)); t += 4; }
 		else if (c == '8') { printf("#%ld", GET_AT(m, L, t + 1)); t += 8; }
@@ -165,27 +166,7 @@ V ds(M* m) { C i; for(i = 0; i < m->sp; i++) { printf("%ld ", m->s[i]); } }
 V dr(M* m) { C i; dc(m, m->ip); for(i = 0; i < m->rp; i++) { dc(m, m->r[i]); } }
 V trace(M* m) { ds(m); dr(m); }
 
-V times(M* m) { L2(m, C, q, C, n); while (n-- > 0) { PUSH(m, q); execute(m); DO(m, inner); } }
-
-V literal(M* m) {
-  L1(m, C, n);
-  if (n >= INT8_MIN && n <= INT8_MAX) {
-    PUT(m, B, '#');
-    PUT(m, B, n);
-  } else if (n >= INT16_MIN && n <= INT16_MAX) {
-    PUT(m, B, '2');
-    PUT(m, S, n);
-  } else if (n >= INT32_MIN && n <= INT32_MAX) {
-    PUT(m, B, '4');
-    PUT(m, I, n);
-  } else {
-    PUT(m, B, '8');
-    PUT(m, L, n);
-  }
-}
-                
 V step(M* m) {
-	trace(m); printf("\n");
 	switch (PEEK(m)) {
 	case 'A': case 'B': case 'C': case 'D':
 	case 'F': case 'G': case 'H': case 'I':
@@ -198,9 +179,11 @@ V step(M* m) {
 		break;
 	default:
 		switch (TOKEN(m)) {
+		/* TODO: 0 should be used for 0= */
 		case '0': PUSH(m, 0); break;
 		case '1': PUSH(m, 1); break;
-		case '#': PUSH(m, *((B*)(m->d->b + m->ip))); m->ip += sizeof(B); break;
+		/* case '#': numeric literal */
+		case '\'': PUSH(m, *((B*)(m->d->b + m->ip))); m->ip += sizeof(B); break;
 		case '2': PUSH(m, *((S*)(m->d->b + m->ip))); m->ip += sizeof(S); break;
 		case '4': PUSH(m, *((I*)(m->d->b + m->ip))); m->ip += sizeof(I); break;
 		case '8': PUSH(m, *((L*)(m->d->b + m->ip))); m->ip += sizeof(L); break;
@@ -240,20 +223,21 @@ V step(M* m) {
     case '\'': sstore(m); break;
     case '"': sfetch(m); break;
 
+		case '[': quotation(m); break;
 		case '{': block(m); break;
 		case '}': case ']': ret(m); break;
 		case 'x': execute(m); break;
 		case 'j': jump(m); break;
 		case 'z': zjump(m); break;
-		case '[': quotation(m); break;
 
-		case 't': times(m); break;
+		case 'c': PUSH(m, sizeof(C)); break;
 
 		case 'b': PUSH(m, m); break;
-		case 'c': PUSH(m, sizeof(C)); break;
-		/*case 'l': PUSH(m, REL_TO_ABS(m, m->d->l)); break;*/
 
-    case 'l': literal(m); break;
+		case 'l': PUSH(m, REL_TO_ABS(m, m->d->l)); break;
+
+		case 'u': m->tr = 0; break;
+		case 'v': m->tr = 1; break;
 		}
 	}
 }
@@ -261,6 +245,10 @@ V step(M* m) {
 V inner(M* m) {
 	C t = m->rp;
 	while (m->rp >= t && IN(m, m->ip)) {
+		if (m->tr) {
+			trace(m);
+			printf("\n");
+		}
 		step(m);
 		/* Manage errors */
 	}
@@ -320,7 +308,22 @@ C literal_size(C n) {
 	else { return 8; }
 }
 
-
+V literal(M* m) {
+	L1(m, C, n);
+	if (n >= INT8_MIN && n <= INT8_MAX) {
+		PUT(m, B, '\'');
+		PUT(m, B, n);
+	} else if (n >= INT16_MIN && n <= INT16_MAX) {
+		PUT(m, B, '2');
+		PUT(m, S, n);
+	} else if (n >= INT32_MIN && n <= INT32_MAX) {
+		PUT(m, B, '4');
+		PUT(m, I, n);
+	} else {
+		PUT(m, B, '8');
+		PUT(m, L, n);
+	}
+}
 
 V evaluate(M* m, char* s) {
   IBUF(m) = (B*)s;
