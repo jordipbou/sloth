@@ -17,6 +17,7 @@ typedef intptr_t C;
 
 #define ALIGNED(a) (a + (sizeof(C) - 1)) & ~(sizeof(C) - 1)
 
+#define MSIZE 1024
 
 typedef struct _State {
 	C s[256];
@@ -26,12 +27,15 @@ typedef struct _State {
 	C ip;
 	C err;
 	C tr;
-	B m[1024];
+	B m[MSIZE];
 	B* d;
 	V (**x)(struct _State*);
 } S;
 
-#define ABUF -1024
+#define ABUF -MSIZE
+#define IBUF ABUF + 64
+#define IPOS IBUF + 256
+#define ILEN IPOS + 1
 
 V inner(S*);
 
@@ -49,14 +53,14 @@ typedef struct _Name {
 	B n[1];
 } N;
 
-B get_at(S* s, C a) { return (a < 0) ? s->m[1024 + a] : *((B*)a); }
-V put_at(S* s, C a, B v) { if (a < 0) s->m[1024 + a] = v; else *((B*)a) = v; }
+B get_at(S* s, C a) { return (a < 0) ? s->m[MSIZE + a] : *((B*)a); }
+V put_at(S* s, C a, B v) { if (a < 0) s->m[MSIZE + a] = v; else *((B*)a) = v; }
 
-W wget_at(S* s, C a) { return (a < 0) ? *((W*)&s->m[1024 + a]) : *((W*)a); }
-V wput_at(S* s, C a, W v) { if (a < 0) *((W*)&s->m[1024 + a]) = v; else *((W*)a) = v; }
+W wget_at(S* s, C a) { return (a < 0) ? *((W*)&s->m[MSIZE + a]) : *((W*)a); }
+V wput_at(S* s, C a, W v) { if (a < 0) *((W*)&s->m[MSIZE + a]) = v; else *((W*)a) = v; }
 
-C cget_at(S* s, C a) { return (a < 0) ? *((C*)&s->m[1024 + a]) : *((W*)a); }
-V cput_at(S* s, C a, C v) { if (a < 0) *((C*)&s->m[1024 + a]) = v; else *((W*)a) = v; }
+C cget_at(S* s, C a) { return (a < 0) ? *((C*)&s->m[MSIZE + a]) : *((W*)a); }
+V cput_at(S* s, C a, C v) { if (a < 0) *((C*)&s->m[MSIZE + a]) = v; else *((W*)a) = v; }
 
 #define SIZE(s) (*((C*)(s->d)))
 #define HERE(s) (*((C*)(s->d + sizeof(C))))
@@ -95,10 +99,10 @@ V mul(S* s) { N(s) = N(s) * T(s); s->sp--; }
 V division(S* s) { N(s) = N(s) / T(s); s->sp--; }
 V mod(S* s) { N(s) = N(s) % T(s); s->sp--; }
 
-V lt(S* s) { N(s) = (N(s) < T(s)) ? -1 : 0; }
-V eq(S* s) { N(s) = (N(s) == T(s)) ? -1 : 0; }
-V gt(S* s) { N(s) = (N(s) > T(s)) ? -1 : 0; }
-V zeq(S* s) { T(s) = (T(s) == 0) ? -1 : 0; }
+V lt(S* s) { N(s) = (N(s) < T(s)) ? -1 : 0; s->sp--; }
+V eq(S* s) { N(s) = (N(s) == T(s)) ? -1 : 0; s->sp--; }
+V gt(S* s) { N(s) = (N(s) > T(s)) ? -1 : 0; s->sp--; }
+V zeq(S* s) { T(s) = (T(s) == 0) ? -1 : 0; s->sp--; }
 
 V and(S* s) { N(s) = N(s) & T(s); s->sp--; }
 V or(S* s) { N(s) = N(s) | T(s); s->sp--; }
@@ -106,8 +110,8 @@ V xor(S* s) { N(s) = N(s) ^ T(s); s->sp--; }
 V invert(S* s) { T(s) = ~T(s); }
 
 C valid(S* s, C a) {
-	if (!s->d) return a >= -1024 && a < 0;
-	else return a >= -1024 && a < SIZE(s);
+	if (!s->d) return a >= -MSIZE && a < 0;
+	else return a >= -MSIZE && a < SIZE(s);
 }
 
 C tail(S* s) { return !valid(s, s->ip) || get_at(s, s->ip) == ']' || get_at(s, s->ip) == '}'; }
@@ -127,13 +131,18 @@ V literal(S* s, C n) {
 	else { put(s, '\\'); cput(s, n); }
 }
 
-B peek(S* s) { return (s->ip >= 0) ? *((B*)(s->ip)) : s->m[1024 + s->ip]; }
-B token(S* s) { return (s->ip >= 0) ? *((B*)(s->ip++)) : s->m[1024 + s->ip++]; }
+B peek(S* s) { return get_at(s, s->ip); }
+B token(S* s) { return get_at(s, s->ip++); }
 
 V number(S* s) {
 	C n = 0;
 	B k;
-	while (valid(s, s->ip) && (k = token(s)) >= 48 && k <= 57) { n = n*10 + (k - 48); }
+	if (peek(s) == '-') {
+		s->ip++;
+		while (valid(s, s->ip) && (k = token(s)) >= 48 && k <= 57) { n = n*10 - (k - 48); }
+	} else {
+		while (valid(s, s->ip) && (k = token(s)) >= 48 && k <= 57) { n = n*10 + (k - 48); }
+	}
 	PUSH(s, n);
 	s->ip--;
 }
@@ -142,7 +151,7 @@ V string(S* s) {
 	B k;
 	PUSH(s, s->ip);
 	while (valid(s, s->ip) && (k = token(s)) != '"') { }
-	PUSH(s, s->ip - T(s));
+	PUSH(s, s->ip - T(s) - 1);
 }
 
 V block(S* s) {
@@ -166,7 +175,7 @@ V step(S* s) {
 	case 'I': case 'J': case 'K': case 'L': case 'M': case 'N': case 'O': case 'P':
 	case 'Q': case 'R': case 'S': case 'T': case 'U': case 'V': case 'W': case 'Y': 
 	case 'Z':
-		/* Do exetensions */
+		s->x[token(s) - 'A'](s);
 		break;
 	default:
 		switch (token(s)) {
@@ -275,6 +284,106 @@ V assembler(S* s, char* q) {
 	put_at(s, ABUF + l - 1, ']');
 	s->ip = ABUF;
 	inner(s);
+}
+
+/* OUTER INTERPRETER */
+
+V parse_name(S* s) {
+	B i = get_at(s, IPOS);
+	B l = get_at(s, ILEN);
+	while (i < l && isspace(get_at(s, IBUF + i))) i++;
+	PUSH(s, i);
+	while (i < l && !isspace(get_at(s, IBUF + i))) i++;
+	PUSH(s, i - T(s));
+	put_at(s, IPOS, i);
+}
+
+V find_name(S* s) {
+	PUSH(s, -1);
+}
+
+B do_asm(S* s) {
+	L2(s, C, l, C, t);
+	if (l > 1 && get_at(s, IBUF + t) == '\\') {
+		int i;
+		l = l - 1;
+		t = t + 1;
+		for (i = 0; i < l; i++) { put_at(s, ABUF + i, get_at(s, IBUF + t + i)); }
+		put_at(s, ABUF + l, ']');
+		s->ip = ABUF;
+		inner(s);
+		return 1;
+	} else {
+		PUSH(s, t);
+		PUSH(s, l);
+		return 0;
+	}
+}
+
+B do_casm(S* s) {
+	L2(s, C, l, C, t);
+	if (l > 1 && get_at(s, IBUF + t) == '$') {
+		int i;
+		l = l - 1;
+		t = t + 1;
+		for (i = 0; i < l; i++) { put(s, get_at(s, IBUF + t + i)); }
+		return 1;
+	} else {
+		PUSH(s, t);
+		PUSH(s, l);
+		return 0;
+	}
+}
+
+B do_colon(S* s) {
+	return 0;
+}
+
+B do_semicolon(S* s) {
+	return 0;
+}
+
+V do_number(S* s) {
+	L2(s, C, l, C, t);
+	B k;
+	int n = 0;
+	int i;
+	if (get_at(s, IBUF + t) == '-') {
+		for (i = 1; i < l; i++) {
+			k = get_at(s, IBUF + t + i);
+			if (k >= 48 && k <= 57) { n = n* 10 - (k - 48); }
+			else { s->err = -13; return; }
+		}
+		PUSH(s, n);
+	} else {
+		for (i = 0; i < l; i++) {
+			k = get_at(s, IBUF + t + i);
+			if (k >= 48 && k <= 57) { n = n* 10 + (k - 48); }
+			else { s->err = -13; return; }
+		}
+		PUSH(s, n);
+	}
+}
+
+V evaluate(S* s, B* str) {
+	int i;
+	put_at(s, IPOS, 0);
+  put_at(s, ILEN, (B)strlen(str));
+	for (i = 0; i < strlen(str); i++) put_at(s, IBUF + i, str[i]);
+	while (get_at(s, IPOS) < get_at(s, ILEN)) {
+		parse_name(s);
+		if (!T(s)) { DROP(s); DROP(s); return; }
+		find_name(s);
+		if (T(s) != -1) {
+		} else {
+			DROP(s);
+			if (!do_asm(s))
+				if (!do_casm(s))
+					if (!do_colon(s))
+						if (!do_semicolon(s))
+							do_number(s);
+		}
+	}
 }
 
 S* init() {

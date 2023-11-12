@@ -69,7 +69,8 @@ int main(int argc, char** argv) {
   
 	while (1) {
 	  r = fgets(buf, 255, stdin);
-		assembler(s, buf);
+		/*assembler(s, buf);*/
+		evaluate(s, buf);
 		if (!s->err) {
 			trace(s);
 			printf("Ok\n");
