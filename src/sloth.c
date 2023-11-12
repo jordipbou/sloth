@@ -1,7 +1,10 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include"vm.h"
+/*
 #include"combinators.h"
+*/
+
 /*#include"sloth.h"*/
 
 #ifdef _WIN32
@@ -11,20 +14,20 @@
   #include <termios.h>
 #endif
 
-void do_error(M* m) {
-/*
+void do_error(S* s) {
+	/*
 	if (x->err == -13) {
 		printf("UNDEFINED WORD [%.*s]\n", (int)T(x), (char *)N(x));
 	} else if (x->err == -16) {
 		printf("ZERO LENGTH NAME::IBUF: %s\n", &x->m->ibuf[x->m->ipos]);
 	} else {
-*/
-		printf("ERROR: %ld\n", m->err);
-/*
+	*/
+	if (s->err == -256) { exit(0); }
+	else { printf("ERROR: %ld\n", s->err); }
+	/*
 	}
-*/
+	*/
 }
-
 /*
  Source code for getch is taken from:
  Crossline readline (https://github.com/jcwangxp/Crossline).
@@ -41,20 +44,42 @@ int _getch ()
   fflush (stdout);
   if (tcgetattr(STDIN_FILENO, &old_term) < 0)	{ perror("tcsetattr"); }
   cur_term = old_term;
-  cur_term.c_lflag &= ~(ICANON | ECHO | ISIG); /* echoing off, canonical off, no signal chars */
+  cur_term.c_lflag &= ~(ICANON | ECHO | ISIG); 
   cur_term.c_cc[VMIN] = 1;
   cur_term.c_cc[VTIME] = 0;
   if (tcsetattr(STDIN_FILENO, TCSANOW, &cur_term) < 0)	{ perror("tcsetattr"); }
-  if (read(STDIN_FILENO, &ch, 1) < 0)	{ /* perror("read()"); */ } /* signal will interrupt */
+  if (read(STDIN_FILENO, &ch, 1) < 0)	{ } 
   if (tcsetattr(STDIN_FILENO, TCSADRAIN, &old_term) < 0)	{ perror("tcsetattr"); }
   return ch;
 }
 #endif
 
-V key(M* m) { PUSH(m, _getch()); }
-V emit(M* m) { L1(m, B, c); printf("%c", c); }
+V key(S* s) { PUSH(s, _getch()); }
+V emit(S* s) { L1(s, B, c); printf("%c", c); }
 
 int main(int argc, char** argv) {
+	char* r;
+	char buf[255];
+
+	S* s = init();
+	s->x['E' - 'A'] = &emit;
+	s->x['K' - 'A'] = &key;
+
+  printf("SLOTH v0.1\n");
+  
+	while (1) {
+	  r = fgets(buf, 255, stdin);
+		assembler(s, buf);
+		if (!s->err) {
+			trace(s);
+			printf("Ok\n");
+		} else {
+			do_error(s);
+			/* reset(s); */
+		}
+	}
+
+/*
 	char* r;
 	char buf[255];
 	C i;
@@ -95,9 +120,7 @@ int main(int argc, char** argv) {
   
 	while (1) {
 	  r = fgets(buf, 255, stdin);
-    /*asm_exec(m, strlen(buf), buf);*/
 		evaluate(m, buf);
-    /*isolated(m, buf);*/
 		if (!m->err) {
 			trace(m);
 			printf(" Ok\n");
@@ -106,55 +129,5 @@ int main(int argc, char** argv) {
 			reset(m);
 		}
 	}
-}
-
-/*
-int main(int argc, char** argv) {
-	char* r;
-	char buf[255];
-	C i;
-
-	X* x = init();
-	EXT(x, 'E') = &emit;
-  EXT(x, 'K') = &key;
-	if (!x) exit(EXIT_FAILURE);
-
-	if (argc == 2) {
-		FILE *f = fopen(argv[1], "r");
-		if (!f) {
-			exit(EXIT_FAILURE);
-		} else {
-			char* line = 0;
-			size_t len = 0;
-			size_t read;
-
-			while ((read = getline(&line, &len, f)) != -1) {
-				printf("--> %s", line);
-				evaluate(x, line);
-				if (x->err) {
-					do_error(x);
-					exit(EXIT_FAILURE);
-				}
-			}
-
-			fclose(f);
-			if (line) free(line);
-		}
-	}
-
-	printf("SLOTH v0.1\n");
-	while (1) {
-	  r = fgets(buf, 255, stdin);
-    evaluate(x, buf);
-		if (!x->err) {
-			for (i = 0; i < x->dp; i++) {
-			  printf("%ld ", x->d[i]);
-			}
-			printf(" Ok\n");
-		} else {
-			do_error(x);
-			reset_context(x);
-		}
-	}
-}
 */
+}

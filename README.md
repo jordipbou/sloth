@@ -41,8 +41,17 @@ Words and code are always aligned, so with 16 bit it's possible to use 65536 cel
 
 ### ARCHITECTURE
 
-* Inner interpreter
-* Outer interpreter
+#### Interpreter Context
+
+Each interpreter context has its own dedicated memory. Its mapping is:
+
+-1024 (64) Assembler buffer
+ -960 (80) Input buffer
+ -880 (84) Pad area
+ -796 (33) CString area
+ -763 (18) #> area
+
+#### Dictionary
   
 ### BYTECODE
 
