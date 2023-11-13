@@ -27,6 +27,7 @@ typedef struct _State {
 	C ip;
 	C err;
 	C tr;
+  C st;	
 	B m[MSIZE];
 	B* d;
 	V (**x)(struct _State*);
@@ -37,14 +38,16 @@ typedef struct _State {
 #define IPOS IBUF + 256
 #define ILEN IPOS + 1
 
+#define IBUF_STR(s) ((B*)(s->m + 1024 - IBUF))
+
 V inner(S*);
 
 #define ABS_TO_REL(s, a) (((C)a) - ((C)s->d))
 #define REL_TO_ABS(s, a) (((C)a) + ((C)s->d))
 
-#define VARIABLE 1
-#define HIDDEN 2
-#define IMMEDIATE 4
+#define VARIABLE 128
+#define HIDDEN 64 
+#define IMMEDIATE 32
 
 typedef struct _Name {
 	W p;
@@ -64,6 +67,7 @@ V cput_at(S* s, C a, C v) { if (a < 0) *((C*)&s->m[MSIZE + a]) = v; else *((W*)a
 
 #define SIZE(s) (*((C*)(s->d)))
 #define HERE(s) (*((C*)(s->d + sizeof(C))))
+#define LATEST(s) (*((W*)(s->d + sizeof(C))))
 
 V put(S* s, B v) { put_at(s, HERE(s), v); HERE(s) += 1; }
 V wput(S* s, W v) { wput_at(s, HERE(s), v); HERE(s) += 2; }
@@ -288,6 +292,8 @@ V assembler(S* s, char* q) {
 
 /* OUTER INTERPRETER */
 
+#define WORD(s, w) ((N*)(s->d + (w << 2)))
+
 V parse_name(S* s) {
 	B i = get_at(s, IPOS);
 	B l = get_at(s, ILEN);
@@ -298,14 +304,32 @@ V parse_name(S* s) {
 	put_at(s, IPOS, i);
 }
 
+B compare_without_case(S* s, N* w, C t, C l) {
+	if ((w->f && 31) != l) return 0;
+	else return strncmp(w->n, IBUF_STR(s) + t, l) == 0;
+}
+
 V find_name(S* s) {
-	PUSH(s, -1);
+	C l = POP(s);
+	C t = POP(s);
+	W w = LATEST(s);
+	printf("FIND-NAME\n");
+	while (w != -1) {
+		printf("FIND-NAME:CURRENT WORD %d\n", w);
+		if (compare_without_case(s, WORD(s, w), t, l)) break;
+		w = WORD(s, w)->p;
+	}
+	PUSH(s, t);
+	PUSH(s, l);
+	PUSH(s, w);
 }
 
 B do_asm(S* s) {
 	L2(s, C, l, C, t);
+	printf("DO-ASM\n");
 	if (l > 1 && get_at(s, IBUF + t) == '\\') {
 		int i;
+		printf("DO-ASM:CORRECT ASSEMBLER\n");
 		l = l - 1;
 		t = t + 1;
 		for (i = 0; i < l; i++) { put_at(s, ABUF + i, get_at(s, IBUF + t + i)); }
@@ -314,6 +338,7 @@ B do_asm(S* s) {
 		inner(s);
 		return 1;
 	} else {
+		printf("DO-ASM:NO ASSEMBLER\n");
 		PUSH(s, t);
 		PUSH(s, l);
 		return 0;
@@ -322,25 +347,73 @@ B do_asm(S* s) {
 
 B do_casm(S* s) {
 	L2(s, C, l, C, t);
+	printf("DO-CASM\n");
 	if (l > 1 && get_at(s, IBUF + t) == '$') {
 		int i;
+		printf("DO-CASM:COMPILING ASSMEBLER\n");
 		l = l - 1;
 		t = t + 1;
 		for (i = 0; i < l; i++) { put(s, get_at(s, IBUF + t + i)); }
 		return 1;
 	} else {
+		printf("DO-CASM:NO COMPILATION\n");
 		PUSH(s, t);
 		PUSH(s, l);
 		return 0;
 	}
 }
 
+V align(S* s) {	HERE(s) = (HERE(s) + sizeof(C) - 1) & ~(sizeof(C) - 1); }
+
 B do_colon(S* s) {
-	return 0;
+	C l = POP(s);
+	C t = POP(s);
+	printf("DO-COLON\n");
+	if (l == 1 && get_at(s, IBUF + t) == ':') {
+		printf("DO-COLON:CREATING COLON WORD\n");
+	  parse_name(s);
+		if (T(s) == 0) { DROP(s); DROP(s); s->err = -16; return 1; }
+		else {
+			int i;
+			W w;
+		  l = POP(s);
+			t = POP(s);
+			align(s);
+			w = HERE(s) >> 2;
+			wput(s, LATEST(s));
+			LATEST(s) = w;
+			wput(s, 0);
+			put(s, HIDDEN & (B)(l));
+			for (i = 0; i < l; i++) put(s, get_at(s, IBUF + t + i));
+			put(s, 0);
+			align(s);
+			s->st = 1;
+			WORD(s, w)->c = HERE(s) >> 2;
+			return 1;
+		}
+	} else {
+		printf("DO-COLON:NO COLON\n");
+		PUSH(s, t);
+		PUSH(s, l);
+		return 0;
+	}
 }
 
 B do_semicolon(S* s) {
-	return 0;
+	C l = POP(s);
+	C t = POP(s);
+	printf("DO-SEMICOLON\n");
+	if (l == 1 && get_at(s, IBUF + t) == ';') {
+		printf("DO-SEMICOLON:ENDING COLON WORD\n");
+		put(s, ']');
+		s->st = 0;
+		WORD(s, LATEST(s))->f &= ~HIDDEN;
+	} else {
+		printf("DO-SEMICOLON:NO SEMICOLON\n");
+		PUSH(s, t);
+		PUSH(s, l);
+		return 0;
+	}
 }
 
 V do_number(S* s) {
@@ -348,18 +421,21 @@ V do_number(S* s) {
 	B k;
 	int n = 0;
 	int i;
+	printf("DO-NUMBER\n");
 	if (get_at(s, IBUF + t) == '-') {
+		printf("DO-NUMBER:NEGATIVE NUMBER\n");
 		for (i = 1; i < l; i++) {
 			k = get_at(s, IBUF + t + i);
 			if (k >= 48 && k <= 57) { n = n* 10 - (k - 48); }
-			else { s->err = -13; return; }
+			else { printf("DO-NUMBER:UNDEFINED WORD\n"); s->err = -13; return; }
 		}
 		PUSH(s, n);
 	} else {
+		printf("DO-NUMBER:POSITIVE NUMBER\n");
 		for (i = 0; i < l; i++) {
 			k = get_at(s, IBUF + t + i);
 			if (k >= 48 && k <= 57) { n = n* 10 + (k - 48); }
-			else { s->err = -13; return; }
+			else { printf("DO-NUMBER:UNDEFINED WORD\n"); s->err = -13; return; }
 		}
 		PUSH(s, n);
 	}
@@ -370,6 +446,7 @@ V evaluate(S* s, B* str) {
 	put_at(s, IPOS, 0);
   put_at(s, ILEN, (B)strlen(str));
 	for (i = 0; i < strlen(str); i++) put_at(s, IBUF + i, str[i]);
+	printf("EVALUATE\n");
 	while (get_at(s, IPOS) < get_at(s, ILEN)) {
 		parse_name(s);
 		if (!T(s)) { DROP(s); DROP(s); return; }
@@ -384,12 +461,23 @@ V evaluate(S* s, B* str) {
 							do_number(s);
 		}
 	}
+	printf("END EVALUATE\n");
 }
 
 S* init() {
 	S* s = malloc(sizeof(S));
 	s->x = malloc(26*sizeof(C));
+	s->ip = 0;
 
+	return s;
+}
+
+S* init_dict(S* s) {
+	s->d = malloc(64 * 1024 * sizeof(C));
+	SIZE(s) = 64 * 1024 * sizeof(C);
+	HERE(s) = 3*sizeof(C);
+	LATEST(s) = -1;
+	s->ip = SIZE(s);
 	return s;
 }
 

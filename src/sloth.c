@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
 	char* r;
 	char buf[255];
 
-	S* s = init();
+	S* s = init_dict(init());
 	s->x['E' - 'A'] = &emit;
 	s->x['K' - 'A'] = &key;
 
