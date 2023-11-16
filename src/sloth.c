@@ -23,7 +23,14 @@ void do_error(S* s) {
 	} else {
 	*/
 	if (s->err == -256) { exit(0); }
-	else { printf("ERROR: %ld\n", s->err); }
+	else { 
+		printf("ERROR: %ld\n", s->err); 
+		s->sp = 0;
+		s->rp = 0;
+		s->ipos = 0;
+		s->ilen = 0;
+		s->err = 0;
+	}
 	/*
 	}
 	*/
@@ -65,7 +72,32 @@ int main(int argc, char** argv) {
 	s->x['E' - 'A'] = &emit;
 	s->x['K' - 'A'] = &key;
 
-  printf("SLOTH v0.1\n");
+	s->tr = 1;
+
+ 	if (argc == 2) {
+		FILE *f = fopen(argv[1], "r");
+		if (!f) {
+			exit(EXIT_FAILURE);
+		} else {
+			char* line = 0;
+			size_t len = 0;
+			size_t read;
+
+			while ((read = getline(&line, &len, f)) != -1) {
+				printf("--> %s", line);
+				evaluate(s, line);
+				if (s->err) {
+					do_error(s);
+					exit(EXIT_FAILURE);
+				}
+			}
+
+			fclose(f);
+			if (line) free(line);
+		}
+	}
+
+ printf("SLOTH v0.1\n");
   
 	while (1) {
 	  r = fgets(buf, 255, stdin);

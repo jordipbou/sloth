@@ -17,33 +17,51 @@ typedef intptr_t C;
 
 #define ALIGNED(a) (a + (sizeof(C) - 1)) & ~(sizeof(C) - 1)
 
+/*
 #define MSIZE 1024
+*/
+#define ABUF_SIZE 64
 
 typedef struct _State {
 	C s[256];
 	C sp;
 	C r[256];
 	C rp;
-	C ip;
+	B* ip;
 	C err;
 	C tr;
   C st;	
-	B m[MSIZE];
 	B* d;
 	V (**x)(struct _State*);
+	/*B m[MSIZE];*/
+	B abuf[ABUF_SIZE];
+	B ibuf[255];
+	C ipos;
+	C ilen;
 } S;
 
+/*
 #define ABUF -MSIZE
 #define IBUF ABUF + 64
 #define IPOS IBUF + 256
 #define ILEN IPOS + 1
 
 #define IBUF_STR(s) ((B*)(s->m + (1024 + IBUF)))
+*/
 
 V inner(S*);
 
+/*
+#define REL_TO_ALG(s, a) (((C)a) >> 2)
+C rel_to_abs(S* s, C a) { if (a < 0) return (C)&s->m[MSIZE + a]; else return (((C)a) + ((C)s->d)); }
+#define ALG_TO_REL(s, a) (((C)a) << 2)
+#define ALG_TO_ABS(s, a) ((((C)a) << 2) + ((C)s->d))
+#define ABS_TO_ALG(s, a) ((((C)a) - ((C)s->d)) >> 2)
 #define ABS_TO_REL(s, a) (((C)a) - ((C)s->d))
-#define REL_TO_ABS(s, a) (((C)a) + ((C)s->d))
+*/
+
+#define ALG_TO_ABS(s, a) ((((C)a) << 2) + ((C)s->d))
+#define ABS_TO_ALG(s, a) ((((C)a) - ((C)s->d)) >> 2)
 
 #define VARIABLE 128
 #define HIDDEN 64 
@@ -56,22 +74,26 @@ typedef struct _Name {
 	B n[1];
 } N;
 
-B get_at(S* s, C a) { return (a < 0) ? s->m[MSIZE + a] : *((B*)a); }
-V put_at(S* s, C a, B v) { if (a < 0) s->m[MSIZE + a] = v; else *((B*)a) = v; }
+/* This is strange, values less than 0 are directly fetched from s->m and bigger ones are
+   taken as a pointer. It does not seem correct. */
+/*
+B get_at(S* s, C a) { return *((B*)a); }
+V put_at(S* s, C a, B v) { *((B*)a) = v; }
 
-W wget_at(S* s, C a) { return (a < 0) ? *((W*)&s->m[MSIZE + a]) : *((W*)a); }
-V wput_at(S* s, C a, W v) { if (a < 0) *((W*)&s->m[MSIZE + a]) = v; else *((W*)a) = v; }
+W wget_at(S* s, C a) { return *((W*)a); }
+V wput_at(S* s, C a, W v) { *((W*)a) = v; }
 
-C cget_at(S* s, C a) { return (a < 0) ? *((C*)&s->m[MSIZE + a]) : *((W*)a); }
-V cput_at(S* s, C a, C v) { if (a < 0) *((C*)&s->m[MSIZE + a]) = v; else *((W*)a) = v; }
+C cget_at(S* s, C a) { return *((W*)a); }
+V cput_at(S* s, C a, C v) { *((W*)a) = v; }
+*/
 
 #define SIZE(s) (*((C*)(s->d)))
 #define HERE(s) (*((C*)(s->d + sizeof(C))))
 #define LATEST(s) (*((W*)(s->d + 2*sizeof(C))))
 
-V put(S* s, B v) { put_at(s, REL_TO_ABS(s, HERE(s)), v); HERE(s) += 1; }
-V wput(S* s, W v) { printf("WPUT:COMPILING %d AT %d\n", v, REL_TO_ABS(s, HERE(s))); wput_at(s, REL_TO_ABS(s, HERE(s)), v); HERE(s) += 2; printf("/// WPUT\n"); }
-V cput(S* s, C v) { cput_at(s, REL_TO_ABS(s, HERE(s)), v); HERE(s) += sizeof(C); }
+V put(S* s, B v) { *((B*)(HERE(s) + s->d)) = v; HERE(s) += 1; }
+V wput(S* s, W v) { *((W*)(HERE(s) + s->d)) =  v; HERE(s) += 2; }
+V cput(S* s, C v) { *((C*)(HERE(s) + s->d)) = v; HERE(s) += sizeof(C); }
 
 #define T(s) (s->s[s->sp - 1])
 #define N(s) (s->s[s->sp - 2])
@@ -113,14 +135,14 @@ V or(S* s) { N(s) = N(s) | T(s); s->sp--; }
 V xor(S* s) { N(s) = N(s) ^ T(s); s->sp--; }
 V invert(S* s) { T(s) = ~T(s); }
 
-C valid(S* s, C a) {
-	if (!s->d) return a >= -MSIZE && a < 0;
-	else return (a >= -MSIZE && a < 0) || (a > s->d && a < (s->d + SIZE(s)));
+C valid(S* s, B* a) {
+	if (!s->d) return a >= s->abuf && a < (s->abuf + ABUF_SIZE);
+	else return (a >= s->abuf && a < (s->abuf + ABUF_SIZE)) || (a >= s->d && a < (s->d + SIZE(s)));
 }
 
-C tail(S* s) { return !valid(s, s->ip) || get_at(s, s->ip) == ']' || get_at(s, s->ip) == '}'; }
-V execute(S* s) { L1(s, C, q); if (!tail(s)) s->r[s->rp++] = s->ip; s->ip = q; }
-V ret(S* s) { if (s->rp > 0) s->ip = s->r[--s->rp]; else s->ip = (!s->d ? 0 : SIZE(s)); }
+C tail(S* s) { return !valid(s, s->ip) || *s->ip == ']' || *s->ip == '}'; }
+V execute(S* s) { L1(s, C, q); if (!tail(s)) s->r[s->rp++] = (C)s->ip; s->ip = (B*)q; }
+V ret(S* s) { if (s->rp > 0) s->ip = (B*)s->r[--s->rp]; else s->ip = (B*)(!s->d ? 0 : SIZE(s)); }
 V eval(S* s, C q) { PUSH(s, q); execute(s); inner(s); }
 V jump(S* s) { L1(s, C, d); s->ip += d; }
 V zjump(S* s) { L2(s, C, d, C, b); if (!b) s->ip += d; }
@@ -135,8 +157,8 @@ V literal(S* s, C n) {
 	else { put(s, '\\'); cput(s, n); }
 }
 
-B peek(S* s) { return get_at(s, s->ip); }
-B token(S* s) { return get_at(s, s->ip++); }
+B peek(S* s) { return *s->ip; }
+B token(S* s) { return *s->ip++; }
 
 V number(S* s) {
 	C n = 0;
@@ -174,7 +196,6 @@ V choice(S* s) { L3(s, C, f, C, t, C, b); if (b) eval(s, t); else eval(s, f); }
 V times(S* s) { L2(s, C, q, C, n); while (n-- > 0) eval(s, q); }
 
 V step(S* s) {
-	printf("STEP:IP %d\n", s->ip);
 	switch (peek(s)) {
 	case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G': case 'H':
 	case 'I': case 'J': case 'K': case 'L': case 'M': case 'N': case 'O': case 'P':
@@ -192,9 +213,9 @@ V step(S* s) {
 		case '#': number(s); break;
 
 		case '1': PUSH(s, 1); break;
-		case '\'': PUSH(s, get_at(s, s->ip)); s->ip += 1; break;
-		case '2': PUSH(s, wget_at(s, s->ip)); s->ip += 2; break;
-		case '\\': PUSH(s, cget_at(s, s->ip)); s->ip += sizeof(C); break;
+		case '\'': PUSH(s, *s->ip); s->ip += 1; break;
+		case '2': PUSH(s, *((W*)s->ip)); s->ip += 2; break;
+		case '\\': PUSH(s, *((C*)s->ip)); s->ip += sizeof(C); break;
 
 		case '_': DROP(s); break;
 		case 'd': duplicate(s); break;
@@ -224,12 +245,12 @@ V step(S* s) {
 		case '^': xor(s); break;
 		case '~': invert(s); break;
 
-		case '!': { L2(s, C, a, C, v); cput_at(s, a, v); } break;
-		case '@': { L1(s, C, a); PUSH(s, cget_at(s, a)); } break;
-		case ';': { L2(s, C, a, W, v); wput_at(s, a, v); } break;
-		case ':': { L1(s, C, a); PUSH(s, wget_at(s, a)); } break;
-		case ',': { L2(s, C, a, B, v); put_at(s, a, v); } break;
-		case '.': { L1(s, C, a); PUSH(s, get_at(s, a)); } break;
+		case '!': { L2(s, C*, a, C, v); *a = v; } break;
+		case '@': { L1(s, C*, a); PUSH(s, *a); } break;
+		case ';': { L2(s, W*, a, W, v); *a = v; } break;
+		case ':': { L1(s, W*, a); PUSH(s, *a); } break;
+		case ',': { L2(s, B*, a, B, v); *a = v; } break;
+		case '.': { L1(s, B*, a); PUSH(s, *a); } break;
 
 		case '[': quotation(s); break;
 		case ']': ret(s); break;
@@ -248,21 +269,22 @@ V step(S* s) {
 		case 'v': s->tr = 1; break;
 
 		case 'b': PUSH(s, s->d); break;
+		case 'y': PUSH(s, s->ibuf); PUSH(s, s->ilen); break;
 		}
 		break;
 	}
 }
 
-V dump_code(S* s, C c) {
+V dump_code(S* s, B* c) {
 	int t = 1;
 	B k;
 	while (t > 0 && valid(s, c)) {
-		switch (k = get_at(s, c++)) {
+		switch (k = *c++) {
 		case '{': case '[': t++; printf("%c", k); break;
 		case '}': case ']': t--; printf("%c", k); break;
-		case '\'': printf("#%d", get_at(s, c++)); break;
-		case '2': printf("#%d", wget_at(s, c)); c += 2; break;
-		case '\\': printf("#%ld", cget_at(s, c)); c += sizeof(C); break;
+		case '\'': printf("#%d", *c); c += 1; break;
+		case '2': printf("#%d", *((W*)c)); c += 2; break;
+		case '\\': printf("#%ld", *((C*)c)); c += sizeof(C); break;
 		default: printf("%c", k); break;
 		}
 	}
@@ -273,7 +295,7 @@ V trace(S* s) {
 	printf("<%ld> ", s->sp);
 	for (i = 0; i < s->sp; i++) { printf("%ld ", s->s[i]); }
 	if (valid(s, s->ip)) { printf(" : "); dump_code(s, s->ip); }
-	for (i = s->rp - 1; i >= 0; i--) { printf(" : "); dump_code(s, s->r[i]); }
+	for (i = s->rp - 1; i >= 0; i--) { printf(" : "); dump_code(s, (B*)s->r[i]); }
 }
 
 V inner(S* s) {
@@ -287,9 +309,9 @@ V inner(S* s) {
 V assembler(S* s, char* q) {
 	C l = strlen(q);
 	int i;
-	for (i = 0; i < l; i++) { put_at(s, ABUF + i, *(q + i)); }
-	put_at(s, ABUF + l - 1, ']');
-	s->ip = ABUF;
+	for (i = 0; i < l; i++) { s->abuf[i] = *(q + i); }
+	s->abuf[l - 1] = ']';
+	s->ip = s->abuf;
 	inner(s);
 }
 
@@ -300,21 +322,15 @@ V assembler(S* s, char* q) {
 B is_immediate(S* s, N* w) { return (w->f & IMMEDIATE) == IMMEDIATE; }
 
 V parse_name(S* s) {
-	B i = get_at(s, IPOS);
-	B l = get_at(s, ILEN);
-	while (i < l && isspace(get_at(s, IBUF + i))) i++;
-	PUSH(s, i);
-	while (i < l && !isspace(get_at(s, IBUF + i))) i++;
-	PUSH(s, i - T(s));
-	put_at(s, IPOS, i);
+	while (s->ipos < s->ilen && isspace(s->ibuf[s->ipos])) s->ipos++;
+	PUSH(s, s->ipos);
+	while (s->ipos < s->ilen && !isspace(s->ibuf[s->ipos])) s->ipos++;
+	PUSH(s, s->ipos - T(s));
 }
 
 B compare_without_case(S* s, N* w, C t, C l) {
-	int i;
-	printf("COMPARE-WITHOUT-CASE:TOKEN-LENGTH %d WORD-LENGTH %d WORD-FLAGS %d\n", l, (w->f & 31), w->f);
-	printf("COMPARING TOKEN [%.*s] WITH WORD [%.*s]\n", l, IBUF_STR(s) + t, (w->f & 31), w->n);
 	if ((w->f & 31) != l) return 0;
-	else return strncmp(w->n, IBUF_STR(s) + t, l) == 0;
+	else return strncmp(w->n, s->ibuf + t, l) == 0;
 }
 
 V find_name(S* s) {
@@ -322,14 +338,8 @@ V find_name(S* s) {
 	C l = POP(s);
 	C t = POP(s);
 	W w = LATEST(s);
-	printf("FIND-NAME\n");
-	printf("FIND-NAME:TOKEN [%.*s]\n", l, IBUF_STR(s) + t);
-	printf("FIND-NAME:TOKEN WITHOUT IBUF_STR [");
-	for (i = 0; i < l; i++) printf("%c", get_at(s, IBUF + t + i));
-	printf("]\n");
 	while (w != -1) {
-		printf("FIND-NAME:CURRENT WORD %d\n", w);
-		if (compare_without_case(s, WORD(s, w), t, l)) { printf("FIND-NAME:NAME FOUND!\n"); break; }
+		if (compare_without_case(s, WORD(s, w), t, l)) break;
 		w = WORD(s, w)->p;
 	}
 	PUSH(s, t);
@@ -338,42 +348,35 @@ V find_name(S* s) {
 }
 
 V do_interpret(S* s, N* w) {
-	printf("DO-INTERPRET:WORD CODE %d IS %d\n", w->c, w->c << 2);
-	eval(s, REL_TO_ABS(s, w->c << 2));
-	printf("/// DO-INTERPRET\n");
+	eval(s, ALG_TO_ABS(s, w->c));
 }
 
 V do_compile(S* s, N* w) {
 	int t = 1;
 	int i = 0;
 	B k;
-	printf("DO-COMPILE\n");
 	while (t > 0) {
-		switch ((k = get_at(s, REL_TO_ABS(s, w->c + i)))) {
+		switch ((k = *(((B*)ALG_TO_ABS(s, w->c)) + i))) {
 		case ']': case '}': t--; if (t > 0) put(s, k); break;
 		case '[': case '{': t++; put(s, k); break;
 		default: put(s, k); break;
 		}
 		i++;
 	}
-	printf("/// DO-COMPILE\n");
 }
 
 B do_asm(S* s) {
 	L2(s, C, l, C, t);
-	printf("DO-ASM\n");
-	if (l > 1 && get_at(s, IBUF + t) == '\\') {
+	if (l > 1 && s->ibuf[t] == '\\') {
 		int i;
-		printf("DO-ASM:CORRECT ASSEMBLER\n");
 		l = l - 1;
 		t = t + 1;
-		for (i = 0; i < l; i++) { put_at(s, ABUF + i, get_at(s, IBUF + t + i)); }
-		put_at(s, ABUF + l, ']');
-		s->ip = ABUF;
+		for (i = 0; i < l; i++) { s->abuf[i] = s->ibuf[t + i]; }
+		s->abuf[l] = ']';
+		s->ip = s->abuf;
 		inner(s);
 		return 1;
 	} else {
-		printf("DO-ASM:NO ASSEMBLER\n");
 		PUSH(s, t);
 		PUSH(s, l);
 		return 0;
@@ -382,16 +385,13 @@ B do_asm(S* s) {
 
 B do_casm(S* s) {
 	L2(s, C, l, C, t);
-	printf("DO-CASM\n");
-	if (l > 1 && get_at(s, IBUF + t) == '$') {
+	if (l > 1 && s->ibuf[t] == '$') {
 		int i;
-		printf("DO-CASM:COMPILING ASSMEBLER\n");
 		l = l - 1;
 		t = t + 1;
-		for (i = 0; i < l; i++) { put(s, get_at(s, IBUF + t + i)); }
+		for (i = 0; i < l; i++) { put(s, s->ibuf[t + i]); }
 		return 1;
 	} else {
-		printf("DO-CASM:NO COMPILATION\n");
 		PUSH(s, t);
 		PUSH(s, l);
 		return 0;
@@ -403,63 +403,44 @@ V align(S* s) {	HERE(s) = (HERE(s) + sizeof(C) - 1) & ~(sizeof(C) - 1); }
 B do_colon(S* s) {
 	C l = POP(s);
 	C t = POP(s);
-	printf("DO-COLON\n");
-	if (l == 1 && get_at(s, IBUF + t) == ':') {
-		printf("DO-COLON:CREATING COLON WORD\n");
-		printf("DO-COLON:PARSING\n");
+	if (l == 1 && s->ibuf[t] == ':') {
 	  parse_name(s);
-		if (T(s) == 0) { DROP(s); DROP(s); s->err = -16; printf("/// DO-COLON::ZERO LENGTH WORD\n"); return 1; }
+		if (T(s) == 0) { DROP(s); DROP(s); s->err = -16; return 1; }
 		else {
 			int i;
 			W w;
 		  l = POP(s);
 			t = POP(s);
-			printf("DO-COLON:CREATING WORD WITH NAME [");
-			for (i = 0; i < l; i++) { printf("%c", get_at(s, IBUF + t)); }
-			printf("]\nDO-COLON:HERE PRE ALIGN %ld\n", HERE(s));
 			align(s);
-			printf("DO-COLON:HERE POST ALIGN %ld\n", HERE(s));
 			w = HERE(s) >> 2;
-			printf("DO-COLON:WORD'S AT %ld\n", w);
-			printf("DO-COLON:COMPILING WORD:STORING LATEST AS PREVIOUS %d\n", LATEST(s));
 			wput(s, LATEST(s));
-			printf("DO-COLON:COMPILING WORD:SETTING LATEST AS WORD %d\n", w);
 			LATEST(s) = w;
-			printf("DO-COLON:COMPILING WORD:SETTING CODE TO 0\n");
 			wput(s, 0);
-			printf("DO-COLON:COMPILING WORD:SETTING FLAGS (HIDDEN) %d AND NAMELENGTH %d TO %d\n", HIDDEN, l, HIDDEN & (B)l);
 			put(s, HIDDEN | ((B)(l)) & 31);
-			printf("DO-COLON:SAVING WORD'S NAME\n");
-			for (i = 0; i < l; i++) put(s, get_at(s, IBUF + t + i));
+			for (i = 0; i < l; i++) put(s, s->ibuf[t + i]);
 			put(s, 0);
-			printf("DO-COLON:HERE AFTER WORD'S HEADER %ld\n", HERE(s));
 			align(s);
-			printf("DO-COLON:HERE AFTER WORD'S HEADER AND ALIGNMENT %ld\n", HERE(s));
 			s->st = 1;
 			WORD(s, w)->c = HERE(s) >> 2;
-			printf("/// DO-COLON\n");
 			return 1;
 		}
 	} else {
-		printf("DO-COLON:NO COLON\n");
 		PUSH(s, t);
 		PUSH(s, l);
-		printf("/// DO-COLON\n");
 		return 0;
 	}
 }
 
 B do_semicolon(S* s) {
+	B* i;
 	C l = POP(s);
 	C t = POP(s);
-	printf("DO-SEMICOLON\n");
-	if (l == 1 && get_at(s, IBUF + t) == ';') {
-		printf("DO-SEMICOLON:ENDING COLON WORD\n");
+	if (l == 1 && s->ibuf[t] == ';') {
 		put(s, ']');
 		s->st = 0;
 		WORD(s, LATEST(s))->f &= ~HIDDEN;
+		return 1;
 	} else {
-		printf("DO-SEMICOLON:NO SEMICOLON\n");
 		PUSH(s, t);
 		PUSH(s, l);
 		return 0;
@@ -471,46 +452,38 @@ V do_number(S* s) {
 	B k;
 	int n = 0;
 	int i;
-	printf("DO-NUMBER\n");
-	if (get_at(s, IBUF + t) == '-') {
-		printf("DO-NUMBER:NEGATIVE NUMBER\n");
+	if (s->ibuf[t] == '-') {
 		for (i = 1; i < l; i++) {
-			k = get_at(s, IBUF + t + i);
+			k = s->ibuf[t + i];
 			if (k >= 48 && k <= 57) { n = n* 10 - (k - 48); }
-			else { printf("DO-NUMBER:UNDEFINED WORD\n"); s->err = -13; return; }
+			else { s->err = -13; return; }
 		}
 		PUSH(s, n);
 	} else {
-		printf("DO-NUMBER:POSITIVE NUMBER\n");
 		for (i = 0; i < l; i++) {
-			k = get_at(s, IBUF + t + i);
+			k = s->ibuf[t + i];
 			if (k >= 48 && k <= 57) { n = n* 10 + (k - 48); }
-			else { printf("DO-NUMBER:UNDEFINED WORD\n"); s->err = -13; return; }
+			else { s->err = -13; return; }
 		}
 		PUSH(s, n);
 	}
-	printf("/// DO-NUMBER\n");
 }
 
 V refill(S* s, B* str) {
 	int i;
-	printf("REFILL\n");
-	put_at(s, IPOS, 0);
-	put_at(s, ILEN, (B)strlen(str));
-	for (i = 0; i < strlen(str); i++) put_at(s, IBUF + i, str[i]);
-	printf("/// REFILL\n");
+	s->ipos = 0;
+	s->ilen = strlen(str);
+	for (i = 0; i < strlen(str); i++) s->ibuf[i] = str[i];
 }
 
 V evaluate(S* s, B* str) {
-	printf("EVALUATE\n");
-	printf("EVALUATE:HERE %d\n", HERE(s));
 	refill(s, str);
-	while (get_at(s, IPOS) < get_at(s, ILEN)) {
+	while (s->ipos < s->ilen) {
 		parse_name(s);
 		if (!T(s)) { DROP(s); DROP(s); return; }
 		find_name(s);
 		if (T(s) != -1) {
-			N* w = (N*)REL_TO_ABS(s, (POP(s) << 2));
+			N* w = (N*)ALG_TO_ABS(s, POP(s));
 			DROP(s); DROP(s);
 			if (is_immediate(s, w) || !s->st) do_interpret(s, w);
 			else do_compile(s, w);
@@ -523,26 +496,21 @@ V evaluate(S* s, B* str) {
 							do_number(s);
 		}
 	}
-	printf("/// EVALUATE\n");
 }
 
 S* init() {
 	S* s = malloc(sizeof(S));
-	printf("INIT\n");
 	s->x = malloc(26*sizeof(C));
 	s->ip = 0;
-	printf("/// INIT\n");
 	return s;
 }
 
 S* init_dict(S* s) {
-	printf("INIT-DICT\n");
 	s->d = malloc(64 * 1024 * sizeof(C));
 	SIZE(s) = 64 * 1024 * sizeof(C);
 	HERE(s) = 3*sizeof(C);
 	LATEST(s) = -1;
-	s->ip = SIZE(s);
-	printf("/// INIT-DICT:HERE %d\n", HERE(s));
+	s->ip = s->d + SIZE(s);
 	return s;
 }
 
