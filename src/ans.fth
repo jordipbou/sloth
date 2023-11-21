@@ -70,6 +70,11 @@
 : WHILE 50 c, here swap 0 w, $$z ; immediate
 : REPEAT 50 c, here - 3 - w, $$j dup here swap - 3 - swap w! ; immediate
 
+: DO $$($( here ; immediate
+: I $))d(s( ; 
+: LOOP $$)$)$1$+$o$o$($($= 50 c, here - 3 - w, $$z$)$)$_$_ ; immediate
+
 : EXIT $$] ; immediate
 : RECURSE 50 c, latest 2 + w@ w, $$a ; immediate
 
+: TYPE 0 do dup c@ emit 1 + loop drop ;
