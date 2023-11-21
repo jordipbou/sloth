@@ -9,17 +9,10 @@
 typedef void V;
 typedef char B;
 typedef int16_t W;
-/*
-typedef int32_t L;
-typedef int64_t X;
-*/
 typedef intptr_t C;
 
 #define ALIGNED(a) (a + (sizeof(C) - 1)) & ~(sizeof(C) - 1)
 
-/*
-#define MSIZE 1024
-*/
 #define ABUF_SIZE 64
 
 typedef struct _State {
@@ -33,32 +26,13 @@ typedef struct _State {
   C st;	
 	B* d;
 	V (**x)(struct _State*);
-	/*B m[MSIZE];*/
 	B abuf[ABUF_SIZE];
 	B ibuf[255];
 	C ipos;
 	C ilen;
 } S;
 
-/*
-#define ABUF -MSIZE
-#define IBUF ABUF + 64
-#define IPOS IBUF + 256
-#define ILEN IPOS + 1
-
-#define IBUF_STR(s) ((B*)(s->m + (1024 + IBUF)))
-*/
-
 V inner(S*);
-
-/*
-#define REL_TO_ALG(s, a) (((C)a) >> 2)
-C rel_to_abs(S* s, C a) { if (a < 0) return (C)&s->m[MSIZE + a]; else return (((C)a) + ((C)s->d)); }
-#define ALG_TO_REL(s, a) (((C)a) << 2)
-#define ALG_TO_ABS(s, a) ((((C)a) << 2) + ((C)s->d))
-#define ABS_TO_ALG(s, a) ((((C)a) - ((C)s->d)) >> 2)
-#define ABS_TO_REL(s, a) (((C)a) - ((C)s->d))
-*/
 
 #define ALG_TO_ABS(s, a) ((((C)a) << 2) + ((C)s->d))
 #define ABS_TO_ALG(s, a) ((((C)a) - ((C)s->d)) >> 2)
@@ -73,19 +47,6 @@ typedef struct _Name {
 	B f;
 	B n[1];
 } N;
-
-/* This is strange, values less than 0 are directly fetched from s->m and bigger ones are
-   taken as a pointer. It does not seem correct. */
-/*
-B get_at(S* s, C a) { return *((B*)a); }
-V put_at(S* s, C a, B v) { *((B*)a) = v; }
-
-W wget_at(S* s, C a) { return *((W*)a); }
-V wput_at(S* s, C a, W v) { *((W*)a) = v; }
-
-C cget_at(S* s, C a) { return *((W*)a); }
-V cput_at(S* s, C a, C v) { *((W*)a) = v; }
-*/
 
 #define SIZE(s) (*((C*)(s->d)))
 #define HERE(s) (*((C*)(s->d + sizeof(C))))
@@ -128,7 +89,7 @@ V mod(S* s) { N(s) = N(s) % T(s); s->sp--; }
 V lt(S* s) { N(s) = (N(s) < T(s)) ? -1 : 0; s->sp--; }
 V eq(S* s) { N(s) = (N(s) == T(s)) ? -1 : 0; s->sp--; }
 V gt(S* s) { N(s) = (N(s) > T(s)) ? -1 : 0; s->sp--; }
-V zeq(S* s) { T(s) = (T(s) == 0) ? -1 : 0; s->sp--; }
+V zeq(S* s) { T(s) = (T(s) == 0) ? -1 : 0; }
 
 V and(S* s) { N(s) = N(s) & T(s); s->sp--; }
 V or(S* s) { N(s) = N(s) | T(s); s->sp--; }
@@ -142,6 +103,7 @@ C valid(S* s, B* a) {
 
 C tail(S* s) { return !valid(s, s->ip) || *s->ip == ']' || *s->ip == '}'; }
 V execute(S* s) { L1(s, C, q); if (!tail(s)) s->r[s->rp++] = (C)s->ip; s->ip = (B*)q; }
+V acall(S* s) { L1(s, W, w); if (!tail(s)) s->r[s->rp++] = (C)s->ip; s->ip = (B*)ALG_TO_ABS(s, w); }
 V ret(S* s) { if (s->rp > 0) s->ip = (B*)s->r[--s->rp]; else s->ip = (B*)(!s->d ? 0 : SIZE(s)); }
 V eval(S* s, C q) { PUSH(s, q); execute(s); inner(s); }
 V jump(S* s) { L1(s, C, d); s->ip += d; }
@@ -194,6 +156,10 @@ V block(S* s) {
 
 V choice(S* s) { L3(s, C, f, C, t, C, b); if (b) eval(s, t); else eval(s, f); }
 V times(S* s) { L2(s, C, q, C, n); while (n-- > 0) eval(s, q); }
+V while_(S* s) { L2(s, C, q, C, c); do { eval(s, c); if (!POP(s)) break; eval(s, q); } while (1); }
+
+V parse_name(S*);
+V find_name(S*);
 
 V step(S* s) {
 	switch (peek(s)) {
@@ -222,12 +188,16 @@ V step(S* s) {
 		case 'o': over(s); break;
 		case 's': swap(s); break;
 		case 'r': rot(s); break;
+		/*
 		case 'n': nip(s); break;
 		case 'p': pick(s); break;
+		*/
 
 		case '(': to_r(s); break;
 		case ')': from_r(s); break;
+		/*
 		case 'f': fetch_r(s); break;
+		*/
 
 		case '+': add(s); break;
 		case '-': sub(s); break;
@@ -257,11 +227,13 @@ V step(S* s) {
 		case '{': block(s); break;
 		case '}': ret(s); break;
 		case 'i': execute(s); break;
+		case 'a': acall(s); break;
 		case 'j': jump(s); break;
 		case 'z': zjump(s); break;
 
 		case '?': choice(s); break;
 		case 't': times(s); break;
+		case 'w': while_(s); break;
 
 		case 'c': PUSH(s, sizeof(C)); break;
 		case 'q': quit(s); break;
@@ -270,6 +242,9 @@ V step(S* s) {
 
 		case 'b': PUSH(s, s->d); break;
 		case 'y': PUSH(s, s->ibuf); PUSH(s, s->ilen); break;
+
+		case 'n': parse_name(s); break;
+		case 'f': find_name(s); break;
 		}
 		break;
 	}
@@ -330,7 +305,17 @@ V parse_name(S* s) {
 
 B compare_without_case(S* s, N* w, C t, C l) {
 	if ((w->f & 31) != l) return 0;
-	else return strncmp(w->n, s->ibuf + t, l) == 0;
+	else {
+		int i;
+		for (i = 0; i < l; i++) {
+			B a = w->n[i];
+			B b = s->ibuf[t + i];
+			if (a >= 97 && a <= 122) a -= 32;
+			if (b >= 97 && b <= 122) b -= 32;
+			if (a != b) return 0;
+		}
+		return 1;
+	}
 }
 
 V find_name(S* s) {
@@ -363,6 +348,11 @@ V do_compile(S* s, N* w) {
 		}
 		i++;
 	}
+	/* In case a normal threaded compile is needed, this is it:
+	put(s, '2');
+	wput(s, w->c);
+	put(s, 'a');
+	*/
 }
 
 B do_asm(S* s) {
@@ -458,15 +448,15 @@ V do_number(S* s) {
 			if (k >= 48 && k <= 57) { n = n* 10 - (k - 48); }
 			else { s->err = -13; return; }
 		}
-		PUSH(s, n);
 	} else {
 		for (i = 0; i < l; i++) {
 			k = s->ibuf[t + i];
 			if (k >= 48 && k <= 57) { n = n* 10 + (k - 48); }
 			else { s->err = -13; return; }
 		}
-		PUSH(s, n);
 	}
+	if (!s->st) PUSH(s, n);
+	else literal(s, n);
 }
 
 V refill(S* s, B* str) {

@@ -1,0 +1,93 @@
+: DROP $_ ;
+: DUP $d ;
+: OVER $o ;
+: SWAP $s ;
+: ROT $r ;
+
+: >R $( ;
+: R> $) ;
+: R@ $f ;
+
+: + $+ ;
+: - $- ;
+: * $* ;
+: / $/ ;
+: MOD $% ;
+
+: 1+ 1 + ;
+: 1- 1 - ;
+
+: < $< ;
+: = $= ;
+: > $> ;
+: 0= $0 ;
+
+: AND $& ;
+: OR $| ;
+: XOR $^ ;
+: INVERT $~ ;
+
+: @ $@ ;
+: ! $! ;
+: W@ $: ;
+: W! $; ;
+: C@ $. ;
+: C! $, ;
+
+: LITERAL $l ;
+
+: BYE $q ;
+
+: TIMES $t ;
+: CHOICE $? ;
+: WHILE $w ;
+
+: SOURCE $y ;
+
+: EMIT $E ;
+: BL 32 emit ;
+: TYPE ${d:E1+}t_ ;
+
+: TRACE $v ;
+: UNTRACE $u ;
+
+: CELL $c ;
+: CELL+ CELL + ;
+: CELLS CELL * ;
+
+: BLOCK-BASE $b ;
+: HERE-ADDR block-base cell+ ;
+
+: HERE here-addr @ block-base + ;
+: ALLOT here-addr @ + here-addr ! ;
+: ALIGN here-addr @ cell 1- + cell 1- invert and here-addr ! ;
+
+: C, here c! 1 allot ;
+: W, here w! 2 allot ;
+: , here ! cell allot ;
+
+: ALG>ABS 4 * block-base + ;
+: ABS>ALG block-base - 4 / ;
+
+: PARSE-NAME $n ;
+: FIND-NAME $f swap drop swap drop alg>abs ;
+
+: NAME>STRING dup 5 + swap 4 + c@ 31 and ;
+: NAME>INTERPRET 2 + w@ alg>abs ;
+: TYPE-CODE 1 r> ${d
+: SEE parse-name find-name dup name>string $":" type bl type bl name>interpret ;
+
+: LATEST block-base cell+ cell+ w@ alg>abs ;
+: FLAG-IMMEDIATE 32 ;
+: IMMEDIATE latest 2 2 + + dup c@ flag-immediate or swap c! ;
+
+: ' parse-name find-name name>interpret ;
+: ['] ' abs>alg w, ; immediate
+: EXECUTE $i ;
+
+: >MARK 2 c, here 0 w, ;
+: >RESOLVE dup here swap - swap w! ;
+
+: IF >mark $$z ; immediate
+: THEN >resolve ; immediate
+
