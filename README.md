@@ -4,7 +4,7 @@ An ANS Forth implemented on a small, simple, relatively fast (or relatively slow
 
 Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor.
 
-## VIRTUAL MACHINE
+## DODO VIRTUAL MACHINE
 
 [In the future there will be other implementations (at least Java/Kotlin for Android development)]
 
@@ -14,6 +14,35 @@ Features:
 * String based human readable bytecode (ASCII 32-126).
 * Relatively fast interpreter meant to be extended.
 * Ability to add C functions thru bytecode extensions (bytecodes A-Z).
+
+### ARCHITECTURE
+
+#### DATA TYPES
+
+* B - 8 bit signed integer
+* W - 16 bit signed integer
+* L - 32 bit signed integer
+* X - 64 bit signed integer
+* C - 32/64 bit signed integer (platform dependent)
+
+#### DICTIONARY
+
+#### PROCESSOR
+
+##### STACKS
+
+* S - Data stack
+* R - Return stack
+
+##### REGISTERS
+
+* SP - Data stack pointer
+* RP - Return stack pointer
+* IP - Instruction pointer
+* ERR - Error code
+* D - Dictionary base address 
+* X - Address of extensions table
+* M - Context private memory
 
 ### EXTENSIBILITY
 
@@ -59,49 +88,49 @@ Each interpreter context has its own dedicated memory. Its mapping is:
 
 	  (< 32) -> noop
     (SPACE) -> noop
-    ! -> store cell
-    " -> short fetch
-    # -> fetch byte
-    $ -> 
+    ! -> cell store
+    " -> RESERVED for string literal if needed
+    # -> RESERVED for number literal if needed
+    $ -> compile next byte
     % -> modulo
     & -> and
     ' -> short store
-    ( -> push to R
-    ) -> pop from R
+    ( -> shift left
+    ) -> shift right
     * -> multiplication
     + -> addition
-    , -> cell store
+    , -> byte store
     - -> substraction
-    . -> cell fetch
+    . -> byte fetch
     / -> division
-    0 -> literal 0
+    0 -> equal to zero
     1 -> literal 1
-    2 -> short literal (16 bit)
+    2 -> 16 bits literal
     3 ->
-    4 -> int literal (32 bit)
+    4 -> 32 bits literal
     5 ->
     6 ->
     7 ->
-    8 -> long literal (64 bit)
+    8 -> 64 bits literal
     9 ->
     : -> byte fetch
     ; -> byte store
     < -> less than
     = -> equal
     > -> greater than
-    ? -> RESERVED for branch (combinator)
-    @ -> 
+    ? -> zero branch
+    @ -> cell fetch
 		A -> C extension
 		B -> C extension
 		C -> C extension
 		D -> C extension
-		E -> C extension
+		E -> emit extension
 		F -> C extension
 		G -> C extension
 		H -> C extension
 		I -> C extension
 		J -> C extension
-		K -> C extension
+		K -> key extension
 		L -> C extension
 		M -> C extension
 		N -> C extension
@@ -119,38 +148,38 @@ Each interpreter context has its own dedicated memory. Its mapping is:
 		Y -> C extension
 		Z -> C extension
     [ -> quotation (push ip and jump)
-    \ -> 
+    \ -> return 
     ] -> return (quotation end)
     ^ -> xor
     _ -> drop
-    ` -> 
-    a -> 
+    ` -> dump memory
+    a -> allot
     b -> push block variable address
 		c -> sizeof cell
     d -> dup
-    e -> RESERVED FOR EMIT
-    f -> 
-    g -> 
-    h -> 
-    i -> 
+    e -> set error
+    f -> from R
+    g -> align
+    h -> here
+    i -> interpret/call/execute
     j -> jump
-    k -> RESERVED FOR KEY
+    k -> 
     l -> 
-		m -> 
+		m -> RESERVED for cmove> if needed
     n -> nip
     o -> over
-    p -> 
-    q -> 
+    p -> RESERVED for compare if needed
+    q -> quit (exit app)
     r -> rot
     s -> swap
-    t -> RESERVED for times combinator
-    u -> 
+    t -> to R
+    u -> unsigned operations
     v -> 
     w -> 
-    x -> execute
+    x -> 
     y -> 
-    z -> jump if zero
-    { -> start quotation (non nestable)
+    z -> 
+    { -> start quotation block
     | -> or
-    } -> end quotation (return)
+    } -> end quotation block (return)
     ~ -> invert

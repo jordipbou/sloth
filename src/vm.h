@@ -9,9 +9,9 @@
 typedef void V;
 typedef char B;
 typedef int16_t W;
+typedef int32_t L;
+typedef int64_t X;
 typedef intptr_t C;
-
-#define ALIGNED(a) (a + (sizeof(C) - 1)) & ~(sizeof(C) - 1)
 
 #define ABUF_SIZE 64
 
@@ -54,6 +54,8 @@ typedef struct _Name {
 
 V put(S* s, B v) { *((B*)(HERE(s) + s->d)) = v; HERE(s) += 1; }
 V wput(S* s, W v) { *((W*)(HERE(s) + s->d)) =  v; HERE(s) += 2; }
+V lput(S* s, L v) { *((L*)(HERE(s) + s->d)) = v; HERE(s) += 4; }
+V xput(S* s, X v) { *((X*)(HERE(s) + s->d)) = v; HERE(s) += 8; }
 V cput(S* s, C v) { *((C*)(HERE(s) + s->d)) = v; HERE(s) += sizeof(C); }
 
 #define T(s) (s->s[s->sp - 1])
@@ -78,13 +80,20 @@ V pick(S* s) { L1(s, C, v); PUSH(s, v); }
 
 V to_r(S* s) { s->r[s->rp++] = s->s[--s->sp]; }
 V from_r(S* s) { s->s[s->sp++] = s->r[--s->rp]; }
-V fetch_r(S* s) { s->s[s->sp++] = s->r[s->rp - 1]; }
+V first_r(S* s) { s->s[s->sp++] = s->r[s->rp - 1]; }
+V second_r(S* s) { s->s[s->sp++] = s->r[s->rp - 2]; }
+V third_r(S* s) { s->s[s->sp++] = s->r[s->rp - 3]; }
+V fourth_r(S* s) { s->s[s->sp++] = s->r[s->rp - 4]; }
+V fifth_r(S* s) { s->s[s->sp++] = s->r[s->rp - 5]; }
+V sixth_r(S* s) { s->s[s->sp++] = s->r[s->rp - 6]; }
 
 V add(S* s) { N(s) = N(s) + T(s); s->sp--; }
 V sub(S* s) { N(s) = N(s) - T(s); s->sp--; }
 V mul(S* s) { N(s) = N(s) * T(s); s->sp--; }
 V division(S* s) { N(s) = N(s) / T(s); s->sp--; }
 V mod(S* s) { N(s) = N(s) % T(s); s->sp--; }
+V lshift(S* s) { N(s) = N(s) << T(s); s->sp--; }
+V rshift(S* s) { N(s) = N(s) >> T(s); s->sp--; }
 
 V lt(S* s) { N(s) = (N(s) < T(s)) ? -1 : 0; s->sp--; }
 V eq(S* s) { N(s) = (N(s) == T(s)) ? -1 : 0; s->sp--; }
@@ -112,54 +121,8 @@ V quotation(S* s) { L1(s, C, d); PUSH(s, s->ip); s->ip += d; }
 
 V quit(S* s) { s->err = -256; }
 
-V literal(S* s, C n) {
-	if (n == 1) { put(s, '1'); }
-	else if (n >= -128 && n <= 127) { put(s, '\''); put(s, n); }
-	else if (n >= -32768 && n <= 32767) { put(s, '2'); wput(s, n); }
-	else { put(s, '\\'); cput(s, n); }
-}
-
 B peek(S* s) { return *s->ip; }
 B token(S* s) { return *s->ip++; }
-
-V number(S* s) {
-	C n = 0;
-	B k;
-	if (peek(s) == '-') {
-		s->ip++;
-		while (valid(s, s->ip) && (k = token(s)) >= 48 && k <= 57) { n = n*10 - (k - 48); }
-	} else {
-		while (valid(s, s->ip) && (k = token(s)) >= 48 && k <= 57) { n = n*10 + (k - 48); }
-	}
-	PUSH(s, n);
-	s->ip--;
-}
-
-V string(S* s) {
-	B k;
-	PUSH(s, s->ip);
-	while (valid(s, s->ip) && (k = token(s)) != '"') { }
-	PUSH(s, s->ip - T(s) - 1);
-}
-
-V block(S* s) {
-	int t = 1;
-	B k;
-	PUSH(s, s->ip);
-	while (t > 0 && valid(s, s->ip)) {
-	  switch (k = token(s)) {
-		case '{': t++; break;
-		case '}': t--; break;
-		}
-	}
-}
-
-V choice(S* s) { L3(s, C, f, C, t, C, b); if (b) eval(s, t); else eval(s, f); }
-V times(S* s) { L2(s, C, q, C, n); while (n-- > 0) eval(s, q); }
-V while_(S* s) { L2(s, C, q, C, c); do { eval(s, c); if (!POP(s)) break; eval(s, q); } while (1); }
-
-V parse_name(S*);
-V find_name(S*);
 
 V step(S* s) {
 	switch (peek(s)) {
@@ -173,37 +136,36 @@ V step(S* s) {
 		switch (token(s)) {
 		case '$': put(s, token(s)); break;
 
-		case '"': string(s); break;
-
-		case 'l': { L1(s, C, n); literal(s, n); } break;
-		case '#': number(s); break;
-
 		case '1': PUSH(s, 1); break;
 		case '\'': PUSH(s, *s->ip); s->ip += 1; break;
 		case '2': PUSH(s, *((W*)s->ip)); s->ip += 2; break;
-		case '\\': PUSH(s, *((C*)s->ip)); s->ip += sizeof(C); break;
+		case '4': PUSH(s, *((L*)s->ip)); s->ip += 4; break;
+		case '8': PUSH(s, *((X*)s->ip)); s->ip += 8; break;
 
 		case '_': DROP(s); break;
 		case 'd': duplicate(s); break;
 		case 'o': over(s); break;
 		case 's': swap(s); break;
 		case 'r': rot(s); break;
-		/*
 		case 'n': nip(s); break;
 		case 'p': pick(s); break;
-		*/
 
-		case '(': to_r(s); break;
-		case ')': from_r(s); break;
-		/*
-		case 'f': fetch_r(s); break;
-		*/
+		case 't': to_r(s); break;
+		case 'f': from_r(s); break;
+		case 'u': first_r(s); break;
+		case 'v': second_r(s); break;
+		case 'w': third_r(s); break;
+		case 'x': fourth_r(s); break;
+		case 'y': fifth_r(s); break;
+		case 'z': sixth_r(s); break;
 
 		case '+': add(s); break;
 		case '-': sub(s); break;
 		case '*': mul(s); break;
 		case '/': division(s); break;
 		case '%': mod(s); break;
+		case '}': rshift(s); break;
+		case '{': lshift(s); break;
 
 		case '<': lt(s); break;
 		case '=': eq(s); break;
@@ -217,34 +179,26 @@ V step(S* s) {
 
 		case '!': { L2(s, C*, a, C, v); *a = v; } break;
 		case '@': { L1(s, C*, a); PUSH(s, *a); } break;
+		case '#': { L2(s, L*, a, L, v); *a = v; } break;
+		case '`': { L1(s, L*, a); PUSH(s, *a); } break;
 		case ';': { L2(s, W*, a, W, v); *a = v; } break;
 		case ':': { L1(s, W*, a); PUSH(s, *a); } break;
 		case ',': { L2(s, B*, a, B, v); *a = v; } break;
 		case '.': { L1(s, B*, a); PUSH(s, *a); } break;
 
 		case '[': quotation(s); break;
+		case '\\': ret(s); break;
 		case ']': ret(s); break;
-		case '{': block(s); break;
-		case '}': ret(s); break;
 		case 'i': execute(s); break;
-		case 'a': acall(s); break;
+		case 'k': acall(s); break;
 		case 'j': jump(s); break;
-		case 'z': zjump(s); break;
+		case '?': zjump(s); break;
 
-		case '?': choice(s); break;
-		case 't': times(s); break;
-		case 'w': while_(s); break;
-
-		case 'c': PUSH(s, sizeof(C)); break;
 		case 'q': quit(s); break;
-		case 'u': s->tr = 0; break;
-		case 'v': s->tr = 1; break;
 
+		case 'a': PUSH(s, s); break;
 		case 'b': PUSH(s, s->d); break;
-		case 'y': PUSH(s, s->ibuf); PUSH(s, s->ilen); break;
-
-		case 'n': parse_name(s); break;
-		case 'f': find_name(s); break;
+		case 'c': PUSH(s, sizeof(C)); break;
 		}
 		break;
 	}
@@ -255,11 +209,12 @@ V dump_code(S* s, B* c) {
 	B k;
 	while (t > 0 && valid(s, c)) {
 		switch (k = *c++) {
-		case '{': case '[': t++; printf("%c", k); break;
-		case '}': case ']': t--; printf("%c", k); break;
+		case '[': t++; printf("%c", k); break;
+		case '\\': case ']': t--; printf("%c", k); break;
 		case '\'': printf("#%d", *c); c += 1; break;
 		case '2': printf("#%d", *((W*)c)); c += 2; break;
-		case '\\': printf("#%ld", *((C*)c)); c += sizeof(C); break;
+		case '4': printf("#%d", *((L*)c)); c += 4; break;
+		case '8': printf("#%ld", *((X*)c)); c += 8; break;
 		default: printf("%c", k); break;
 		}
 	}
@@ -435,6 +390,14 @@ B do_semicolon(S* s) {
 		PUSH(s, l);
 		return 0;
 	}
+}
+
+V literal(S* s, C n) {
+	if (n == 1) { put(s, '1'); }
+	else if (n >= -128 && n <= 127) { put(s, '\''); put(s, n); }
+	else if (n >= -32768 && n <= 32767) { put(s, '2'); wput(s, n); }
+	else if (n >= -2147483648 && n <= 2147483647) { put(s, '4'); lput(s, n); }
+	else { put(s, '8'); xput(s, n); }
 }
 
 V do_number(S* s) {
