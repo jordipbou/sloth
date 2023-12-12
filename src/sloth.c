@@ -14,7 +14,7 @@
   #include <termios.h>
 #endif
 
-void do_error(S* s) {
+void do_error(X* x) {
 	/*
 	if (x->err == -13) {
 		printf("UNDEFINED WORD [%.*s]\n", (int)T(x), (char *)N(x));
@@ -22,14 +22,12 @@ void do_error(S* s) {
 		printf("ZERO LENGTH NAME::IBUF: %s\n", &x->m->ibuf[x->m->ipos]);
 	} else {
 	*/
-	if (s->err == -256) { exit(0); }
+	if (x->err == -256) { exit(0); }
 	else { 
-		printf("ERROR: %ld\n", s->err); 
-		s->sp = 0;
-		s->rp = 0;
-		s->ipos = 0;
-		s->ilen = 0;
-		s->err = 0;
+		printf("ERROR: %ld\n", x->err); 
+		x->sp = 0;
+		x->rp = 0;
+		x->err = 0;
 	}
 	/*
 	}
@@ -61,19 +59,22 @@ int _getch ()
 }
 #endif
 
-V key(S* s) { PUSH(s, _getch()); }
-V emit(S* s) { L1(s, B, c); printf("%c", c); }
+V key(X* x) { PUSH(x, _getch()); }
+V emit(X* x) { L1(x, B, c); printf("%c", c); }
 
 int main(int argc, char** argv) {
 	char* r;
 	char buf[255];
 
-	S* s = init_dict(init());
-	s->x['E' - 'A'] = &emit;
-	s->x['K' - 'A'] = &key;
+	/*X* x = init_context(init_dict(1024 * 1024));*/
+	X* x = (X*)init_sloth(init_dict(1024 * 1024));
+	EXT(x, 'E') = &emit;
+	EXT(x, 'K') = &key;
+	EXT(x, 'S') = &sloth_ext;
 
-	s->tr = 1;
+	x->tr = 1;
 
+/*
  	if (argc == 2) {
 		FILE *f = fopen(argv[1], "r");
 		if (!f) {
@@ -96,19 +97,19 @@ int main(int argc, char** argv) {
 			if (line) free(line);
 		}
 	}
-
+*/
  printf("SLOTH v0.1\n");
   
 	while (1) {
 	  r = fgets(buf, 255, stdin);
-		/*assembler(s, buf);*/
-		evaluate(s, buf);
-		if (!s->err) {
-			trace(s);
+		/*assembler(x, buf);*/
+		evaluate((S*)x, buf);
+		if (!x->err) {
+			trace(x);
 			printf("Ok\n");
 		} else {
-			do_error(s);
-			/* reset(s); */
+			do_error(x);
+			/* reset(x); */
 		}
 	}
 

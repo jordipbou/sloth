@@ -94,31 +94,31 @@ Each interpreter context has its own dedicated memory. Its mapping is:
     $ -> compile next byte
     % -> modulo
     & -> and
-    ' -> short store
-    ( -> shift left
-    ) -> shift right
+    ' -> 8 bits literal
+    ( -> to r
+    ) -> from r
     * -> multiplication
     + -> addition
-    , -> byte store
+    , -> 8 bits store
     - -> substraction
-    . -> byte fetch
+    . -> 8 bits fetch
     / -> division
     0 -> equal to zero
     1 -> literal 1
     2 -> 16 bits literal
-    3 ->
+    3 -> 
     4 -> 32 bits literal
-    5 ->
-    6 ->
-    7 ->
+    5 -> 
+    6 -> 
+    7 -> 
     8 -> 64 bits literal
-    9 ->
-    : -> byte fetch
-    ; -> byte store
+    9 -> 
+    : -> 16 bits fetch
+    ; -> 16 bits store
     < -> less than
     = -> equal
     > -> greater than
-    ? -> zero branch
+    ? -> RESERVED for if combinator
     @ -> cell fetch
 		A -> C extension
 		B -> C extension
@@ -148,38 +148,38 @@ Each interpreter context has its own dedicated memory. Its mapping is:
 		Y -> C extension
 		Z -> C extension
     [ -> quotation (push ip and jump)
-    \ -> return 
+    \ -> 
     ] -> return (quotation end)
     ^ -> xor
     _ -> drop
     ` -> dump memory
     a -> allot
-    b -> push block variable address
-		c -> sizeof cell
+    b -> 
+		c -> RESERVED for sizeof cell
     d -> dup
-    e -> set error
-    f -> from R
-    g -> align
+    e -> RESERVED for error
+    f -> fetch top of return stack
+    g -> aligned
     h -> here
     i -> interpret/call/execute
     j -> jump
     k -> 
     l -> 
 		m -> RESERVED for cmove> if needed
-    n -> nip
+    n -> 
     o -> over
     p -> RESERVED for compare if needed
     q -> quit (exit app)
     r -> rot
     s -> swap
-    t -> to R
-    u -> unsigned operations
-    v -> 
-    w -> 
-    x -> 
-    y -> 
-    z -> 
-    { -> start quotation block
+    t -> RESERVED for times combinator
+    u -> RESERVED for unsigned operations
+    v -> view/unview traces
+    w -> RESERVED for while loop combinator
+    x -> RESERVED for context operations (self or other)
+    y -> RESERVED for type if needed
+    z -> zjump
+    { -> start quotation block literal
     | -> or
     } -> end quotation block (return)
     ~ -> invert

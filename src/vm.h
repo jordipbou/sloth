@@ -9,262 +9,363 @@
 typedef void V;
 typedef char B;
 typedef int16_t W;
-typedef int32_t L;
-typedef int64_t X;
 typedef intptr_t C;
 
-#define ABUF_SIZE 64
+#define PAD_OFFSET 176
+#define PAD_SIZE 84
 
-typedef struct _State {
-	C s[256];
-	C sp;
-	C r[256];
-	C rp;
-	B* ip;
-	C err;
-	C tr;
-  C st;	
-	B* d;
-	V (**x)(struct _State*);
-	B abuf[ABUF_SIZE];
-	B ibuf[255];
-	C ipos;
-	C ilen;
-} S;
+typedef struct _Context X;
 
-V inner(S*);
+typedef struct _Dictionary { 
+	C size; 
+	C here; 
+	C there; 
+	B* data; 
+	V (**x)(struct _Context*);
+} D;
 
-#define ALG_TO_ABS(s, a) ((((C)a) << 2) + ((C)s->d))
-#define ABS_TO_ALG(s, a) ((((C)a) - ((C)s->d)) >> 2)
+#define HERE_TO_THERE(d) (d->there = d->here + PAD_OFFSET + PAD_SIZE)
 
-#define VARIABLE 128
-#define HIDDEN 64 
-#define IMMEDIATE 32
-
-typedef struct _Name {
-	W p;
-	W c;
-	B f;
-	B n[1];
-} N;
-
-#define SIZE(s) (*((C*)(s->d)))
-#define HERE(s) (*((C*)(s->d + sizeof(C))))
-#define LATEST(s) (*((W*)(s->d + 2*sizeof(C))))
-
-V put(S* s, B v) { *((B*)(HERE(s) + s->d)) = v; HERE(s) += 1; }
-V wput(S* s, W v) { *((W*)(HERE(s) + s->d)) =  v; HERE(s) += 2; }
-V lput(S* s, L v) { *((L*)(HERE(s) + s->d)) = v; HERE(s) += 4; }
-V xput(S* s, X v) { *((X*)(HERE(s) + s->d)) = v; HERE(s) += 8; }
-V cput(S* s, C v) { *((C*)(HERE(s) + s->d)) = v; HERE(s) += sizeof(C); }
-
-#define T(s) (s->s[s->sp - 1])
-#define N(s) (s->s[s->sp - 2])
-#define NN(s) (s->s[s->sp - 3])
-
-#define PUSH(s, v) (s->s[s->sp++] = (C)(v))
-#define POP(s) (s->s[--s->sp])
-#define DROP(s) (--s->sp)
-
-#define L1(s, t, v) t v = (t)POP(s)
-#define L2(s, t1, v1, t2, v2) L1(s, t1, v1); L1(s, t2, v2)
-#define L3(s, t1, v1, t2, v2, t3, v3) L2(s, t1, v1, t2, v2); L1(s, t3, v3)
-#define L4(s, t1, v1, t2, v2, t3, v3, t4, v4) L3(s, t1, v1, t2, v2, t3, v3); L1(s, t4, v4)
-
-V duplicate(S* s) { s->sp++; T(s) = N(s); }
-V over(S* s) { s->sp++; T(s) = NN(s); }
-V swap(S* s) { C t = T(s); T(s) = N(s); N(s) = t; }
-V rot(S* s) { C t = NN(s); NN(s) = N(s); N(s) = T(s); T(s) = t; }
-V nip(S* s) { N(s) = T(s); s->sp--; }
-V pick(S* s) { L1(s, C, v); PUSH(s, v); }
-
-V to_r(S* s) { s->r[s->rp++] = s->s[--s->sp]; }
-V from_r(S* s) { s->s[s->sp++] = s->r[--s->rp]; }
-V first_r(S* s) { s->s[s->sp++] = s->r[s->rp - 1]; }
-V second_r(S* s) { s->s[s->sp++] = s->r[s->rp - 2]; }
-V third_r(S* s) { s->s[s->sp++] = s->r[s->rp - 3]; }
-V fourth_r(S* s) { s->s[s->sp++] = s->r[s->rp - 4]; }
-V fifth_r(S* s) { s->s[s->sp++] = s->r[s->rp - 5]; }
-V sixth_r(S* s) { s->s[s->sp++] = s->r[s->rp - 6]; }
-
-V add(S* s) { N(s) = N(s) + T(s); s->sp--; }
-V sub(S* s) { N(s) = N(s) - T(s); s->sp--; }
-V mul(S* s) { N(s) = N(s) * T(s); s->sp--; }
-V division(S* s) { N(s) = N(s) / T(s); s->sp--; }
-V mod(S* s) { N(s) = N(s) % T(s); s->sp--; }
-V lshift(S* s) { N(s) = N(s) << T(s); s->sp--; }
-V rshift(S* s) { N(s) = N(s) >> T(s); s->sp--; }
-
-V lt(S* s) { N(s) = (N(s) < T(s)) ? -1 : 0; s->sp--; }
-V eq(S* s) { N(s) = (N(s) == T(s)) ? -1 : 0; s->sp--; }
-V gt(S* s) { N(s) = (N(s) > T(s)) ? -1 : 0; s->sp--; }
-V zeq(S* s) { T(s) = (T(s) == 0) ? -1 : 0; }
-
-V and(S* s) { N(s) = N(s) & T(s); s->sp--; }
-V or(S* s) { N(s) = N(s) | T(s); s->sp--; }
-V xor(S* s) { N(s) = N(s) ^ T(s); s->sp--; }
-V invert(S* s) { T(s) = ~T(s); }
-
-C valid(S* s, B* a) {
-	if (!s->d) return a >= s->abuf && a < (s->abuf + ABUF_SIZE);
-	else return (a >= s->abuf && a < (s->abuf + ABUF_SIZE)) || (a >= s->d && a < (s->d + SIZE(s)));
+D* init_dict(C s) {
+	D* d = malloc(sizeof(D));
+	if (d == 0) return 0;
+	d->data = malloc(s);
+	if (d->data == 0) { free(d); return 0; }
+	d->size = s;
+	d->here = 0;
+	HERE_TO_THERE(d);
+	d->x = malloc(26 * sizeof(C));
+	if (d->x == 0) { free(d->data); free(d); return 0; }
+	return d;
 }
 
-C tail(S* s) { return !valid(s, s->ip) || *s->ip == ']' || *s->ip == '}'; }
-V execute(S* s) { L1(s, C, q); if (!tail(s)) s->r[s->rp++] = (C)s->ip; s->ip = (B*)q; }
-V acall(S* s) { L1(s, W, w); if (!tail(s)) s->r[s->rp++] = (C)s->ip; s->ip = (B*)ALG_TO_ABS(s, w); }
-V ret(S* s) { if (s->rp > 0) s->ip = (B*)s->r[--s->rp]; else s->ip = (B*)(!s->d ? 0 : SIZE(s)); }
-V eval(S* s, C q) { PUSH(s, q); execute(s); inner(s); }
-V jump(S* s) { L1(s, C, d); s->ip += d; }
-V zjump(S* s) { L2(s, C, d, C, b); if (!b) s->ip += d; }
-V quotation(S* s) { L1(s, C, d); PUSH(s, s->ip); s->ip += d; }
+C aligned(D* d) { return (d->here + (sizeof(C) - 1)) & ~(sizeof(C) - 1); }
+V align(D* d) { d->here = aligned(d); }
+V allot(D* d, C n) { d->here += n; }
 
-V quit(S* s) { s->err = -256; }
+V bcompile(D* d, B v) { *((B*)(d->data + d->here)) = v; d->here += 1; }
+V wcompile(D* d, W v) { *((W*)(d->data + d->here)) = v; d->here += 2; }
+V ccompile(D* d, C v) { *((C*)(d->data + d->here)) = v; d->here += sizeof(C); }
 
-B peek(S* s) { return *s->ip; }
-B token(S* s) { return *s->ip++; }
+V btransient(D* d, B v) { *((B*)(d->data + d->there)) = v; d->there += 1; }
+V wtransient(D* d, W v) { *((W*)(d->data + d->there)) = v; d->there += 2; }
+V ctransient(D* d, C v) { *((C*)(d->data + d->there)) = v; d->there += sizeof(C); }
 
-V step(S* s) {
-	switch (peek(s)) {
-	case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G': case 'H':
-	case 'I': case 'J': case 'K': case 'L': case 'M': case 'N': case 'O': case 'P':
-	case 'Q': case 'R': case 'S': case 'T': case 'U': case 'V': case 'W': case 'Y': 
-	case 'Z':
-		s->x[token(s) - 'A'](s);
+C unused(D* d) { return d->size - d->here; }
+C tunused(D* d) { return d->size - d->there; }
+
+B getB(D* d, C p) { return *((B*)(d->data + p)); }
+W getW(D* d, C p) { return *((W*)(d->data + p)); }
+C getC(D* d, C p) { return *((C*)(d->data + p)); }
+
+V putB(D* d, C p, B v) { *((B*)(d->data + p)) = v; }
+V putW(D* d, C p, W v) { *((W*)(d->data + p)) = v; }
+V putC(D* d, C p, C v) { *((C*)(d->data + p)) = v; }
+
+C str_to_transient(D* d, B* s, C l) {
+	C t, i;
+	if (tunused(d) < l) HERE_TO_THERE(d);
+	if (tunused(d) < l) return -1;
+	t = d->there;
+	for (i = 0; i < l; i++) btransient(d, *(s + i));
+	return t;
+}
+
+#define SSTACK_SIZE 256
+#define RSTACK_SIZE 256
+
+struct _Context { 
+	D* d; 
+	C s[SSTACK_SIZE]; 
+	C sp; 
+	C r[RSTACK_SIZE]; 
+	C rp; 
+	C ip; 
+	C err; 
+	C tr;
+};
+
+#define EXT(x, l) (x->d->x[l - 'A'])
+
+X* init_context(D* d) {
+	X* x = malloc(sizeof(X));
+	x->d = d;
+	x->sp = x->rp = x->err = x->tr = 0;
+	x->ip = 0;
+	return x;
+}
+
+V inner(X*);
+
+#define T(x) (((X*)(x))->s[((X*)(x))->sp - 1])
+#define N(x) (((X*)(x))->s[((X*)(x))->sp - 2])
+#define NN(x) (((X*)(x))->s[((X*)(x))->sp - 3])
+
+#define PUSH(x, v) (((X*)(x))->s[((X*)(x))->sp++] = ((C)(v)))
+#define POP(x) (((X*)(x))->s[--((X*)(x))->sp])
+#define DROP(x) (((X*)(x))->sp--)
+#define SWAP(x) { C a = T(x); T(x) = N(x); N(x) = a; }
+#define OVER(x) (PUSH(x, N(x)))
+
+#define L1(x, t1, v1) t1 v1 = (t1)POP((X*)(x))
+#define L2(x, t1, v1, t2, v2) L1(x, t1, v1); L1(x, t2, v2)
+#define L3(x, t1, v1, t2, v2, t3, v3) L2(x, t1, v1, t2, v2); L1(x, t3, v3)
+
+#define PEEK(x) (getB(x->d, x->ip))
+#define TOKEN(x) (getB(x->d, x->ip++))
+#define IN(x, a) ((a) >= 0 && (a) <= x->d->size)
+
+#define TAIL(x) (!IN(x, x->ip) || PEEK(x) == ']' || PEEK(x) == '}')
+V execute(X* x) { L1(x, C, q); if (!TAIL(x)) x->r[x->rp++] = x->ip; x->ip = q; }
+V jump(X* x) { L1(x, C, d); x->ip += d; }
+V zjump(X* x) { L2(x, C, d, C, c); if (!c) x->ip += d; }
+V ret(X* x) { if (x->rp > 0) x->ip = x->r[--x->rp]; else x->ip = x->d->size; }
+V eval(X* x, C q) { PUSH(x, q); execute(x); inner(x); }
+V quotation(X* x) { L1(x, C, d); PUSH(x, x->ip); x->ip += d; }
+
+V quit(X* x) { x->err = -256; }
+
+V literal(X* x, C n) {
+	if (n == 1) { bcompile(x->d, '1'); }
+	else if (n >= -128 && n <= 127) { bcompile(x->d, '\''); bcompile(x->d, (B)n); }
+	else if (n >= -32768 && n <= 32767) { bcompile(x->d, '2'); wcompile(x->d, (W)n); }
+	/* TODO: Manage 32/64 bits */
+	else { bcompile(x->d, '8'); ccompile(x->d, n); }
+}
+
+V dump(X* x) {
+	L2(x, C, n, B*, a);
+	C i;
+	while (n > 0) {
+		printf("\n%010ld  ", (C)a);
+		for (i = 0; i < 8; i++) printf("%02X ", (*(a + i)) & 0xFF);
+		printf(" ");
+		for (i = 0; i < 8; i++) printf("%02X ", (*(a + 8 + i)) & 0xFF);
+		printf("   ");
+		for (i = 0; i < 16; i++) {
+			B k = *(a + i);
+			if (k >= 32 && k <= 127) printf("%c", k);
+			else printf(".");
+		}
+		a += 16;
+		n -= 16;
+	}
+	printf("\n");
+}
+
+V string(X* x) { 
+	PUSH(x, x->d->data + x->ip); 
+	while(TOKEN(x) != '"') { } 
+	PUSH(x, x->d->data + x->ip - T(x) - 1); 
+}
+V number(X* x) { 
+	C n = 0; 
+	B k; 
+	for (k = TOKEN(x); k >= 48 && k <= 57; k = TOKEN(x)) n = 10*n + (k - 48);
+	x->ip--;
+	PUSH(x, n);
+}
+V block(X* x) { 
+	C t = 1; 
+	PUSH(x, x->ip); 
+	while (t > 0) { 
+		switch (TOKEN(x)) { 
+			case '{': t++; break;
+			case '}': t--; break;
+		}
+	}
+}
+
+V times(X* x) { L2(x, C, q, C, n); for (;n > 0; n--) { eval(x, q); } }
+V choice(X* x) { L2(x, C, f, C, t); if (POP(x)) eval(x, t); else eval(x, f); }
+
+V type(X* x) { 
+	L2(x, C, n, B*, s); 
+	C i; 
+	for (i = 0; i < n; i++) { 
+		PUSH(x, *(s + i)); 
+		EXT(x, 'E')(x); 
+	} 
+}
+
+V step(X* x) {
+	C a, b, c;
+	switch (PEEK(x)) {
+	case 'A': case 'B':
+	case 'C': case 'D':
+	case 'E': case 'F':
+	case 'G': case 'H':
+	case 'I': case 'J':
+	case 'K': case 'L':
+	case 'M': case 'N':
+	case 'O': case 'P':
+	case 'Q': case 'R':
+	case 'S': case 'T':
+	case 'U': case 'V':
+	case 'W': case 'X':
+	case 'Y': case 'Z':
+		EXT(x, TOKEN(x))(x);
 		break;
 	default:
-		switch (token(s)) {
-		case '$': put(s, token(s)); break;
+		switch (TOKEN(x)) {
+		case '"': string(x); break;
+		case '#': number(x); break;
+		case '?': choice(x); break;
+		case 't': times(x); break;
+		case 'y': type(x); break;
 
-		case '1': PUSH(s, 1); break;
-		case '\'': PUSH(s, *s->ip); s->ip += 1; break;
-		case '2': PUSH(s, *((W*)s->ip)); s->ip += 2; break;
-		case '4': PUSH(s, *((L*)s->ip)); s->ip += 4; break;
-		case '8': PUSH(s, *((X*)s->ip)); s->ip += 8; break;
+		case '$': bcompile(x->d, TOKEN(x)); break;
 
-		case '_': DROP(s); break;
-		case 'd': duplicate(s); break;
-		case 'o': over(s); break;
-		case 's': swap(s); break;
-		case 'r': rot(s); break;
-		case 'n': nip(s); break;
-		case 'p': pick(s); break;
+		case '1': PUSH(x, 1); break;
+		case '\'': PUSH(x, TOKEN(x)); break;
+		case '2': PUSH(x, *((W*)x->ip)); x->ip += 2; break;
+		case '8': PUSH(x, *((C*)x->ip)); x->ip += sizeof(C); break;
 
-		case 't': to_r(s); break;
-		case 'f': from_r(s); break;
-		case 'u': first_r(s); break;
-		case 'v': second_r(s); break;
-		case 'w': third_r(s); break;
-		case 'x': fourth_r(s); break;
-		case 'y': fifth_r(s); break;
-		case 'z': sixth_r(s); break;
+		case '_': DROP(x); break;
+		case 'd': a = T(x); PUSH(x, a); break;
+		case 'o': b = N(x); PUSH(x, b); break;
+		case 's': a = T(x); T(x) = N(x); N(x) = a; break;
+		case 'r': a = T(x); T(x) = NN(x); NN(x) = N(x); N(x) = a; break;
 
-		case '+': add(s); break;
-		case '-': sub(s); break;
-		case '*': mul(s); break;
-		case '/': division(s); break;
-		case '%': mod(s); break;
-		case '}': rshift(s); break;
-		case '{': lshift(s); break;
+		case '(': x->r[x->rp++] = x->s[--x->sp]; break;
+		case ')': x->s[x->sp++] = x->r[--x->rp]; break;
+		case 'f': PUSH(x, x->r[x->rp - 1]); break;
 
-		case '<': lt(s); break;
-		case '=': eq(s); break;
-		case '>': gt(s); break;
-		case '0': zeq(s); break;
+		case '+': N(x) = N(x) + T(x); x->sp--; break;
+		case '-': N(x) = N(x) - T(x); x->sp--; break;
+		case '*': N(x) = N(x) * T(x); x->sp--; break;
+		case '/': N(x) = N(x) / T(x); x->sp--; break;
+		case '%': N(x) = N(x) % T(x); x->sp--; break;
 
-		case '&': and(s); break;
-		case '|': or(s); break;
-		case '^': xor(s); break;
-		case '~': invert(s); break;
+		case '<': N(x) = N(x) < T(x) ? -1 : 0; x->sp--; break;
+		case '=': N(x) = N(x) == T(x) ? -1 : 0; x->sp--; break;
+		case '>': N(x) = N(x) > T(x) ? -1 : 0; x->sp--; break;
+		case '0': T(x) = T(x) == 0 ? -1 : 0; break;
 
-		case '!': { L2(s, C*, a, C, v); *a = v; } break;
-		case '@': { L1(s, C*, a); PUSH(s, *a); } break;
-		case '#': { L2(s, L*, a, L, v); *a = v; } break;
-		case '`': { L1(s, L*, a); PUSH(s, *a); } break;
-		case ';': { L2(s, W*, a, W, v); *a = v; } break;
-		case ':': { L1(s, W*, a); PUSH(s, *a); } break;
-		case ',': { L2(s, B*, a, B, v); *a = v; } break;
-		case '.': { L1(s, B*, a); PUSH(s, *a); } break;
+		case '&': N(x) = N(x) & T(x); x->sp--; break;
+		case '|': N(x) = N(x) | T(x); x->sp--; break;
+		case '^': N(x) = N(x) ^ T(x); x->sp--; break;
+		case '~': T(x) = ~T(x); break;
+	
+		/* Memory access must be absolute to allow the full power of the Forth !!! */
+		case '!': { L2(x, C*, a, C, v); *a = v; } break;
+		case '@': { L1(x, C*, a); PUSH(x, *a); } break;
+		case ';': { L2(x, W*, a, W, v); *a = v; } break;
+		case ':': { L1(x, W*, a); PUSH(x, *a); } break;
+		case ',': { L2(x, B*, a, B, v); *a = v; } break;
+		case '.': { L1(x, B*, a); PUSH(x, *a); } break;
 
-		case '[': quotation(s); break;
-		case '\\': ret(s); break;
-		case ']': ret(s); break;
-		case 'i': execute(s); break;
-		case 'k': acall(s); break;
-		case 'j': jump(s); break;
-		case '?': zjump(s); break;
+		case '[': quotation(x); break;
+		case '}': case ']': ret(x); break;
+		case '{': block(x); break;
 
-		case 'q': quit(s); break;
+		case 'i': execute(x); break;
+		case 'j': jump(x); break;
+		case 'z': zjump(x); break;
+	
+		case 'c': PUSH(x, sizeof(C)); break;
+		case 'b': PUSH(x, x->d->data); break;
+		case 'e': x->err = POP(x); break;
+		case 'q': quit(x); break;
 
-		case 'a': PUSH(s, s); break;
-		case 'b': PUSH(s, s->d); break;
-		case 'c': PUSH(s, sizeof(C)); break;
+		case '`': dump(x); break;
+
+		case 'h': PUSH(x, x->d->data + x->d->here); break;
+		case 'a': { L1(x, C, n); allot(x->d, n); } break;
+		case 'g': align(x->d); break;
+
+		case 'v': { L1(x, C, n); x->tr = n != 0; } break;
 		}
 		break;
 	}
 }
 
-V dump_code(S* s, B* c) {
-	int t = 1;
+V dump_code(X* x, C c) {
+	C t = 1;
 	B k;
-	while (t > 0 && valid(s, c)) {
-		switch (k = *c++) {
-		case '[': t++; printf("%c", k); break;
-		case '\\': case ']': t--; printf("%c", k); break;
-		case '\'': printf("#%d", *c); c += 1; break;
-		case '2': printf("#%d", *((W*)c)); c += 2; break;
-		case '4': printf("#%d", *((L*)c)); c += 4; break;
-		case '8': printf("#%ld", *((X*)c)); c += 8; break;
-		default: printf("%c", k); break;
+	while (t > 0 && IN(x, c)) {
+		switch (k = getB(x->d, c++)) {
+		case '#': printf("#"); while (k = getB(x->d, c++) >= 48 && k <= 57) printf("%c", k); c--; break;
+		case '{': case '[': t++; printf("%c", k); break;
+		case '}': case ']': t--; printf("%c", k); break;
+		case '\'': printf("#%d", getB(x->d, c++)); break;
+		case '2': printf("#%d", getW(x->d, c)); c += 2; break;
+		case '8': printf("#%ld", getC(x->d, c)); c += sizeof(C); break;
+		default: if (k >= 32 && k < 127) printf("%c", k); break;
 		}
 	}
 }
 
-V trace(S* s) {
-	int i;
-	printf("<%ld> ", s->sp);
-	for (i = 0; i < s->sp; i++) { printf("%ld ", s->s[i]); }
-	if (valid(s, s->ip)) { printf(" : "); dump_code(s, s->ip); }
-	for (i = s->rp - 1; i >= 0; i--) { printf(" : "); dump_code(s, (B*)s->r[i]); }
+V trace(X* x) {
+	C i;
+	for (i = 0; i < x->sp; i++) { printf("%ld ", x->s[i]); }
+	if (IN(x, x->ip)) { printf(" : "); dump_code(x, x->ip); }
+	for (i = x->rp - 1; i >= 0; i--) { printf(" : "); dump_code(x, x->r[i]); }
 }
 
-V inner(S* s) {
-	C t = s->rp;
-	while (t <= s->rp && valid(s, s->ip)) {
-		if (s->tr) { trace(s); printf("\n"); }
-		step(s);
+V inner(X* x) {
+	C t = x->rp;
+	while (t <= x->rp && IN(x, x->ip)) {
+		if (x->tr) { trace(x); printf("\n"); }
+		step(x);
 	}
 }
 
-V assembler(S* s, char* q) {
-	C l = strlen(q);
-	int i;
-	for (i = 0; i < l; i++) { s->abuf[i] = *(q + i); }
-	s->abuf[l - 1] = ']';
-	s->ip = s->abuf;
-	inner(s);
+V assembler(X* x, B* s) {
+	x->ip = str_to_transient(x->d, s, strlen(s));
+	btransient(x->d, ']');
+	inner(x);
 }
 
-/* OUTER INTERPRETER */
+typedef struct _Sloth {
+	X x;
+	B* ibuf;
+	C ipos;
+	C ilen;
+	C latest;
+	C state;
+} S;
 
-#define WORD(s, w) ((N*)(s->d + (w << 2)))
+S* init_sloth(D* d) {
+	S* s = malloc(sizeof(S));
+	X* x = (X*)s;
+	x->d = d;
+	x->sp = x->rp = x->err = x->tr = 0;
+	x->ip = x->d->size;
+	s->ibuf = 0;
+	s->ipos = s->ilen = 0;
+	s->latest = -1;
+	s->state = 0;
+	return s;
+}
 
-B is_immediate(S* s, N* w) { return (w->f & IMMEDIATE) == IMMEDIATE; }
+#define NO_FLAGS 0
+#define HIDDEN 1
+#define EXECUTABLE 2
+#define IMMEDIATE 4
+
+#define wPREVIOUS 0
+#define wXT (wPREVIOUS + sizeof(C))
+#define wFLAGS (wXT + sizeof(C))
+#define wNAMELEN (wFLAGS + 1)
+#define wNAME (wNAMELEN + 1)
 
 V parse_name(S* s) {
-	while (s->ipos < s->ilen && isspace(s->ibuf[s->ipos])) s->ipos++;
-	PUSH(s, s->ipos);
-	while (s->ipos < s->ilen && !isspace(s->ibuf[s->ipos])) s->ipos++;
-	PUSH(s, s->ipos - T(s));
+	X* x = (X*)s;
+	while (s->ipos < s->ilen && isspace(*(s->ibuf + s->ipos))) { s->ipos++; }
+	PUSH(x, s->ibuf + s->ipos);
+	while (s->ipos < s->ilen && !isspace(*(s->ibuf + s->ipos))) { s->ipos++; }
+	PUSH(x, s->ibuf + s->ipos - T(x));
 }
 
-B compare_without_case(S* s, N* w, C t, C l) {
-	if ((w->f & 31) != l) return 0;
+B compare_without_case(S* s, C w, C l, B* t) {
+	X* x = (X*)s;
+	if (getB(x->d, w + wNAMELEN) != l) return 0;
 	else {
 		int i;
 		for (i = 0; i < l; i++) {
-			B a = w->n[i];
-			B b = s->ibuf[t + i];
+			B a = getB(x->d, w + wNAME + i);
+			B b = *(t + i);
 			if (a >= 97 && a <= 122) a -= 32;
 			if (b >= 97 && b <= 122) b -= 32;
 			if (a != b) return 0;
@@ -274,197 +375,166 @@ B compare_without_case(S* s, N* w, C t, C l) {
 }
 
 V find_name(S* s) {
-	int i;
-	C l = POP(s);
-	C t = POP(s);
-	W w = LATEST(s);
+	X* x = (X*)s;
+	L2(x, C, l, B*, t);
+	C w = s->latest;
 	while (w != -1) {
-		if (compare_without_case(s, WORD(s, w), t, l)) break;
-		w = WORD(s, w)->p;
+		if ((getB(x->d, w + wFLAGS)	& HIDDEN) != HIDDEN && compare_without_case(s, w, l, t)) break;
+		w = getC(x->d, w + wPREVIOUS);
 	}
-	PUSH(s, t);
-	PUSH(s, l);
-	PUSH(s, w);
+	PUSH(x, w == -1 ? 0 : w);
 }
 
-V do_interpret(S* s, N* w) {
-	eval(s, ALG_TO_ABS(s, w->c));
+C do_interpret(S* s, C w) {
+	X* x = (X*)s;
+	B f = getB(x->d, w + wFLAGS);
+	if ((f & EXECUTABLE) == EXECUTABLE) {
+		eval(x, getC(x->d, w + wXT));
+	} else {
+		PUSH(x, x->d->data + getC(x->d, w + wXT));
+	}
 }
 
-V do_compile(S* s, N* w) {
-	int t = 1;
-	int i = 0;
+/* TODO: do_compile should check if state is less than 0 to compile on transient memory */
+C do_compile(S* s, C w) {
+	X* x = (X*)s;
+	C t = 1;
+	C i = 0;
+	C xt = getC(x->d, w + wXT);
 	B k;
 	while (t > 0) {
-		switch ((k = *(((B*)ALG_TO_ABS(s, w->c)) + i))) {
-		case ']': case '}': t--; if (t > 0) put(s, k); break;
-		case '[': case '{': t++; put(s, k); break;
-		default: put(s, k); break;
+		switch (k = getB(x->d, xt + i)) {
+		case ']': case '}': t--; if (t > 0) bcompile(x->d, k); break;
+		case '[': case '{': t++; bcompile(x->d, k); break;
+		default: bcompile(x->d, k); break;
 		}
 		i++;
 	}
-	/* In case a normal threaded compile is needed, this is it:
-	put(s, '2');
-	wput(s, w->c);
-	put(s, 'a');
-	*/
 }
 
-B do_asm(S* s) {
-	L2(s, C, l, C, t);
-	if (l > 1 && s->ibuf[t] == '\\') {
-		int i;
-		l = l - 1;
-		t = t + 1;
-		for (i = 0; i < l; i++) { s->abuf[i] = s->ibuf[t + i]; }
-		s->abuf[l] = ']';
-		s->ip = s->abuf;
-		inner(s);
+C do_asm(S* s, C l, B* t) {
+	X* x = (X*)s;
+	if (l <= 1 || *t != '\\') return 0;
+	else {
+		C q = str_to_transient(x->d, t + 1, l - 1);
+		btransient(x->d, ']');
+		eval(x, q);
 		return 1;
-	} else {
-		PUSH(s, t);
-		PUSH(s, l);
-		return 0;
 	}
 }
 
-B do_casm(S* s) {
-	L2(s, C, l, C, t);
-	if (l > 1 && s->ibuf[t] == '$') {
-		int i;
-		l = l - 1;
-		t = t + 1;
-		for (i = 0; i < l; i++) { put(s, s->ibuf[t + i]); }
+C do_casm(S* s, C l, B* t) {
+	X* x = (X*)s;
+	if (l <= 1 || *t != '$') return 0;
+	else {
+		C i; for (i = 1; i < l; i++) bcompile(x->d, *(t + i));
 		return 1;
-	} else {
-		PUSH(s, t);
-		PUSH(s, l);
-		return 0;
 	}
 }
 
-V align(S* s) {	HERE(s) = (HERE(s) + sizeof(C) - 1) & ~(sizeof(C) - 1); }
-
-B do_colon(S* s) {
-	C l = POP(s);
-	C t = POP(s);
-	if (l == 1 && s->ibuf[t] == ':') {
-	  parse_name(s);
-		if (T(s) == 0) { DROP(s); DROP(s); s->err = -16; return 1; }
-		else {
-			int i;
-			W w;
-		  l = POP(s);
-			t = POP(s);
-			align(s);
-			w = HERE(s) >> 2;
-			wput(s, LATEST(s));
-			LATEST(s) = w;
-			wput(s, 0);
-			put(s, HIDDEN | ((B)(l)) & 31);
-			for (i = 0; i < l; i++) put(s, s->ibuf[t + i]);
-			put(s, 0);
-			align(s);
-			s->st = 1;
-			WORD(s, w)->c = HERE(s) >> 2;
-			return 1;
-		}
-	} else {
-		PUSH(s, t);
-		PUSH(s, l);
-		return 0;
+V header(S* s) {
+	X* x = (X*)s;
+	parse_name(s);
+	if (!T(s)) { DROP(s); DROP(s); x->err = -16; return; }
+	else {
+		L2(s, C, l, B*, t);
+		C w, i;
+		align(x->d);
+		w = x->d->here;
+		ccompile(x->d, s->latest);
+		s->latest = w;
+		ccompile(x->d, 0);
+		bcompile(x->d, NO_FLAGS);
+		bcompile(x->d, l);
+		for (i = 0; i < l; i++) bcompile(x->d, *(t + i));
+		align(x->d);
+		putC(x->d, w + wXT, x->d->here);
 	}
 }
 
-B do_semicolon(S* s) {
-	B* i;
-	C l = POP(s);
-	C t = POP(s);
-	if (l == 1 && s->ibuf[t] == ';') {
-		put(s, ']');
-		s->st = 0;
-		WORD(s, LATEST(s))->f &= ~HIDDEN;
+C do_colon(S* s, C l, B* t) {
+	X* x = (X*)s;
+	if (l != 1 || *t != ':') return 0;
+	else {
+		C w;
+		header(s); if (x->err) return;
+		w = s->latest;	
+		putB(x->d, w + wFLAGS, HIDDEN | EXECUTABLE);
+		s->state = 1;
 		return 1;
-	} else {
-		PUSH(s, t);
-		PUSH(s, l);
-		return 0;
 	}
 }
 
-V literal(S* s, C n) {
-	if (n == 1) { put(s, '1'); }
-	else if (n >= -128 && n <= 127) { put(s, '\''); put(s, n); }
-	else if (n >= -32768 && n <= 32767) { put(s, '2'); wput(s, n); }
-	else if (n >= -2147483648 && n <= 2147483647) { put(s, '4'); lput(s, n); }
-	else { put(s, '8'); xput(s, n); }
+C do_semicolon(S* s, C l, B* t) {
+	X* x = (X*)s;
+	if (l != 1 || *t != ';') return 0;
+	else {
+		C w = s->latest;
+		bcompile(x->d, ']');
+		s->state = 0;
+		putB(x->d, w + wFLAGS, EXECUTABLE);
+		return 1;
+	}
 }
 
-V do_number(S* s) {
-	L2(s, C, l, C, t);
+V do_number(S* s, C l, B* t) {
+	X* x = (X*)s;
 	B k;
 	int n = 0;
 	int i;
-	if (s->ibuf[t] == '-') {
+	if (*t == '-') {
 		for (i = 1; i < l; i++) {
-			k = s->ibuf[t + i];
+			k = *(t + i);
 			if (k >= 48 && k <= 57) { n = n* 10 - (k - 48); }
-			else { s->err = -13; return; }
+			else { x->err = -13; return; }
 		}
 	} else {
 		for (i = 0; i < l; i++) {
-			k = s->ibuf[t + i];
+			k = *(t + i);
 			if (k >= 48 && k <= 57) { n = n* 10 + (k - 48); }
-			else { s->err = -13; return; }
+			else { x->err = -13; return; }
 		}
 	}
-	if (!s->st) PUSH(s, n);
-	else literal(s, n);
-}
-
-V refill(S* s, B* str) {
-	int i;
-	s->ipos = 0;
-	s->ilen = strlen(str);
-	for (i = 0; i < strlen(str); i++) s->ibuf[i] = str[i];
+	if (!s->state) PUSH(x, n);
+	else literal(x, n);
 }
 
 V evaluate(S* s, B* str) {
-	refill(s, str);
-	while (s->ipos < s->ilen) {
+	X* x = (X*)s;
+	s->ibuf = x->d->data + str_to_transient(x->d, str, strlen(str));
+	s->ilen = strlen(str);
+	s->ipos = 0;
+	while (!x->err) {
 		parse_name(s);
-		if (!T(s)) { DROP(s); DROP(s); return; }
+		if (!T(x)) { DROP(x); DROP(x); return; }
+		OVER(x); OVER(x);
 		find_name(s);
-		if (T(s) != -1) {
-			N* w = (N*)ALG_TO_ABS(s, POP(s));
-			DROP(s); DROP(s);
-			if (is_immediate(s, w) || !s->st) do_interpret(s, w);
+		if (T(x)) {
+			L3(x, C, w, C, l, B*, t);
+			if (s->state == 0 || (getB(x->d, w + wFLAGS) & IMMEDIATE) == IMMEDIATE) do_interpret(s, w);
 			else do_compile(s, w);
 		} else {
-			DROP(s);
-			if (!do_asm(s))
-				if (!do_casm(s))
-					if (!do_colon(s))
-						if (!do_semicolon(s))
-							do_number(s);
+			L3(x, C, w, C, l, B*, t);
+			if (!do_asm(s, l, t))
+				if (!do_casm(s, l, t))
+					if (!do_colon(s, l, t))
+						if (!do_semicolon(s, l, t))
+							do_number(s, l, t);	
 		}
 	}
 }
 
-S* init() {
-	S* s = malloc(sizeof(S));
-	s->x = malloc(26*sizeof(C));
-	s->ip = 0;
-	return s;
+V sloth_ext(X* x) {
+	S* s = (S*)x;
+	switch (TOKEN(x)) {
+	case '>': PUSH(x, &s->ipos); break;
+	case 'c': header(s); break;
+	case 'f': find_name(s); break;
+	case 'l': PUSH(x, s->latest); break;
+	case 'n': parse_name(s); break;
+	case 's': PUSH(x, s->ibuf); PUSH(x, s->ilen); break;
+	case 't': PUSH(x, x->d->data + x->d->there); break;
+	}
 }
-
-S* init_dict(S* s) {
-	s->d = malloc(64 * 1024 * sizeof(C));
-	SIZE(s) = 64 * 1024 * sizeof(C);
-	HERE(s) = 3*sizeof(C);
-	LATEST(s) = -1;
-	s->ip = s->d + SIZE(s);
-	return s;
-}
-
+	
 #endif
