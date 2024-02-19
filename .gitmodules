@@ -1,3 +1,6 @@
 [submodule "deps/Unity"]
 	path = deps/Unity
 	url = https://github.com/ThrowTheSwitch/Unity.git
+[submodule "deps/forth2012-test-suite"]
+	path = deps/forth2012-test-suite
+	url = https://github.com/gerryjackson/forth2012-test-suite.git

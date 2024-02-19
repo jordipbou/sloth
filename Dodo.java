@@ -936,6 +936,7 @@ public class Dodo {
 	public void dot_r() { push(0); swap(); d_dot_r(); }
 	public void not_equals() { s[sp - 2] = s[sp - 2] != s[sp - 1] ? -1 : 0; sp--; }
 	public void hex() { v(BASE, 16); }
+	public void tuck() { swap(); over(); }
 	public void backslash() { push(10); parse(); drop(); drop(); }
 
 	public void core_extensions() {
@@ -946,6 +947,7 @@ public class Dodo {
 		primitive("HEX", (vm) -> vm.hex());
 		primitive("PARSE", (vm) -> vm.parse());
 		primitive("PARSE-NAME", (vm) -> vm.parse_name());
+		primitive("TUCK", (vm) -> vm.tuck());
 		primitive("\\", (vm) -> vm.backslash()); immediate();
 	}
 
