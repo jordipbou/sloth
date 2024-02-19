@@ -1,5 +1,11 @@
 # SLOTH
 
+Sloth is an ANS Forth implementation in top of a basic virtual machine in both C and Java.
+
+The basic machine, named DODO its meant to be very easily added to other projects, being just one Java/C file.
+
+-----------
+
 A small, simple, relatively fast, double stack based virtual machine f with human readable/writeable bytecode meant for extending application.
 
 In the future there will be other implementations (at least Java/Kotlin for Android development).
