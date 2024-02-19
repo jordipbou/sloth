@@ -1,3 +1,6 @@
+// TODO: For implementing :NONAME latestxt variable needs to exist, as no word
+// will be added to current recurse will not work if there's no latestxt.
+
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -19,6 +22,7 @@ public class Dodo {
 	public ByteBuffer d;
 	public int there = M;
 	public int ip = -1;
+	public int latestxt = 0;
 	public int current = 0;
 	public int context[] = new int[8];
 
@@ -142,11 +146,22 @@ public class Dodo {
 	public void create() { parse_name(); if (T() == 0) { two_drop(); return; } create(data_to_str()); }
 
 	public void immediate() { latest().immediate = true; }
-	public void hide() { latest().hidden = true; }
+	//public void hide() { latest().hidden = true; }
 
-	public void reveal() { Word l = latest(); l.hidden = false; l.colon = true; }
-	public void colon() { create(); latest().xt = d.position(); hide(); right_bracket(); }
-	public void semicolon() { compile(EXIT); bracket(); reveal(); }
+	//public void reveal() { Word l = latest(); l.hidden = false; l.colon = true; }
+	public void colon() { 
+		create(); 
+		latestxt = latest().xt = d.position(); 
+		latest().hidden = true;
+		latest().colon = true;
+		right_bracket(); 
+	}
+	public void semicolon() { 
+		compile(EXIT); 
+		bracket(); 
+		latest().hidden = false;
+	}
+	//reveal(); }
 
 	public Word find_name_in(String n, int wl) {
 		Word w = wordlists.get(wl);
@@ -492,7 +507,7 @@ public class Dodo {
 	public void exit() { if (rp > 0) ip = r[--rp]; else ip = -1; }
 	public void literal(int v) { compile(LIT); compile(v); }
 	public void literal() { literal(pop()); }
-	public void recurse() { compile(latest().xt); }
+	public void recurse() { compile(latestxt); } // compile(latest().xt); }
 
 	public void _throw() { /* TODO */ }
 	public void _catch() { /* TODO */ }
@@ -541,16 +556,29 @@ public class Dodo {
 	public void convert_to_number() {
 		int l = pop();
 		int t = pop();
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < l; i++) sb.append((char)d.get(t + i));
-		String s = sb.toString();
-		try {
-			int n = Integer.parseInt(s, v(BASE));
-			push(n);
+		if (l == 3 && d.get(t) == (byte)'\'' && d.get(t + 2) == (byte)'\'') {
+			push(d.get(t + 1));
 			if (v(STATE) != 0) literal();
-		} catch (NumberFormatException e) {
-			System.out.printf("DO_NUMBER:Can't convert %s to number\n", s);
-			System.out.println(e);
+		} else {
+			int base = v(BASE);
+			switch (d.get(t)) {
+				case '#': base = 10; t++; l--; break;
+				case '$': base = 16; t++; l--; break;
+				case '%': base = 2; t++; l--; break;
+			}
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < l; i++) {
+				sb.append((char)d.get(t + i));
+			}
+			String s = sb.toString();
+			try {
+				int n = Integer.parseInt(s, base);
+				push(n);
+				if (v(STATE) != 0) literal();
+			} catch (NumberFormatException e) {
+				System.out.printf("DO_NUMBER:Can't convert %s to number\n", s);
+				System.out.println(e);
+			}
 		}
 	}
 
@@ -934,20 +962,35 @@ public class Dodo {
 
 	public void dot_paren() { push(41); parse(); one_minus(); type(); }
 	public void dot_r() { push(0); swap(); d_dot_r(); }
+	public void zero_ne() { push(pop() != 0 ? -1 : 0); }
+	public void zero_more() { push(pop() > 0 ? -1 : 0); }
+	public void two_to_r() { swap(); to_r(); to_r(); }
+	public void two_from_r() { from_r(); from_r(); swap(); }
+	public void two_r_fetch() { push(r[rp - 2]); push(r[rp - 1]); }
+	public void noname() { latestxt = d.position(); push(latestxt); right_bracket(); }
 	public void not_equals() { s[sp - 2] = s[sp - 2] != s[sp - 1] ? -1 : 0; sp--; }
 	public void hex() { v(BASE, 16); }
 	public void tuck() { swap(); over(); }
+	public void u_more() { long b = upop(); push(upop() > b ? -1 : 0); }
 	public void backslash() { push(10); parse(); drop(); drop(); }
 
 	public void core_extensions() {
 		primitive(".(", (vm) -> vm.dot_paren()); immediate();
 		primitive(".R", (vm) -> vm.dot_r());
+		primitive("0<>", (vm) -> vm.zero_ne());
+		primitive("0>", (vm) -> vm.zero_more());
+		primitive("2>R", (vm) -> vm.two_to_r());
+		primitive("2R>", (vm) -> vm.two_from_r());
+		primitive("2R@", (vm) -> vm.two_r_fetch());
+		primitive(":NONAME", (vm) -> vm.noname());
 		primitive("<>", (vm) -> vm.not_equals());
 		primitive("AGAIN", (vm) -> vm.again()); immediate();
 		primitive("HEX", (vm) -> vm.hex());
+		primitive("NIP", (vm) -> vm.nip());
 		primitive("PARSE", (vm) -> vm.parse());
 		primitive("PARSE-NAME", (vm) -> vm.parse_name());
 		primitive("TUCK", (vm) -> vm.tuck());
+		primitive("U>", (vm) -> u_more());
 		primitive("\\", (vm) -> vm.backslash()); immediate();
 	}
 
@@ -1018,5 +1061,4 @@ public class Dodo {
 		file();
 		_double();
 	}
-
 }
