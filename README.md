@@ -6,8 +6,6 @@ Inspired by STABLE Forth, RetroForth/ilo, XY, Joy/Factor.
 
 ## DODO VIRTUAL MACHINE
 
-[In the future there will be other implementations (at least Java/Kotlin for Android development)]
-
 Features:
 
 * C89. Very easily embedabble in a C/C++ application.
@@ -16,6 +14,11 @@ Features:
 * Ability to add C functions thru bytecode extensions (bytecodes A-Z).
 
 ### ARCHITECTURE
+
+The DODO VM is made from:
+
+* Linear memory array used for storing code and data, also known as the dictionary.
+* Bytecode interpreter that executes data stored on the dictionary.
 
 #### DATA TYPES
 
@@ -163,12 +166,12 @@ Each interpreter context has its own dedicated memory. Its mapping is:
     h -> here
     i -> interpret/call/execute
     j -> jump
-    k -> 
+    k -> RESERVED for compare if needed 
     l -> 
 		m -> RESERVED for cmove> if needed
     n -> 
     o -> over
-    p -> RESERVED for compare if needed
+    p -> pick
     q -> quit (exit app)
     r -> rot
     s -> swap

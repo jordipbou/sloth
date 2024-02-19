@@ -1,32 +1,29 @@
+: FIRST_COLON ;
+
 : DROP $_ ;
 : DUP $d ;
 : OVER $o ;
 : SWAP $s ;
 : ROT $r ;
-: NIP $n ;
+
+: 2DROP drop drop ;
 
 : >R $( ;
 : R> $) ;
-: R@ $u ;
-: U $u ;
-: V $v ;
-: W $w ;
-: X $x ;
-: Y $y ;
-: Z $z ;
+: R@ $f ;
 
 : + $+ ;
 : - $- ;
 : * $* ;
 : / $/ ;
 : MOD $% ;
-: LSHIFT ${ ;
-: RSHIFT $} ;
 
 : < $< ;
 : = $= ;
 : > $> ;
 : 0= $0 ;
+
+: 0< 0 < ;
 
 : AND $& ;
 : OR $| ;
@@ -35,68 +32,74 @@
 
 : @ $@ ;
 : ! $! ;
-: L@ $` ;
-: L! $" ;
 : W@ $: ;
 : W! $; ;
 : C@ $. ;
 : C! $, ;
+
+: +! dup @ rot + swap ! ;
+
+: CELL $c ;
+: CELL+ cell + ;
+: CELLS cell * ;
+
+: HERE $h ;
+: ALLOT $a ;
+
+: , here ! cell allot ;
+: W, here w! 2 allot ;
+: C, here c! 1 allot ;
 
 : BYE $q ;
 
 : EMIT $E ;
 : KEY $K ;
 
-: CELL $c ;
-: CELL+ cell + ;
-: CELLS cell * ;
+: IMMEDIATE $Si ;
+: PARSE $Sp ;
 
-: BLOCK-BASE $b ;
-: REL>ABS block-base + ;
-: ALG>ABS 4 * rel>abs ;
-: ABS>REL block-base - ;
-: HERE@ block-base cell+ ;
-: HERE here@ @ rel>abs ;
-: ALLOT here@ @ + here@ ! ;
-: ALIGN here@ @ cell 1 - + cell 1 - invert and here@ ! ;
+: ( 41 parse drop drop ; immediate
 
-: , here ! cell allot ;
-: L, here l! 4 allot ;
-: W, here w! 2 allot ;
-: C, here c! 1 allot ;
+: CREATE $Sh ;
+: VARIABLE create 0 , ;
 
-: LATEST block-base cell+ cell+ w@ alg>abs ;
-: NAME>INTERPRET 2 + w@ alg>abs ;
-: NAME>FLAGS 2 + 2 + ;
+VARIABLE BASE
 
-: FLAG-IMMEDIATE 32 ;
-: IMMEDIATE latest name>flags dup c@ flag-immediate or swap c! ;
+: DECIMAL   10 base !  ;
+: OCTAL      8 base !  ;
+: HEX       16 base !  ;
+: BINARY     2 base !  ;
 
-: IF 50 c, here 0 w, $$? ; immediate
-: ELSE 50 c, here swap 0 w, $$j dup here swap - 3 - swap w! ; immediate
-: THEN dup here swap - 3 - swap w! ; immediate
+decimal
 
-: BEGIN here ; immediate
-: AGAIN 50 c, here - 3 - w, $$j ; immediate
-: UNTIL 50 c, here - 3 - w, $$? ; immediate
-: WHILE 50 c, here swap 0 w, $$? ; immediate
-: REPEAT 50 c, here - 3 - w, $$j dup here swap - 3 - swap w! ; immediate
+: PAD here 176 + ;
 
-: DO $$($( here ; immediate
-: I $))d(s( ; 
-: LOOP $$)$)$1$+$o$o$($($= 50 c, here - 3 - w, $$?$)$)$_$_ ; immediate
+\ ------------------------ OUTPUT ( pForth ) -------------------------
+\ Number output based on F83
+variable HLD    \ points to last character added
 
-: EXIT $$] ; immediate
-: RECURSE 50 c, latest 2 + w@ w, $$a ; immediate
-
-: TYPE 0 do dup c@ emit 1 + loop drop ;
-
-: IS-SPACE 
-	dup 32 = swap 
-	dup 10 = swap 
-	dup 9 = swap 
-	dup 11 = swap 
-	dup 12 = swap 
-	dup 10 = nip 
-	or or or or or 
+: hold   ( char -- , add character to text representation)
+    -1 hld  +!
+    hld @  c!
 ;
+: <#     ( -- , setup conversion )
+    pad hld !
+;
+: #>     ( d -- addr len , finish conversion )
+    2drop  hld @  pad  over -
+;
+\ : sign   ( n -- , add '-' if negative )
+\     0<  if  ascii - hold  then
+\ ;
+: #      ( d -- d , convert one digit )
+   base @  mu/mod rot 9 over <
+   IF  7 +
+   THEN
+   ascii 0 + hold
+;
+
+: #s     ( d -- d , convert remaining digits )
+    BEGIN  #  2dup or 0=
+    UNTIL
+;
+

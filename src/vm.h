@@ -6,10 +6,14 @@
 #include<string.h> /* strncpy */
 #include<fcntl.h>  /* open, close, read, write, O_RDONLY, O_WRONLY */
 
+/* TYPES */
+
 typedef void V;
 typedef char B;
 typedef int16_t W;
 typedef intptr_t C;
+
+/* DICTIONARY */
 
 #define PAD_OFFSET 176
 #define PAD_SIZE 84
@@ -24,7 +28,7 @@ typedef struct _Dictionary {
 	V (**x)(struct _Context*);
 } D;
 
-#define HERE_TO_THERE(d) (d->there = d->here + PAD_OFFSET + PAD_SIZE)
+#define H_TO_T(d) (d->there = d->here + PAD_OFFSET + PAD_SIZE)
 
 D* init_dict(C s) {
 	D* d = malloc(sizeof(D));
@@ -33,7 +37,7 @@ D* init_dict(C s) {
 	if (d->data == 0) { free(d); return 0; }
 	d->size = s;
 	d->here = 0;
-	HERE_TO_THERE(d);
+	H_TO_T(d);
 	d->x = malloc(26 * sizeof(C));
 	if (d->x == 0) { free(d->data); free(d); return 0; }
 	return d;
@@ -41,11 +45,11 @@ D* init_dict(C s) {
 
 C aligned(D* d) { return (d->here + (sizeof(C) - 1)) & ~(sizeof(C) - 1); }
 V align(D* d) { d->here = aligned(d); }
-V allot(D* d, C n) { d->here += n; }
+V allot(D* d, C n) { d->here += n; H_TO_T(d); }
 
-V bcompile(D* d, B v) { *((B*)(d->data + d->here)) = v; d->here += 1; }
-V wcompile(D* d, W v) { *((W*)(d->data + d->here)) = v; d->here += 2; }
-V ccompile(D* d, C v) { *((C*)(d->data + d->here)) = v; d->here += sizeof(C); }
+V bcompile(D* d, B v) { *((B*)(d->data + d->here)) = v; allot(d, 1); }
+V wcompile(D* d, W v) { *((W*)(d->data + d->here)) = v; allot(d, 2); }
+V ccompile(D* d, C v) { *((C*)(d->data + d->here)) = v; allot(d, sizeof(C)); }
 
 V btransient(D* d, B v) { *((B*)(d->data + d->there)) = v; d->there += 1; }
 V wtransient(D* d, W v) { *((W*)(d->data + d->there)) = v; d->there += 2; }
@@ -62,14 +66,18 @@ V putB(D* d, C p, B v) { *((B*)(d->data + p)) = v; }
 V putW(D* d, C p, W v) { *((W*)(d->data + p)) = v; }
 V putC(D* d, C p, C v) { *((C*)(d->data + p)) = v; }
 
-C str_to_transient(D* d, B* s, C l) {
+C str_to_transient(D* d, C l, B* s) {
 	C t, i;
-	if (tunused(d) < l) HERE_TO_THERE(d);
+	if (tunused(d) < l) H_TO_T(d);
 	if (tunused(d) < l) return -1;
 	t = d->there;
 	for (i = 0; i < l; i++) btransient(d, *(s + i));
 	return t;
 }
+
+C str_to_cstr(D* d, C l, B* s) { C t = str_to_transient(d, l, s); btransient(d, 0); return t; }
+
+/* INNER INTERPRETER */
 
 #define SSTACK_SIZE 256
 #define RSTACK_SIZE 256
@@ -218,14 +226,15 @@ V step(X* x) {
 
 		case '1': PUSH(x, 1); break;
 		case '\'': PUSH(x, TOKEN(x)); break;
-		case '2': PUSH(x, *((W*)x->ip)); x->ip += 2; break;
-		case '8': PUSH(x, *((C*)x->ip)); x->ip += sizeof(C); break;
+		case '2': PUSH(x, *((W*)(x->d->data + x->ip))); x->ip += 2; break;
+		case '8': PUSH(x, *((C*)(x->d->data + x->ip))); x->ip += sizeof(C); break;
 
 		case '_': DROP(x); break;
 		case 'd': a = T(x); PUSH(x, a); break;
 		case 'o': b = N(x); PUSH(x, b); break;
 		case 's': a = T(x); T(x) = N(x); N(x) = a; break;
 		case 'r': a = T(x); T(x) = NN(x); NN(x) = N(x); N(x) = a; break;
+		case 'p': { L1(x, C, i); PUSH(x, x->s[x->sp - i - 1]); } break;
 
 		case '(': x->r[x->rp++] = x->s[--x->sp]; break;
 		case ')': x->s[x->sp++] = x->r[--x->rp]; break;
@@ -312,10 +321,12 @@ V inner(X* x) {
 }
 
 V assembler(X* x, B* s) {
-	x->ip = str_to_transient(x->d, s, strlen(s));
+	x->ip = str_to_transient(x->d, strlen(s), s);
 	btransient(x->d, ']');
 	inner(x);
 }
+
+/* OUTER INTERPRETER */
 
 typedef struct _Sloth {
 	X x;
@@ -349,6 +360,16 @@ S* init_sloth(D* d) {
 #define wFLAGS (wXT + sizeof(C))
 #define wNAMELEN (wFLAGS + 1)
 #define wNAME (wNAMELEN + 1)
+
+V parse(S* s) {
+	X* x = (X*)s;
+	L1(x, C, k);
+	s->ipos++;
+	PUSH(x, s->ibuf + s->ipos);
+	while (s->ipos < s->ilen && *(s->ibuf + s->ipos) != k) { s->ipos++; }
+	s->ipos++;
+	PUSH(x, s->ibuf + s->ipos - T(x) - 1);
+}
 
 V parse_name(S* s) {
 	X* x = (X*)s;
@@ -396,19 +417,24 @@ C do_interpret(S* s, C w) {
 }
 
 /* TODO: do_compile should check if state is less than 0 to compile on transient memory */
+/* TODO: do_compile should check size to just compile a call if its bytecode size is smaller */
 C do_compile(S* s, C w) {
 	X* x = (X*)s;
 	C t = 1;
 	C i = 0;
 	C xt = getC(x->d, w + wXT);
 	B k;
-	while (t > 0) {
-		switch (k = getB(x->d, xt + i)) {
-		case ']': case '}': t--; if (t > 0) bcompile(x->d, k); break;
-		case '[': case '{': t++; bcompile(x->d, k); break;
-		default: bcompile(x->d, k); break;
+	if ((getB(x->d, w + wFLAGS) & EXECUTABLE) == EXECUTABLE) {
+		while (t > 0) {
+			switch (k = getB(x->d, xt + i)) {
+			case ']': case '}': t--; if (t > 0) bcompile(x->d, k); break;
+			case '[': case '{': t++; bcompile(x->d, k); break;
+			default: bcompile(x->d, k); break;
+			}
+			i++;
 		}
-		i++;
+	} else {
+		literal(x, (C)(x->d->data + xt));
 	}
 }
 
@@ -416,7 +442,7 @@ C do_asm(S* s, C l, B* t) {
 	X* x = (X*)s;
 	if (l <= 1 || *t != '\\') return 0;
 	else {
-		C q = str_to_transient(x->d, t + 1, l - 1);
+		C q = str_to_transient(x->d, l - 1, t + 1);
 		btransient(x->d, ']');
 		eval(x, q);
 		return 1;
@@ -501,7 +527,7 @@ V do_number(S* s, C l, B* t) {
 
 V evaluate(S* s, B* str) {
 	X* x = (X*)s;
-	s->ibuf = x->d->data + str_to_transient(x->d, str, strlen(str));
+	s->ibuf = x->d->data + str_to_transient(x->d, strlen(str), str);
 	s->ilen = strlen(str);
 	s->ipos = 0;
 	while (!x->err) {
@@ -524,14 +550,48 @@ V evaluate(S* s, B* str) {
 	}
 }
 
+V include(S* s, B* n) {
+	X* x = (X*)s;
+	FILE *f = fopen(n, "r");
+	if (!f) { x->err = -37; }
+	else {
+		char* line = 0;
+		size_t len = 0;
+		size_t read;
+
+		/* TODO: Right now, let's just clear the return stack */
+		x->sp = 0;
+		x->ip = x->d->size;
+
+		while ((read = getline(&line, &len, f)) != -1) {
+			printf("\n--> %s\n", line);
+			evaluate(s, line);
+			if (x->err) { return; }
+			trace(x);
+		}
+
+		fclose(f);
+		if (line) free(line);
+	}
+}
+
+V immediate(S* s) {
+	X* x = (X*)s;
+	C w = s->latest;
+	putB(x->d, w + wFLAGS, getB(x->d, w + wFLAGS) | IMMEDIATE);
+}
+
 V sloth_ext(X* x) {
 	S* s = (S*)x;
 	switch (TOKEN(x)) {
 	case '>': PUSH(x, &s->ipos); break;
-	case 'c': header(s); break;
 	case 'f': find_name(s); break;
+	case 'h': header(s); break;
+	case 'i': immediate(s); break;
 	case 'l': PUSH(x, s->latest); break;
 	case 'n': parse_name(s); break;
+	case 'p': parse(s); break;
+	case 'r': {	L2(x, C, l, B*, t); include(s, x->d->data + str_to_cstr(x->d, l, t)); } break;
 	case 's': PUSH(x, s->ibuf); PUSH(x, s->ilen); break;
 	case 't': PUSH(x, x->d->data + x->d->there); break;
 	}
