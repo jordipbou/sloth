@@ -1,5 +1,6 @@
-// TODO: For implementing :NONAME latestxt variable needs to exist, as no word
-// will be added to current recurse will not work if there's no latestxt.
+// TODO: How to do does> part from Java? Interesting for implementing a "native" compiler.
+// TODO: Including source code here as a string works well, maybe it will be interesting
+// to move everything possible to Forth source code?
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -969,10 +970,78 @@ public class Dodo {
 	public void two_r_fetch() { push(r[rp - 2]); push(r[rp - 1]); }
 	public void noname() { latestxt = d.position(); push(latestxt); right_bracket(); }
 	public void not_equals() { s[sp - 2] = s[sp - 2] != s[sp - 1] ? -1 : 0; sp--; }
+	public void q_do() {
+		// This one is tricky, as it needs to allow use of LOOP, +LOOP, UNLOOP and LEAVE
+		push(d.position() + 4); // position to be resolved for every leave
+		literal(0); // placeholder for pushing were to jump on a leave
+		compile(TO_R); // move leave address to return stack
+		// Compile check equals
+		compile(OVER);
+		compile(OVER);
+		compile(EQUALS);
+		_if();
+		compile(DROP);
+		compile(DROP);
+		// If equals exit
+		compile(EXIT);
+		then();
+		// next is like do
+		begin();	// compile a backwards mark
+		compile(TO_R);	// move index to return stack
+		compile(TO_R); // move limit to return stack
+	}
+	public void action_of() {
+		if (v(STATE) == 0) {
+			push(find_name("DEFER@").xt);
+		} else {
+			compile(find_name("DEFER@").xt);
+		}
+	}
 	public void hex() { v(BASE, 16); }
 	public void tuck() { swap(); over(); }
 	public void u_more() { long b = upop(); push(upop() > b ? -1 : 0); }
 	public void backslash() { push(10); parse(); drop(); drop(); }
+
+	public String defer_compat = """
+	\\ deferred words and perform
+
+	\\ This file is in the public domain. NO WARRANTY.
+	
+	: perform ( ? addr -- ? )
+	    @ execute ;
+	
+	: defer ( "name" -- )
+	    create ['] abort , \\ you should not rely on initialization with noop
+	does> ( ? -- ? )
+	    perform ;
+	
+	: defer@ ( xt1 -- xt2 )
+	  >body @ ;
+	
+	: defer! ( xt2 xt1 -- )
+	  >body ! ;
+	
+	: <is> ( xt "name" -- )
+	    ' defer! ;
+	
+	: [is] ( compilation: "name" -- ; run-time: xt -- )
+	    postpone ['] postpone defer! ; immediate
+	
+	: is
+	  state @ if
+	    postpone [is]
+	  else
+	    <is>
+	  then ; immediate
+	
+	: action-of
+	 state @ if
+	   POSTPONE ['] POSTPONE defer@
+	 else
+	   ' defer@
+	then ; immediate
+	
+	""";
 
 	public void core_extensions() {
 		primitive(".(", (vm) -> vm.dot_paren()); immediate();
@@ -984,6 +1053,8 @@ public class Dodo {
 		primitive("2R@", (vm) -> vm.two_r_fetch());
 		primitive(":NONAME", (vm) -> vm.noname());
 		primitive("<>", (vm) -> vm.not_equals());
+		primitive("?DO", (vm) -> q_do()); immediate();
+		primitive("ACTION-OF", (vm) -> action_of()); immediate();
 		primitive("AGAIN", (vm) -> vm.again()); immediate();
 		primitive("HEX", (vm) -> vm.hex());
 		primitive("NIP", (vm) -> vm.nip());
@@ -992,6 +1063,7 @@ public class Dodo {
 		primitive("TUCK", (vm) -> vm.tuck());
 		primitive("U>", (vm) -> u_more());
 		primitive("\\", (vm) -> vm.backslash()); immediate();
+		evaluate(defer_compat);
 	}
 
 	// TOOLS
