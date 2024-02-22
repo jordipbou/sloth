@@ -1,4 +1,4 @@
-package org.jordipbou.sloth;
+package examples;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -9,6 +9,8 @@ import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.NonBlockingReader;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
+
+import org.jordipbou.sloth.Dodo;
 
 public class REPL {
 	public static void main(String[] args) throws IOException {

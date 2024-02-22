@@ -47,13 +47,13 @@ public class Dodo {
 	public Stack<Word> words = new Stack<Word>();
 
 	public class Word {
-		Word previous;
-		int xt = -1;
-		int dt = -1;
-		boolean immediate = false;
-		boolean colon = false;
-		boolean hidden = false;
-		String name = "";
+		public Word previous;
+		public int xt = -1;
+		public int dt = -1;
+		public boolean immediate = false;
+		public boolean colon = false;
+		public boolean hidden = false;
+		public String name = "";
 	}
 
 	// ***** Helpers
@@ -411,7 +411,11 @@ public class Dodo {
 		}
 		push(max);
 	}
-	public void type() { System.out.printf("%s", data_to_str()); }
+	public void type() {
+		int l = pop();
+		int a = pop();
+		for (int i = 0; i < l; i++) { push(cfetch(a + i)); emit(); }
+	}
 
 	public void bl() { push(32); }
 	public void cr() { push(10); emit(); }
