@@ -2,6 +2,8 @@
 // TODO: Including source code here as a string works well, maybe it will be interesting
 // to move everything possible to Forth source code?
 
+package org.jordipbou.sloth;
+
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -990,16 +992,16 @@ public class Dodo {
 		compile(TO_R);	// move index to return stack
 		compile(TO_R); // move limit to return stack
 	}
-	public void action_of() {
-		if (v(STATE) == 0) {
-			push(find_name("DEFER@").xt);
-		} else {
-			compile(find_name("DEFER@").xt);
-		}
-	}
+	public void buffer() { create(); allot(); }
 	public void hex() { v(BASE, 16); }
+	public void marker() {
+		create();
+		// TODO: marker is a defining word. It should set latest().xt to the xt of a word
+		// that does the delete based on the dt of that word.
+	}
 	public void tuck() { swap(); over(); }
 	public void u_more() { long b = upop(); push(upop() > b ? -1 : 0); }
+	public void unused() { push(d.capacity() - d.position()); }
 	public void backslash() { push(10); parse(); drop(); drop(); }
 
 	public String defer_compat = """
@@ -1054,14 +1056,19 @@ public class Dodo {
 		primitive(":NONAME", (vm) -> vm.noname());
 		primitive("<>", (vm) -> vm.not_equals());
 		primitive("?DO", (vm) -> q_do()); immediate();
-		primitive("ACTION-OF", (vm) -> action_of()); immediate();
 		primitive("AGAIN", (vm) -> vm.again()); immediate();
+		primitive("BUFFER:", (vm) -> vm.buffer());
 		primitive("HEX", (vm) -> vm.hex());
+		primitive("MARKER", (vm) -> vm.marker());
 		primitive("NIP", (vm) -> vm.nip());
 		primitive("PARSE", (vm) -> vm.parse());
 		primitive("PARSE-NAME", (vm) -> vm.parse_name());
+		evaluate(": PICK ( x0 i*x u.i -- x0 i*x x0 ) dup 0= if drop dup exit then swap >r 1- recurse r> swap ;");
+		evaluate(": ROLL ( x0 i*x u.i -- i*x x0 ) dup 0= if drop exit then swap >r 1- recurse r> swap ;");
 		primitive("TUCK", (vm) -> vm.tuck());
 		primitive("U>", (vm) -> u_more());
+		primitive("UNUSED", (vm) -> unused());
+		evaluate(": WITHIN ( n1|u1 n2|u2 n3|u3 -- flag ) over - >r - r> u< ;");
 		primitive("\\", (vm) -> vm.backslash()); immediate();
 		evaluate(defer_compat);
 	}

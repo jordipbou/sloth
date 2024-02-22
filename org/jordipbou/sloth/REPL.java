@@ -1,3 +1,5 @@
+package org.jordipbou.sloth;
+
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
