@@ -20,6 +20,9 @@ public class Dodo {
 	public int[] r;
 	public int rs = 0;
 	public int rp = 0;
+	public float[] f;
+	public int fs = 0;
+	public int fp = 0;
 	public ByteBuffer u;
 	public int us = 0;
 	public ByteBuffer d;
@@ -31,11 +34,13 @@ public class Dodo {
 
 	public String last_dir = "";
 
-	public Dodo(int ssize, int rsize, int usize, ByteBuffer dict) {
+	public Dodo(int ssize, int rsize, int fsize, int usize, ByteBuffer dict) {
 		s = new int[ssize];
 		ss = ssize;
 		r = new int[rsize];
 		rs = rsize;
+		f = new float[fsize];
+		fs = fsize;
 		u = ByteBuffer.allocateDirect(usize*4);
 		us = usize*4;
 		ip = -us - 1;
@@ -78,6 +83,11 @@ public class Dodo {
 
 	public int rpop() { return r[--rp]; }
 	public void rpush(int v) { r[rp++] = v; }
+
+	// --- Float stack
+
+	public float fpop() { return f[--fp]; }
+	public void fpush(float v) { f[fp++] = v; }
 
 	// --- Transient region
 
@@ -1137,6 +1147,23 @@ public class Dodo {
 		primitive("D+", (vm) -> vm.d_plus());
 	}
 
+	// FLOAT
+
+	public void _float() {
+		primitive("F*", (vm) -> { float b = fpop(); fpush(fpop() * b); });
+		primitive("F+", (vm) -> { float b = fpop(); fpush(fpop() + b); });
+		primitive("F-", (vm) -> { float b = fpop(); fpush(fpop() - b); });
+		primitive("F/", (vm) -> { float b = fpop(); fpush(fpop() / b); });
+		// Non standard
+		primitive("F.S", (vm) -> { for (int i = 0; i < fp; i++) { System.out.printf("%f ", f[i]); }; });
+	}
+
+	public void _float_extensions() {
+		primitive("F.", (vm) -> System.out.printf("%f", vm.fpop()));
+		primitive("F>S", (vm) -> vm.push((int)vm.fpop()));
+		primitive("S>F", (vm) -> vm.fpush((float)vm.pop()));
+	}
+
 	public void bootstrap() {
 		kernel();
 		core();
@@ -1144,5 +1171,7 @@ public class Dodo {
 		tools();
 		file();
 		_double();
+		_float();
+		_float_extensions();
 	}
 }
