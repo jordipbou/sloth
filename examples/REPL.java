@@ -38,6 +38,7 @@ public class REPL {
 
     while (true) {
 			x.evaluate(lineReader.readLine());
+			x.f_dot_s();
 			x.dot_s(); 
 			System.out.println(" ok.");
     }     

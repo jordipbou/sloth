@@ -514,6 +514,7 @@ public class Dodo {
 	}
 	public void quotation() { push(ip + 4); ip += d.getInt(ip); }
 	public void lit() { push(d.getInt(ip)); ip += 4; }
+	public void flit() { fpush(d.getFloat(ip)); ip += 4; }
 
 	public int peek() { return d.getInt(ip); }
 	public int token() { int t = d.getInt(ip); ip += 4; return t; }
@@ -534,6 +535,8 @@ public class Dodo {
 	public void exit() { if (rp > 0) ip = r[--rp]; else ip = -1; }
 	public void literal(int v) { compile(LIT); compile(v); }
 	public void literal() { literal(pop()); }
+	public void fliteral(float v) { compile(FLIT); d.putFloat(v); }
+	public void fliteral() { fliteral(fpop()); }
 	public void recurse() { compile(latestxt); } // compile(latest().xt); }
 
 	public void _throw() { /* TODO */ }
@@ -602,9 +605,15 @@ public class Dodo {
 				int n = Integer.parseInt(s, base);
 				push(n);
 				if (v(STATE) != 0) literal();
-			} catch (NumberFormatException e) {
-				System.out.printf("DO_NUMBER:Can't convert %s to number\n", s);
-				System.out.println(e);
+			} catch (NumberFormatException ex) {
+				try {
+					float f = Float.parseFloat(s);
+					fpush(f);
+					if (v(STATE) != 0) fliteral();
+				} catch (NumberFormatException e) {
+					System.out.printf("DO_NUMBER:Can't convert %s to number\n", s);
+					System.out.println(e);
+				}
 			}
 		}
 	}
@@ -703,6 +712,7 @@ public class Dodo {
 	public static int OVER = -26;
 	public static int FROM_R = -27;
 	public static int TYPE = -28;
+	public static int FLIT = -33;
 
 	public void kernel() {
 		wordlist(); drop();	// Create ROOT wordlist
@@ -748,6 +758,7 @@ public class Dodo {
 		/* 30 */ primitive(":", (vm) -> vm.colon());
 		/* 31 */ primitive(";", (vm) -> vm.semicolon()); immediate();
 		/* 32 */ primitive("IMMEDIATE", (vm) -> vm.immediate());
+		/* 33 */ primitive("FLIT", (vm) -> vm.flit());
 	}
 
 	public void digit() {
@@ -1085,6 +1096,11 @@ public class Dodo {
 		for (int i = 0; i < sp; i++) System.out.printf("%d ", s[i]);
 	}
 
+	public void f_dot_s() {
+		System.out.printf("[%d] ", fp);
+		for (int i = 0; i < fp; i++) System.out.printf("%f ", f[i]);
+	}
+
 	public void trace() {
 		System.out.printf("[%d] ", v(STATE));
 		dot_s();
@@ -1123,9 +1139,12 @@ public class Dodo {
 		primitive("F+", (vm) -> { float b = fpop(); fpush(fpop() + b); });
 		primitive("F-", (vm) -> { float b = fpop(); fpush(fpop() - b); });
 		primitive("F/", (vm) -> { float b = fpop(); fpush(fpop() / b); });
+		primitive("FDROP", (vm) -> fpop());
+		primitive("FDUP", (vm) -> fpush(f[fp - 1]));
+		primitive("FOVER", (vm) -> fpush(f[fp - 2]));
+		primitive("FSWAP", (vm) -> { float b = fpop(); float a = fpop(); fpush(b); fpush(a); });
 		// Non standard
-		primitive("F.S", (vm) -> { for (int i = 0; i < fp; i++) { System.out.printf("%f ", f[i]); }; });
-	}
+		primitive("F.S", (vm) -> f_dot_s());	}
 
 	public void _float_extensions() {
 		primitive("F.", (vm) -> System.out.printf("%f", vm.fpop()));
