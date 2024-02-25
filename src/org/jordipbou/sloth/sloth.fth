@@ -6,7 +6,7 @@
     @ execute ;
 
 : defer ( "name" -- )
-    create ['] abort , \\ you should not rely on initialization with noop
+    create ['] abort , \ you should not rely on initialization with noop
 does> ( ? -- ? )
     perform ;
 
