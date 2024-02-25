@@ -23,6 +23,9 @@ public class Dodo {
 	public float[] f;
 	public int fs = 0;
 	public int fp = 0;
+	public Object[] o;
+	public int os = 0;
+	public int op = 0;
 	public ByteBuffer u;
 	public int us = 0;
 	public ByteBuffer d;
@@ -34,13 +37,15 @@ public class Dodo {
 
 	public String last_dir = "";
 
-	public Dodo(int ssize, int rsize, int fsize, int usize, ByteBuffer dict) {
+	public Dodo(int ssize, int rsize, int fsize, int osize, int usize, ByteBuffer dict) {
 		s = new int[ssize];
 		ss = ssize;
 		r = new int[rsize];
 		rs = rsize;
 		f = new float[fsize];
 		fs = fsize;
+		o = new Object[osize];
+		os = osize;
 		u = ByteBuffer.allocateDirect(usize*4);
 		us = usize*4;
 		ip = -us - 1;
@@ -88,6 +93,11 @@ public class Dodo {
 
 	public float fpop() { return f[--fp]; }
 	public void fpush(float v) { f[fp++] = v; }
+
+	// --- Object stack
+
+	public Object opop() { return o[--op]; }
+	public void opush(Object v) { o[op++] = v; }
 
 	// --- Transient region
 
@@ -1017,47 +1027,6 @@ public class Dodo {
 	public void u_more() { long b = upop(); push(upop() > b ? -1 : 0); }
 	public void unused() { push(d.capacity() - d.position()); }
 	public void backslash() { push(10); parse(); drop(); drop(); }
-
-	//public String defer_compat = """
-	//\\ deferred words and perform
-
-	//\\ This file is in the public domain. NO WARRANTY.
-	//
-	//: perform ( ? addr -- ? )
-	//    @ execute ;
-	//
-	//: defer ( "name" -- )
-	//    create ['] abort , \\ you should not rely on initialization with noop
-	//does> ( ? -- ? )
-	//    perform ;
-	//
-	//: defer@ ( xt1 -- xt2 )
-	//  >body @ ;
-	//
-	//: defer! ( xt2 xt1 -- )
-	//  >body ! ;
-	//
-	//: <is> ( xt "name" -- )
-	//    ' defer! ;
-	//
-	//: [is] ( compilation: "name" -- ; run-time: xt -- )
-	//    postpone ['] postpone defer! ; immediate
-	//
-	//: is
-	//  state @ if
-	//    postpone [is]
-	//  else
-	//    <is>
-	//  then ; immediate
-	//
-	//: action-of
-	// state @ if
-	//   POSTPONE ['] POSTPONE defer@
-	// else
-	//   ' defer@
-	//then ; immediate
-	//
-	//""";
 
 	public void core_extensions() {
 		primitive(".(", (vm) -> vm.dot_paren()); immediate();

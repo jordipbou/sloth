@@ -18,7 +18,7 @@ public class REPL {
 		terminal.enterRawMode();
 		NonBlockingReader reader = terminal.reader();
 
-		Dodo x = new Dodo(64, 64, 64, 64, ByteBuffer.allocateDirect(16 * 1024 * 1024));
+		Dodo x = new Dodo(64, 64, 64, 64, 64, ByteBuffer.allocateDirect(16 * 1024 * 1024));
 		x.bootstrap();
 		x.primitive("EMIT", (vm) -> System.out.printf("%c", (byte)vm.pop()));
 		x.v(Dodo.EMIT, x.latest().xt);
@@ -30,6 +30,9 @@ public class REPL {
 			};
 		});
 		x.v(Dodo.KEY, x.latest().xt);
+
+		x.primitive("PRINTLN", (vm) -> System.out.println(vm.opop()));
+		x.primitive("STR>STRING", (vm) -> vm.opush(vm.data_to_str()));
 
 		LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
 
