@@ -222,17 +222,24 @@ public class Dodo {
 	public void qdup() { if (s[sp - 1] != 0) dup(); }
 	public void nip() { swap(); drop(); }
 
-	public void store() { int a = pop(); store(a, pop()); }
 	public void store(int a, int v) { if (a >= 0) d.putInt(a, v); else u.putInt(us + a, v); }
+	public void store() { int a = pop(); store(a, pop()); }
 	public void comma(int v) { d.putInt(v); }
 	public void comma() { int v = pop(); comma(v); }
 	public void fetch() { push(fetch(pop())); }
 	public int fetch(int a) { if (a >= 0) return d.getInt(a); else return u.getInt(us + a); }
+
 	public void cstore() { int a = pop(); cstore(a, (byte)pop()); }
 	public void cstore(int a, byte v) { d.put(a, v); }
 	public void ccomma() { int a = pop(); d.put((byte)a); }
 	public byte cfetch(int a) { return d.get(a); }
 	public void cfetch() { push(cfetch(pop())); }
+
+	public void fstore(int a, float v) { if (a >= 0) d.putFloat(a, v); else u.putFloat(us + a, v); }
+	public void fstore() { int a = pop(); fstore(a, fpop()); }
+	public float ffetch(int a) { if (a >= 0) return d.getFloat(a); else return u.getFloat(us + a); }
+	public void ffetch() { fpush(ffetch(pop())); }
+
 	public void plus_store() { dup(); fetch(); rot(); plus(); swap(); store(); }
 	public void two_store() { swap(); over(); store(); cell_plus(); store(); }
 	public void two_fetch() { dup(); cell_plus(); fetch(); swap(); fetch(); }
@@ -1065,7 +1072,6 @@ public class Dodo {
 		evaluate(": WITHIN ( n1|u1 n2|u2 n3|u3 -- flag ) over - >r - r> u< ;");
 		primitive("\\", (vm) -> vm.backslash()); immediate();
 		//evaluate(defer_compat);
-		included("sloth.fth");
 	}
 
 	// TOOLS
@@ -1140,10 +1146,12 @@ public class Dodo {
 	// FLOAT
 
 	public void _float() {
+		primitive("F!", (vm) -> fstore());
 		primitive("F*", (vm) -> { float b = fpop(); fpush(fpop() * b); });
 		primitive("F+", (vm) -> { float b = fpop(); fpush(fpop() + b); });
 		primitive("F-", (vm) -> { float b = fpop(); fpush(fpop() - b); });
 		primitive("F/", (vm) -> { float b = fpop(); fpush(fpop() / b); });
+		primitive("F@", (vm) -> ffetch());
 		primitive("FDROP", (vm) -> fpop());
 		primitive("FDUP", (vm) -> fpush(f[fp - 1]));
 		primitive("FOVER", (vm) -> fpush(f[fp - 2]));
@@ -1177,5 +1185,6 @@ public class Dodo {
 		_float();
 		_float_extensions();
 		_object();
+		included("sloth.fth");
 	}
 }

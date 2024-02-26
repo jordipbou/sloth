@@ -1,3 +1,6 @@
+: F, ( F:f -- ) here f! 4 allot ;
+: FVARIABLE ( -- ) create 0.0 f, ;
+
 \ deferred words and perform (cloned from gforth/compat library)
 
 \ This file is in the public domain. NO WARRANTY.
@@ -35,4 +38,3 @@ does> ( ? -- ? )
  else
    ' defer@
 then ; immediate
-
