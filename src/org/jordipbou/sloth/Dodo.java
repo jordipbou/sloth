@@ -1101,6 +1101,11 @@ public class Dodo {
 		for (int i = 0; i < fp; i++) System.out.printf("%f ", f[i]);
 	}
 
+	public void o_dot_s() {
+		System.out.printf("{%d} ", fp);
+		for (int i = 0; i < op; i++) System.out.printf("%s ", o[i].toString());
+	}
+
 	public void trace() {
 		System.out.printf("[%d] ", v(STATE));
 		dot_s();
@@ -1147,9 +1152,19 @@ public class Dodo {
 		primitive("F.S", (vm) -> f_dot_s());	}
 
 	public void _float_extensions() {
-		primitive("F.", (vm) -> System.out.printf("%f", vm.fpop()));
-		primitive("F>S", (vm) -> vm.push((int)vm.fpop()));
-		primitive("S>F", (vm) -> vm.fpush((float)vm.pop()));
+		primitive("F.", (vm) -> System.out.printf("%f", fpop()));
+		primitive("F>S", (vm) -> push((int)fpop()));
+		primitive("S>F", (vm) -> fpush((float)pop()));
+	}
+
+	// OBJECTS
+
+	public void _object() {
+		primitive("ODROP", (vm) -> opop());
+		primitive("ODUP", (vm) -> opush(o[op - 1]));
+		primitive("OOVER", (vm) -> opush(o[op - 2]));
+		primitive("OSWAP", (vm) -> { Object b = opop(); Object a = opop(); opush(b); opush(a); });
+		primitive("O.S", (vm) -> o_dot_s());
 	}
 
 	public void bootstrap() {
@@ -1161,5 +1176,6 @@ public class Dodo {
 		_double();
 		_float();
 		_float_extensions();
+		_object();
 	}
 }
