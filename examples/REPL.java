@@ -14,35 +14,37 @@ import org.jordipbou.sloth.Dodo;
 
 public class REPL {
 	public static void main(String[] args) throws IOException {
-		Terminal terminal = TerminalBuilder.terminal();
-		terminal.enterRawMode();
-		NonBlockingReader reader = terminal.reader();
-
-		//Dodo x = new Dodo(64, 64, 64, 64, 64, ByteBuffer.allocateDirect(16 * 1024 * 1024));
 		Dodo x = new Dodo();
+		x.bootstrap();
+		//Terminal terminal = TerminalBuilder.terminal();
+		//terminal.enterRawMode();
+		//NonBlockingReader reader = terminal.reader();
+
+		////Dodo x = new Dodo(64, 64, 64, 64, 64, ByteBuffer.allocateDirect(16 * 1024 * 1024));
+		//Dodo x = new Dodo();
 		//x.bootstrap();
-		//x.primitive("EMIT", (vm) -> System.out.printf("%c", (byte)vm.pop()));
-		//x.v(Dodo.EMIT, x.latest().xt);
-		//x.primitive("KEY", (vm) -> {
-		//	try { 
-		//		vm.push(reader.read()); 
-		//	} catch (IOException ex) { 
-		//		vm.push(-1); 
-		//	};
-		//});
-		//x.v(Dodo.KEY, x.latest().xt);
+		////x.primitive("EMIT", (vm) -> System.out.printf("%c", (byte)vm.pop()));
+		////x.v(Dodo.EMIT, x.latest().xt);
+		////x.primitive("KEY", (vm) -> {
+		////	try { 
+		////		vm.push(reader.read()); 
+		////	} catch (IOException ex) { 
+		////		vm.push(-1); 
+		////	};
+		////});
+		////x.v(Dodo.KEY, x.latest().xt);
 
-		//x.primitive("PRINTLN", (vm) -> System.out.println(vm.opop()));
-		//x.primitive("STR>STRING", (vm) -> vm.opush(vm.data_to_str()));
+		////x.primitive("PRINTLN", (vm) -> System.out.println(vm.opop()));
+		////x.primitive("STR>STRING", (vm) -> vm.opush(vm.data_to_str()));
 
-		LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
+		//LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
 
-    while (true) {
-			x.evaluate(lineReader.readLine());
-			//x.o_dot_s();
-			//x.f_dot_s();
-			//x.dot_s(); 
-			System.out.println(" ok.");
-    }     
+    //while (true) {
+		//	x.evaluate(lineReader.readLine());
+		//	//x.o_dot_s();
+		//	//x.f_dot_s();
+		//	//x.dot_s(); 
+		//	System.out.println(" ok.");
+    //}     
 	}
 }

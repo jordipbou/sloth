@@ -1,3 +1,5 @@
+// Compiled Java code with Forth primitives its really fast!! Continue like doing now.
+
 package org.jordipbou.sloth;
 
 import java.io.*;
@@ -10,189 +12,410 @@ import java.util.Map;
 import java.util.HashMap;
 
 public class Dodo {
+	public Dodo() {
+		s = new int[256];
+		ss = 256;
+		sp = 0;
+
+		r = new int[256];
+		rs = 256;
+		rp = 0;
+
+		o = new Object[65536];
+		op = 0;
+
+		ip = -1;
+	}
+
+	// Data stack ------
 
 	public int[] s;
 	public int ss;
 	public int sp;
 
-	public int[] r;
-	public int rs;
-	public int rp;
-
-	public Object[] o;
-	public int op;
-
- 	public class Word {
- 		public Word previous;
- 		public int xt = -1;
- 		public int dt = -1;
- 		public boolean immediate = false;
- 		public boolean colon = false;
- 		public boolean hidden = false;
- 		public String name = "";
- 	}
-
-	public Dodo() {
-		s = new int[256];
-		ss = 256;
-		sp = 0;
-		r = new int[256];
-		rs = 256;
-		rp = 0;
-		// Dictionary
-		o = new Object[65536];
-		o[0] = ByteBuffer.allocateDirect(65536);	// User area
-		o[1] = ByteBuffer.allocateDirect(65536);	// Main memory
-		op = 2;
-
-		store(STATE, 0);
-		store(CURRENT, 1);
-		store(CONTEXT, 1);
-		store(CONTEXT + 4, 0);
-	}
-
-	public static int BASE = 0;
-	public static int STATE = 4;
-	public static int CURRENT = 8;
-	public static int CONTEXT = 12;
-	public static int IBUF = 44;
-	public static int IPOS = 48;
-	public static int ILEN = 52;
-
-	// Basic API
-
-	public void evaluate(String s) {
-		int ibuf = fetch(IBUF);
-		int ipos = fetch(IPOS);
-		int ilen = fetch(ILEN);
-
-		o[op++] = s;
-		store(IBUF, (op - 1) << 16);
-		store(IPOS, 0);
-		store(ILEN, s.length());
-
-		interpret();
-
-		store(IBUF, ibuf);
-		store(IPOS, ipos);
-		store(ILEN, ilen);
-	}
-
-	// Helpers
-
-	// Data stack
-
 	public int T() { return s[sp - 1]; }
 	public int S() { return s[sp - 2]; }
 
 	public void push(int v) { s[sp++] = v; }
-	public void over() { push(S()); }
+	public int pop() { return s[--sp]; }
 
-	// Memory access
+	public void dup() { push(T()); }
+	public void over() { push(S()); }
+	public void swap() { int b = pop(); int a = pop(); push(b); push(a); }
+	public void drop() { pop(); }
+	public void nip() { s[sp - 2] = s[sp - 1]; sp--; }
+ 	public void rot() { int a = T(); s[sp - 1] = s[sp - 3]; s[sp - 3] = s[sp - 2]; s[sp - 2] = a; }
+	public void two_dup() { over(); over(); }
+	public void two_drop() { drop(); drop(); }
+
+	// Return stack ------
+
+	public int[] r;
+	public int rs;
+	public int rp;
+
+	public void to_r() { r[rp++] = s[--sp]; }
+	public void from_r() { s[sp++] = r[--rp]; }
+
+	// Memory ------
+
+	public Object[] o;
+	public int op;
+
+	public void opush(Object v) { o[op++] = v; }
+	public Object opop() { return o[--op]; }
 
  	public void ostore(int a, Object v) { o[a >> 16] = v; }
 	public void store(int a, int v) { ((ByteBuffer)o[a >> 16]).putInt(a & 0xFFFF, v);	}
-	public void cstore(int a, byte v) { ((ByteBuffer)o[a >> 16]).put(a & 0xFFFF, v); }
+	public void cstore(int a, char v) { ((ByteBuffer)o[a >> 16]).putChar(a & 0xFFFF, v); }
 
 	public Object ofetch(int a) { return o[a >> 16]; }
 	public int fetch(int a) { return ((ByteBuffer)o[a >> 16]).getInt(a & 0xFFFF); }
-	public byte cfetch(int a) { 
+	public char cfetch(int a) { 
 		Object i = o[a >> 16];
-		if (i instanceof String) { return (byte)((String)i).charAt(a & 0xFFFF); }
-		if (i instanceof ByteBuffer) { return ((ByteBuffer)i).get(a & 0xFFFF); }
+		if (i instanceof String) { return ((String)i).charAt(a & 0xFFFF); }
+		if (i instanceof ByteBuffer) { return ((ByteBuffer)i).getChar(a & 0xFFFF); }
 		return 0;
 	}
 
-	// Compilation
+	// Execution -----
 
-	public int here() { return (1 << 32) + ((ByteBuffer)o[1]).position(); }
-	public void allot(int n) { ByteBuffer b = (ByteBuffer)o[1]; b.position(b.position() + n); }
+	public int ip;
+ 	public List<Consumer<Dodo>> primitives = new ArrayList<Consumer<Dodo>>();
 
-	public void comma(int v) { ((ByteBuffer)o[fetch(CURRENT)]).putInt(v); }
-	public void ccomma(byte v) { ((ByteBuffer)o[fetch(CURRENT)]).put(v); }
+	public static int EXIT = 0;
 
-	// Words
+ 	public boolean valid_ip() {
+		if (ip < 0) return false;
+		Object i = o[ip >> 16];
+		if (!(i instanceof ByteBuffer)) return false;
+		return (ip & 0xFFFF) >= 0 && (ip & 0xFFFF) <= ((ByteBuffer)i).capacity();
+	}
+ 	public int token() { int t = fetch(ip); ip += 4; return t; }
+ 	public boolean tail() { return !valid_ip() || fetch(ip) == -1; }
+ 	public void do_prim(int p) { primitives.get(-1 - p).accept(this); }
+ 	public void call(int q) { if (!tail()) r[rp++] = ip; ip = q; }
+ 	public void exec(int q) { if (q < 0) do_prim(q); else call(q); }
+ 	public void eval(int q) { call(q); int t = rp; while (t <= rp && valid_ip()) exec(token()); }
+ 	public void exit() { if (rp > 0) ip = r[--rp]; else ip = -1; }
 
-	public int latest() { return 
+	// Debugging ------
 
-	public void header(String n) {
-		for (int i = 0; i < n.length(); i++) ccomma(n.charAt(i));
+	public void trace() {
+		for (int i = 0; i < sp; i++) System.out.printf("%d ", s[i]);
+		System.out.printf("| %04X:%d ", (ip >> 16) & 0xFFFF, ip & 0xFFFF);
+		for (int i = rp - 1; i >= 0; i--) System.out.printf("| %04X:%d ", (r[i] >> 16) & 0xFFFF, r[i] & 0xFFFF);
+		System.out.println();
 	}
 
-	// PARSING
+	public void debug(int q) { 
+		call(q); 
+		int t = rp; 
+		while (t <= rp && valid_ip()) {
+			exec(token()); 
+			trace();
+		}
+	}
 
-	//public void parse_chars() {
- 	//	byte c = (byte)pop();
- 	//	push(v(IBUF) + v(IPOS));
- 	//	while (v(IPOS) < v(ILEN) && d.get(v(IBUF) + v(IPOS)) == c) v(IPOS, v(IPOS) + 1);
- 	//	push(v(IBUF) + v(IPOS) - T());
- 	//}
- 
- 	//public void parse() {
- 	//	byte c = (byte)pop();
- 	//	push(v(IBUF) + v(IPOS));
- 	//	while (v(IPOS) < v(ILEN) && d.get(v(IBUF) + v(IPOS)) != c) v(IPOS, v(IPOS) + 1);
- 	//	v(IPOS, v(IPOS) + 1);
- 	//	push(v(IBUF) + v(IPOS) - T());
- 	//}
- 
- 	public void parse_name() {
-		int ibuf = fetch(IBUF);
-		int ipos = fetch(IPOS);
-		int ilen = fetch(ILEN);
-		while (ipos < ilen && cfetch(ibuf + ipos) <= 32) ipos++;
-		push(ibuf + ipos);
- 		while (ipos < ilen && cfetch(ibuf + ipos) > 32) ipos++;
- 		push(ibuf + ipos - T());
-		store(IPOS, ipos + 1);
- 	}
+	public void gt() { int b = pop(); int a = pop(); push(a > b ? -1 : 0); }
+	public void decrement() { int a = pop(); push(a - 1); }
+	public void plus() { int b = pop(); int a = pop(); push(a + b); }
 
-	// FINDING NAMES
+	public void fib() {
+		dup();
+		push(1);
+		gt();
+		if (pop() != 0) {
+			decrement();
+			dup();
+			decrement();
+			fib();
+			swap();
+			fib();
+			plus();
+		}
+	}
 
-// 	public Word find_name_in(String n, int wl) {
-// 		Word w = wordlists.get(wl);
-// 		while (w != null) {
-// 			if (!w.hidden && w.name.equalsIgnoreCase(n)) break;
-// 			w = w.previous;
-// 		}
-// 		return w;
-// 	}
-// 	public void find_name_in() { int l = pop(); push(words.indexOf(find_name_in(data_to_str(), l))); }
+
+	public void bootstrap() {
+		o[0] = ByteBuffer.allocateDirect(65536); // User area
+		o[1] = ByteBuffer.allocateDirect(65536); // Dictionary
+
+		primitives.add((vm) -> exit());					// EXIT
+		primitives.add((vm) -> push(token()));	// (LIT)
+		primitives.add((vm) -> dup());					// DUP
+		primitives.add((vm) -> { int b = pop(); int a = pop(); push(a + b); }); // +
+		primitives.add((vm) -> { int b = pop(); int a = pop(); push(a > b ? -1 : 0); }); // >
+		primitives.add((vm) -> { if (pop() == 0) { ip += token(); } else { ip += 4; } }); // (BRANCH)
+		primitives.add((vm) -> { int a = pop(); push(a - 1); }); // 1-
+		primitives.add((vm) -> swap()); // SWAP
+		primitives.add((vm) -> fib()); // FIB
+
+		/* 00 */ ((ByteBuffer)o[1]).putInt(-3);
+		/* 04 */ ((ByteBuffer)o[1]).putInt(-2);
+		/* 08 */ ((ByteBuffer)o[1]).putInt(1);
+		/* 12 */ ((ByteBuffer)o[1]).putInt(-5);
+		/* 16 */ ((ByteBuffer)o[1]).putInt(-6);
+		/* 20 */ ((ByteBuffer)o[1]).putInt(32);
+		/* 24 */ ((ByteBuffer)o[1]).putInt(-7);
+		/* 28 */ ((ByteBuffer)o[1]).putInt(-3);
+		/* 32 */ ((ByteBuffer)o[1]).putInt(-7);
+		/* 36 */ ((ByteBuffer)o[1]).putInt((1 << 16));
+		/* 40 */ ((ByteBuffer)o[1]).putInt(-8);
+		/* 44 */ ((ByteBuffer)o[1]).putInt((1 << 16));
+		/* 48 */ ((ByteBuffer)o[1]).putInt(-4);
+		/* 52 */ ((ByteBuffer)o[1]).putInt(-1);
+
+		/* 56 */ ((ByteBuffer)o[1]).putInt(-2);
+		/* 60 */ ((ByteBuffer)o[1]).putInt(36);
+		// /* 64 */ ((ByteBuffer)o[1]).putInt((1 << 16));
+		((ByteBuffer)o[1]).putInt(-9);
+		/* 68 */ ((ByteBuffer)o[1]).putInt(-1);
+
+		eval((1 << 16) + 56);
+		trace();
+	}
+}
+///	// Registers
+//	public int err;	// Do I need it having exceptions?
+//	public int ip;
+//
+//	// Primitives
+// 	public List<Consumer<Dodo>> primitives = new ArrayList<Consumer<Dodo>>();
+//
+//	public Dodo() {
+//		s = new int[256];
+//		ss = 256;
+//		sp = 0;
+//		r = new int[256];
+//		rs = 256;
+//		rp = 0;
+//		// Dictionary
+//		o = new Object[65536];
+//		o[0] = ByteBuffer.allocateDirect(65536);	// User area
+//		o[1] = ByteBuffer.allocateDirect(65536);	// Main wordlist
+//		op = 2;
+//
+//		store(BASE, 10);
+//		store(STATE, 0);
+//		store(CURRENT, 1);
+//		store(CONTEXT, 1);
+//		store(CONTEXT + 4, 0);k
+//
+//		comma(0); // No words in the dictionary
+//	}
+//
+//	public static int BASE = 0;
+//	public static int STATE = 4;
+//	public static int CURRENT = 8;
+//	public static int CONTEXT = 12;
+//	public static int IBUF = 44;
+//	public static int IPOS = 48;
+//	public static int ILEN = 52;
+//
+//	// Basic API
+//
+//	public void evaluate(String s) {
+//		int ibuf = fetch(IBUF);
+//		int ipos = fetch(IPOS);
+//		int ilen = fetch(ILEN);
+//
+//		o[op++] = s;
+//		store(IBUF, (op - 1) << 16);
+//		store(IPOS, 0);
+//		store(ILEN, s.length());
+//
+//		interpret();
+//
+//		store(IBUF, ibuf);
+//		store(IPOS, ipos);
+//		store(ILEN, ilen);
+//	}
+//
+//	// Helpers
+//
+//	// Data stack
+//
+//	public int T() { return s[sp - 1]; }
+//	public int S() { return s[sp - 2]; }
+//
+//	public int pop() { return s[--sp]; }
+//	public void push(int v) { s[sp++] = v; }
+//	public void over() { push(S()); }
+//	public void nip() { s[sp - 2] = s[sp - 1]; sp--; }
+//
+//	// Memory access
+//
+// 	public void ostore(int a, Object v) { o[a >> 16] = v; }
+//	public void store(int a, int v) { ((ByteBuffer)o[a >> 16]).putInt(a & 0xFFFF, v);	}
+//	public void cstore(int a, byte v) { ((ByteBuffer)o[a >> 16]).put(a & 0xFFFF, v); }
+//
+//	public Object ofetch(int a) { return o[a >> 16]; }
+//	public int fetch(int a) { return ((ByteBuffer)o[a >> 16]).getInt(a & 0xFFFF); }
+//	public byte cfetch(int a) { 
+//		Object i = o[a >> 16];
+//		if (i instanceof String) { return (byte)((String)i).charAt(a & 0xFFFF); }
+//		if (i instanceof ByteBuffer) { return ((ByteBuffer)i).get(a & 0xFFFF); }
+//		return 0;
+//	}
+//
+//	// Compilation (Into current wordlist memory)
+//
+//	public int here() { return (1 << 32) + ((ByteBuffer)o[1]).position(); }
+//	public void allot(int n) { ByteBuffer b = (ByteBuffer)o[1]; b.position(b.position() + n); }
+//
+//	public void comma() { comma(pop()); }
+//	public void comma(int v) { ((ByteBuffer)o[fetch(CURRENT)]).putInt(v); }
+//	public void ccomma() { ccomma((byte)pop()); }
+//	public void ccomma(byte v) { ((ByteBuffer)o[fetch(CURRENT)]).put(v); }
+//
+//	// Words
+//
+//	public static byte HIDDEN = 1;
+//	public static byte COLON = 2;
+//	public static byte IMMEDIATE = 4;
+//
+//	public int latest() { return fetch(fetch(CURRENT)); }
+//	public void latest(int w) { store(fetch(CURRENT), w); }
+//
+//	public void xt(int w, int v) { store(w + 4, v); }
+//	public int xt(int w) { return fetch(w + 4); }
+//	public void dt(int w, int v) { store(w + 8, v); }
+//	public int dt(int w) { return fetch(w + 8); }
+//	public void flags(int w, byte v) { cstore(w + 12, v); }
+//	public byte flags(int w) { return cfetch(w + 12); }
+//	public byte namelen(int w) { return cfetch(w + 13); }
+//	public int name(int w) { return w + 14; }
+//
+//	public void create(String n) {
+//		int l = latest();
+//		latest(here());
+//		comma(l);	// prev
+//		comma(0);	// xt
+//		comma(0);	// dt
+//		ccomma((byte)0); // flags
+//		ccomma((byte)n.length());	// name length
+//		for (int i = 0; i < n.length(); i++) ccomma((byte)n.charAt(i));	// name
+//		xt(latest(), -1);
+//		dt(latest(), here());
+//	}
+//
+//	public void hide() { flags(latest(), (byte)(flags(latest()) | HIDDEN)); }
+//	public void reveal() { flags(latest(), (byte)(flags(latest()) & ~HIDDEN)); }
+//	public void colon() { flags(latest(), (byte)(flags(latest()) | COLON)); }
+//	public void immediate() { flags(latest(), (byte)(flags(latest()) | IMMEDIATE)); }
+//
+//	public boolean is_hidden(int w) { return (flags(w) & HIDDEN) == HIDDEN; }
+//	public boolean is_colon(int w) { return (flags(w) & COLON) == COLON; }
+//	public boolean is_immediate(int w) { return (flags(w) & IMMEDIATE) == IMMEDIATE; }
+//
+//	// PARSING
+//
+//	//public void parse_chars() {
+// 	//	byte c = (byte)pop();
+// 	//	push(v(IBUF) + v(IPOS));
+// 	//	while (v(IPOS) < v(ILEN) && d.get(v(IBUF) + v(IPOS)) == c) v(IPOS, v(IPOS) + 1);
+// 	//	push(v(IBUF) + v(IPOS) - T());
+// 	//}
 // 
-// 	public Word find_name(String n) {
-// 		for (int i = 0; i < 8; i++) {
-// 			if (context[i] == -1) return null;
-// 			Word w = find_name_in(n, context[i]);
-// 			if (w != null) return w;
-// 		}
-// 		return null;
+// 	//public void parse() {
+// 	//	byte c = (byte)pop();
+// 	//	push(v(IBUF) + v(IPOS));
+// 	//	while (v(IPOS) < v(ILEN) && d.get(v(IBUF) + v(IPOS)) != c) v(IPOS, v(IPOS) + 1);
+// 	//	v(IPOS, v(IPOS) + 1);
+// 	//	push(v(IBUF) + v(IPOS) - T());
+// 	//}
+// 
+// 	public void parse_name() {
+//		int ibuf = fetch(IBUF);
+//		int ipos = fetch(IPOS);
+//		int ilen = fetch(ILEN);
+//		while (ipos < ilen && cfetch(ibuf + ipos) <= 32) ipos++;
+//		push(ibuf + ipos);
+// 		while (ipos < ilen && cfetch(ibuf + ipos) > 32) ipos++;
+// 		push(ibuf + ipos - T());
+//		store(IPOS, ipos + 1);
 // 	}
-// 	public void find_name() { push(words.indexOf(find_name(data_to_str()))); }
+//
+//	// FINDING NAMES
+//
+//	public boolean equalsIgnoreCase(int n1, int l1, int n2, int l2) {
+//		if (l1 != l2) return false;
+//		for (int i = 0; i < l1; i++) {
+//			byte a = cfetch(n1 + i);
+//			byte b = cfetch(n2 + i);
+//			if (a >= 97 && a <= 122) a -= 32;
+//			if (b >= 97 && b <= 122) b -= 32;
+//			if (a != b) return false;
+//		}
+//		return true;
+//	}
+//
+// 	public void find_name_in() { int wl = pop(); int l = pop(); push(find_name_in(pop(), l, wl)); }
+// 	public int find_name_in(int n, int l, int wl) {
+// 	 	int w = fetch(wl);
+// 	 	while (w != 0) {
+// 	 		if (!is_hidden(w) && equalsIgnoreCase(n, l, name(w), namelen(w))) break;
+// 	 		w = fetch(w);
+// 	 	}
+// 	 	return w;
+// 	 }
+// 
+// 	public void find_name() { int l = pop(); push(find_name(pop(), l)); }
+// 	public int find_name(int n, int l) {
+// 		for (int i = 0; i < 8; i++) {
+// 			if (fetch(CONTEXT + i*4) == 0) return 0;
+// 			int w = find_name_in(n, l, fetch(CONTEXT + i*4));
+// 			if (w != 0) return w;
+// 		}
+// 		return 0;
+// 	}
+//
+//	public void emit() { emit((byte)pop()); }
+//	public void emit(byte v) { System.out.printf("%c", (char)v); }
+//	public void type() {
+//		int l = pop();
+//		int s = pop();
+//		for (int i = 0; i < l; i++) emit(cfetch(s + i));
+//	}
+//	public void cr() { emit((byte)'\n'); }
+//
+// 	public void interpret() {
+// 		do {
+// 			parse_name();
+// 			if (T() == 0) break;
+//			over(); over();
+// 			find_name();
+// 			if (T() > 0) {
+// 				nip(); nip();
+// 				int w = pop();
+// 				if (fetch(STATE) == 0 || is_immediate(w)) {
+// 					if (!is_colon(w)) push(dt(w));
+// 					if (xt(w) != -1) eval(xt(w));
+// 				} else {
+// 					if (!is_colon(w)) literal(dt(w));
+// 					if (xt(w) != -1) compile(xt(w));
+// 				}
+// 			} else {
+// 				drop();
+// 				// convert_to_number();
+// 			}
+// 		} while(true);
+// 		//two_drop();
+// 	}
+//
+//	public void primitive(String name, Consumer<Dodo> code) {
+// 		primitives.add(code);
+// 		create(name);
+// 		colon();
+// 		xt(latest(), 0 - (primitives.size() - 1));
+//	}
+//
+//	public void bootstrap() {
+//		primitive("DUP", (vm) -> System.out.println("Hello from DUP!"));
+//	}
 
- 	public void interpret() {
- 		do {
- 			parse_name();
- 			if (T() == 0) break;
-			over(); over();
- 			find_name();
- 			//if (T() > 0) {
- 			//	nip(); nip();
- 			//	Word w = words.get(pop());
- 			//	if (v(STATE) == 0 || w.immediate) {
- 			//		if (!w.colon) push(w.dt);
- 			//		if (w.xt != -1) eval(w.xt);
- 			//	} else {
- 			//		if (!w.colon) literal(w.dt);
- 			//		if (w.xt != -1) compile(w.xt);
- 			//	}
- 			//} else {
- 			//	drop();
- 			//	convert_to_number();
- 			//}
- 		} while(true);
- 		//two_drop();
- 	}
-}	
+
 
 // // TODO: How to do does> part from Java? Interesting for implementing a "native" compiler.
 // // TODO: Including source code here as a string works well, maybe it will be interesting
