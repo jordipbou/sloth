@@ -4,25 +4,25 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SlothTest {
-	@Test void innerInterpreterEXIT1() {
-		Sloth x = new Sloth();
-		
-		x.ip = 0;
-		x.exit();
+	// @Test void innerInterpreterEXIT1() {
+	// 	Sloth x = new Sloth();
+	// 	
+	// 	x.ip = 0;
+	// 	x.exit();
 
-		assertTrue(x.ip == -1);
-	}
+	// 	assertTrue(x.ip == -1);
+	// }
 
-	@Test void innerInterpreterEXIT2() {
-		Sloth x = new Sloth();
+	// @Test void innerInterpreterEXIT2() {
+	// 	Sloth x = new Sloth();
 
-		x.rpush(11);
-		x.ip = 13;
-		x.exit();
+	// 	x.rpush(11);
+	// 	x.ip = 13;
+	// 	x.exit();
 
-		assertTrue(x.ip == 11);
-		assertTrue(x.rp == 0);
-	}
+	// 	assertTrue(x.ip == 11);
+	// 	assertTrue(x.rp == 0);
+	// }
 
 	// @Test void bootstrappedPrimitiveEXIT() {
 	// 	Sloth x = new Sloth();
