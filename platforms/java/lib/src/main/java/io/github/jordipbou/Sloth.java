@@ -27,330 +27,6 @@ public class Sloth {
 	public static int CELL = 4;
 	public static int CHAR = 2;	// Sloth uses 16 bit chars, as Java does
 
-	// // -- Input buffer ----------------------------------------------------------
-
-	// public int ibuf;
-	// public int ilen;
-
-	// public String last_dir = "";
-	// public BufferedReader last_buffered_reader;
-
-	// public void refill() {
-	// switch (fetch(SOURCE_ID)) {
-	// 	case -1: push(-1); break;
-	// 	case 0: 
-	// 		ibuf = tallot(80);
-	// 		push(ibuf); 
-	// 		push(80); 
-	// 		accept();
-	// 		ilen = pop();
-	// 		store(IPOS, 0);
-	// 		push(-1); 
-	// 		break;
-	// 	default: 
-	// 		try {
-	// 			str_to_transient(last_buffered_reader.readLine());
-	// 			ilen = pop();
-	// 			ibuf = pop();
-	// 			store(IPOS, 0);
-	// 			push(-1);
-	// 		} catch (Exception e) {
-	// 			push(0);
-	// 		}
-	// 	}
-	// }
-
-	// public void include(String filename) throws FileNotFoundException, IOException {
-	//  	File file = new File(filename);
-	// 	if (!file.exists()) {
-	// 		file = new File(last_dir + filename);
-	// 		if (!file.exists()) {
-	// 			throw new FileNotFoundException();
-	// 		}
-	// 	}
-
-	// 	String prevDir = last_dir;
-	// 	last_dir = file.getAbsolutePath().replace(file.getName(), "");
-
-	// 	BufferedReader prevReader = last_buffered_reader;
-	//  	last_buffered_reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
-
-	// 	int last_source_id = fetch(SOURCE_ID);
-	// 	store(SOURCE_ID, 1);
-
-	//  	while (true) {
-	//  		String line = last_buffered_reader.readLine();
-	//  		if (line == null) break;
-	// 		System.out.println(line);
-	// 		str_to_transient(line);
-	// 		ilen = pop();
-	// 		ibuf = pop();
-	// 		store(IPOS, 0);
-	// 		try {
-	// 			interpret();
-	// 		} catch(Exception e) {
-	// 			// TODO Exceptions should be managed by the inner interpreter
-	// 			System.out.printf("Exception on line: [%s]\n", line);
-	// 			e.printStackTrace();
-	// 			break;
-	// 		}
-	//  	}
-
-	// 	store(SOURCE_ID, last_source_id);
-	// 	last_buffered_reader.close();
-	// 	last_buffered_reader = prevReader;
-	// 	last_dir = prevDir;
-	// }
-
-	// // -- Input/Output ----------------------------------------------------------
-
-	// public void key() {
-	// 	if (fetch(KEY) != 0) eval(fetch(KEY));
-	// 	else {
-	// 		try {
-	// 			push(System.in.read());
-	// 		} catch (IOException e) {
-	// 			push(0);
-	// 		}
-	// 	}
-	// }
-
-	// public void emit() {
-	// 	if (fetch(EMIT) != 0) eval(fetch(EMIT));
-	// 	else System.out.printf("%c", (char)pop());
-	// }
-
-	// public void accept() {
-	// 	if (fetch(ACCEPT) != 0) eval(fetch(ACCEPT));
-	// 	else if (fetch(KEY) == 0) {
-	// 		String s = System.console().readLine();
-	// 		int l = pop();
-	// 		int a = pop();
-	// 		for (int i = 0; i < s.length() && i < l; i++) 
-	// 			cstore(a + (i * CHAR), s.charAt(i));
-	// 		push(s.length());
-	// 	} else {
-	// 		int l = pop();
-	// 		int a = pop();
-	// 		int n = 0;
-	// 		while (l > 0) {
-	// 			key();
-	// 			char c = (char)pop();
-	// 			if (c == 10 || c == 13) { 
-	// 				push(n); return;
-	// 			} else if (c == 127) { 
-	// 				if (n > 0) {
-	// 					n--;
-	// 					l++;
-	// 					a--;
-	// 					push(8); emit();
-	// 					push(32); emit();
-	// 					push(8); emit();
-	// 				}
-	// 			} else {
-	// 				cstore(a, c);
-	// 				n++;
-	// 				a++;
-	// 				l--;
-	// 			}
-	// 		}
-	// 	}
-	// }
-
-	// public void type() {
-	// 	int l = pop();
-	// 	int a = pop();
-	// 	for (int i = 0; i < l; i++) { 
-	// 		push(cfetch(a + (i * CHAR))); emit(); 
-	// 	}
-	// }
-
-	// // -- Parsing ---------------------------------------------------------------
-
-	// public void parse_name() {
-	// 	int ipos = fetch(IPOS);
-	// 	while (ipos < ilen && cfetch(ibuf + (ipos * CHAR)) < 33) ipos++;
-	// 	push(ibuf + (ipos * CHAR));
-	// 	while (ipos < ilen && cfetch(ibuf + (ipos * CHAR)) > 32) ipos++;
-	// 	push((ibuf + (ipos * CHAR) - pick(0)) / CHAR);
-	// 	store(IPOS, ipos + (ipos < ilen ? 1 : 0));
-	// }
-
-	// // -- Iterators -------------------------------------------------------------
-
-	// public void q_iter() { 
-	// 	int q = pop();
-	// 	int l = pop();
-	// 	int a = pop();
-	// 	for (int i = a; i < (a + l*CELL); i += CELL) {
-	// 			push(fetch(i));
-	// 			eval(q);
-	// 			if (pop() != 0) { push(-1); return; }
-	// 	}
-	// 	push(0);
-	// }
-
-	// // -- Additional stacks -----------------------------------------------------
-
-	// public void stack() { create(); dup(); comma(); comma(0); cells(); allot(); does(); cells(); add(); }
-	// public void map_stack() { dup(); push(CELL); sub(); fetch(); rot(); q_iter(); }
-	// 
-	// // -- Word definitions ------------------------------------------------------
-
-	// public void create() { parse_name(); header(); }
-	// public void does() { literal(here() + 16); compile(doDOES); compile(EXIT); }
-
-	// public void colon() {
-	// 	parse_name();
-	// 	header();
-	// 	xt(latest(), dt(latest()));
-	// 	latestxt(xt(latest()));
-	// 	set_flag(latest(), COLON);
-	// 	set_flag(latest(), HIDDEN);
-	// 	store(STATE, 1);
-	// }
-
-	// public void semicolon() { 
-	// 	compile(EXIT); 
-	// 	store(STATE, 0); 
-	// 	// If latestxt is not a :NONAME definition, remove its hidden flag
-	// 	if (xt(latest()) == latestxt())	
-	// 		unset_flag(latest(), HIDDEN); 
-	// };
-
-	// public void noname() {
-	// 	align();
-	// 	push(here());
-	// 	latestxt(here());
-	// 	store(STATE, 1);
-	// }
-
-	// public void start_quotation() {
-	// 	if (fetch(STATE) > 0) {
-	// 		align();
-	// 		compile(doBLOCK);
-	// 		push(here());
-	// 		comma(0);
-	// 		latestxt(here());
-	// 		store(STATE, fetch(STATE) + 1);
-	// 	} else if (fetch(STATE) == 0) {
-	// 		push(here());
-	// 		latestxt(here());
-	// 		store(STATE, fetch(STATE) - 1);
-	// 	} else {
-	// 		talign();
-	// 		compile(doBLOCK);
-	// 		push(there());
-	// 		comma(0);
-	// 		latestxt(there());
-	// 		store(STATE, fetch(STATE) - 1);
-	// 	}
-	// }
-
-	// public void end_quotation() {
-	// 	compile(EXIT);
-	// 	if (fetch(STATE) > 0) {
-	// 		int mark = pop();
-	// 		store(mark, here() - mark);
-	// 		store(STATE, fetch(STATE) - 1);
-	// 	} else {
-	// 		int tmark = pop();
-	// 		store(tmark, there() - tmark);
-	// 		store(STATE, fetch(STATE) + 1);
-	// 	}
-	// }
-
-	// // -- Bootstrapping the state -----------------------------------------------
-
-	// public int RECTYPE_NULL;
-	// public int RECTYPE_NT;
-
-	// public void stack(String s, int v) {
-	// 	header(s);
-	// 	comma(v);
-	// 	comma(0);
-	// 	allot(v);
-	// 	does((vm) -> { int x = pop(); push(2 * CELL); add(); });
-	// }
-
-	// // public void primitive(String s, Consumer<Sloth> c) {
-	// // 	primitives.add(c);
-	// // 	header(s);
-	// // 	xt(latest(), 0 - primitives.size());
-	// // 	set_flag(latest(), COLON);
-	// // }
-
-	// public void bootstrap() {
-	// 	allot(LAST_VAR);
-
-	// 	store(LATEST, 0);
-	// 	store(LATESTXT, 0);
-	// 	store(STATE, 0);
-	// 	store(SOURCE_ID, 0);
-	// 	store(IPOS, 0);
-	// 	store(BASE, 10);
-	// 	store(CURRENT, 1);
-
-	// 	store(EMIT, 0);
-	// 	store(KEY, 0);
-	// 	store(ACCEPT, 0);
-	// 	store(INTERPRET, 0);
-
-	// 	// EXIT must be -1 (as required by the VM implementation) so it must be
-	// 	// the first one defined.
-	// 	EXIT = colon("EXIT", (vm) -> exit());
-	// 	doLIT = colon("doLIT", (vm) -> push(token()));
-	// 	doDOES = colon("doDOES", (vm) -> xt(latest(), pop()));
-	// 	doBLOCK = colon("doBLOCK", (vm) -> { int v = token(); push(ip); ip += v - CELL; });
-	// 	LITERAL = colon("LITERAL", (vm) -> literal());
-	// 	COMPILE = colon("COMPILE,", (vm) -> compile());
-
-	// 	colon("QUIT", (vm) -> quit());
-
-	// 	// -- Exception primitives
-
-	// 	colon("THROW", (vm) -> _throw());
-	// 	colon("CATCH", (vm) -> _catch());
-
-	// 	// -- Stack shuffling primitives
-
-	// 	colon("DROP", (vm) -> drop());
-	// 	colon("PICK", (vm) -> pick(pop()));
-	// 	colon("DUP", (vm) -> dup());
-	// 	colon("OVER", (vm) -> over());
-	// 	colon("SWAP", (vm) -> swap());
-	// 	colon("ROT", (vm) -> rot());
-
-	// 	// -- Arithmetic primitives
-
-	// 	colon("+", (vm) -> add());
-	// 	colon("-", (vm) -> sub());
-	// 	colon("*", (vm) -> mul());
-	// 	colon("/", (vm) -> div());
-
-	// 	// -- Recognizers
-
-	// 	colon("RECTYPE:", (vm) -> rectype());
-
-	// 	push(noname((vm) -> rec_null()));
-	// 	dup(); 
-	// 	dup();
-	// 	rectype("RECTYPE-NULL");
-	// 	RECTYPE_NULL = xt(latest());
-
-	// 	push(noname((vm) -> recint_nt()));
-	// 	push(noname((vm) -> reccomp_nt()));
-	// 	push(noname((vm) -> recpost_nt()));
-	// 	rectype("RECTYPE-NT");
-	// 	RECTYPE_NT = xt(latest());
-
-	// 	colon("REC-FIND", (vm) -> rec_find());
-
-	// 	stack("FORTH-RECOGNIZER", 64);
-	// }
-
-	// **************************************************************************
-
 	// -- Outer interpreter -----------------------------------------------------
 
 	public void quit() {
@@ -365,6 +41,7 @@ public class Sloth {
 				case 0: drop(); System.out.printf(" OK "); dump_stack(); break;
 				case -1: store(STATE, 0); /* Aborted */ break;
 				case -2: store(STATE, 0); /* Display message from abort" */ break;
+				case -13: store(STATE, 0); drop(); push('?'); emit(); cr(); break;
 				default: store(STATE, 0); System.out.printf(" #%d\n", pop()); break;
 				// TODO I'm not sure if data stack should be cleared or not
 			}
@@ -497,6 +174,8 @@ public class Sloth {
 			if (top() != RECTYPE_NULL) return;
 			else drop();
 		}
+		push(a);
+		push(l);
 		push(RECTYPE_NULL);
 	}
 
@@ -676,6 +355,10 @@ public class Sloth {
 		if (fetch(EMIT) != 0) eval(fetch(EMIT));
 		else System.out.printf("%c", (char)pop());
 	}
+
+	public void emit(char v) { push(v); emit(); }
+
+	public void cr() { emit('\n'); }
 
 	public void type(int a, int l) {
 		for (int i = a; i < a+(l*CHAR); i += CHAR) {
@@ -1020,6 +703,20 @@ public class Sloth {
 		comma(noname((vm) -> rec_num()));
 		comma(noname((vm) -> rec_dnum()));
 		allot(5 * CELL);
+
+		// -- Primitive words -----------------------------------------------------
+
+		colon("DROP", (vm) -> drop());
+		colon("NIP", (vm) -> nip());
+		colon("DUP", (vm) -> dup());
+		colon("OVER", (vm) -> over());
+		colon("SWAP", (vm) -> swap());
+		colon("ROT", (vm) -> rot());
+
+		colon("+", (vm) -> add());
+		colon("-", (vm) -> sub());
+		colon("*", (vm) -> mul());
+		colon("/", (vm) -> div());
 	}
 
 	// == Virtual machine =======================================================
