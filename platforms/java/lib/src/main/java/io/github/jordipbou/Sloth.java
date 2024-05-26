@@ -362,7 +362,7 @@ public class Sloth {
 			_catch(fetch(INTERPRET));
 			switch (top()) {
 				// TODO Change this to not use printf
-				case 0: drop(); System.out.println(" OK"); break;
+				case 0: drop(); System.out.printf(" OK "); dump_stack(); break;
 				case -1: store(STATE, 0); /* Aborted */ break;
 				case -2: store(STATE, 0); /* Display message from abort" */ break;
 				default: store(STATE, 0); System.out.printf(" #%d\n", pop()); break;
@@ -394,6 +394,8 @@ public class Sloth {
 
 	public void rec_null() { type(); push(-13); _throw(); }
 
+	// Recognizer for finding names --
+
 	public void recint_nt() { 
 		int w = pop();
 		if (!has_flag(w, COLON)) { push(dt(w)); }
@@ -419,8 +421,68 @@ public class Sloth {
 	public void rec_find() { 
 		find_name();
 		if (top() != 0) push(RECTYPE_NT);
-		else push(RECTYPE_NULL);
+		else { drop(); push(RECTYPE_NULL); }
 	}
+
+	// Recognizer for single cell numbers --
+
+	public void recint_num() { /* NOOP */ }
+	public void reccomp_num() { literal(); }
+	public void recpost_num() { literal(); }
+
+	public void rec_num() {
+		int l = pop();
+		int a = pop();
+		if (cfetch(a) == '\'' && cfetch(a + CHAR + CHAR) == '\'') {
+			push(cfetch(a + CHAR));	
+			push(RECTYPE_NUM);
+		} else {
+			int n;
+			StringBuilder sb = new StringBuilder();
+			int r = fetch(BASE);
+			int start = 0;
+			if (cfetch(a) == '#') { r = 10; start = 1; }
+			else if (cfetch(a) == '$') { r = 16; start = 1; }
+			else if (cfetch(a) == '%') { r = 2; start = 1; }
+			for (int i = start; i < l; i++) sb.append(cfetch(a + (i * CHAR)));
+			try {
+				n = Integer.parseInt(sb.toString(), r);
+				push(n);
+				push(RECTYPE_NUM);
+			} catch (NumberFormatException e) {
+				push(RECTYPE_NULL);
+			}
+		}
+	}
+
+	// Recognizer for double cell numbers --
+
+	public void recint_dnum() { /* NOOP */ }
+	public void reccomp_dnum() { two_literal(); }
+	public void recpost_dnum() { two_literal(); }
+
+	public void rec_dnum() {
+		int l = pop();
+		int a = pop();
+		if (cfetch(a + ((l-1)*CHAR)) == '.') {
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < (l - 1); i++) sb.append(cfetch(a + (i * CHAR)));
+			long n;
+			try {
+				n = Long.parseLong(sb.toString(), fetch(BASE));
+				dpush(n);
+				push(RECTYPE_DNUM);
+			} catch (NumberFormatException e) {
+				push(RECTYPE_NULL);
+			}
+		} else {
+			push(RECTYPE_NULL);
+		} 
+	}
+
+	// Recognizer for floating point numbers --
+
+	// TODO
 
 	public void recognize() {
 		int r = fetch(pop()); // Recognizer stack identifier (address)
@@ -741,6 +803,8 @@ public class Sloth {
 
 	public int RECTYPE_NULL;
 	public int RECTYPE_NT;
+	public int RECTYPE_NUM;
+	public int RECTYPE_DNUM;
 
 	// -- Contiguous memory -----------------------------------------------------
 
@@ -820,6 +884,9 @@ public class Sloth {
 
 	public void literal(int v) { compile(doLIT); compile(v); }
 	public void literal() { literal(pop()); }
+
+	public void two_literal(long v) { compile(doLIT); compile((int)(msp(v) >> 32)); compile(doLIT); compile((int)lsp(v)); }
+	public void two_literal() { two_literal(dpop()); }
 
 	// -- Defining words --------------------------------------------------------
 
@@ -935,12 +1002,24 @@ public class Sloth {
 		push(noname((vm) -> recpost_nt()));
 		RECTYPE_NT = rectype("RECTYPE-NT");
 
+		push(noname((vm) -> recint_num()));
+		push(noname((vm) -> reccomp_num()));
+		push(noname((vm) -> recpost_num()));
+		RECTYPE_NUM = rectype("RECTYPE-NUM");
+
+		push(noname((vm) -> recint_dnum()));
+		push(noname((vm) -> reccomp_dnum()));
+		push(noname((vm) -> recpost_dnum()));
+		RECTYPE_DNUM = rectype("RECTYPE-DNUM");
+
 		// Define default recognizer
 		comma(8);
-		comma(1);
+		comma(3);
 		store(FORTH_RECOGNIZER, here());
 		comma(noname((vm) -> rec_find()));
-		allot(7 * CELL);
+		comma(noname((vm) -> rec_num()));
+		comma(noname((vm) -> rec_dnum()));
+		allot(5 * CELL);
 	}
 
 	// == Virtual machine =======================================================
@@ -956,7 +1035,21 @@ public class Sloth {
 	int s[];					// Parameter stack
 	int sp;						// Parameter stack pointer
 
+	// Helpers to get the most/least significant bits from a long integer, 
+	// used for working with double cell numbers which are a requirement for
+	// ANS Forth (even when not implementing the optional Double-Number word
+	// set).
+	public long msp(long v) { return (v & 0xFFFFFFFF00000000L); }
+	public long lsp(long v) { return (v & 0x00000000FFFFFFFFL); }
+
+	// Push/pop variants
+	public void dpush(long v) { push(v); push(v >> 32); }
+	public void push(long v) { push((int)lsp(v)); }
 	public void push(int v) { s[sp++] = v; }
+	public long dpop() { long b = lpop(); return msp(b << 32) + lsp(lpop()); }
+	public long lpop() { return (long)s[--sp]; }
+	public long upop() { return Integer.toUnsignedLong(s[--sp]); }
+	public long udpop() { long b = upop(); return msp(b << 32) + lsp(upop()); }
 	public int pop() { return s[--sp]; }
 
 	public int pick(int a) { return s[sp - a - 1]; }
