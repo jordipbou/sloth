@@ -54,9 +54,9 @@ public class Sloth {
 			do { 
 				parse_name(); if (top() == 0) break;		// Parse until no more input
 				push(FORTH_RECOGNIZER); recognize();		// Recognize the token
-				push(fetch(STATE)); cells(); add(); at_execute(); // Excute rec-type
+				push((fetch(STATE) * CELL) + pop()); at_execute();
 			} while (true);
-			two_drop();
+			drop(); drop();
 		}
 	}
 
@@ -200,68 +200,73 @@ public class Sloth {
 
 	// -- Word definitions ------------------------------------------------------
 
-	public void create() { parse_name(); header(); }
-	public void does() { literal(here() + 16); compile(doDOES); compile(EXIT); }
+	public void create() { parse_name(); if (top() == 0) { drop(); drop(); _throw(-16); } header(); }
 
-	public void colon() {
-		parse_name();
-		header();
-		xt(latest(), dt(latest()));
-		latestxt(xt(latest()));
-		set_flag(latest(), COLON);
-		set_flag(latest(), HIDDEN);
-		store(STATE, 1);
-	}
+	// This are not really needed for bootstrapping !!
+	
+	// public void does() { literal(here() + 16); compile(doDOES); compile(EXIT); }
 
-	public void semicolon() { 
-		compile(EXIT); 
-		store(STATE, 0); 
-		// If latestxt is not a :NONAME definition, remove its hidden flag
-		if (xt(latest()) == latestxt())	
-			unset_flag(latest(), HIDDEN); 
-	};
+	// public void colon() {
+	// 	parse_name();
+	// 	if (top() == 0) { drop(); drop(); _throw(-16); }
+	// 	header();
+	// 	xt(latest(), dt(latest()));
+	// 	latestxt(xt(latest()));
+	// 	set_flag(latest(), COLON);
+	// 	set_flag(latest(), HIDDEN);
+	// 	store(STATE, 1);
+	// }
 
-	public void noname() {
-		align();
-		push(here());
-		latestxt(here());
-		store(STATE, 1);
-	}
+	// public void semicolon() { 
+	// 	System.out.println(">>SEMICOLON");
+	// 	compile(EXIT); 
+	// 	store(STATE, 0); 
+	// 	// If latestxt is not a :NONAME definition, remove its hidden flag
+	// 	if (xt(latest()) == latestxt())	
+	// 		unset_flag(latest(), HIDDEN); 
+	// };
 
-	public void start_quotation() {
-		if (fetch(STATE) > 0) {
-			align();
-			compile(doBLOCK);
-			push(here());
-			comma(0);
-			latestxt(here());
-			store(STATE, fetch(STATE) + 1);
-		} else if (fetch(STATE) == 0) {
-			push(here());
-			latestxt(here());
-			store(STATE, fetch(STATE) - 1);
-		} else {
-			talign();
-			compile(doBLOCK);
-			push(there());
-			comma(0);
-			latestxt(there());
-			store(STATE, fetch(STATE) - 1);
-		}
-	}
+	// public void noname() {
+	// 	align();
+	// 	push(here());
+	// 	latestxt(here());
+	// 	store(STATE, 1);
+	// }
 
-	public void end_quotation() {
-		compile(EXIT);
-		if (fetch(STATE) > 0) {
-			int mark = pop();
-			store(mark, here() - mark);
-			store(STATE, fetch(STATE) - 1);
-		} else {
-			int tmark = pop();
-			store(tmark, there() - tmark);
-			store(STATE, fetch(STATE) + 1);
-		}
-	}
+	// public void start_quotation() {
+	// 	if (fetch(STATE) > 0) {
+	// 		align();
+	// 		compile(doBLOCK);
+	// 		push(here());
+	// 		comma(0);
+	// 		latestxt(here());
+	// 		store(STATE, fetch(STATE) + 1);
+	// 	} else if (fetch(STATE) == 0) {
+	// 		push(here());
+	// 		latestxt(here());
+	// 		store(STATE, fetch(STATE) - 1);
+	// 	} else {
+	// 		talign();
+	// 		compile(doBLOCK);
+	// 		push(there());
+	// 		comma(0);
+	// 		latestxt(there());
+	// 		store(STATE, fetch(STATE) - 1);
+	// 	}
+	// }
+
+	// public void end_quotation() {
+	// 	compile(EXIT);
+	// 	if (fetch(STATE) > 0) {
+	// 		int mark = pop();
+	// 		store(mark, here() - mark);
+	// 		store(STATE, fetch(STATE) - 1);
+	// 	} else {
+	// 		int tmark = pop();
+	// 		store(tmark, there() - tmark);
+	// 		store(STATE, fetch(STATE) + 1);
+	// 	}
+	// }
 
 	// -- Parsing ---------------------------------------------------------------
 
@@ -450,6 +455,20 @@ public class Sloth {
 		push(w);
 	}
 
+	public void tick() {
+		parse_name();
+		int l = pick(0);
+		int a = pick(1);
+		find_name();
+		if (top() != 0) {
+			push(xt(pop()));
+		} else {
+			push(a);
+			push(l);
+			_throw(-13);
+		}
+	}
+
 	// -- Forth State -----------------------------------------------------------
 
 	// Variables --
@@ -480,6 +499,8 @@ public class Sloth {
 	public int doLIT;
 	public int doDOES;
 	public int doBLOCK;
+	public int BRANCH;
+	public int zBRANCH;
 
 	public int LITERAL;
 	public int COMPILE;
@@ -671,9 +692,12 @@ public class Sloth {
 		comma(1);	// ROOT wordlist to be searched
 		allot(7 * CELL); // Leave space for the rest of the possible wordlists
 
+		// EXIT must be the first defined word as the VM requires it to be -1
 		colon("EXIT", (vm) -> exit());
 
-		store(INTERPRET, colon("INTERPRET", (vm) -> interpret()));
+		BRANCH = colon("BRANCH", (vm) -> { ip += token(); });
+		zBRANCH = colon("?BRANCH", (vm) -> { if(pop() == 0) ip += token(); else ip += CELL; });
+		doLIT = colon("doLIT", (vm) -> push(token()));
 
 		// Define basic recognizer types
 
@@ -706,8 +730,58 @@ public class Sloth {
 		comma(noname((vm) -> rec_dnum()));
 		allot(5 * CELL);
 
-		// -- Primitive words -----------------------------------------------------
+		// -- Primitives ----------------------------------------------------------
 
+		store(INTERPRET, colon("INTERPRET", (vm) -> interpret()));
+
+		colon("DROP", (vm) -> drop());
+		colon("DUP", (vm) -> dup());
+		colon("OVER", (vm) -> over());
+		colon("SWAP", (vm) -> swap());
+		colon("ROT", (vm) -> rot());
+
+		colon(">R", (vm) -> to_r());
+		colon("R@", (vm) -> fetch_r());
+		colon("R>", (vm) -> from_r());
+
+		colon("2>R", (vm) -> two_to_r());
+		colon("2R>", (vm) -> two_from_r());
+
+		colon("!", (vm) -> { int a = pop(); store(a, pop()); });
+		colon("@", (vm) -> push(fetch(pop())));
+		colon("C!", (vm) -> { int a = pop(); cstore(a, (char)pop()); });
+		colon("C@", (vm) -> push(cfetch(pop())));
+
+		colon(",", (vm) -> comma());
+		colon("C,", (vm) -> ccomma());
+
+		colon("2@", (vm) -> two_fetch());
+
+		colon("ALIGN", (vm) -> align());
+
+		colon("'", (vm) -> tick());
+		colon("EXECUTE", (vm) -> execute());
+
+		colon("PARSE-NAME", (vm) -> parse_name());
+		colon("FIND-NAME", (vm) -> find_name());
+
+		colon(":", (vm) -> { create(); set_colon(); set_hidden(); xt(latest(), dt(latest())); latestxt(xt(latest())); store(STATE, 1); });
+		colon(";", (vm) -> { compile(EXIT); store(STATE, 0); if (latestxt() == xt(latest())) unset_flag(latest(), HIDDEN); }); set_immediate();
+		colon("RECURSE", (vm) -> comma(latestxt())); set_immediate();
+
+		colon("TRACE", (vm) -> { tick(); trace(pop()); });
+		colon("DUMP", (vm) -> { int l = pop(); dump_memory(pop(), l); });
+
+		colon("BYE", (vm) -> System.exit(0));
+
+		// Control structures --
+
+		colon("IF", (vm) -> { compile(zBRANCH); push(here()); comma(0); }); set_immediate();
+		colon("THEN", (vm) -> { int a = pop(); store(a, here() - a); }); set_immediate();
+
+	}
+
+	public void ANS_bootstrap() {
 		// This words are not required for bootstrapping the system, but to 
 		// make it ANS Forth compatible.
 
@@ -715,59 +789,51 @@ public class Sloth {
 
 		// Stack shuffling
 
-		colon("DROP", (vm) -> drop());
-		colon("NIP", (vm) -> nip());
-		colon("DUP", (vm) -> dup());
-		colon("OVER", (vm) -> over());
-		colon("SWAP", (vm) -> swap());
-		colon("ROT", (vm) -> rot());
-		colon("TUCK", (vm) -> tuck());
+		colon("NIP", (vm) -> { swap(); drop(); });
+		colon("TUCK", (vm) -> { swap(); over(); });
 
-		colon(">R", (vm) -> to_r());
-		colon("R@", (vm) -> fetch_r());
-		colon("R>", (vm) -> from_r());
+		colon("2DROP", (vm) -> { drop(); drop(); });
+		colon("2DUP", (vm) -> { over(); over(); });
+		colon("2OVER", (vm) -> { push(pick(3)); push(pick(3)); });
+		colon("2SWAP", (vm) -> { rot(); to_r(); rot(); from_r(); });
 
-		colon("2DROP", (vm) -> two_drop());
-		colon("2DUP", (vm) -> two_dup());
-		colon("2OVER", (vm) -> two_over());
-		colon("2SWAP", (vm) -> two_swap());
-
-		colon("2>R", (vm) -> two_to_r());
-		colon("2R@", (vm) -> two_fetch_r());
-		colon("2R>", (vm) -> two_from_r());
+		colon("2R@", (vm) -> { two_from_r(); over(); over(); two_to_r(); });
 
 		// Arithmetic
 
-		colon("+", (vm) -> add());
-		colon("-", (vm) -> sub());
-		colon("*", (vm) -> mul());
-		colon("/", (vm) -> div());
-		colon("MOD", (vm) -> mod());
+		colon("+", (vm) -> { place(1, pick(1) + pick(0)); drop(); });
+		colon("-", (vm) -> { place(1, pick(1) - pick(0)); drop(); });
+		colon("*", (vm) -> { place(1, pick(1) * pick(0)); drop(); });
+		colon("/", (vm) -> { place(1, pick(1) / pick(0)); drop(); });
+		colon("MOD", (vm) -> { place(1, pick(1) % pick(0)); drop(); });
 
-		colon("*/MOD", (vm) -> times_slash_mod());
-		colon("*/", (vm) -> times_slash());
-		colon("/MOD", (vm) -> slash_mod());
+		colon("*/MOD", (vm) -> { long n = lpop(); long d = lpop() * lpop(); push(d % n); push(d / n); });
+		colon("*/", (vm) -> { long n = lpop(); long d = lpop() * lpop(); push(d / n); });
+		colon("/MOD", (vm) -> { long n = lpop(); long d = lpop(); push(d % n); push(d / n); });
 
-		colon("2*", (vm) -> two_times());
-		colon("1-", (vm) -> one_minus());
-		colon("1+", (vm) -> one_plus());
-		colon("2+", (vm) -> two_plus());
+		colon("2*", (vm) -> place(0, pick(0) << 1));
+		colon("1-", (vm) -> place(0, pick(0) - 1));
+		colon("1+", (vm) -> place(0, pick(0) + 1));
+		colon("2+", (vm) -> place(0, pick(0) + 2));
 
-		colon("NEGATE", (vm) -> negate());
+		colon("NEGATE", (vm) -> place(0, ~pick(0) + 1));
+
+		// Comparison
+
+		colon(">", (vm) -> { place(1, pick(1) > pick(0) ? -1 : 0); drop(); });
+		colon("<", (vm) -> { place(1, pick(1) < pick(0) ? -1 : 0); drop(); });
+		colon("=", (vm) -> { place(1, pick(1) == pick(0) ? -1 : 0); drop(); });
+		colon(">=", (vm) -> { place(1, pick(1) >= pick(0) ? -1 : 0); drop(); });
+		colon("<=", (vm) -> { place(1, pick(1) <= pick(0) ? -1 : 0); drop(); });
 
 		// Bit
 
-		colon("INVERT", (vm) -> invert());
-		colon("AND", (vm) -> and());
-		colon("OR", (vm) -> or());
-		colon("XOR", (vm) -> xor());
+		colon("INVERT", (vm) -> place(0, ~pick(0)));
+		colon("AND", (vm) -> { place(1, pick(1) & pick(0)); drop(); });
+		colon("OR", (vm) -> { place(1, pick(1) | pick(0)); drop(); });
+		colon("XOR", (vm) -> { place(1, pick(1) ^ pick(0)); drop(); });
 
 		// Memory
-
-		colon("!", (vm) -> { int a = pop(); store(a, pop()); });
-		colon("@", (vm) -> push(fetch(pop())));
-		colon("C!", (vm) -> { int a = pop(); cstore(a, (char)pop()); });
-		colon("C@", (vm) -> push(cfetch(pop())));
 
 		colon("CELL", (vm) -> push(CELL));
 		colon("CHAR", (vm) -> push(CHAR));
@@ -778,19 +844,14 @@ public class Sloth {
 		colon("CHAR+", (vm) -> push(pop() + CHAR));
 		colon("CHAR-", (vm) -> push(pop() - CHAR));
 
-		colon(",", (vm) -> comma());
-		colon("C,", (vm) -> ccomma());
-
 		colon("+!", (vm) -> { int a = pop(); int v = pop(); store(a, fetch(a) + v); });
 		colon("0!", (vm) -> store(pop(), 0));
 		colon("1+!", (vm) -> { int a = pop(); store(a, fetch(a) + 1); });
 		colon("1-!", (vm) -> { int a = pop(); store(a, fetch(a) - 1); });
 
 		colon("2!", (vm) -> { int a = pop(); int x2 = pop(); int x1 = pop(); store(a, x1); store(a + CELL, x2); });
-		colon("2@", (vm) -> two_fetch());
 
 		colon("ALIGNED", (vm) -> push(aligned(pop())));
-		colon("ALIGN", (vm) -> align());
 
 		colon("CONSTANT", (vm) -> { create(); comma(); does((vmi) -> fetch()); });
 		colon("VARIABLE", (vm) -> { create(); comma(0); });
@@ -801,13 +862,19 @@ public class Sloth {
 		colon("FALSE", (vm) -> push(0));
 		colon("TRUE", (vm) -> push(~0));
 
+		colon("ON", (vm) -> store(pop(), ~0));
+		colon("OFF", (vm) -> store(pop(), 0));
+
+		colon("LITERAL", (vm) -> { compile(doLIT); comma(); }); set_immediate();
+
+		colon("[']", (vm) -> { tick(); compile(doLIT); comma(); }); set_immediate();
+		colon("2LITERAL", (vm) -> { swap(); compile(doLIT); comma(); compile(doLIT); comma(); }); set_immediate();
+
 		// TODO Should this two take into account postpone state or negative state
 		// values?
 		colon("[", (vm) -> store(STATE, 0));
 		colon("]", (vm) -> store(STATE, 1));
 
-
-		colon("BYE", (vm) -> System.exit(0));
 	}
 
 	// == Virtual machine =======================================================
@@ -850,15 +917,6 @@ public class Sloth {
 	public void swap() { int t = top(); place(0, pick(1)); place(1, t); }
 	public void over() { push(pick(1)); }
 	public void rot() { int t = top(); place(0, pick(2)); place(2, pick(1)); place(1, t); }
-	public void nip() { place(1, pick(0)); drop(); }
-	public void tuck() { swap(); over(); }
-
-	public void two_drop() { drop(); drop(); }
-	public void two_dup() { over(); over(); }
-	public void two_over() { push(pick(3)); push(pick(3)); }
-	public void two_swap() { rot(); to_r(); rot(); from_r(); }
-
-	public void two_rot() { two_to_r(); two_swap(); two_from_r(); two_swap(); }
 
 	int r[];					// Return stack
 	int rp;						// Return stack pointer
@@ -871,7 +929,6 @@ public class Sloth {
 	public void from_r() { push(rpop()); }
 
 	public void two_to_r() { swap(); to_r(); to_r(); }
-	public void two_fetch_r() { two_from_r(); two_dup(); two_to_r(); }
 	public void two_from_r() { from_r(); from_r(); swap(); }
 
 	// -- Memory
@@ -905,16 +962,30 @@ public class Sloth {
 	public boolean valid_ip() { return ip >= 0 && ip < mem.capacity(); }
 	public void do_prim(int p) { primitives.get(-1 - p).accept(this); }
 	public boolean tail() { return !valid_ip() || fetch(ip) == EXIT; }
+
 	public void call(int q) { if (!tail()) rpush(ip); ip = q; }
+
 	// Negative xts represent primitive functions from the primitives list.
 	public void execute(int q) { if (q < 0) do_prim(q); else call(q); }
 	// Will execute until returning from current level, or an exception is thrown
 	public void inner() {	int t = rp; while (t <= rp && valid_ip()) { execute(token()); } }
+	public void trace(int q) {
+		execute(q);
+		int t = rp;
+		while (t <= rp && valid_ip()) {
+			System.out.printf("<%d> ", sp);
+			for (int i = 0; i < sp; i++) System.out.printf("%d ", s[i]);
+			System.out.printf(": [%d] %d ", ip, fetch(ip));
+			for (int i = rp - 1; i >= 0; i--) System.out.printf(": [%d] %d ", r[i], fetch(r[i]));
+			System.out.println();
+			execute(token());
+		}
+	}
 	// Eval is equivalent to execute but its meant to be called from Java, as
 	// it starts a new inner interpreter
 	public void eval(int q) { execute(q); inner(); }
 
-	public void execute() { execute(pop()); }
+	public void execute() { if (ip == -1) { execute(pop()); inner(); } else execute(pop()); }
 	public void at_execute() { execute(fetch(pop())); }
 
 	public void exit() { if (rp > 0) ip = rpop(); else ip = -1; }
@@ -934,32 +1005,6 @@ public class Sloth {
 		}
 	}
 	public void _catch() { _catch(pop()); }
-
-	// -- Arithmetic 
-
-	public void add() { place(1, pick(1) + pick(0)); drop(); }
-	public void sub() { place(1, pick(1) - pick(0)); drop(); }
-	public void mul() { place(1, pick(1) * pick(0)); drop(); }
-	public void div() { place(1, pick(1) / pick(0)); drop(); }
-	public void mod() { place(1, pick(1) % pick(0)); drop(); }
-
-	public void times_slash_mod() { long n = lpop(); long d = lpop() * lpop(); push(d % n); push(d / n); }
-	public void times_slash() { times_slash_mod(); swap(); drop(); }
-	public void slash_mod() { push(1); swap(); times_slash_mod(); }
-
-	public void two_times() { place(0, pick(0) << 1); }
-	public void one_minus() { place(0, pick(0) - 1); }
-	public void one_plus() { place(0, pick(0) + 1); }
-	public void two_plus() { place(0, pick(0) + 2); }
-
-	public void negate() { invert(); one_plus(); }
-
-	// -- Bit
-
-	public void invert() { place(0, ~pick(1)); }
-	public void and() { place(0, pick(1) & pick(0)); drop(); }
-	public void or() { place(0, pick(1) | pick(0)); drop(); }
-	public void xor() { place(0, pick(1) ^ pick(0)); drop(); }
 
 	// -- Constructor
 
@@ -1008,6 +1053,7 @@ public class Sloth {
 	public static void main(String[] args) {
 		Sloth x = new Sloth();
 		x.bootstrap();
+		x.ANS_bootstrap();
 
 		System.out.println("SLOTH v1.0.0 (JVM implementation), jordipbou 2024");
 
