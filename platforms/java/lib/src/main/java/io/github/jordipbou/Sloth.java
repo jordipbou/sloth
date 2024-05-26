@@ -363,9 +363,10 @@ public class Sloth {
 			switch (top()) {
 				// TODO Change this to not use printf
 				case 0: drop(); System.out.println(" OK"); break;
-				case -1: store(STATE, 0); sp = 0; /* Aborted */ break;
-				case -2: store(STATE, 0); sp = 0; /* Display message from abort" */ break;
-				default: store(STATE, 0); sp = 0; /* Display number of exception */ break;
+				case -1: store(STATE, 0); /* Aborted */ break;
+				case -2: store(STATE, 0); /* Display message from abort" */ break;
+				default: store(STATE, 0); System.out.printf(" #%d\n", pop()); break;
+				// TODO I'm not sure if data stack should be cleared or not
 			}
 		} while(true);
 	}
@@ -1024,7 +1025,8 @@ public class Sloth {
 
 	public void exit() { if (rp > 0) ip = rpop(); else ip = -1; }
 
-	public void _throw() { int v = pop(); if (v != 0) { throw new SlothException(v); } }
+	public void _throw(int v) { if (v != 0) { throw new SlothException(v); } }
+	public void _throw() { _throw(pop()); }
 	public void _catch(int q) {
 		int tsp = sp;
 		int trp = rp;
@@ -1093,6 +1095,8 @@ public class Sloth {
 	public int recfib(int n) { if (n > 1) return recfib(n - 1) + recfib(n - 2); else return n; }
 	public void fib() { push(recfib(pop())); }
 
+	public void exctest() { _throw(-15); }
+
 	public static void main(String[] args) {
 		Sloth x = new Sloth();
 		x.bootstrap();
@@ -1100,6 +1104,7 @@ public class Sloth {
 		x.colon("FIB", (vm) -> vm.fib());
 		x.colon(".S", (vm) -> vm.dump_stack());
 		x.colon("BYE", (vm) -> System.exit(0));
+		x.colon("EXCTEST", (vm) -> vm.exctest());
 
 		x.push(36);
 
