@@ -12,11 +12,139 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.util.function.Consumer;
 import java.io.FileNotFoundException;
+import java.nio.channels.FileChannel;
 
 public class Sloth {
+
+	// ** Virtual machine *******************************************************
+
+	public static int CELL = 4;
+	public static int CHAR = 2;	// Sloth uses 16 bit chars, as Java does
+
+	// TODO Add load/save image
+	// TODO Add tracing for debugging purposes
+	// TODO Add cloning of an already bootstrapped VM (like forth in C)
+	// TODO Add floating point stack and instructions
+	// TODO Add object stack and memory and instructions
+
+	// The virtual machine is language independent.
+
+	int s[];					// Parameter stack
+	int sp;						// Parameter stack pointer
+
+	// Helpers to get the most/least significant bits from a long integer, 
+	// used for working with double cell numbers which are a requirement for
+	// ANS Forth (even when not implementing the optional Double-Number word
+	// set).
+	public long msp(long v) { return (v & 0xFFFFFFFF00000000L); }
+	public long lsp(long v) { return (v & 0x00000000FFFFFFFFL); }
+
+	// Push/pop variants
+	public void dpush(long v) { push(v); push(v >> 32); }
+	public void push(long v) { push((int)lsp(v)); }
+	public void push(int v) { s[sp++] = v; }
+	public long dpop() { long b = lpop(); return msp(b << 32) + lsp(lpop()); }
+	public long lpop() { return (long)s[--sp]; }
+	public long upop() { return Integer.toUnsignedLong(s[--sp]); }
+	public long udpop() { long b = upop(); return msp(b << 32) + lsp(upop()); }
+	public int pop() { return s[--sp]; }
+
+	public int pick(int a) { return s[sp - a - 1]; }
+	public void place(int a, int v) { s[sp - a - 1] = v; }
+
+	public int top() { return pick(0); }
+
+	public void drop() { pop(); }
+	public void dup() { push(top()); }
+	public void swap() { int t = top(); place(0, pick(1)); place(1, t); }
+	public void over() { push(pick(1)); }
+	public void rot() { int t = top(); place(0, pick(2)); place(2, pick(1)); place(1, t); }
+
+	int r[];					// Return stack
+	int rp;						// Return stack pointer
+
+	public void rpush(int v) { r[rp++] = v; }
+	public int rpop() { return r[--rp]; }
+
+	public void to_r() { rpush(pop()); }
+	public void fetch_r() { push(r[rp - 1]); }
+	public void from_r() { push(rpop()); }
+
+	public void two_to_r() { swap(); to_r(); to_r(); }
+	public void two_from_r() { from_r(); from_r(); swap(); }
+
+	int idx[];				// Index stack
+	int idxp;					// Index stack pointer
+
+	public void idxpush(int v) { idx[idxp++] = v; }
+	public int idxpop() { return idx[--idxp]; }
+
+	public int idxpick(int a) { return idx[idxp - a - 1]; }
+
+	// -- Memory
+
+	ByteBuffer mem;		// Dictionary memory
+
+	public int fetch(int a) { return mem.getInt(a); }
+	public void store(int a, int v) { mem.putInt(a, v); }
+	public char cfetch(int a) { return mem.getChar(a); }
+	public void cstore(int a, char v) { mem.putChar(a, v); }
+
+	public void fetch() { push(fetch(pop())); }
+	public void store() { int a = pop(); store(a, pop()); }
+	public void cfetch() { push(cfetch(pop())); }
+	public void cstore() { int a = pop(); cstore(a, (char)pop()); }
+
+	public void two_fetch() { int a = pop(); push(fetch(a)); push(fetch(a + CELL)); }
+
+	public void cells() { place(0, pick(0) * CELL); }
+	public void chars() { place(0, pick(0) * CHAR); }
+
+	// -- Inner interpreter
+
+	public int ip;
+
+	public List<Consumer<Sloth>> primitives;
+
+	public int EXIT = -1;	// EXIT is the only required opcode value to be predefined
+
+	public int token() { int v = fetch(ip); ip += CELL; return v; }
+	public boolean valid_ip() { return ip >= 0 && ip < mem.capacity(); }
+	public void do_prim(int p) { primitives.get(-1 - p).accept(this); }
+	public boolean tail() { return !valid_ip() || fetch(ip) == EXIT; }
+
+	public void call(int q) { if (!tail()) rpush(ip); ip = q; }
+
+	// Negative xts represent primitive functions from the primitives list.
+	public void execute(int q) { if (q < 0) do_prim(q); else call(q); }
+	// Will execute until returning from current level, or an exception is thrown
+	public void inner() {	int t = rp; while (t <= rp && valid_ip()) { execute(token()); } }
+	public void trace(int q) {
+		execute(q);
+		int t = rp;
+		while (t <= rp && valid_ip()) {
+			System.out.printf("<%d> ", sp);
+			for (int i = 0; i < sp; i++) System.out.printf("%d ", s[i]);
+			System.out.printf(": [%d] %d ", ip, fetch(ip));
+			for (int i = rp - 1; i >= 0; i--) System.out.printf(": [%d] %d ", r[i], fetch(r[i]));
+			System.out.println();
+			execute(token());
+		}
+	}
+	// Eval is equivalent to execute but its meant to be called from Java, as
+	// it starts a new inner interpreter
+	public void eval(int q) { execute(q); inner(); }
+
+	public void execute() { if (ip == -1) { execute(pop()); inner(); } else execute(pop()); }
+	public void at_execute() { execute(fetch(pop())); }
+
+	public void exit() { if (rp > 0) ip = rpop(); else ip = -1; }
+
+	// -- Exceptions --
 
 	public class SlothException extends RuntimeException {
 		public int v;
@@ -24,8 +152,47 @@ public class Sloth {
 		public SlothException(int v) { this.v = v; }
 	}
 
-	public static int CELL = 4;
-	public static int CHAR = 2;	// Sloth uses 16 bit chars, as Java does
+	public void _throw(int v) { if (v != 0) { throw new SlothException(v); } }
+	public void _throw() { _throw(pop()); }
+	public void _catch(int q) {
+		int tsp = sp;
+		int trp = rp;
+		try { 
+			execute(q); 
+			push(0);
+		} catch(SlothException x) {
+			sp = tsp;
+			rp = trp;
+			push(x.v);
+		}
+	}
+	public void _catch() { _catch(pop()); }
+
+	public void load_image(String s) throws FileNotFoundException, IOException {
+		FileChannel channel = new FileInputStream(new File(s)).getChannel();
+
+		mem.position(0);
+		mem.limit(mem.capacity());
+
+		channel.read(mem);
+
+		channel.close();
+	}
+
+	public void save_image(String s) throws FileNotFoundException, IOException {
+		FileChannel channel = new FileOutputStream(new File(s), false).getChannel();
+
+		mem.position(here());
+		mem.flip();
+
+		channel.write(mem);
+
+		channel.close();
+
+		mem.limit(mem.capacity());
+	}
+
+	// **************************************************************************
 
 	// -- Outer interpreter -----------------------------------------------------
 
@@ -54,6 +221,8 @@ public class Sloth {
 			do { 
 				parse_name(); if (top() == 0) break;		// Parse until no more input
 				push(FORTH_RECOGNIZER); recognize();		// Recognize the token
+				// The absolute value of state is used to ensure the
+				// correct recognizer is called even when state is negative.
 				push((Math.abs(fetch(STATE)) * CELL) + pop()); at_execute();
 			} while (true);
 			drop(); drop();
@@ -161,6 +330,27 @@ public class Sloth {
 
 	// TODO
 
+	// Recognizer for strings --
+
+	public void recint_string() { /* NOOP */ }
+	public void reccomp_string() { /* TODO sliteral */ }
+	public void recpost_string() { /* TODO compile code to compile a sliteral */ }
+
+	public void rec_string() {
+		int l = pop();
+		int a = pop();
+		if (cfetch(a) == '"') {
+			// Input buffer must be parsed until matching " or end of line
+			store(IPOS, (a - ibuf) + 1);
+			push(ibuf + (fetch(IPOS) * CHAR));
+			parse('"');
+			place(0, pick(0) - 1);
+			push(RECTYPE_STRING);
+		} else {
+			push(RECTYPE_NULL);
+		}
+	}
+
 	public void recognize() {
 		int r = fetch(pop()); // Recognizer stack identifier (address)
 		int l = pop();
@@ -205,6 +395,14 @@ public class Sloth {
 		while (ipos < ilen && cfetch(ibuf + (ipos * CHAR)) < 33) ipos++;
 		push(ibuf + (ipos * CHAR));
 		while (ipos < ilen && cfetch(ibuf + (ipos * CHAR)) > 32) ipos++;
+		push((ibuf + (ipos * CHAR) - pick(0)) / CHAR);
+		store(IPOS, ipos + (ipos < ilen ? 1 : 0));
+	}
+
+	public void parse(char c) {
+		int ipos = fetch(IPOS);
+		push(ibuf + (ipos * CHAR));
+		while (ipos < ilen && cfetch(ibuf + (ipos * CHAR)) != c) ipos++;
 		push((ibuf + (ipos * CHAR) - pick(0)) / CHAR);
 		store(IPOS, ipos + (ipos < ilen ? 1 : 0));
 	}
@@ -440,6 +638,7 @@ public class Sloth {
 	public int RECTYPE_NT;
 	public int RECTYPE_NUM;
 	public int RECTYPE_DNUM;
+	public int RECTYPE_STRING;
 
 	public int DROP;
 
@@ -661,14 +860,20 @@ public class Sloth {
 		push(noname((vm) -> recpost_dnum()));
 		RECTYPE_DNUM = rectype("RECTYPE-DNUM");
 
+		push(noname((vm) -> recint_string()));
+		push(noname((vm) -> reccomp_string()));
+		push(noname((vm) -> recpost_string()));
+		RECTYPE_STRING = rectype("RECTYPE-STRING");
+
 		// Define default recognizer
 		comma(8);
-		comma(3);
+		comma(4);
 		store(FORTH_RECOGNIZER, here());
 		comma(noname((vm) -> rec_find()));
+		comma(noname((vm) -> rec_string()));
 		comma(noname((vm) -> rec_num()));
 		comma(noname((vm) -> rec_dnum()));
-		allot(5 * CELL);
+		allot(4 * CELL);
 
 		// -- Primitives ----------------------------------------------------------
 
@@ -769,6 +974,15 @@ public class Sloth {
 
 		colon("I", (vm) -> push(idxpick(0)));
 
+		// Input/output
+
+		colon("EMIT", (vm) -> emit());
+		colon("KEY", (vm) -> key());
+
+		// --
+
+		colon("LOAD-IMAGE", (vm) -> { try { load_image("sloth.rom"); } catch(FileNotFoundException e) { _throw(-38); } catch (IOException e) { _throw(-37); } });
+		colon("SAVE-IMAGE", (vm) -> { try { save_image("sloth.rom"); } catch(FileNotFoundException e) { _throw(-38); } catch (IOException e) { _throw(-37); } });
 	}
 
 	public void start_quotation() { 
@@ -929,143 +1143,6 @@ public class Sloth {
 		colon("3KEEP", (vm) -> { int xt = pop(); int v1 = pick(0); int v2 = pick(1); int v3 = pick(2); eval(xt); push(v3); push(v2); push(v1); });
 	}
 
-	// == Virtual machine =======================================================
-
-	// TODO Add load/save image
-	// TODO Add tracing for debugging purposes
-	// TODO Add cloning of an already bootstrapped VM (like forth in C)
-	// TODO Add floating point stack and instructions
-	// TODO Add object stack and memory and instructions
-
-	// The virtual machine is language independent.
-
-	int s[];					// Parameter stack
-	int sp;						// Parameter stack pointer
-
-	// Helpers to get the most/least significant bits from a long integer, 
-	// used for working with double cell numbers which are a requirement for
-	// ANS Forth (even when not implementing the optional Double-Number word
-	// set).
-	public long msp(long v) { return (v & 0xFFFFFFFF00000000L); }
-	public long lsp(long v) { return (v & 0x00000000FFFFFFFFL); }
-
-	// Push/pop variants
-	public void dpush(long v) { push(v); push(v >> 32); }
-	public void push(long v) { push((int)lsp(v)); }
-	public void push(int v) { s[sp++] = v; }
-	public long dpop() { long b = lpop(); return msp(b << 32) + lsp(lpop()); }
-	public long lpop() { return (long)s[--sp]; }
-	public long upop() { return Integer.toUnsignedLong(s[--sp]); }
-	public long udpop() { long b = upop(); return msp(b << 32) + lsp(upop()); }
-	public int pop() { return s[--sp]; }
-
-	public int pick(int a) { return s[sp - a - 1]; }
-	public void place(int a, int v) { s[sp - a - 1] = v; }
-
-	public int top() { return pick(0); }
-
-	public void drop() { pop(); }
-	public void dup() { push(top()); }
-	public void swap() { int t = top(); place(0, pick(1)); place(1, t); }
-	public void over() { push(pick(1)); }
-	public void rot() { int t = top(); place(0, pick(2)); place(2, pick(1)); place(1, t); }
-
-	int r[];					// Return stack
-	int rp;						// Return stack pointer
-
-	public void rpush(int v) { r[rp++] = v; }
-	public int rpop() { return r[--rp]; }
-
-	public void to_r() { rpush(pop()); }
-	public void fetch_r() { push(r[rp - 1]); }
-	public void from_r() { push(rpop()); }
-
-	public void two_to_r() { swap(); to_r(); to_r(); }
-	public void two_from_r() { from_r(); from_r(); swap(); }
-
-	int idx[];				// Index stack
-	int idxp;					// Index stack pointer
-
-	public void idxpush(int v) { idx[idxp++] = v; }
-	public int idxpop() { return idx[--idxp]; }
-
-	public int idxpick(int a) { return idx[idxp - a - 1]; }
-
-	// -- Memory
-
-	ByteBuffer mem;		// Dictionary memory
-
-	public int fetch(int a) { return mem.getInt(a); }
-	public void store(int a, int v) { mem.putInt(a, v); }
-	public char cfetch(int a) { return mem.getChar(a); }
-	public void cstore(int a, char v) { mem.putChar(a, v); }
-
-	public void fetch() { push(fetch(pop())); }
-	public void store() { int a = pop(); store(a, pop()); }
-	public void cfetch() { push(cfetch(pop())); }
-	public void cstore() { int a = pop(); cstore(a, (char)pop()); }
-
-	public void two_fetch() { int a = pop(); push(fetch(a)); push(fetch(a + CELL)); }
-
-	public void cells() { place(0, pick(0) * CELL); }
-	public void chars() { place(0, pick(0) * CHAR); }
-
-	// -- Inner interpreter
-
-	public int ip;
-
-	public List<Consumer<Sloth>> primitives;
-
-	public int EXIT = -1;	// EXIT is the only required opcode value to be predefined
-
-	public int token() { int v = fetch(ip); ip += CELL; return v; }
-	public boolean valid_ip() { return ip >= 0 && ip < mem.capacity(); }
-	public void do_prim(int p) { primitives.get(-1 - p).accept(this); }
-	public boolean tail() { return !valid_ip() || fetch(ip) == EXIT; }
-
-	public void call(int q) { if (!tail()) rpush(ip); ip = q; }
-
-	// Negative xts represent primitive functions from the primitives list.
-	public void execute(int q) { if (q < 0) do_prim(q); else call(q); }
-	// Will execute until returning from current level, or an exception is thrown
-	public void inner() {	int t = rp; while (t <= rp && valid_ip()) { execute(token()); } }
-	public void trace(int q) {
-		execute(q);
-		int t = rp;
-		while (t <= rp && valid_ip()) {
-			System.out.printf("<%d> ", sp);
-			for (int i = 0; i < sp; i++) System.out.printf("%d ", s[i]);
-			System.out.printf(": [%d] %d ", ip, fetch(ip));
-			for (int i = rp - 1; i >= 0; i--) System.out.printf(": [%d] %d ", r[i], fetch(r[i]));
-			System.out.println();
-			execute(token());
-		}
-	}
-	// Eval is equivalent to execute but its meant to be called from Java, as
-	// it starts a new inner interpreter
-	public void eval(int q) { execute(q); inner(); }
-
-	public void execute() { if (ip == -1) { execute(pop()); inner(); } else execute(pop()); }
-	public void at_execute() { execute(fetch(pop())); }
-
-	public void exit() { if (rp > 0) ip = rpop(); else ip = -1; }
-
-	public void _throw(int v) { if (v != 0) { throw new SlothException(v); } }
-	public void _throw() { _throw(pop()); }
-	public void _catch(int q) {
-		int tsp = sp;
-		int trp = rp;
-		try { 
-			execute(q); 
-			push(0);
-		} catch(SlothException x) {
-			sp = tsp;
-			rp = trp;
-			push(x.v);
-		}
-	}
-	public void _catch() { _catch(pop()); }
-
 	// -- Constructor
 
 	public Sloth() {
@@ -1118,7 +1195,12 @@ public class Sloth {
 		x.ANS_bootstrap();
 		x.Sloth_bootstrap();
 
-		System.out.println("SLOTH v1.0.0 (JVM implementation), jordipbou 2024");
+		// System.out.println("  __.  .    _.  ... .  .");
+		// System.out.println(" /___  |   /  \\  |  |..|");
+		// System.out.println(" .__/  |__ \\._/  |  |  |");
+
+		System.out.println("SLOTH (SLOw forTH) for the JVM");
+		System.out.println("v1.0.0 jordipbou, 2024");
 
 		x.quit();
 
