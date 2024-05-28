@@ -1,4 +1,4 @@
-// Virtual Forth computer and API
+// Virtual Forth computer, API and Forth implementation on top of it
 // jordipbou, 2024
 
 package io.github.jordipbou;
@@ -25,13 +25,14 @@ public class Sloth {
 	public static int CELL = 4;
 	public static int CHAR = 2;	// Sloth uses 16 bit chars, as Java does
 
-	// TODO Add load/save image
-	// TODO Add tracing for debugging purposes
 	// TODO Add cloning of an already bootstrapped VM (like forth in C)
 	// TODO Add floating point stack and instructions
 	// TODO Add object stack and memory and instructions
 
-	// The virtual machine is language independent.
+	// The virtual machine is language independent. It gives enough blocks
+	// to construct a Forth from it.
+
+	// -- Parameter stack --
 
 	int s[];					// Parameter stack
 	int sp;						// Parameter stack pointer
@@ -39,7 +40,7 @@ public class Sloth {
 	// Helpers to get the most/least significant bits from a long integer, 
 	// used for working with double cell numbers which are a requirement for
 	// ANS Forth (even when not implementing the optional Double-Number word
-	// set).
+	// set!).
 	public long msp(long v) { return (v & 0xFFFFFFFF00000000L); }
 	public long lsp(long v) { return (v & 0x00000000FFFFFFFFL); }
 
@@ -58,11 +59,7 @@ public class Sloth {
 
 	public int top() { return pick(0); }
 
-	public void drop() { pop(); }
-	public void dup() { push(top()); }
-	public void swap() { int t = top(); place(0, pick(1)); place(1, t); }
-	public void over() { push(pick(1)); }
-	public void rot() { int t = top(); place(0, pick(2)); place(2, pick(1)); place(1, t); }
+	// -- Return stack --
 
 	int r[];					// Return stack
 	int rp;						// Return stack pointer
@@ -70,20 +67,12 @@ public class Sloth {
 	public void rpush(int v) { r[rp++] = v; }
 	public int rpop() { return r[--rp]; }
 
-	public void to_r() { rpush(pop()); }
-	public void fetch_r() { push(r[rp - 1]); }
-	public void from_r() { push(rpop()); }
+	// -- Loop registers --
 
-	public void two_to_r() { swap(); to_r(); to_r(); }
-	public void two_from_r() { from_r(); from_r(); swap(); }
+	int ix, jx, kx;
 
-	int idx[];				// Index stack
-	int idxp;					// Index stack pointer
-
-	public void idxpush(int v) { idx[idxp++] = v; }
-	public int idxpop() { return idx[--idxp]; }
-
-	public int idxpick(int a) { return idx[idxp - a - 1]; }
+	public void ipush() { rpush(kx); kx = jx; jx = ix; }
+	public void ipop() { ix = jx; jx = kx; kx = rpop(); }
 
 	// -- Memory
 
@@ -94,12 +83,8 @@ public class Sloth {
 	public char cfetch(int a) { return mem.getChar(a); }
 	public void cstore(int a, char v) { mem.putChar(a, v); }
 
-	public void fetch() { push(fetch(pop())); }
-	public void store() { int a = pop(); store(a, pop()); }
-	public void cfetch() { push(cfetch(pop())); }
-	public void cstore() { int a = pop(); cstore(a, (char)pop()); }
-
-	public void two_fetch() { int a = pop(); push(fetch(a)); push(fetch(a + CELL)); }
+	public int aligned(int a) { return (a + (CELL - 1)) & ~(CELL - 1); }
+	public int caligned(int a) { return (a + (CHAR - 1)) & ~(CHAR - 1); }
 
 	public void cells() { place(0, pick(0) * CELL); }
 	public void chars() { place(0, pick(0) * CHAR); }
@@ -110,19 +95,21 @@ public class Sloth {
 
 	public List<Consumer<Sloth>> primitives;
 
+	// NONAME adds an anonymous primitive that can be called by its xt
+	public int noname(Consumer<Sloth> c) { primitives.add(c); return 0 - primitives.size(); }
+
+	// TODO This should be defined in bootstrap_vm?
 	public int EXIT = -1;	// EXIT is the only required opcode value to be predefined
 
 	public int token() { int v = fetch(ip); ip += CELL; return v; }
+
 	public boolean valid_ip() { return ip >= 0 && ip < mem.capacity(); }
 	public void do_prim(int p) { primitives.get(-1 - p).accept(this); }
-	public boolean tail() { return !valid_ip() || fetch(ip) == EXIT; }
-
-	public void call(int q) { if (!tail()) rpush(ip); ip = q; }
-
-	// Negative xts represent primitive functions from the primitives list.
+	public void call(int q) { rpush(ip); ip = q; }
 	public void execute(int q) { if (q < 0) do_prim(q); else call(q); }
 	// Will execute until returning from current level, or an exception is thrown
 	public void inner() {	int t = rp; while (t <= rp && valid_ip()) { execute(token()); } }
+
 	public void trace(int q) {
 		execute(q);
 		int t = rp;
@@ -139,7 +126,6 @@ public class Sloth {
 	// it starts a new inner interpreter
 	public void eval(int q) { execute(q); inner(); }
 
-	public void execute() { if (ip == -1) { execute(pop()); inner(); } else execute(pop()); }
 	public void at_execute() { execute(fetch(pop())); }
 
 	public void exit() { if (rp > 0) ip = rpop(); else ip = -1; }
@@ -168,27 +154,135 @@ public class Sloth {
 	}
 	public void _catch() { _catch(pop()); }
 
+	// ** Basic primitives ******************************************************
+
+	// These functions are meant to be used as building blocks to construct
+	// other words from Java.
+
+	public int BRANCH, zBRANCH, LIT, BLOCK, STRING;
+
+	public void branch() { ip += token(); }
+	public void zbranch() { if(pop() == 0) ip += token(); else ip += CELL; }
+	public void lit() { push(token()); }
+	public void block() { push(ip + CELL); ip += token(); }
+	public void string() { int l = token(); push(ip); push(l); ip = aligned(ip + l); }
+
+	public int EXECUTE;
+
+	public void execute() { if (ip == -1) { execute(pop()); inner(); } else execute(pop()); }
+
+	public int STORE, FETCH, CSTORE, CFETCH;
+
+	public void fetch() { push(fetch(pop())); }
+	public void store() { int a = pop(); store(a, pop()); }
+	public void cfetch() { push(cfetch(pop())); }
+	public void cstore() { int a = pop(); cstore(a, (char)pop()); }
+
+	public int DROP, DUP, SWAP, OVER, ROT, PICK;
+
+	public void drop() { pop(); }
+	public void dup() { push(pick(0)); }
+	public void swap() { int t = pick(0); place(0, pick(1)); place(1, t); }
+	public void over() { push(pick(1)); }
+	public void rot() { int t = pick(0); place(0, pick(2)); place(2, pick(1)); place(1, t); }
+	public void pick() { push(pick(pop())); }
+
+	public int TO_R, FETCH_R, FROM_R;
+
+	public void to_r() { rpush(pop()); }
+	public void fetch_r() { push(r[rp - 1]); }
+	public void from_r() { push(rpop()); }
+
+	public int ADD, SUB, MUL, DIV, MOD;
+
+	public void add() { place(1, pick(1) + pick(0)); drop(); }
+	public void sub() { place(1, pick(1) - pick(0)); drop(); }
+	public void mul() { place(1, pick(1) * pick(0)); drop(); }
+	public void div() { place(1, pick(1) / pick(0)); drop(); }
+	public void mod() { place(1, pick(1) % pick(0)); drop(); }
+
+	public int INVERT, AND, OR, XOR;
+
+	public void invert() { place(0, ~pick(0)); }
+	public void and() {  place(1, pick(1) & pick(0)); drop(); }
+	public void or() { place(1, pick(1) | pick(0)); drop(); }
+	public void xor() { place(1, pick(1) ^ pick(0)); drop(); }
+
+	public void bootstrap_vm() {
+		// Previous functions are added to primitives list to be used from Forth code.
+		// Their index is stored in variables to compile Forth code from Java.
+
+		EXIT = noname((vm) -> exit());
+
+		BRANCH = noname((vm) -> branch());
+		zBRANCH = noname((vm) -> zbranch());
+		LIT = noname((vm) -> lit());
+		BLOCK = noname((vm) -> block());
+		STRING = noname((vm) -> string());
+
+		EXECUTE = noname((vm) -> execute());
+
+		STORE = noname((vm) -> store());
+		FETCH = noname((vm) -> fetch());
+		CSTORE = noname((vm) -> cstore());
+		CFETCH = noname((vm) -> cfetch());
+
+		DROP = noname((vm) -> drop());
+		DUP = noname((vm) -> dup());
+		SWAP = noname((vm) -> swap());
+		OVER = noname((vm) -> over());
+		ROT = noname((vm) -> rot());
+		PICK = noname((vm) -> pick());
+
+		TO_R = noname((vm) -> to_r());
+		FETCH_R = noname((vm) -> fetch_r());
+		FROM_R = noname((vm) -> from_r());
+
+		ADD = noname((vm) -> add());
+		SUB = noname((vm) -> sub());
+		MUL = noname((vm) -> mul());
+		DIV = noname((vm) -> div());
+		MOD = noname((vm) -> mod());
+
+		INVERT = noname((vm) -> invert());
+		AND = noname((vm) -> and());
+		OR = noname((vm) -> or());
+		XOR = noname((vm) -> xor());
+	}
+
+	// **************************************************************************
+	// Temporal rearrangement of some functions
+	// **************************************************************************
+
+	public void two_to_r() { swap(); to_r(); to_r(); }
+	public void two_from_r() { from_r(); from_r(); swap(); }
+
+	public void two_fetch() { int a = pop(); push(fetch(a)); push(fetch(a + CELL)); }
+
+	// int idx[];				// Index stack
+	// int idxp;					// Index stack pointer
+
+	// public void idxpush(int v) { idx[idxp++] = v; }
+	// public int idxpop() { return idx[--idxp]; }
+
+	// public int idxpick(int a) { return idx[idxp - a - 1]; }
+
+	// ** ROM operations ********************************************************
+
 	public void load_image(String s) throws FileNotFoundException, IOException {
 		FileChannel channel = new FileInputStream(new File(s)).getChannel();
-
 		mem.position(0);
 		mem.limit(mem.capacity());
-
 		channel.read(mem);
-
 		channel.close();
 	}
 
 	public void save_image(String s) throws FileNotFoundException, IOException {
 		FileChannel channel = new FileOutputStream(new File(s), false).getChannel();
-
 		mem.position(here());
 		mem.flip();
-
 		channel.write(mem);
-
 		channel.close();
-
 		mem.limit(mem.capacity());
 	}
 
@@ -625,11 +719,11 @@ public class Sloth {
 
 	// Some required primitives to store their xt to be compiled from Java
 
-	public int doLIT;
-	public int doDOES;
-	public int doBLOCK;
-	public int BRANCH;
-	public int zBRANCH;
+	// public int LIT;
+	// public int doDOES;
+	// public int BLOCK;
+	// public int BRANCH;
+	// public int zBRANCH;
 
 	public int LITERAL;
 	public int COMPILE;
@@ -640,7 +734,7 @@ public class Sloth {
 	public int RECTYPE_DNUM;
 	public int RECTYPE_STRING;
 
-	public int DROP;
+	// public int DROP;
 
 	// -- Contiguous memory -----------------------------------------------------
 
@@ -650,16 +744,11 @@ public class Sloth {
 	public int here() { return dp; }
 	public void here(int v) { dp = v; }
 	public void allot(int v) { 
-		if (here() + v > mem.capacity()) {
-			/* Throw exception */
-		} else {
-			here(here() + v);
-		}
+		if (here() + v > mem.capacity()) _throw(-8);
+		else here(here() + v);
 	}
 	public void allot() { allot(pop()); }
 	public void align() { here((here() + (CELL - 1)) & ~(CELL - 1)); }
-	public int aligned(int a) { return (a + (CELL - 1)) & ~(CELL - 1); }
-	public int caligned(int a) { return (a + (CHAR - 1)) & ~(CHAR - 1); }
 
 	// -- Transient memory ------------------------------------------------------
 
@@ -722,10 +811,10 @@ public class Sloth {
 	public void compile(int v) { comma(v); }
 	public void compile() { compile(pop()); }
 
-	public void literal(int v) { compile(doLIT); compile(v); }
+	public void literal(int v) { compile(LIT); compile(v); }
 	public void literal() { literal(pop()); }
 
-	public void two_literal(long v) { compile(doLIT); compile((int)(msp(v) >> 32)); compile(doLIT); compile((int)lsp(v)); }
+	public void two_literal(long v) { compile(LIT); compile((int)(msp(v) >> 32)); compile(LIT); compile((int)lsp(v)); }
 	public void two_literal() { two_literal(dpop()); }
 
 	// -- Defining words --------------------------------------------------------
@@ -786,9 +875,6 @@ public class Sloth {
 
 	public void header(String s) { str_to_transient(s); header(); }
 
-	// NONAME adds an anonymous primitive that can be called by its xt
-	public int noname(Consumer<Sloth> c) { primitives.add(c); return 0 - primitives.size(); }
-
 	// COLON is used to create a named primitive 
 	public int colon(String s, Consumer<Sloth> c) { 
 		header(s); 
@@ -835,8 +921,8 @@ public class Sloth {
 		BRANCH = colon("BRANCH", (vm) -> { ip += token(); });
 		zBRANCH = colon("?BRANCH", (vm) -> { if(pop() == 0) ip += token(); else ip += CELL; });
 
-		doLIT = colon("doLIT", (vm) -> push(token()));
-		doBLOCK = colon("doBLOCK", (vm) -> { push(ip + CELL); ip += token(); });
+		LIT = colon("LIT", (vm) -> push(token()));
+		BLOCK = colon("BLOCK", (vm) -> { push(ip + CELL); ip += token(); });
 
 		// Define basic recognizer types
 
@@ -951,7 +1037,7 @@ public class Sloth {
 				latestxt(there());
 			} else {
 				// Nested quotation (inside a colon or another quotation)
-				compile(doBLOCK);
+				compile(BLOCK);
 				push(here_or_there());
 				comma(0);
 				latestxt(here_or_there());
@@ -968,11 +1054,14 @@ public class Sloth {
 
 		// Loops
 
-		colon("TIMES", (vm) -> { int q = pop(); int n = pop(); for (int i = 0; i < n; i++) { idxpush(i); eval(q); idxpop(); } });
-		DOLOOP = colon("DO/LOOP", (vm) -> { int q = pop(); int v1 = pop(); int v2 = pop(); for (int i = v1; i < v2; i++) { idxpush(i); eval(q); idxpop(); } });
-		colon("DO/+LOOP", (vm) -> { int q = pop(); int v1 = pop(); int v2 = pop(); for (int i = v1; i < v2;) { idxpush(i); eval(q); idxpop(); i += pop(); } });
+		colon("TIMES", (vm) -> { ipush(); int q = pop(); int n = pop(); for (ix = 0; ix < n; ix++) eval(q); ipop(); });
+		colon("DO/LOOP", (vm) -> { ipush(); int q = pop(); int i = pop(); int l = pop(); for (ix = i; ix < l; ix++) eval(q); ipop(); });
+		// TODO DO/+LOOP does not work for -10 0 with -1 step
+		colon("DO/+LOOP", (vm) -> { ipush(); int q = pop(); int i = pop(); int l = pop(); for (ix = i; ix < l;) { eval(q); ix += pop(); } ipop(); });
 
-		colon("I", (vm) -> push(idxpick(0)));
+		colon("I", (vm) -> push(ix));
+		colon("J", (vm) -> push(jx));
+		colon("K", (vm) -> push(kx));
 
 		// Input/output
 
@@ -995,7 +1084,7 @@ public class Sloth {
 			latestxt(there());
 		} else {
 			// Nested quotation (inside a colon or another quotation)
-			compile(doBLOCK);
+			compile(BLOCK);
 			push(here_or_there());
 			comma(0);
 			latestxt(here_or_there());
@@ -1119,10 +1208,10 @@ public class Sloth {
 		colon("ON", (vm) -> store(pop(), ~0));
 		colon("OFF", (vm) -> store(pop(), 0));
 
-		colon("LITERAL", (vm) -> { compile(doLIT); comma(); }); set_immediate();
+		colon("LITERAL", (vm) -> { compile(LIT); comma(); }); set_immediate();
 
-		colon("[']", (vm) -> { tick(); compile(doLIT); comma(); }); set_immediate();
-		colon("2LITERAL", (vm) -> { swap(); compile(doLIT); comma(); compile(doLIT); comma(); }); set_immediate();
+		colon("[']", (vm) -> { tick(); compile(LIT); comma(); }); set_immediate();
+		colon("2LITERAL", (vm) -> { swap(); compile(LIT); comma(); compile(LIT); comma(); }); set_immediate();
 
 		// TODO Should this two take into account postpone state or negative state
 		// values?
@@ -1148,12 +1237,10 @@ public class Sloth {
 	public Sloth() {
 		s = new int[256];
 		r = new int[256];
-		idx = new int[12];
 		mem = ByteBuffer.allocateDirect(65536);
 		primitives = new ArrayList<Consumer<Sloth>>();
 		sp = 0;
 		rp = 0;
-		idxp = 0;
 		ip = -1;
 		dp = 0;
 		tp = MARGIN;
@@ -1191,6 +1278,19 @@ public class Sloth {
 
 	public static void main(String[] args) {
 		Sloth x = new Sloth();
+		// x.bootstrap_vm(); // TODO This could be called on constructor?
+
+		// x.store(0, x.LIT);
+		// x.store(4, 2);
+		// x.store(8, x.LIT);
+		// x.store(12, 3);
+		// x.store(16, x.ADD);
+		// x.store(20, x.EXIT);
+
+		// x.ip = 0;
+		// x.inner();
+
+		// x.dump_stack();
 		x.bootstrap();
 		x.ANS_bootstrap();
 		x.Sloth_bootstrap();
@@ -1440,7 +1540,7 @@ public class Sloth {
 	// // -- Primitives to be accessed from Java -----------------------------------
 
 	// public int EXIT;
-	// public int doLIT;
+	// public int LIT;
 
 	// // -- Forth state -----------------------------------------------------------
 
@@ -1489,7 +1589,7 @@ public class Sloth {
 	// //}
 
 	// //public void compile(int v) { comma(v); }
-	// //public void literal(int v) { compile(doLIT); compile(v); }
+	// //public void literal(int v) { compile(LIT); compile(v); }
 
 	// //// Copies a string object content to transient memory
 
@@ -1530,9 +1630,9 @@ public class Sloth {
 	// //// Primitives that need to be compiled from Java code
 
 	// //public static int EXIT;
-	// //public static int doLIT;
+	// //public static int LIT;
 	// //public static int doDOES;
-	// //public static int doBLOCK;
+	// //public static int BLOCK;
 	// //public static int COMPILE;
 	// //public static int BRANCH;
 	// //public static int zBRANCH;
@@ -1802,7 +1902,7 @@ public class Sloth {
 	// //public void start_quotation() {
 	// //	if (fetch(STATE) > 0) {
 	// //		align();
-	// //		compile(doBLOCK);
+	// //		compile(BLOCK);
 	// //		push(here());
 	// //		comma(0);
 	// //		latestxt(here());
@@ -1813,7 +1913,7 @@ public class Sloth {
 	// //		store(STATE, fetch(STATE) - 1);
 	// //	} else {
 	// //		talign();
-	// //		compile(doBLOCK);
+	// //		compile(BLOCK);
 	// //		push(there());
 	// //		comma(0);
 	// //		latestxt(there());
@@ -1874,7 +1974,7 @@ public class Sloth {
 	// // 					if (xt(w) != 0) eval(xt(w));
 	// // 				} else {
 	// // 					System.out.println("COMPILING");
-	// // 					if (!(has_flag(w, COLON))) { literal(dt(w)); } // comma(doLIT); comma(dt(w)); }
+	// // 					if (!(has_flag(w, COLON))) { literal(dt(w)); } // comma(LIT); comma(dt(w)); }
 	// // 					if (xt(w) != 0) compile(xt(w)); // comma(xt(w));
 	// // 				}
 	// // 			} else {
@@ -1883,7 +1983,7 @@ public class Sloth {
 	// // 				for (int i = 0; i < u; i++) sb.append(cfetch(caddr + (i * CHAR)));
 	// // 				int n = (int)Long.parseLong(sb.toString(), fetch(BASE));
 	// // 				if (fetch(STATE) == 0) push(n);
-	// // 				else { comma(doLIT); comma(n); }
+	// // 				else { comma(LIT); comma(n); }
 	// // 			}
 	// // 		}
 	// // 	}
@@ -1924,8 +2024,8 @@ public class Sloth {
 	// // 	// its xt on variables.
 	// // 	primitive("EXIT", (vm) -> exit());
 	// // 	EXIT = xt(latest());
-	// // 	primitive("doLIT", (vm) -> push(token()));
-	// // 	doLIT = xt(latest());
+	// // 	primitive("LIT", (vm) -> push(token()));
+	// // 	LIT = xt(latest());
 	// // 	primitive("doDOES", (vm) -> xt(latest(), pop()));
 	// // 	doDOES = xt(latest());
 	// // 	primitive("COMPILE,", (vm) -> comma(pop()));
@@ -1936,8 +2036,8 @@ public class Sloth {
 	// // 	primitive("?BRANCH", (vm) -> { if (pop() == 0) ip += token(); else ip += CELL; });
 	// // 	zBRANCH = xt(latest());
 
-	// // 	primitive("doBLOCK", (vm) -> { int v = token(); push(ip); ip += v - CELL; });
-	// // 	doBLOCK = xt(latest());
+	// // 	primitive("BLOCK", (vm) -> { int v = token(); push(ip); ip += v - CELL; });
+	// // 	BLOCK = xt(latest());
 
 	// // 	primitive("doSTRING", (vm) -> { int l = token(); push(ip); push(l); ip += (l + (CELL - 1)) & ~(CELL - 1);	});
 
@@ -2074,7 +2174,7 @@ public class Sloth {
 
 	// // 	// Quotations -------------------------------------------------------------
 
-	// // 	primitive("[:", (vm) -> { compile(doBLOCK); push(here()); comma(0); }); immediate();
+	// // 	primitive("[:", (vm) -> { compile(BLOCK); push(here()); comma(0); }); immediate();
 	// // 	primitive(";]", (vm) -> { compile(EXIT); int a = pop(); store(a, here() - a); }); immediate();
 
 	// // 	// Input/output -----------------------------------------------------------
