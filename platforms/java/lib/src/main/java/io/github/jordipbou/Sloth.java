@@ -268,6 +268,7 @@ public class Sloth {
 		ipop(); 
 	}
 
+	// TODO I'm not sure if I need iloop, I still have not used it
 	public void iloop() {
 		ipush();
 		int q = pop();
@@ -506,6 +507,7 @@ public class Sloth {
 		if (!has_flag(w, COLON)) { literal(dt(w)); }
 		if (xt(w) != 0) {
 			if (has_flag(w, IMMEDIATE)) { push(xt(w)); execute(); }
+			else if (has_flag(w, INFINITE)) { push(xt(w)); execute(); }
 			else { compile(xt(w)); }
 		}
 	}
@@ -514,6 +516,7 @@ public class Sloth {
 		if (!has_flag(w, COLON)) { literal(dt(w)); compile(LITERAL); }
 		if (xt(w) != 0) {
 			if (has_flag(w, IMMEDIATE)) { compile(xt(w)); }
+			else if (has_flag(w, INFINITE)) { push(xt(w)); execute(); }
 			else { literal(xt(w)); compile(COMPILE); }
 		}
 	}
@@ -775,6 +778,7 @@ public class Sloth {
 	public static char HIDDEN = 1;
 	public static char COLON = 2;
 	public static char IMMEDIATE = 4;
+	public static char INFINITE = 8;
 
 	public int latest() { return fetch(LATEST); }
 	public void latest(int v) { store(LATEST, v); }
@@ -805,6 +809,7 @@ public class Sloth {
 	public void set_hidden() { set_flag(latest(), (char)(flags(latest()) | HIDDEN)); }
 	public void set_colon() { set_flag(latest(), (char)(flags(latest()) | COLON)); }
 	public void set_immediate() { set_flag(latest(), (char)(flags(latest()) | IMMEDIATE)); }
+	public void set_infinite() { set_flag(latest(), (char)(flags(latest()) | INFINITE)); }
 
 	public void header(String s) { str_to_transient(s); header(); }
 	public void header() {
@@ -1085,6 +1090,11 @@ public class Sloth {
 
 		colon("[:", (vm) -> start_quotation()); set_immediate();
 		colon(";]", (vm) -> end_quotation()); set_immediate();
+
+		colon("]", (vm) -> store(STATE, fetch(STATE) + 1)); set_infinite();
+		colon("]]", (vm) -> store(STATE, 2)); set_infinite();
+		colon("[[", (vm) -> store(STATE, 0)); set_infinite();
+		colon("[", (vm) -> store(STATE, fetch(STATE) - 1)); set_infinite();
 
 		colon("SOURCE", (vm) -> { push(ibuf); push(ilen); });
 		colon(">IN", (vm) -> push(IPOS));

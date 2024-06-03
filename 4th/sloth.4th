@@ -2,143 +2,206 @@
 
 ?: \	source >in ! drop ; immediate
 
-\ TODO Try to add parse earlier to allow stack comments
-\ TODO Add more recognizers (string, double numbers...)
-\ TODO Add numeric output
-\ TODO Add tools (dump trace debug)
+\ Now that we can do end-of-line comments, let's comment the first line on top:
+\ ?: allows conditional compilation of words with one line definitions only.
 
-?: [		0 state ! ; immediate
-?: ]		1 state ! ; immediate	\ This will not return to -1 if needed !!!
+\ SLOTH is a Forth implementation that tries to implement as much of words as
+\ possible in Forth itself, allowing easier implementation and porting of the
+\ core words.
 
-\ HOT (here-or-there) allows compilation to contiguous or transient
-\ memory depending of value of state, allowing use of quotations and
-\ control structures in interpretation state.
+\ The current required set of primitives is:
 
-?: HOT		state @ 0 < [: there ;] [: here ;] choose ;
+\ EXIT
+\ LIT BLOCK STRING
+\ DROP SWAP PICK
+\ >R R>
+\ @ ! C@ C!
+\ - */MOD
+\ AND OR INVERT
+\ : ; POSTPONE IMMEDIATE [: ;]
+\ PARSE-NAME SOURCE >IN 
+\ FIND-NAME '
+\ CHOOSE DOLOOP LEAVE I J K
+\ STATE LATEST CURRENT
 
-\ Control structures ---
+\ The next section defines enough words to allow for parsing, one of the most
+\ fundamental activities to have a complete Forth environment.
 
-?: AHEAD	postpone branch hot 0 , ; immediate
-?: IF		postpone ?branch hot 0 , ; immediate
-?: THEN		hot over - swap ! ; immediate
+\ -- Basic stack shuffling ----------------------------------------------------
 
-?: BEGIN	hot ; immediate
-?: UNTIL	postpone ?branch hot - , ; immediate
-?: AGAIN	postpone branch hot - , ; immediate
+?: DUP			0 pick ;					\ ( x -- x x )
+?: OVER			1 pick ;					\ ( x1 x2 -- x1 x2 x1 )
+?: TUCK			swap over ;					\ ( x1 x2 -- x2 x1 x2 )
+?: NIP			swap drop ;					\ ( x1 x2 -- x2 )
 
-?: ELSE		postpone ahead swap postpone then ; immediate
+\ -- Basic memory -------------------------------------------------------------
 
-?: WHILE	postpone if swap ; immediate
-?: REPEAT	postpone again postpone then ; immediate
+?: CHAR			1 chars ;					\ ( -- u )
 
-?: LITERAL	postpone lit , ; immediate 
-?: 2LITERAL swap postpone literal postpone literal ; 
+?: 1+!			dup @ 1 + swap ! ;			\ ( a-addr -- ) non ANS
 
-?: [']		' postpone literal ; immediate 
+\ HOT (here-or-there) allows compilation to transient regions
+?: HOT			state @ 0 < [: there ;] [: here ;] choose ;	\ ( -- n )
 
-\ Stack shuffling ---
+\ -- Basic control structures -------------------------------------------------
 
-?: DUP		0 pick ;				\ ( x -- x x )
-?: OVER		1 pick ;				\ ( x1 x2 -- x1 x2 x1 )
-?: NIP		swap drop ;				\ ( x1 x2 -- x2 )
-?: TUCK		swap over ;				\ ( x1 x2 -- x2 x1 x2 )
-?: ROT		>r swap r> swap ;		\ ( x1 x2 x3 -- x2 x3 x1 )
-?: -ROT		rot rot ;				\ ( x1 x2 x3 -- x3 x1 x2 ) Non ANS
-?: ?DUP		dup if dup then ; \ ( x -- 0 | x x )
+?: AHEAD		postpone branch hot 0 , ; immediate
+?: IF			postpone ?branch hot 0 , ; immediate
+?: THEN			hot over - swap ! ; immediate
 
-?: 2DUP		over over ;				\ ( x1 x2 -- x1 x2 x1 x2 )
-?: 2DROP	drop drop ;				\ ( x1 x2 -- )
-?: 2OVER	3 pick 3 pick ;			\ ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 )
-?: 2SWAP	rot >r rot r> ; 		\ ( x1 x2 x3 x4 -- x3 x4 x1 x2 )
+?: ELSE			postpone ahead swap postpone then ; immediate
 
-?: 3DROP	drop drop drop ;		\ ( x1 x2 x3 -- )
+?: BEGIN		hot ; immediate
+?: UNTIL		postpone ?branch hot - , ; immediate
+?: AGAIN		postpone branch hot - , ; immediate
 
-?: R@		r> r> dup >r swap >r ;	\ ( -- x ) ( R: x -- x )
+?: WHILE		postpone if swap ; immediate
+?: REPEAT		postpone again postpone then ; immediate
 
-\ ( x1 x2 -- ) ( R: -- x1 x2 )
-?: 2>R		postpone swap postpone >r postpone >r ; immediate
-\ ( -- x1 x2 ) ( R: x1 x2 -- )
-?: 2R>		postpone r> postpone r> postpone swap ; immediate
-\ ( -- x1 x2 ) ( R: x1 x2 -- x1 x2 )
-?: 2R@		postpone r> postpone r> postpone 2dup postpone 2>r ; immediate
+\ -- Basic comparisons --------------------------------------------------------
+
+?: <>			= invert ;					\ ( x1 x2 -- flag )
+?: 0=			if 0 else 0 invert then ;	\ ( x -- flag )
+?: 0<>			0= 0= ;						\ ( n -- flag )
+?: 0<			0 < ;						\ ( n -- flag )
+
+\ -- Basic arithmetic ---------------------------------------------------------
+
+?: +			0 swap - - ;				\ ( x1 x2 -- x3 )
+
+\ -- Parsing (required by stack comments) -------------------------------------
+
+?: /STRING		tuck - >r chars + r> ;		\ ( c-addr1 u1 n -- c-addr2 u2 )
+
+\ Puts on stack the non parsed area of source
+?: /SOURCE		source >in @ /string dup 0< if drop 0 then ; \ ( -- c-addr u )
+
+?: <P			/source ; \ Start parsing (similar to <# for numberic output)
+?: *P			>r begin /source nip while /source drop c@ r@ execute while >in 1+! repeat then r> drop ;
+?: P>			/source nip dup >r - r> if >in 1+! then ; \ End parsing
+
+?: PARSE		<p rot [: over <> ;] *p drop p> ;
+
+\ ( "ccc<paren>" -- )
+?: (				41 parse drop drop ; immediate 
+
+\ Now we can use stack comments too !!
+
+\ -- Conditional compilation --------------------------------------------------
+
+?: [DEFINED] ( "<spaces>name ... " -- flag ) parse-name find-name 0<> ;
+?: [UNDEFINED] ( "<spaces>name ... " -- flag ) parse-name find-name 0= ;
+
+\ -- More stack shuffling words -----------------------------------------------
+
+?: ROT ( x1 x2 x3 -- x2 x3 x1 ) >r swap r> swap ;
+?: -ROT ( x1 x2 x3 -- x3 x1 x2 ) rot rot ;
+?: ?DUP ( x -- 0 | x x ) dup if dup then ;
+
+?: 2DUP ( x1 x2 -- x1 x2 x1 x2 ) over over ;
+?: 2DROP ( x1 x2 -- ) drop drop ;
+?: 2OVER ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 ) 3 pick 3 pick ;
+?: 2SWAP ( x1 x2 x3 x4 -- x3 x4 x1 x2 ) rot >r rot r> ;
+
+?: 3DROP ( x x x -- ) drop drop drop ;
+
+?: R@ ( -- x ) ( R: x -- x )  r> r> dup >r swap >r ;
+
+?: 2>R ( x1 x2 -- ) ( R: -- x1 x2 ) ]] swap >r >r [[ ; immediate
+?: 2R> ( -- x1 x2 ) ( R: x1 x2 -- ) ]] r> r> swap [[ ; immediate
+?: 2R@ ( -- x1 x2 ) ( R: x1 x2 -- x1 x2 ) ]] 2r> 2dup 2>r [[ ; immediate
+
+?: 2ROT ( x1 x2 x3 x4 x5 x6 -- x3 x4 x5 x6 x1 x2 ) 2>r 2swap 2r> 2swap ;
+
+\ -- More arithmetic words ----------------------------------------------------
+
+?: + ( x1 x2 -- x3 ) 0 swap - - ;
+?: * ( x1 x2 -- x3 ) 1 */mod swap drop ;
+?: / ( x1 x2 -- x3 ) 1 swap */mod swap drop ;
+?: */ ( x1 x2 -- x3 ) */mod swap drop ;
+?: MOD ( x1 x2 -- x3 ) 1 swap */mod drop ;
+?: /MOD ( x1 x2 -- x3 ) 1 swap */mod ;
+?: 2* ( x1 x2 -- x3 ) dup + ;
+
+?: 1- ( x1 -- x2 ) 1 - ;
+?: 1+ ( x1 -- x2 ) 1 + ;
+?: 2+ ( x1 -- x2 ) 2 + ;
+
+?: NEGATE ( x1 -- x2 ) invert 1+ ;
+
+\ -- Bit ----------------------------------------------------------------------
+\ 
+?: OR ( x1 x2 -- x3 ) invert swap invert and invert ;
+?: XOR ( x1 x2 -- x3 ) over over invert and >r swap invert and r> or ;
+
+\ -- More comparisons ---------------------------------------------------------
+
+?: < ( n1 n2 -- flag ) 2dup xor 0< if drop 0< else - 0< then ;
+?: > ( n1 n2 -- flag ) swap < ;
+?: <= ( n1 n2 -- flag ) > invert ;
+?: >= ( n1 n2 -- flag ) < invert ;
+?: 0> ( n -- flag ) 0 > ;
+?: = ( x1 x2 -- flag ) - 0= ;
+?: <> ( x1 x2 -- flag ) = invert ;
+?: U< ( u1 u2 -- flag ) 2dup xor 0< if swap drop 0< else - 0< then ;
+?: U> ( u1 u2 -- flag ) swap u< ;
+?: WITHIN ( n1 | u1 n2 | u2 n3 | u3 -- flag ) over - >r - r> u< ; 
    
-?: 2ROT		2>r 2swap 2r> 2swap ; \ ( x1 x2 x3 x4 x5 x6 -- x3 x4 x5 x6 x1 x2 )
+?: MIN ( n1 n2 -- n3 ) 2dup swap < if swap then drop ;
+?: MAX ( n1 n2 -- n3 ) 2dup < if swap then drop ;
 
-\ Stack shuffling combinators ---
+\ -- More memory words --------------------------------------------------------
 
-?: DIP		swap >r execute r> ; \ ( i*x n xt -- j*x n )
-?: 2DIP		-rot 2>r execute 2r> ; \ ( n1 n2 xt -- n1 n2 )
-?: 3DIP		swap >r swap >r swap >r execute r> r> r> ; \ ( n1 n2 n3 xt -- n1 n2 n3 )
-?: 4DIP		swap >r swap >r swap >r swap >r execute r> r> r> r> ; \ ( n1 n2 n3 n4 xt -- n1 n2 n3 n4 )
-?: KEEP		over >r execute r> ; \ ( n xt[ n -- i*x ] -- i*x n )
-?: 2KEEP	2 pick 2 pick >r >r execute r> r> ; \ ( n1 n2 xt -- n1 n2 )
-?: 3KEEP	3 pick 3 pick 3 pick >r >r >r execute r> r> r> ; \ ( n1 n2 n3 xt -- n1 n2 n3 )
+?: CHAR ( -- u ) 1 chars ;
+?: CELL ( -- u ) 1 cells ;
+?: CHAR+ ( c-addr1 -- c-addr2 ) 1 chars + ;
+?: CELL+ ( a-addr1 -- a-addr2 ) 1 cells + ;
+?: CELL- ( a-addr1 -- a-addr2 ) 1 cells - ;
+
+\ TODO , and C, are not taking into account when state < 0
+?: , ( x -- ) here ! 1 cells allot ;
+?: C, ( char -- ) here c! 1 chars allot ;
  
-?: KEEP-XT	>r r@ execute r> ; \ ( i*x xt -- j*x xt )
+?: +! ( n | u a-addr -- ) swap over @ + swap ! ;
+?: 0! ( a-addr -- ) 0 swap ! ;
+?: 1+! ( a-addr -- ) dup @ 1+ swap ! ;
+?: 1-! ( a-addr -- ) dup @ 1- swap ! ;
 
-\ Arithmetic
+?: 2! ( x1 x2 a-addr -- ) swap over ! cell+ ! ;
+?: 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
 
-?: +		0 swap - - ;			\ ( x1 x2 -- x3 )
-?: *		1 */mod swap drop ;		\ ( x1 x2 -- x3 )
-?: /		1 swap */mod swap drop ;	\ ( x1 x2 -- x3 )
-?: */		*/mod swap drop ;		\ ( x1 x2 -- x3 )
-?: MOD		1 swap */mod drop ;		\ ( x1 x2 -- x3 )
-?: /MOD		1 swap */mod ;			\ ( x1 x2 -- x3 )
-?: 2*		dup + ;					\ ( x1 x2 -- x3 )
+\ -- Constants and variables --------------------------------------------------
 
-?: 1-		1 - ;					\ ( x1 -- x2 )
-?: 1+		1 + ;					\ ( x1 -- x2 )
-?: 2+		2 + ;					\ ( x1 -- x2 )
+?: CONSTANT ( x "name" -- ) create , does> @ ;
+?: VARIABLE ( "name" -- ) create 0 , ;
 
-?: NEGATE	invert 1+ ;				\ ( x1 -- x2 )
+?: 2CONSTANT ( x1 x2 "name" -- ) create , , does> 2@ ;
+?: 2VARIABLE ( "name" -- ) create 0 , 0 , ;
 
-\ Bit
+?: CONSTANT? >in @ >r [undefined] if r> >in ! constant else r> 2drop postpone \ then ;
+?: VARIABLE? >in @ >r [undefined] if r> >in ! variable else r> drop postpone \ then ;
 
-?: OR		invert swap invert and invert ;	\ ( x1 x2 -- x3 )
-?: XOR		over over invert and >r swap invert and r> or ; \ ( x1 x2 -- x3 )
+\ -- true / false / on / off --------------------------------------------------
 
-\ Comparison
+0				constant? FALSE
+false invert	constant? TRUE
 
-?: <		2dup xor 0< if drop 0< else - 0< then ; \ ( n1 n2 -- flag )
-?: >		swap < ;								\ ( n1 n2 -- flag )
-?: <=		> invert ;								\ ( n1 n2 -- flag )
-?: >=		< invert ;					\ ( n1 n2 -- flag )
-?: 0=		if 0 else 0 invert then ;	\ ( x -- flag )
-?: 0>		0 > ;						\ ( n -- flag )
-?: 0<>		0= 0= ;						\ ( n -- flag )
-?: NOT		0= ;						\ ( x -- flag ) Non ANS
-?: =		- 0= ;						\ ( x1 x2 -- flag )
-?: <>		= invert ;					\ ( x1 x2 -- flag )
-?: U<		2dup xor 0< if swap drop 0< else - 0< then ; \ ( u1 u2 -- flag )
-?: U>		swap u< ;					\ ( u1 u2 -- flag )
-?: WITHIN	over - >r - r> u< ; 
-   
-?: MIN		2dup swap < if swap then drop ;
-?: MAX		2dup	  < if swap then drop ;
+?: ON ( a-addr -- ) true swap ! ;
+?: OFF ( a-addr -- ) false swap ! ;
 
-\ -if was not defined until 0= was defined
-?: -IF		postpone 0= postpone if ; immediate
+\ -- Compilation --------------------------------------------------------------
 
-\ Memory
+variable? LAST-STATE
 
-?: CHAR		1 chars ;				\ ( -- u )
-?: CELL		1 cells ;				\ ( -- u )
-?: CHAR+	1 chars + ;				\ ( c-addr1 -- c-addr2 )
-?: CELL+	1 cells + ; 			\ ( a-addr1 -- a-addr2 )
-?: CELL-	1 cells - ; 			\ ( a-addr1 -- a-addr2 )
+?: [ ( -- ) state @ last-state ! 0 state ! ; immediate
+?: ] ( -- ) last-state @  state ! ; immediate
 
-?: ,		here ! 1 cells allot ;	\ ( x -- )
-?: C,		here c! 1 chars allot ; \ ( char -- )
- 
-?: +!		swap over @ + swap ! ;	\ ( n | u a-addr -- )
-?: 0!		0 swap ! ;				\ ( a-addr -- ) non ANS
-?: 1+!		dup @ 1+ swap ! ;		\ ( a-addr -- ) non ANS
-?: 1-!		dup @ 1- swap ! ;		\ ( a-addr -- ) non ANS
+?: LITERAL ( C: x -- ) ( -- x ) postpone lit , ; immediate 
+?: 2LITERAL ( C: x1 x2 -- ) ( -- x1 x2 ) swap postpone literal postpone literal ; 
 
-?: 2!		swap over ! cell+ ! ;	\ ( x1 x2 a-addr -- )
-?: 2@		dup cell+ @ swap @ ;	\ ( a-addr -- x1 x2 )
+?: ['] ( C: "<spaces>name" -- ) ( -- xt ) ' postpone literal ; immediate 
 
-\ Loops ---
+\ -- Do/Loop ------------------------------------------------------------------
 
 ?: DO		postpone [: ; immediate
 ?: ?DO		postpone [: ; immediate
@@ -147,82 +210,85 @@
 
 ?: UNLOOP	; \ Unloop is a noop in this implementation
 
-?: TIMES	swap 0 [: keep-xt 1 ;] doloop drop ; \ ( n q -- )
+\ -- Stack shuffling combinators ----------------------------------------------
 
-?: BOUNDS		over + swap ; \ ( addr u -- u u )
-?: ITER			-rot cells bounds [: >r i @ r@ execute r> cell ;] doloop drop ; \ ( addr u xt -- )
-?: ITER/ADDR	swap [: dup >r keep cell+ r> ;] times 2drop ; \ ( addr u xt -- )
-?: -ITER/ADDR	over 2>r 1- cells + 2r> [: dup >r keep cell- r> ;] times 2drop ; \ ( addr u xt -- )
-?: *ITER		-rot bounds [: i @ keep execute cell ;] doloop ; \ ( addr u xt -- )
-?: CITER		-rot chars bounds [: >r i c@ r@ execute r> char ;] doloop drop ; \ ( c-addr u xt -- )
+?: DIP ( i*x n xt -- j*x n ) swap >r execute r> ;
+?: 2DIP ( n1 n2 xt -- n1 n2 ) swap >r swap >r execute r> r> ;
+?: 3DIP ( n1 n2 n3 xt -- n1 n2 n3 ) swap >r swap >r swap >r execute r> r> r> ;
+?: 4DIP ( n1 n2 n3 n4 xt -- n1 n2 n3 n4 ) swap >r swap >r swap >r swap >r execute r> r> r> r> ;
 
-\ Constants and variables
+?: KEEP ( n xt[ n -- i*x ] -- i*x n ) over >r execute r> ;
+?: 2KEEP ( n1 n2 xt[ n1 n2 -- i*x ] -- i*x n1 n2 ) 2 pick 2 pick >r >r execute r> r> ;
+?: 3KEEP ( n1 n2 n3 xt[ n1 n2 n3 -- i*x ] -- i*x n1 n2 n3 ) 3 pick 3 pick 3 pick >r >r >r execute r> r> r> ;
+ 
+?: KEEP-XT ( i*x xt[ i*x -- j*x]  -- j*x xt ) >r r@ execute r> ;
 
-?: CONSTANT		create , does> @ ;		\ ( x "name" -- )
-?: VARIABLE		create 0 , ;			\ ( "name" -- )
+?: BI@ ( x1 x2 xt[ x -- i*x ] -- i*x1 i*x2 ) swap >r >r r@ execute r> r> swap execute ;
 
-?: 2CONSTANT	create , , does> 2@ ;	\ ( x1 x2 "name" -- )
-?: 2VARIABLE	create 0 , 0 , ;		\ ( "name" -- )
+\ -- Looping combinators ------------------------------------------------------
 
-: CONSTANT?	>in @ >r parse-name find-name 0= if r> >in ! constant else drop r> drop postpone \ then ;
-: VARIABLE? >in @ >r parse-name find-name 0= if r> >in ! variable else r> drop postpone \ then ;
+?: TIMES ( n xt -- ) swap 0 [: keep-xt 1 ;] doloop drop ;
+ 
+?: BOUNDS ( addr u -- u u ) over + swap ;
 
-\ true / false / on / off
+?: ITER ( addr u xt -- ) -rot cells bounds [: >r i @ r@ execute r> cell ;] doloop drop ;
+?: ITER/ADDR ( addr u xt -- ) swap [: dup >r keep cell+ r> ;] times 2drop ;
+?: -ITER/ADDR ( addr u xt -- ) over >r >r 1- cells + r> r> [: dup >r keep cell- r> ;] times 2drop ;
+?: CITER ( c-addr u xt -- ) -rot chars bounds [: >r i c@ r@ execute r> char ;] doloop drop ;
 
-0				constant? FALSE
-false invert	constant? TRUE
-
-?: ON		true swap ! ;	\ ( a-addr -- )
-?: OFF		false swap ! ;	\ ( a-addr -- )
-
+\ TODO Implement:
+\ 
+\ ZIP 
+\ *ZIP
+\ CZIP
+\ *CZIP
+ 
 \ -- Tools for accessing the dictionary ---------------------------------------
 
 4 constant? IMMEDIATE-FLAG
 2 constant? COLON-FLAG
 1 constant? HIDDEN-FLAG
 
-?: NT>LINK		@ ;
-?: NT>XT		1 cells + @ ;
-?: NT>DT		2 cells + @ ;
-?: NT>WORDLIST	3 cells + @ ;
-?: NT>FLAGS		4 cells + c@ ;
-?: NAME>STRING	4 cells + 1 chars + dup c@ swap 1 chars + swap ;
+?: NT>LINK ( nt1 -- nt2 ) @ ;
+?: NT>XT ( nt -- xt ) 1 cells + @ ;
+?: NT>DT ( nt -- a-addr ) 2 cells + @ ;
+?: NT>WORDLIST ( nt -- wid ) 3 cells + @ ;
+?: NT>FLAGS ( nt -- n ) 4 cells + c@ ;
+?: NT>NAME ( nt -- c-addr u ) 4 cells + 1 chars + dup c@ swap 1 chars + swap ;
 
-?: HAS-FLAG?	swap nt>flags over and = ;
+?: HAS-FLAG? ( nt n -- flag ) swap nt>flags over and = ;
 
-?: IMMEDIATE?	immediate-flag has-flag? ;
-?: COLON?		colon-flag has-flag? ;
-?: HIDDEN?		hidden-flag has-flag? ;
+?: IMMEDIATE? ( nt -- flag ) immediate-flag has-flag? ;
+?: COLON? ( nt -- flag ) colon-flag has-flag? ;
+?: HIDDEN? ( nt -- flag ) hidden-flag has-flag? ;
 
-\ Wordlists
+\ -- Wordlists ----------------------------------------------------------------
 
 variable? LAST-WORDLIST 1 last-wordlist !
 
-?: WORDLIST		last-wordlist @ 1+ dup last-wordlist ! ;
+?: WORDLIST ( -- wid ) last-wordlist @ 1+ dup last-wordlist ! ;
 
-?: GET-CURRENT	current @ ;
-?: SET-CURRENT	current ! ;
+?: GET-CURRENT ( -- wid ) current @ ;
+?: SET-CURRENT ( wid -- ) current ! ;
 
-?: GET-ORDER	order @ dup cell- @ dup >r ['] noop iter r> ;
-?: SET-ORDER	dup order @ cell- ! order @ swap [: ! ;] -iter/addr ;
-?: +ORDER		>r get-order 1+ r> swap set-order ;
-?: -ORDER		get-order nip 1- set-order ;
-
-\ TODO Search order functions FIND-NAME-IN FIND-NAME SEARCH-WORDLIST
-
-\ -- Input/Output -------------------------------------------------------------
-
-?: BL			32 ; 
-?: CR		10 emit ;
-
-?: SPACE		bl emit ;
+?: GET-ORDER ( -- widn ... wid1 n ) order @ dup cell- @ dup >r ['] noop iter r> ;
+?: SET-ORDER ( widn ... wid1 n -- ) dup order @ cell- ! order @ swap [: ! ;] -iter/addr ;
+?: +ORDER ( wid -- ) >r get-order 1+ r> swap set-order ;
+?: -ORDER ( -- ) get-order nip 1- set-order ;
 
 \ -- Finding definitions ------------------------------------------------------
 
-\ ( u1 -- u2 )
-?: UPPER			dup dup 97 >= swap 122 <= and if 32 - then ;
+\ TODO The traverse functions must take a return argument 0/-1 to continue
+\ traversing or stop it
 
-?: (COMPARE-NO-CASE) 2>r -1 swap 2r> [: upper over c@ upper <> if drop 0 swap leave then char+ ;] citer drop ;
+\ TODO Use a map (instead of traverse) for not stopping (like iter and *iter)
+
+?: UPPER ( u1 -- u2 ) dup dup 97 >= swap 122 <= and if 32 - then ;
+
+\ TODO Implement better compare-no-case with *czip 
+
+\ ?: (COMPARE-NO-CASE) 2>r -1 swap 2r> [: upper over c@ upper <> if drop 0 swap leave then char+ ;] citer drop ;
+?: (COMPARE-NO-CASE) >r >r -1 swap r> r> [: upper over c@ upper <> if drop 0 swap leave then char+ ;] citer drop ;
 ?: COMPARE-NO-CASE	rot over = if (compare-no-case) else 3drop 0 then ;
 
 \ ( i*x xt -- j*x ) Map xt to each word, use LEAVE to exit mapping
@@ -232,23 +298,20 @@ variable? LAST-WORDLIST 1 last-wordlist !
 ?: TRAVERSE-WORDLIST [: nt>wordlist over = if >r >r i r@ execute r> r> then ;] traverse-dict 2drop ;
 
 \ ( c-addr u wid -- nt | 0 ) 
-?: FIND-NAME-IN >r 0 -rot r> [: name>string 2over compare-no-case if rot drop i -rot leave then ;] swap traverse-wordlist 2drop ;
+?: FIND-NAME-IN >r 0 -rot r> [: nt>name 2over compare-no-case if rot drop i -rot leave then ;] swap traverse-wordlist 2drop ;
 
 \ ( c-addr u wid -- 0 | xt 1 | xt -1 )
 ?: SEARCH-WORDLIST find-name-in dup if dup nt>xt swap immediate? if 1 else -1 then then ;
-
-\ -- Conditional compilation --------------------------------------------------
-
-: [DEFINED]		parse-name find-name 0<> ;
-: [UNDEFINED]	parse-name find-name 0= ;
+ 
+\ -- More conditional compilation ---------------------------------------------
 
 \ Implementation of [IF] [ELSE] [THEN] by ruv, as seen in:
 \ https://forth-standard.org/standard/tools/BracketELSE
 
 wordlist dup constant BRACKET-FLOW-WL get-current swap set-current
-: [IF]		1+ ; \ ( level1 -- level2 )
-: [ELSE]	dup 1 = if 1- then ; \ ( level1 -- level2 )
-: [THEN]	1- ; \ ( level1 -- level2 )
+: [IF]				1+ ;					\ ( level1 -- level2 )
+: [ELSE]			dup 1 = if 1- then ;	\ ( level1 -- level2 )
+: [THEN]			1- ;					\ ( level1 -- level2 )
 set-current
 
 : [ELSE] \ ( -- )
@@ -267,10 +330,42 @@ set-current
 : [THEN]	; immediate \ ( -- )
 
 : [IF]		0= if postpone [else] then ; immediate \ ( flag -- )
+ 
+ 
+\ \ TODO With current implementation it's not possible to do multiline quotations
+\ \ on interpret mode because the input source on refill is put in the middle 
+\ \ of the quotation !!!!!
+\ \ TODO Try to add CZIP and ZIP to iterate over two arrays at once
+\ \ TODO Try to add parse earlier to allow stack comments
+\ \ TODO Add more recognizers (string, double numbers, quote for xts...)
+\ \ TODO Add numeric output
+\ \ TODO Add tools (dump trace debug)
+\ 
 
+ 
+ 
+\ \ -if was not defined until 0= was defined
+\ ?: -IF		postpone 0= postpone if ; immediate
+\ 
+ 
+ 
 
+\ \ TODO Search order functions FIND-NAME-IN FIND-NAME SEARCH-WORDLIST
+\ 
+\ \ -- Input/Output -------------------------------------------------------------
+\ 
+\ ?: BL			32 ; 
+\ ?: CR		10 emit ;
+\ 
+\ ?: SPACE		bl emit ;
+\ 
 
-\ -- Tools --------------------------------------------------------------------
+\ 
+\ \ -- Tools --------------------------------------------------------------------
+\ 
+\ ?: WORDS [: nt>name type space ;] get-order over >r set-order r> traverse-wordlist ;
+\ 
 
-?: WORDS [: name>string type space ;] get-order over >r set-order r> traverse-wordlist ;
+\ To be defined when I have [[ ]] for postponing several words
+
 
