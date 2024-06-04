@@ -13,16 +13,17 @@
 
 \ EXIT
 \ LIT BLOCK STRING
+\ EXECUTE THROW CATCH
 \ DROP SWAP PICK
 \ >R R>
 \ @ ! C@ C!
 \ - */MOD
 \ AND OR INVERT
-\ : ; POSTPONE IMMEDIATE [: ;]
+\ : ; POSTPONE IMMEDIATE [: ;] [ [[ ]] ] :NONAME [: ;]
 \ PARSE-NAME SOURCE >IN 
 \ FIND-NAME '
 \ CHOOSE DOLOOP LEAVE I J K
-\ STATE LATEST CURRENT
+\ STATE BASE LATEST CURRENT
 
 \ The next section defines enough words to allow for parsing, one of the most
 \ fundamental activities to have a complete Forth environment.
@@ -83,7 +84,7 @@
 ?: PARSE		<p rot [: over <> ;] *p drop p> ;
 
 \ ( "ccc<paren>" -- )
-?: (				41 parse drop drop ; immediate 
+?: (			41 parse drop drop ; immediate 
 
 \ Now we can use stack comments too !!
 
@@ -170,6 +171,10 @@
 ?: 2! ( x1 x2 a-addr -- ) swap over ! cell+ ! ;
 ?: 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
 
+?: BOUNDS ( addr u -- u u ) over + swap ;
+
+?: MOVE ( addr1 addr2 u -- ) rot swap chars bounds [: i c@ over c! char+ char ;] doloop drop ;
+
 \ -- Constants and variables --------------------------------------------------
 
 ?: CONSTANT ( x "name" -- ) create , does> @ ;
@@ -201,6 +206,8 @@ variable? LAST-STATE
 
 ?: ['] ( C: "<spaces>name" -- ) ( -- xt ) ' postpone literal ; immediate 
 
+?: SLITERAL ( C: c-addr u -- ) ( -- c-addr u ) postpone string dup , here swap move align ; immediate
+
 \ -- Do/Loop ------------------------------------------------------------------
 
 ?: DO		postpone [: ; immediate
@@ -227,10 +234,8 @@ variable? LAST-STATE
 
 \ -- Looping combinators ------------------------------------------------------
 
-?: TIMES ( n xt -- ) swap 0 [: keep-xt 1 ;] doloop drop ;
+?: TIMES ( n xt -- ) swap dup 0> if 0 [: keep-xt 1 ;] doloop else drop then drop ;
  
-?: BOUNDS ( addr u -- u u ) over + swap ;
-
 ?: ITER ( addr u xt -- ) -rot cells bounds [: >r i @ r@ execute r> cell ;] doloop drop ;
 ?: ITER/ADDR ( addr u xt -- ) swap [: dup >r keep cell+ r> ;] times 2drop ;
 ?: -ITER/ADDR ( addr u xt -- ) over >r >r 1- cells + r> r> [: dup >r keep cell- r> ;] times 2drop ;
@@ -342,30 +347,78 @@ set-current
 \ \ TODO Add tools (dump trace debug)
 \ 
 
- 
- 
-\ \ -if was not defined until 0= was defined
-\ ?: -IF		postpone 0= postpone if ; immediate
-\ 
- 
- 
+\ -- Tools for recognizers ----------------------------------------------------
 
-\ \ TODO Search order functions FIND-NAME-IN FIND-NAME SEARCH-WORDLIST
-\ 
-\ \ -- Input/Output -------------------------------------------------------------
-\ 
-\ ?: BL			32 ; 
-\ ?: CR		10 emit ;
-\ 
-\ ?: SPACE		bl emit ;
-\ 
+?: SET-RECOGNIZERS ( xtn ... xt1 n -- )
+	dup forth-recognizer @ cell- ! forth-recognizer @ swap ['] ! -iter/addr ;
 
-\ 
-\ \ -- Tools --------------------------------------------------------------------
-\ 
-\ ?: WORDS [: nt>name type space ;] get-order over >r set-order r> traverse-wordlist ;
-\ 
+?: GET-RECOGNIZERS ( -- xtn ... xt1 n ) 
+	forth-recognizer @ dup cell- @ dup >r ['] noop iter r> ;
 
-\ To be defined when I have [[ ]] for postponing several words
+\ -- Characters ---------------------------------------------------------------
 
+?: BL ( -- n ) 32 ; 
+?: CR ( -- ) 10 emit ;
+?: SPACE ( -- ) bl emit ;
+?: SPACES ( n -- ) [: space ;] times ;
 
+?: [CHAR] ( C: "<spaces>name" -- ) ( -- char ) parse-name drop c@ postpone literal ; immediate
+
+\ -- String recognizer --------------------------------------------------------
+
+[UNDEFINED] rectype-string [IF]
+
+' noop
+:noname postpone sliteral ;
+:noname -48 throw ; 
+rectype: rectype-string
+
+: rec-string ( addr len -- addr' len' rectype-string | rectype-null )
+	over c@ [char] " <> if 2drop rectype-null exit then
+	negate /source nip 0= if 2+ else 1+ then >in +! drop
+	[char] " parse
+	-1 /string
+	rectype-string
+;
+
+get-recognizers 1+ ' rec-string swap set-recognizers
+
+[THEN]
+
+\ -- Tools --------------------------------------------------------------------
+
+?: WORDS [: nt>name type space ;] get-order over >r set-order r> traverse-wordlist ;
+
+\ -- Doubles (Taken mostly from SwapForth) ------------------------------------
+
+?: D+		swap >r + swap r@ + swap over r> u< - ;
+?: DNEGATE	invert swap negate tuck 0= - ;
+
+\ -- Numeric output -----------------------------------------------------------
+
+?: DABS ( d1 -- d2 ) dup 0 < if dnegate then ;
+?: UD/MOD ( -?- ) >r 0 r@ um/mod r> swap >r um/mod r> ;
+
+[UNDEFINED] . [IF]
+variable hld
+create <HOLD 100 chars dup allot <hold + constant HOLD>
+
+: <# ( -- ) hold> hld ! ;
+: HOLD ( c -- ) hld @ char - dup hld ! c! ;
+: # ( d1 -- d2 ) base @ ud/mod rot 9 over < if 7 + then 48 + hold ;
+: #S ( d1 -- d2 ) begin # over over or 0= until ;
+: #> ( d -- c-addr u ) drop drop hld @ hold> over - ;
+
+: SIGN ( n -- ) 0 < if 45 hold then ;
+
+: UD.R ( ud n -- ) >r <# #s #> r> over - spaces type ;
+: UD. ( ud -- ) 0 ud.r space ;
+: U.R ( -?- ) 0 swap ud.r ;
+: U. ( u -- ) 0 ud. ;
+: D.R ( d n -- ) >r swap over dabs <# #s rot sign #> char / r> over - spaces type ;
+: D. ( d -- ) 0 d.r space ;
+: .R ( -?- ) >r dup 0 < r> d.r ;
+: . ( n -- ) dup 0 < d. ;
+[THEN]
+
+?: ? ( addr -- ) @ . ; ( addr -- )

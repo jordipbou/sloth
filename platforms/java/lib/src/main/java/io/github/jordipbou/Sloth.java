@@ -151,7 +151,6 @@ public class Sloth {
 	}
 
 	public void _throw(int v) { if (v != 0) { throw new SlothException(v); } }
-	public void _throw() { _throw(pop()); }
 	public void _catch(int q) {
 		int tsp = sp;
 		int trp = rp;
@@ -169,7 +168,6 @@ public class Sloth {
 			push(-1000);
 		}
 	}
-	public void _catch() { _catch(pop()); }
 
 	// ** Basic primitives *****************************************************
 
@@ -186,7 +184,7 @@ public class Sloth {
 	public void zbranch() { if(pop() == 0) ip += token(); else ip += CELL; }
 	public void lit() { push(token()); }
 	public void block() { push(ip + CELL); ip += token(); }
-	public void string() { int l = token(); push(ip); push(l); ip = aligned(ip + l); }
+	public void string() { int l = token(); push(ip); push(l); ip = aligned(ip + (l * CHAR)); }
 
 	public int EXECUTE;
 
@@ -214,14 +212,16 @@ public class Sloth {
 	public void fetch_r() { push(r[rp - 1]); }
 	public void from_r() { push(rpop()); }
 
-	public int ADD, SUB, MUL, DIV, MOD, TSMOD;
+	public int ADD, SUB, MUL, DIV, MOD, TIMES_DIV_MOD, U_M_DIV_MOD;
 
 	public void add() { place(1, pick(1) + pick(0)); drop(); }
 	public void sub() { place(1, pick(1) - pick(0)); drop(); }
 	public void mul() { place(1, pick(1) * pick(0)); drop(); }
 	public void div() { place(1, pick(1) / pick(0)); drop(); }
 	public void mod() { place(1, pick(1) % pick(0)); drop(); }
-	public void tsmod() { long n = lpop(); long d = lpop() * lpop(); push(d % n); push(d / n); };
+	public void times_div_mod() { long n = lpop(); long d = lpop() * lpop(); push(d % n); push(d / n); };
+	public void u_m_div_mod() { long u = upop(); long d = dpop(); push(Long.remainderUnsigned(d, u)); push(Long.divideUnsigned(d, u)); }
+
 	public int INVERT, AND, OR, XOR;
 
 	public void invert() { place(0, ~pick(0)); }
@@ -259,11 +259,13 @@ public class Sloth {
 		int q = pop();
 		ix = pop();
 		int l = pop();
-		for (int o = ix - l, d = 0;((o ^ (o + d)) & (o ^ d)) >= 0 && lx == 0;) {
-			eval(q);
-			d = pop();
-			o = ix - l;
-			ix += d;
+		if (ix != l) {
+			for (int o = ix - l, d = 0;((o ^ (o + d)) & (o ^ d)) >= 0 && lx == 0;) {
+				eval(q);
+				d = pop();
+				o = ix - l;
+				ix += d;
+			}
 		}
 		ipop(); 
 	}
@@ -302,6 +304,13 @@ public class Sloth {
 
 	// Returns here or there depending on state
 	public int hot() { if (fetch(STATE) >= 0) return here(); else return there(); }
+
+	// -- Exceptions ------------------------------------------------------------
+
+	public int THROW, CATCH;
+
+	public void _throw() { _throw(pop()); }
+	public void _catch() { _catch(pop()); }
 
 	// -- Constructor
 
@@ -352,7 +361,8 @@ public class Sloth {
 		MUL = noname((vm) -> mul());
 		DIV = noname((vm) -> div());
 		MOD = noname((vm) -> mod());
-		TSMOD = noname((vm) -> tsmod());
+		TIMES_DIV_MOD = noname((vm) -> times_div_mod());
+		U_M_DIV_MOD = noname((vm) -> u_m_div_mod());
 
 		INVERT = noname((vm) -> invert());
 		AND = noname((vm) -> and());
@@ -383,6 +393,9 @@ public class Sloth {
 		TALIGN = noname((vm) -> talign());
 
 		HOT = noname((vm) -> push(hot()));
+
+		THROW = noname((vm) -> _throw());
+		CATCH = noname((vm) -> _catch());
 	}
 
 	// --------------------------------------------------------------------------
@@ -469,11 +482,15 @@ public class Sloth {
 	public int RECTYPE_NT;
 	public int RECTYPE_NUM;
 
+	public int RECTYPE;
+
 	public int rectype(String s) {
 		header(s);
 		swap(); rot(); comma(); comma(); comma();
 		return dt(latest());
 	}
+
+	public void rectype() { parse_name(); int u = pop(); rectype(data_to_str(pop(), u)); }
 
 	public void recognize() {
 		int r = fetch(pop()); // Recognizer stack identifier (address)
@@ -855,10 +872,11 @@ public class Sloth {
 	public void semicolon() { 
 		compile(EXIT); 
 		store(STATE, 0); 
-		if (pop() != sp) _throw(-22); // Control structure mismatch
-		// If latestxt is not a :NONAME definition, remove its hidden flag
-		if (xt(latest()) == latestxt())	
+		// Don't do this for nonames
+		if (xt(latest()) == latestxt()) {
+			if (pop() != sp) _throw(-22); // Control structure mismatch
 			unset_flag(latest(), HIDDEN); 
+		}
 	};
 
 	// CREATE DOES> from Java becomes:
@@ -959,6 +977,8 @@ public class Sloth {
 		push(noname((vm) -> recpost_num()));
 		RECTYPE_NUM = rectype("RECTYPE-NUM");
 
+		colon("RECTYPE:", (vm) -> rectype());
+
 		// push(noname((vm) -> recint_dnum()));
 		// push(noname((vm) -> reccomp_dnum()));
 		// push(noname((vm) -> recpost_dnum()));
@@ -978,6 +998,8 @@ public class Sloth {
 		comma(noname((vm) -> rec_num()));
 		//comma(noname((vm) -> rec_dnum()));
 		allot(6 * CELL);
+
+		colon("FORTH-RECOGNIZER", (vm) -> push(FORTH_RECOGNIZER));
 
 		// Create headers for the basic primitives
 
@@ -1014,7 +1036,8 @@ public class Sloth {
 		colon("*", MUL);
 		colon("/", DIV);
 		colon("MOD", MOD);
-		colon("*/MOD", TSMOD);
+		colon("*/MOD", TIMES_DIV_MOD);
+		colon("UM/MOD", U_M_DIV_MOD);
 
 		colon("INVERT", INVERT);
 		colon("AND", AND);
@@ -1046,6 +1069,9 @@ public class Sloth {
 
 		colon("HOT", HOT);
 
+		colon("THROW", THROW);
+		colon("CATCH", CATCH);
+
 		// Input/output
 
 		// These words are vectored, if KEY/EMIT/ACCEPT variables have a 
@@ -1065,6 +1091,7 @@ public class Sloth {
 		// Compiler words
 
 		colon("STATE", (vm) -> push(STATE));
+		colon("BASE", (vm) -> push(BASE));
 		colon("LATEST", (vm) -> push(LATEST));
 		colon("CURRENT", (vm) -> push(CURRENT));
 
@@ -1084,12 +1111,13 @@ public class Sloth {
 		DOES = noname((vm) -> xt(latest(), pop()));
 		colon("DOES>", (vm) -> does()); set_immediate(); 
 
+	 	colon(":NONAME", (vm) -> { push(here()); latestxt(here()); store(STATE, 1); });
+		colon("[:", (vm) -> start_quotation()); set_immediate();
+		colon(";]", (vm) -> end_quotation()); set_immediate();
+
 		colon("PARSE-NAME", (vm) -> parse_name());
 		colon("FIND-NAME", (vm) -> find_name());
 		colon("'", (vm) -> tick());
-
-		colon("[:", (vm) -> start_quotation()); set_immediate();
-		colon(";]", (vm) -> end_quotation()); set_immediate();
 
 		colon("]", (vm) -> store(STATE, fetch(STATE) + 1)); set_infinite();
 		colon("]]", (vm) -> store(STATE, 2)); set_infinite();
@@ -1100,8 +1128,11 @@ public class Sloth {
 		colon(">IN", (vm) -> push(IPOS));
 		colon("REFILL", (vm) -> refill());
 
+    colon("INCLUDED", (vm) -> { int u = pop(); include(data_to_str(pop(), u)); });
+
 		// Tools 
 
+		colon("TRACE", (vm) -> { parse_name(); find_name(); trace(xt(pop())); });
 		colon("DUMP", (vm) -> { int l = pop(); dump_memory(pop(), l); });
 		colon("BYE", (vm) -> System.exit(0));
 
