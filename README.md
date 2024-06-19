@@ -1,26 +1,21 @@
 # SLOTH (SLOw forTH / Scripting Language Of The Heaven/Hell)
 
-SLOTH tries to be a small ANS Forth implementation that is easy to embed
-and easy to use.
+# Current idea
 
-## Bootstrapping
+3 interpreters:
 
-Several options for bootstrapping have been tried: 
+* String rewriting interpreter, written in Sloth/0
+* Sloth/0 interpreter, bootstrapped from Java/C/ASM...
+* Inner (VM) interpreter
 
-* A small ilo/retroforth like VM with an assembler and loading of a ROM.
-* A complete ANS implementation in the host language.
-* A minimal interpreter in the host enought to bootstrap from Forth.
+# String rewriting interpreter:
 
-At the end, it seems tat the best option for this project is to implement
-in the host enough Forth words to have a full wordlist/recognizer based
-Forth interpreter implemented in the host.
+Has two data constructs, normal form and input sequence:
 
-The main reasons for this decision are:
+stack : astack : normal : input
 
-* Having most of required words in the host allows just one file to be included
-  in a project.
-* If primitives are added to the host, no modification has to be made to a ROM.
-* Using an assembler like pali (from ilo) moves complexity from host
-  implementation to assembler implementation. Although the assembler
-	implementation can be shared by different hosts, I don't plan to implement
-	so many hosts as ilo/retroforth has.
+First, an longest-leftmost strategy is used to apply the rules to the input.
+Second, when no more rules can be applied (and there has been no error) we're
+left with the normal form. The normal form is sent to the Sloth/0
+interpreter/compiler.
+Third, VM code is executed (if needed)
