@@ -1,3 +1,11 @@
+# 2024/06/23
+
+It occured to me that Sloth is not a VM, but an word based assembler.
+The VM is important to make it work, but should not be in the specification.
+Every word can be rewritten by other words and every word can be made
+a primitive.
+That's the important thing about Sloth.
+
 # 2024/06/19
 
 Input bufer needs its own reserved memory space to not fuck up compilations.

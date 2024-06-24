@@ -2,6 +2,7 @@ package io.github.jordipbou;
 
 import java.net.URL;
 import java.io.File;
+import java.util.List;
 import java.nio.ByteBuffer;
 import java.util.Hashtable;
 import java.util.ArrayList;
@@ -45,6 +46,17 @@ public class Sloth {
 
 	public void rplace(int a, int v) { r[rp - a - 1] = v; }
 	public int rpick(int a) { return r[rp - a - 1]; }
+
+	// -- Locals stack --
+
+	int l[];
+	int lp;
+
+	public void lpush(int v) { l[lp++] = v; }
+	public int lpop() { return l[--lp]; }
+
+	public void lplace(int a, int v) { l[lp - a - 1] = v; }
+	public int lpick(int a) { return l[lp - a - 1]; }
 
 	// -- Memory --
 
@@ -290,11 +302,12 @@ public class Sloth {
 
 	// -- Constructors --
 
-	public Sloth(int ibufsize, int psize, int rsize, int dsize) {
+	public Sloth(int ibufsize, int psize, int rsize, int lsize, int dsize) {
 		p = new int[psize];
 		r = new int[rsize];
+		l = new int[lsize];
 		d = ByteBuffer.allocateDirect(dsize);
-		pp = rp = state = 0;
+		pp = rp = lp = state = 0;
 		dp = ibufsize;
 		tp = dsize / 2;
 		ibuf = ipos = ilen = 0;
@@ -304,7 +317,7 @@ public class Sloth {
 		tr = 3;
 	}
 
-	public Sloth() { this(1024, 256, 256, 65536); }
+	public Sloth() { this(1024, 256, 256, 16, 65536); }
 
 	// -- Bootstrapping --
 
@@ -344,24 +357,24 @@ public class Sloth {
 	public void ipush() { rpush(kx); kx = jx; jx = ix; lx = 0; }
 	public void ipop() { lx = 0; ix = jx; jx = kx; kx = rpop(); }
 
-	// Algorithm for doloop taken from pForth (pf_inner.c case ID_PLUS_LOOP)
-	public void doloop() {
-		ipush(); 
-		int q = pop();
-		ix = pop();
-		int l = pop();
-		if (ix != l) {
-			for (int o = ix - l, d = 0;((o ^ (o + d)) & (o ^ d)) >= 0 && lx == 0;) {
-				eval(q);
-				if (lx == 0) { // Avoid pop if we're leaving
-					d = pop();
-					o = ix - l;
-					ix += d;
-				}
-			}
-		}
-		ipop(); 
-	}
+	// // Algorithm for doloop taken from pForth (pf_inner.c case ID_PLUS_LOOP)
+	// public void doloop() {
+	// 	ipush(); 
+	// 	int q = pop();
+	// 	ix = pop();
+	// 	int l = pop();
+	// 	if (ix != l) {
+	// 		for (int o = ix - l, d = 0;((o ^ (o + d)) & (o ^ d)) >= 0 && lx == 0;) {
+	// 			eval(q);
+	// 			if (lx == 0) { // Avoid pop if we're leaving
+	// 				d = pop();
+	// 				o = ix - l;
+	// 				ix += d;
+	// 			}
+	// 		}
+	// 	}
+	// 	ipop(); 
+	// }
 
 	public void leave() { lx = -1; exit(); }
 
@@ -369,45 +382,9 @@ public class Sloth {
 	public void j() { push(jx); }
 	public void k() { push(kx); }
 
-	public void times() { ipush(); int q = pop(), l = pop(); for (ix = 0; ix < l; ix++) eval(q); ipop(); }
+	public void times() { ipush(); int q = pop(), l = pop(); for (ix = 0; ix < l && lx == 0; ix++) eval(q); ipop(); }
 
-	public void _while() {
-		int q2 = pop(), q1 = pop();
-		do {
-			eval(q1);
-			if (pop() == 0) break;
-			eval(q2);
-		} while(true);
-	}
-
-	public void _two_while() {
-		int q3 = pop(), q2 = pop(), q1 = pop();
-		do {
-			eval(q1);
-			if (pop() == 0) break;
-			eval(q2);
-			if (pop() == 0) break;
-			eval(q3);
-		} while(true);
-	}
-
-	public void _binrec(int q1, int q2, int q3, int q4) {
-		eval(q1);
-		if (pop() == 1) {
-			eval(q2);
-		} else {
-			eval(q3);
-			_binrec(q1, q2, q3, q4);
-			swap();
-			_binrec(q1, q2, q3, q4);
-			eval(q4);
-		}
-	}
-
-	public void binrec() {
-		int q4 = pop(), q3 = pop(), q2 = pop(), q1 = pop();
-		_binrec(q1, q2, q3, q4);
-	}
+	public void loop() { ipush(); int q = pop(); while (lx == 0) eval(q); ipop(); }
 
 	public void bootstrap() {
 		// Reserve space for the input buffer
@@ -479,18 +456,16 @@ public class Sloth {
 
 		colon("CHOOSE", (vm) -> { int q2 = pop(); int q1 = pop(); eval(pop() == 0 ? q2 : q1); });
 
-		colon("DOLOOP", (vm) -> doloop());
-		colon("LEAVE", (vm) -> leave());
+		//colon("DOLOOP", (vm) -> doloop()); // Complex counted loop
+
+		colon("TIMES", (vm) -> times()); // Counted loop
 		colon("I", (vm) -> i());
 		colon("J", (vm) -> j());
 		colon("K", (vm) -> k());
 
-		colon("TIMES", (vm) -> times());
+		colon("LOOP", (vm) -> loop()); // Infinite loop
 
-		colon("WHILE", (vm) -> _while());
-		colon("2WHILE", (vm) -> _two_while());
-
-		colon("BINREC", (vm) -> binrec());
+		colon("WHILE", (vm) -> { if (pop() != 0) leave(); });
 
 		colon(":", (vm) -> colon());
 		colon(";", (vm) -> semicolon()); set_immediate();
@@ -510,6 +485,11 @@ public class Sloth {
 
 		colon("KEY", (vm) -> key());
 		colon("EMIT", (vm) -> emit());
+
+		colon(">L", (vm) -> lpush(pop()));
+		colon("L>", (vm) -> push(lpop()));
+		colon("L@", (vm) -> push(lpick(pop())));
+		colon("L!", (vm) -> { int a = pop(); lplace(a, pop()); });
 	}
 
 	public int KEY = 0;
