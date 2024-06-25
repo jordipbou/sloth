@@ -33,6 +33,7 @@ class Sloth:
 
     def push(self, v): self.s[self.sp] = v; self.sp = self.sp + 1
     def pop(self): v = self.s[self.sp - 1]; self.sp = self.sp - 1; return v
+
     def pick(self, a): return self.s[self.sp - a - 1]
     def place(self, a, v): self.s[self.sp - a - 1] = v
 
@@ -71,11 +72,7 @@ class Sloth:
 
     def do_prim(self, q): self.primitives[-1 - q](self)
     def call(self, q): self.rpush(self.ip); self.ip = q
-    def execute(self, q): 
-        if q > 0:
-            self.call(q) 
-        else:
-            self.do_prim(q)
+    def execute(self, q): self.call(q) if q > 0 else self.do_prim(q)
     def exit(self): self.ip = -1 if self.rp == 0 else self.rpop()
 
     def opcode(self): o = self.m[self.ip]; self.ip = self.ip + 1; return o
@@ -95,6 +92,10 @@ class Sloth:
     def noname(self, l): self.primitives.append(l); return 0 - len(self.primitives)
 
     # -- Exceptions --
+
+    # TODO It should be possible to use this exception system to get out of loops
+    # but without losing what is present on the parameter stack. Maybe using one
+    # exception value for that.
 
     def throw(self, v): 
         if not v == 0:
@@ -157,91 +158,30 @@ class Sloth:
     # -- Symbols --------------------------------------------------------------
     # -------------------------------------------------------------------------
 
-    # # I have all this things here that come from Forth (hidden, colon, immediate)
-    # # and all fields link, xt, dt, wl, flags, ....
-    # # But I think that I don't need xt/dt, only xt:
-    # # A var is defined as 0 $ my-var
-    # # And its value is taken as ^ my-var
-    # # To modify a var, 5 $ my-var
-    # # To create a new variable use $$ my-var
-    # # To create a word  : word ... ;
-    # # To repeat a word if it does not exist :: word .... ;
-
-    # HIDDEN = 1
-    # COLON = 2
-    # IMMEDIATE = 4
-
-    # def init_symbols(self):
-    #     self.latest = 0
-
-    # def symsize(self, name):
-    #     return Sloth.CELL + Sloth.CELL + Sloth.CELL + Sloth.CELL + Sloth.CHAR + Sloth.CHAR + len(name)*Sloth.CHAR
-
-    # def link(self, w): return w
-    # def xt(self, w): return w + Sloth.CELL
-    # def dt(self, w): return w + Sloth.CELL + Sloth.CELL
-    # def wl(self, w): return w + Sloth.CELL + Sloth.CELL + Sloth.CELL
-    # def flags(self, w): return w + Sloth.CELL + Sloth.CELL + Sloth.CELL + Sloth.CELL
-    # def namelen(self, w): return w + Sloth.CELL + Sloth.CELL + Sloth.CELL + Sloth.CELL + Sloth.CHAR
-    # def name(self, w): return w + Sloth.CELL + Sloth.CELL + Sloth.CELL + Sloth.CELL + Sloth.CHAR + Sloth.CHAR
-
-    # # Basic implementation with symbols inserted between the heap, but it
-    # # can be modified to put it at the top of the heap, making latest
-    # # effectively the non-writeable part of the heap
-    # def symbol(self, name):
-    #     w = self.allot(self.symsize(name))
-    #     self.store(self.link(w), self.latest)
-    #     self.latest = w
-    #     self.store(self.xt(w), 0)
-    #     self.store(self.dt(w), self.mp)
-    #     self.store(self.wl(w), 0)
-    #     self.cstore(self.flags(w), 0)
-    #     self.cstore(self.namelen(w), len(name))
-    #     for i in range(len(name)):
-    #         self.cstore(self.name(w) + i*Sloth.CHAR, ord(name[i]))
-
-    # def set_flag(self, w, f): self.cstore(self.flags(w), self.cfetch(self.flags(w)) | f)
-    # def unset_flag(self, w, f): self.cstore(self.flags(w), self.cfetch(self.flags(w)) & ~f)
-
-    # def has_flag(self, w, f): return self.cfetch(self.flags(w)) & f
-
-    # def colon(self, name, xt):
-    #     self.symbol(name)
-    #     self.xt(self.latest, xt)
-    #     self.set_flag(self.latest, COLON) 
-
-    # # TODO find !!
-
-    # # To be able to use it like FORSP (and that seems interesting), there
-    # # will not be does> (it can be implemented later, but not in symbols
-    # # directly and not allowing several does> -i think that makes no sense-)
-    # # quote symbol -> \ symbol
-    # # push symbol binding -> ' symbol (tick does exactly that, return the xt)
-    # # pop and bound to symbol -> $ symbol
-
-    # # quote symbol -> ' symbol
-    # # push symbol binding (xt) -> $ symbol
-    # # bound symbol to pop -> | symbol
+    IMMEDIATE = 1
 
     def init_symbols(self):
         self.latest = 0
 
     def link(self, w): return w
     def binding(self, w): return w + Sloth.CELL
-    def namelen(self, w): return w + Sloth.CELL + Sloth.CELL
-    def name(self, w): return w + Sloth.CELL + Sloth.CELL + Sloth.CHAR
+    def flags(self, w): return w + Sloth.CELL + Sloth.CELL
+    def namelen(self, w): return w + Sloth.CELL + Sloth.CELL + Sloth.CHAR
+    def name(self, w): return w + Sloth.CELL + Sloth.CELL + Sloth.CHAR + Sloth.CHAR
 
     def sym_size(self, u):
-        return Sloth.CELL + Sloth.CELL + Sloth.CHAR + u*Sloth.CHAR
+        return Sloth.CELL + Sloth.CELL + Sloth.CHAR + Sloth.CHAR + u*Sloth.CHAR
 
     def create_symbol(self, a, u):
         w = self.allot(self.sym_size(u))
         self.store(self.link(w), self.latest)
         self.latest = w
         self.store(self.binding(w), 0)
+        self.cstore(self.flags(w), 0)
         self.cstore(self.namelen(w), u)
         for i in range(u):
             self.cstore(self.name(w) + i*Sloth.CHAR, self.cfetch(a + i*Sloth.CHAR))
+        # alignment?
         return w
 
     def compare(self, a, u, w):
@@ -264,16 +204,8 @@ class Sloth:
             w = self.fetch(self.link(w))
         return w
 
-    # Syntax:
-
-    # The double char words are there to ensure an hyperstatic environment
-    # when its required, like in lexical scope for locals
-
-    # Quote symbol -> ' symbol
-    # Create symbol -> '' symbol ( ' symbol <> '' symbol )
-    # Pop and bound to symbol -> $ symbol
-    # Create symbol and bound to it -> $$ symbol
-    # Push symbol binding -> ^ symbol
+    def set(w, v): self.store(self.binding(w), v)
+    def get(w): self.fetch(self.binding(w))
 
     # -------------------------------------------------------------------------
     # -- Outer interpreter (for bootstrapping) --------------------------------
@@ -286,6 +218,8 @@ class Sloth:
 
         self.tok = 0
         self.tlen = 0
+
+        self.STATE = 0
 
     def token(self):
         while self.ipos < self.ilen and self.cfetch(self.ibuf + self.ipos*Sloth.CHAR) < 33:
@@ -306,103 +240,17 @@ class Sloth:
                 break
             w = self.find_symbol(a, u)
             if not w == 0:
-                self.eval(self.fetch(self.binding(w)))
+                if self.STATE == 0 or self.cfetch(self.flags(w)) == Sloth.IMMEDIATE:
+                    self.eval(self.fetch(self.binding(w)))
+                else:
+                    self.comma(self.fetch(self.binding(w)))
             else:
-                self.push(self.tok); self.push(self.tlen)
-                self.type()
-                print('?')
+                self.throw(-13)
             self.trace()
 
-    # # -------------------------------------------------------------------------
-
-    # def compile(self, v): self.m[self.mp] = v; self.mp = self.mp + 1
-
-    #     self.latest = 0
-
-    #     self.ibuf = 0
-    #     self.ipos = 0
-    #     self.ilen = 0
-
-    #     self.tok = 0
-    #     self.tlen = 0
-
-    #     self.primitives = []
-
-    #     self.symbols = []
-
-    #     self.EXIT = self.colon('EXIT', lambda vm: vm.exit())
-
-    #     self.HELLO = self.colon('HELLO', lambda vm: print('Hello world!'))
-
-    #     self.BYE = self.colon('BYE', lambda vm: sys.exit(0))
-
-    #     self.colon('#', lambda vm: vm.intnum())
-
-    #     self.colon('$', lambda vm: vm.tick())
-    #     self.colon('\'', lambda vm: vm.do((Sloth.tick, Sloth.binding)))
-    #     self.colon('BINDING', lambda vm: vm.push(vm.binding(vm.pop())))
-    #     self.colon('NAME', lambda vm: vm.str_to_transient(vm.name(vm.pop())))
-
-    #     self.colon('TYPE', lambda vm: vm.type())
-
-    #     self.colon('DROP', lambda vm: vm.pop())
-    #     self.colon('DUP', lambda vm: vm.push(vm.pick(0)))
-
-    #     self.colon('+', lambda vm: vm.add())
-    #     self.colon('-', lambda vm: vm.sub())
-    #     self.colon('*', lambda vm: vm.mul())
-    #     self.colon('/', lambda vm: vm.div())
-    #     self.colon('MOD', lambda vm: vm.mod())
-
-    #     self.colon(':', lambda vm: vm._colon())
-    #     self.colon(';', lambda vm: vm._semicolon())
-
-    # -- Parsing numbers --
-
-    def intnum(self):
-        self.token()
-        try:
-            u = self.pop(); a = self.pop()
-            n = int(self.data_to_str(a, u))
-            self.push(n)
-        except ValueError as e:
-            print('Error converting number', e) 
-
-    def quote(self):
-        self.token()
-        u = self.pop(); a = self.pop()
-        self.push(self.find_symbol(a, u))
-
-    def set_binding(self):
-        self.token()
-        u = self.pop(); a = self.pop()
-        w = self.find_symbol(a, u)
-        if w == 0:
-            w = self.create_symbol(a, u)
-        self.store(self.binding(w), self.pop())
-
-    def get_binding(self):
-        self.token()
-        u = self.pop(); a = self.pop()
-        w = self.find_symbol(a, u)
-        if w == 0:
-            w = self.create_symbol(a, u)
-        self.push(self.fetch(self.binding(w)))
-
-
-    def type(self):
-        l = self.pop(); a = self.pop()
-        for i in range(l):
-            print(chr(self.fetch(a + i)), sep='', end='')
-
-    def trace(self):
-        print(self.mp, ' ', self.s[:self.sp], ' ', sep='', end='')
-        print(': [', self.ip, '] ', sep = '', end = '')
-        print(Fore.YELLOW, end='')
-        if self.tlen > 0: self.push(self.tok); self.push(self.tlen); self.type()
-        print(Style.RESET_ALL, end='')
-        if self.ipos < self.ilen: self.push(self.ibuf + self.ipos); self.push(self.ilen); self.type()
-        print()
+    # -------------------------------------------------------------------------
+    # -- Bootstrapping --------------------------------------------------------
+    # -------------------------------------------------------------------------
 
     def str_to_data(self, s, a):
         for i in range(len(s)):
@@ -413,32 +261,36 @@ class Sloth:
         self.tok = 0
         self.tlen = 0
 
-    def data_to_str(self, a, u):
-        s = ''
-        for i in range(u):
-            s = s + chr(self.cfetch(a + i*Sloth.CHAR))
-        return s
-
     def pad(self): return self.mp + 1024
 
     def colon(self, n, l):
         self.str_to_data(n, self.pad())
         w = self.create_symbol(self.pad(), len(n))
-        self.store(self.binding(w), self.noname(l))
+        xt = self.noname(l)
+        self.store(self.binding(w), xt)
+        return xt
 
-    def repl(self):
-        while True:
-            self.str_to_data(input('>>> '), 0)
-            self.outer()
+    def immediate(self):
+        self.cstore(self.flags(self.latest), Sloth.IMMEDIATE)
 
     def bootstrap(self):
+        self.EXIT = self.colon('EXIT', lambda vm: vm.exit())
+        self.doLIT = self.colon('doLIT', lambda vm: vm.do_lit())
+        self.doFLIT = self.colon('doFLIT', lambda vm: vm.do_flit())
+        self.doQUOTE = self.colon('doQUOTE', lambda vm: vm.do_quote())
+        self.doSTRING = self.colon('doSTRING', lambda vm: vm.do_string())
+
+        self.colon('EXECUTE', lambda vm: vm.execute(vm.pop()))
         self.colon('BYE', lambda vm: exit())
 
-        self.colon('#', lambda vm: vm.intnum())
+        self.OUTER = self.colon('OUTER', lambda vm: vm.outer())
+
+        self.colon('#', lambda vm: vm.intnum()); self.immediate()
+        self.colon('"', lambda vm: vm.strlit()); self.immediate()
 
         self.colon('\'', lambda vm: vm.quote())
-        self.colon('$', lambda vm: vm.set_binding())
-        self.colon('|', lambda vm: vm.get_binding())
+        self.colon('!\'', lambda vm: vm.set_binding())
+        self.colon('@\'', lambda vm: vm.get_binding())
 
         self.colon('DROP', lambda vm: vm.drop())
         self.colon('DUP', lambda vm: vm.dup())
@@ -448,22 +300,150 @@ class Sloth:
         self.colon('!', lambda vm: vm.store(vm.pop(), vm.pop()))
 
         self.colon('+', lambda vm: vm.add())
+        self.colon('-', lambda vm: vm.sub())
+        self.colon('*', lambda vm: vm.mul())
+        self.colon('/', lambda vm: vm.div())
+        self.colon('MOD', lambda vm: vm.mod())
 
+        self.colon('<', lambda vm: vm.lt())
         self.colon('=', lambda vm: vm.eq())
+        self.colon('>', lambda vm: vm.gt())
+
+        self.colon('0<', lambda vm: vm.zlt())
+        self.colon('0=', lambda vm: vm.zeq())
+        self.colon('0>', lambda vm: vm.zgt())
+
+        self.colon('[', lambda vm: vm.start_quotation())
+        self.colon(']', lambda vm: vm.end_quotation()); self.immediate()
+
+        self.colon('TYPE', lambda vm: vm.type())
+
+    def repl(self):
+        while True:
+            self.str_to_data(input('>>> '), 0)
+            self.catch(self.OUTER)
+            r = self.pop()
+            if r == -13:
+                self.push(self.tok); self.push(self.tlen); self.type(); print(' ?')
+
+    # -------------------------------------------------------------------------
+    # -- Words ----------------------------------------------------------------
+    # -------------------------------------------------------------------------
+
+    # -- Parsing numbers --
+
+    def do_lit(self): self.push(self.opcode())
+    def do_flit(self): self.push(self.opcode())
+
+    def intnum(self):
+        self.token()
+        u = self.pop(); a = self.pop()
+        s = self.data_to_str(a, u)
+        try:
+            n = int(s)
+            if self.STATE == 0:
+                self.push(n)
+            else:
+                self.comma(self.doLIT)
+                self.comma(n)
+        except ValueError as e:
+            try:
+                f = float(s)
+                if self.STATE == 0:
+                    self.push(f)
+                else:
+                    self.comma(doFLIT)
+                    self.comma(f)
+            except ValueError as e:
+                print('Error converting number', e) 
+
+    # -- Parsing strings --
+
+    def do_string(self): 
+        n = self.opcode()
+        self.push(self.ip)
+        self.push(n)
+        self.ip = self.ip + n*Sloth.CHAR
+
+    def strlit(self):
+        self.ipos = self.ipos + 1
+        a = self.ibuf + self.ipos*Sloth.CHAR
+        u = 0
+        while self.ipos < self.ilen and chr(self.cfetch(self.ibuf + self.ipos*Sloth.CHAR)) != '"':
+            self.ipos = self.ipos + 1
+            u = u + 1
+        self.ipos = self.ipos + 1
+        self.comma(self.doSTRING)
+        self.comma(u)
+        if self.STATE == 0:
+            self.push(self.mp)
+        for i in range(u):
+            self.ccomma(self.cfetch(a + i*Sloth.CHAR))
+        if self.STATE == 0:
+            self.push(u)
+
+    # -- Working with symbols --
+
+    def find_or_create(self):
+        self.token()
+        u = self.pop(); a = self.pop()
+        w = self.find_symbol(a, u)
+        if w == 0:
+            w = self.create_symbol(a, u)
+        return w
+
+    def quote(self): w = self.find_or_create(); self.push(w)
+    def set_binding(self): w = self.find_or_create(); self.store(self.binding(w), self.pop())
+    def get_binding(self): w = self.find_or_create(); self.push(self.fetch(self.binding(w)))
+
+    # -- Quotations --
+
+    def do_quote(self):
+        self.push(self.ip + self.CELL)
+        self.ip = self.ip + self.opcode()
+
+    def start_quotation(self):
+        self.comma(self.doQUOTE)
+        self.push(self.mp)
+        self.comma(0)
+        if self.STATE == 0:
+            self.push(self.mp)
+            self.swap()
+        self.STATE = 1
+
+    def end_quotation(self):
+        self.comma(self.EXIT)
+        self.STATE = 0
+        a = self.pop()
+        self.store(a, self.mp - a)
+
+    # --
+
+    def type(self):
+        l = self.pop(); a = self.pop()
+        for i in range(l):
+            print(chr(self.fetch(a + i*Sloth.CHAR)), sep='', end='')
+
+    def trace(self):
+        print('[', self.STATE, ']', '', sep='', end='')
+        print(self.mp, ' ', self.s[:self.sp], ' ', sep='', end='')
+        print(': [', self.ip, '] ', sep = '', end = '')
+        print(Fore.YELLOW, end='')
+        if self.tlen > 0: self.push(self.tok); self.push(self.tlen); self.type()
+        print(Style.RESET_ALL, end='')
+        if self.ipos < self.ilen: self.push(self.ibuf + self.ipos); self.push(self.ilen); self.type()
+        print()
+
+    def data_to_str(self, a, u):
+        s = ''
+        for i in range(u):
+            s = s + chr(self.cfetch(a + i*Sloth.CHAR))
+        return s
+
 
 def main():
     x = Sloth()
 
-    # Print all symbols
-    # w = x.latest
-    # while not w == 0:
-    #     x.push(x.name(w)); x.push(x.namelen(w))
-    #     x.type()
-    #     print()
-    #     w = x.fetch(x.link(w))
-
-    # x.catch(x.noname(lambda vm: vm.throw(-15)))
-    # x.trace()
     x.repl()
 
 if __name__ == '__main__':
