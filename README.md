@@ -1,5 +1,51 @@
 # SLOTH (SLOw forTH / Scripting Language Of The Heaven/Hell)
 
+## Basic words
+
+### Stacks
+
+DROP DUP OVER SWAP >R R@ R>
+
+### Memory
+
+! @ C! C@ HERE HERE! UNUSED CELL CHAR
+
+### Comparison
+
+< = > 
+
+### Arithmetic
+
++ - * / MOD RSHIFT
+
+### Logic/Bit
+
+AND OR XOR INVERT LSHIFT
+
+### Input source
+
+IBUF IPOS ILEN IBUF! IPOS! ILEN! REFILL
+
+### Input/Output
+
+KEY EMIT INCLUDED
+
+### Strings
+
+s"
+
+### Execution and defining words (compiler?)
+
+EXECUTE THROW CATCH CREATE DOES> : ; POSTPONE IMMEDIATE RECURSE
+
+### Simple control flow
+
+AHEAD IF THEN BEGIN REPEAT AGAIN ELSE WHILE
+
+### Quotations and combinators
+
+[ ] CHOOSE
+
 # Current idea
 
 3 interpreters:

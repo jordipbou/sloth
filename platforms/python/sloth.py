@@ -6,6 +6,8 @@
 import sys
 from colorama import Fore, Back, Style
 
+import operator
+
 class Sloth:
     def __init__(self):
         # VM initialization
@@ -62,7 +64,12 @@ class Sloth:
     def comma(self, v): self.store(self.mp, v); self.mp = self.mp + Sloth.CELL
     def ccomma(self, v): self.cstore(self.mp, v); self.mp = self.mp + Sloth.CHAR
 
+    def here(self): return self.mp
+    def set_here(self, v): self.mp = v
+
     def allot(self, v): t = self.mp; self.mp = self.mp + v; return t
+
+    def align(self): self.set_here((self.here() + (Sloth.CELL - 1)) & ~(Sloth.CELL - 1))
 
     # -- Inner interpreter --
 
@@ -83,19 +90,15 @@ class Sloth:
             self.trace()
             self.execute(self.opcode())
 
-    def eval(self, q): self.execute(q); self.inner()
+    def evaluate(self, q): self.execute(q); self.inner()
 
     def do(self, l): 
         for i in l:
-            self.eval(i)
+            self.evaluate(i)
 
     def noname(self, l): self.primitives.append(l); return 0 - len(self.primitives)
 
     # -- Exceptions --
-
-    # TODO It should be possible to use this exception system to get out of loops
-    # but without losing what is present on the parameter stack. Maybe using one
-    # exception value for that.
 
     def throw(self, v): 
         if not v == 0:
@@ -105,7 +108,7 @@ class Sloth:
         tsp = self.sp
         trp = self.rp
         try:
-            self.eval(q)
+            self.evaluate(q)
             self.push(0)
         except RuntimeError as e:
             self.sp = tsp
@@ -116,82 +119,67 @@ class Sloth:
     # -- Basic VM instructions ------------------------------------------------
     # -------------------------------------------------------------------------
 
-    # -- Stack shufflers --
-
     def drop(self): self.pop()
     def dup(self): self.push(self.pick(0))
     def swap(self): a = self.pop(); b = self.pop(); self.push(a); self.push(b)
     def over(self): self.push(self.pick(1))
 
-    # -- Arithmetic --
+    # Helper for all binary operators
+    def binop(self, o): a = self.pop(); self.push(o(self.pop(), a))
 
-    def add(self): a = self.pop(); self.push(self.pop() + a)
-    def sub(self): a = self.pop(); self.push(self.pop() - a)
-    def mul(self): a = self.pop(); self.push(self.pop() * a)
-    def div(self): a = self.pop(); self.push(self.pop() / a)
-    def mod(self): a = self.pop(); self.push(self.pop() % a)
-
-    # -- Bit --
-
-    def _and(self): a = self.pop(); self.push(self.pop() & a)
-    def _or(self): a = self.pop(); self.push(self.pop() | a)
-    def _xor(self): a = self.pop(); self.push(self.pop() ^ a)
     def _invert(self): self.place(0, ~self.pick(0))
-
-    def lshift(self): a = self.pop(); self.push(self.pop() << a)
-    # def lrshift(self): python does not have logical right shift, do I need it?
-    def rshift(self): a = self.pop(); self.push(self.pop() >> a)
-
-    # -- Comparisons --
-
-    def gt(self): a = self.pop(); b = self.pop(); self.push(-1 if b > a else 0)
-    def eq(self): a = self.pop(); b = self.pop(); self.push(-1 if b == a else 0)
-    def lt(self): a = self.pop(); b = self.pop(); self.push(-1 if b < a else 0)
-
-    def zgt(self): self.push(-1 if self.pop() > 0 else 0)
-    def zeq(self): self.push(-1 if self.pop() == 0 else 0)
-    def zlt(self): self.push(-1 if self.pop() < 0 else 0)
-
-    # -- Here starts the meaty part of Sloth !!! ------------------------------
 
     # -------------------------------------------------------------------------
     # -- Symbols --------------------------------------------------------------
     # -------------------------------------------------------------------------
 
+    NO_FLAGS = 0
     HIDDEN = 1
     COLON = 2
     IMMEDIATE = 4
 
     def init_symbols(self):
         self.latest = 0
+        self.latestxt = 0
 
-    def link(self, w): return w
-    def binding(self, w): return w + Sloth.CELL
-    def flags(self, w): return w + Sloth.CELL + Sloth.CELL
-    def namelen(self, w): return w + Sloth.CELL + Sloth.CELL + Sloth.CHAR
-    def name(self, w): return w + Sloth.CELL + Sloth.CELL + Sloth.CHAR + Sloth.CHAR
+    def get_link(self, w): return self.fetch(w)
+    def set_link(self, w, v): self.store(w, v)
 
-    def sym_size(self, u):
-        return Sloth.CELL + Sloth.CELL + Sloth.CHAR + Sloth.CHAR + u*Sloth.CHAR
+    def get_xt(self, w): return self.fetch(w + Sloth.CELL)
+    def set_xt(self, w, v): self.store(w + Sloth.CELL, v)
+
+    def get_dt(self, w): return self.fetch(w + 2*Sloth.CELL)
+    def set_dt(self, w, v): self.store(w + 2*Sloth.CELL, v)
+
+    def get_flags(self, w): return self.cfetch(w + 3*Sloth.CELL)
+    def set_flags(self, w, f): self.cstore(w + 3*Sloth.CELL, f)
+
+    def has_flag(self, w, f): return (self.get_flags(w) & f) == f
+    def set_flag(self, w, f): self.set_flags(w, self.get_flags(w) | f)
+    def unset_flag(self, w, f): self.set_flags(w, self.get_flags(w) & ~f)
+
+    def get_namelen(self, w): return self.cfetch(w + 3*Sloth.CELL + Sloth.CHAR)
+    def set_namelen(self, w, v): self.cstore(w + 3*Sloth.CELL + Sloth.CHAR, v)
+
+    def name_addr(self, w): return w + 3*Sloth.CELL + 2*Sloth.CHAR
 
     def create_symbol(self, a, u):
-        w = self.allot(self.sym_size(u))
-        self.store(self.link(w), self.latest)
-        self.latest = w
-        self.store(self.binding(w), 0)
-        self.cstore(self.flags(w), 0)
-        self.cstore(self.namelen(w), u)
+        w = self.allot(3*Sloth.CELL + 2*Sloth.CHAR + u*Sloth.CHAR); self.align()
+        self.set_link(w, self.latest); self.latest = w
+        self.set_xt(w, 0)
+        self.set_dt(w, self.here())
+        self.set_flags(w, Sloth.NO_FLAGS)
+        self.set_namelen(w, u)
         for i in range(u):
-            self.cstore(self.name(w) + i*Sloth.CHAR, self.cfetch(a + i*Sloth.CHAR))
-        # alignment?
+            self.cstore(self.name_addr(w) + i*Sloth.CHAR, self.cfetch(a + i*Sloth.CHAR))
         return w
 
-    def compare(self, a, u, w):
-        if not u == self.cfetch(self.namelen(w)):
+    def compare_no_case(self, a, u, w):
+        if not u == self.get_namelen(w):
             return False
         for i in range(u):
             c1 = self.cfetch(a + i*Sloth.CHAR)
-            c2 = self.cfetch(self.name(w) + i*Sloth.CHAR)
+            c2 = self.cfetch(self.name_addr(w) + i*Sloth.CHAR)
             c1 = (c1 - 32) if 97 <= c1 <= 122 else c1
             c2 = (c2 - 32) if 97 <= c2 <= 122 else c2
             if not c1 == c2:
@@ -201,13 +189,23 @@ class Sloth:
     def find_symbol(self, a, u):
         w = self.latest
         while not w == 0:
-            if self.compare(a, u, w):
+            if not self.has_flag(w, Sloth.HIDDEN) and self.compare_no_case(a, u, w):
                 break
-            w = self.fetch(self.link(w))
+            w = self.get_link(w)
         return w
 
-    def set(self, w, v): self.store(self.binding(w), v)
-    def get(self, w): return self.fetch(self.binding(w))
+    def eval_symbol(self, w):
+        if not self.has_flag(w, Sloth.COLON):
+            self.push(self.get_dt(w))
+        if not self.get_xt(w) == 0:
+            self.evaluate(self.get_xt(w))
+
+    def compile_symbol(self, w):
+        if not self.has_flag(w, Sloth.COLON):
+            self.comma(self.doLIT)
+            self.comma(self.get_dt(w))
+        if not self.get_xt(w) == 0:
+            self.comma(self.get_xt(w))
 
     # -------------------------------------------------------------------------
     # -- Outer interpreter (for bootstrapping) --------------------------------
@@ -242,12 +240,29 @@ class Sloth:
                 break
             w = self.find_symbol(a, u)
             if not w == 0:
-                if self.STATE == 0 or (self.cfetch(self.flags(w)) & Sloth.IMMEDIATE) == Sloth.IMMEDIATE:
-                    self.eval(self.fetch(self.binding(w)))
+                if self.STATE == 0 or self.has_flag(w, Sloth.IMMEDIATE):
+                    self.eval_symbol(w)
                 else:
-                    self.comma(self.fetch(self.binding(w)))
+                    self.compile_symbol(w)
             else:
-                self.throw(-13)
+                s = self.data_to_str(a, u)
+                try:
+                    n = int(s)
+                    if self.STATE == 0:
+                        self.push(n)
+                    else:
+                        self.comma(self.doLIT)
+                        self.comma(n)
+                except ValueError as e:
+                    try:
+                        f = float(s)
+                        if self.STATE == 0:
+                            self.push(f)
+                        else:
+                            self.comma(doFLIT)
+                            self.comma(f)
+                    except ValueError as e:
+                        self.throw(-13)
             self.trace()
 
     # -------------------------------------------------------------------------
@@ -263,17 +278,17 @@ class Sloth:
         self.tok = 0
         self.tlen = 0
 
-    def pad(self): return self.mp + 1024
+    def pad(self): return self.here() + 1024
 
     def colon(self, n, l):
         self.str_to_data(n, self.pad())
         w = self.create_symbol(self.pad(), len(n))
         xt = self.noname(l)
-        self.store(self.binding(w), xt)
+        self.set_xt(w, xt)
+        self.set_flag(w, Sloth.COLON)
         return xt
 
-    def immediate(self):
-        self.cstore(self.flags(self.latest), Sloth.IMMEDIATE)
+    def immediate(self): self.set_flag(self.latest, Sloth.IMMEDIATE)
 
     def bootstrap(self):
         self.EXIT = self.colon('EXIT', lambda vm: vm.exit())
@@ -285,17 +300,9 @@ class Sloth:
         self.colon('EXECUTE', lambda vm: vm.execute(vm.pop()))
         self.colon('BYE', lambda vm: exit())
 
-        self.OUTER = self.colon('OUTER', lambda vm: vm.outer())
+        self.OUTER = self.noname(lambda vm: vm.outer())
 
-        self.colon('#', lambda vm: vm.intnum()); self.immediate()
         self.colon('"', lambda vm: vm.strlit()); self.immediate()
-
-        # TODO I don't see the advantage of this symbols (except using
-        # symbols like in CL ' north ' east and that can be done with 
-        # constants=
-        self.colon('\'', lambda vm: vm.quote())
-        self.colon('!\'', lambda vm: vm.set_binding())
-        self.colon('@\'', lambda vm: vm.get_binding())
 
         self.colon('DROP', lambda vm: vm.drop())
         self.colon('DUP', lambda vm: vm.dup())
@@ -303,20 +310,30 @@ class Sloth:
 
         self.colon('@', lambda vm: vm.push(vm.fetch(vm.pop())))
         self.colon('!', lambda vm: vm.store(vm.pop(), vm.pop()))
+        self.colon('C@', lambda vm: vm.push(vm.cfetch(vm.pop())))
+        self.colon('C!', lambda vm: vm.cstore(vm.pop(), vm.pop()))
+        self.colon('HERE', lambda vm: vm.push(vm.here()))
+        self.colon('HERE!', lambda vm: vm.set_here(vm.pop()))
+        self.colon('CELL', lambda vm: vm.push(Sloth.CELL))
+        self.colon('CHAR', lambda vm: vm.push(Sloth.CHAR))
 
-        self.colon('+', lambda vm: vm.add())
-        self.colon('-', lambda vm: vm.sub())
-        self.colon('*', lambda vm: vm.mul())
-        self.colon('/', lambda vm: vm.div())
-        self.colon('MOD', lambda vm: vm.mod())
+        self.colon('+', lambda vm: vm.binop(operator.add))
+        self.colon('-', lambda vm: vm.binop(operator.sub))
+        self.colon('*', lambda vm: vm.binop(operator.mul))
+        self.colon('/', lambda vm: vm.binop(operator.truediv))
+        self.colon('MOD', lambda vm: vm.binop(operator.mod))
 
-        self.colon('<', lambda vm: vm.lt())
-        self.colon('=', lambda vm: vm.eq())
-        self.colon('>', lambda vm: vm.gt())
+        self.colon('LSHIFT', lambda vm: vm.binop(operator.lshift))
+        self.colon('RSHIFT', lambda vm: vm.binop(operator.rshift))
 
-        self.colon('0<', lambda vm: vm.zlt())
-        self.colon('0=', lambda vm: vm.zeq())
-        self.colon('0>', lambda vm: vm.zgt())
+        self.colon('<', lambda vm: vm.binop(operator.lt))
+        self.colon('=', lambda vm: vm.binop(operator.eq))
+        self.colon('>', lambda vm: vm.binop(operator.gt))
+
+        self.colon('AND', lambda vm: vm._and())
+        self.colon('OR', lambda vm: vm._or())
+        self.colon('XOR', lambda vm: vm._xor())
+        self.colon('INVERT', lambda vm: vm._invert())
 
         self.colon('[', lambda vm: vm.start_quotation()); self.immediate()
         self.colon(']', lambda vm: vm.end_quotation()); self.immediate()
@@ -328,6 +345,7 @@ class Sloth:
         self.colon(';', lambda vm: vm.semicolon()); self.immediate()
         self.colon('|', lambda vm: vm.postpone()); self.immediate()
         self.colon('IMMEDIATE', lambda vm: vm.immediate())
+        self.colon('RECURSE', lambda vm: vm.comma(vm.latestxt))
 
         self.colon('TYPE', lambda vm: vm.type())
 
@@ -343,34 +361,12 @@ class Sloth:
     # -- Words ----------------------------------------------------------------
     # -------------------------------------------------------------------------
 
-    # -- Parsing numbers --
+    # -- Numbers --
 
     def do_lit(self): self.push(self.opcode())
     def do_flit(self): self.push(self.opcode())
 
-    def intnum(self):
-        self.token()
-        u = self.pop(); a = self.pop()
-        s = self.data_to_str(a, u)
-        try:
-            n = int(s)
-            if self.STATE == 0:
-                self.push(n)
-            else:
-                self.comma(self.doLIT)
-                self.comma(n)
-        except ValueError as e:
-            try:
-                f = float(s)
-                if self.STATE == 0:
-                    self.push(f)
-                else:
-                    self.comma(doFLIT)
-                    self.comma(f)
-            except ValueError as e:
-                print('Error converting number', e) 
-
-    # -- Parsing strings --
+    # -- Strings --
 
     def do_string(self): 
         n = self.opcode()
@@ -436,20 +432,20 @@ class Sloth:
     def choose(self):
         f = self.pop(); t = self.pop(); c = self.pop()
         if not c == 0:
-            self.eval(t)
+            self.evaluate(t)
         else:
-            self.eval(f)
+            self.evaluate(f)
 
     def _binrec(self, q1, q2, q3, q4):
         self.eval(q1)
         if self.pop() != 0:
-            self.eval(q2)
+            self.evaluate(q2)
         else:
-            self.eval(q3)
+            self.evaluate(q3)
             self._binrec(q1, q2, q3, q4)
             self.swap()
             self._binrec(q1, q2, q3, q4)
-            self.eval(q4)
+            self.evaluate(q4)
 
     def binrec(self):
         q4 = self.pop(); q3 = self.pop(); q2 = self.pop(); q1 = self.pop()
@@ -461,14 +457,15 @@ class Sloth:
         self.token()
         u = self.pop(); a = self.pop()
         w = self.create_symbol(a, u)
-        self.set(w, self.mp)
-        self.cstore(self.flags(w), Sloth.HIDDEN | Sloth.COLON)
+        self.set_xt(w, self.get_dt(w))
+        self.set_flag(w, Sloth.HIDDEN)
+        self.set_flag(w, Sloth.COLON)
         self.STATE = 1
 
     def semicolon(self):
         self.comma(self.EXIT)
         self.STATE = 0
-        self.cstore(self.flags(self.latest), Sloth.COLON)
+        self.unset_flag(self.latest, Sloth.HIDDEN)
 
     def postpone(self):
         self.token()
@@ -487,7 +484,7 @@ class Sloth:
             None
 
     def trace(self):
-        print('[', self.STATE, ']', '', sep='', end='')
+        print('[', self.STATE, '] ', sep='', end='')
         print(self.mp, ' ', self.s[:self.sp], ' ', sep='', end='')
         print(': [', self.ip, '] ', sep = '', end = '')
         if self.rp > 0:
@@ -496,7 +493,10 @@ class Sloth:
         print(Fore.YELLOW, end='')
         if self.tlen > 0: self.push(self.tok); self.push(self.tlen); self.type()
         print(Style.RESET_ALL, end='')
-        if self.ipos < self.ilen: self.push(self.ibuf + self.ipos); self.push(self.ilen); self.type()
+        if self.ipos < self.ilen: 
+            self.push(self.ibuf + self.ipos)
+            self.push(self.ilen - self.ipos)
+            self.type()
         print()
 
     def data_to_str(self, a, u):
