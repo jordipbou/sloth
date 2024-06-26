@@ -158,9 +158,7 @@ class Sloth:
     # -- Symbols --------------------------------------------------------------
     # -------------------------------------------------------------------------
 
-    HIDDEN = 1
-    COLON = 2
-    IMMEDIATE = 4
+    IMMEDIATE = 1
 
     def init_symbols(self):
         self.latest = 0
@@ -206,8 +204,8 @@ class Sloth:
             w = self.fetch(self.link(w))
         return w
 
-    def set(self, w, v): self.store(self.binding(w), v)
-    def get(self, w): return self.fetch(self.binding(w))
+    def set(w, v): self.store(self.binding(w), v)
+    def get(w): self.fetch(self.binding(w))
 
     # -------------------------------------------------------------------------
     # -- Outer interpreter (for bootstrapping) --------------------------------
@@ -242,7 +240,7 @@ class Sloth:
                 break
             w = self.find_symbol(a, u)
             if not w == 0:
-                if self.STATE == 0 or (self.cfetch(self.flags(w)) & Sloth.IMMEDIATE) == Sloth.IMMEDIATE:
+                if self.STATE == 0 or self.cfetch(self.flags(w)) == Sloth.IMMEDIATE:
                     self.eval(self.fetch(self.binding(w)))
                 else:
                     self.comma(self.fetch(self.binding(w)))
@@ -283,6 +281,7 @@ class Sloth:
         self.doSTRING = self.colon('doSTRING', lambda vm: vm.do_string())
 
         self.colon('EXECUTE', lambda vm: vm.execute(vm.pop()))
+        self.colon('RECURSE', lambda vm: vm.recurse())
         self.colon('BYE', lambda vm: exit())
 
         self.OUTER = self.colon('OUTER', lambda vm: vm.outer())
@@ -290,9 +289,6 @@ class Sloth:
         self.colon('#', lambda vm: vm.intnum()); self.immediate()
         self.colon('"', lambda vm: vm.strlit()); self.immediate()
 
-        # TODO I don't see the advantage of this symbols (except using
-        # symbols like in CL ' north ' east and that can be done with 
-        # constants=
         self.colon('\'', lambda vm: vm.quote())
         self.colon('!\'', lambda vm: vm.set_binding())
         self.colon('@\'', lambda vm: vm.get_binding())
@@ -318,16 +314,10 @@ class Sloth:
         self.colon('0=', lambda vm: vm.zeq())
         self.colon('0>', lambda vm: vm.zgt())
 
-        self.colon('[', lambda vm: vm.start_quotation()); self.immediate()
+        self.colon('[', lambda vm: vm.start_quotation())
         self.colon(']', lambda vm: vm.end_quotation()); self.immediate()
 
         self.colon('CHOOSE', lambda vm: vm.choose())
-        self.colon('BINREC', lambda vm: vm.binrec())
-
-        self.colon(':', lambda vm: vm.colondef())
-        self.colon(';', lambda vm: vm.semicolon()); self.immediate()
-        self.colon('|', lambda vm: vm.postpone()); self.immediate()
-        self.colon('IMMEDIATE', lambda vm: vm.immediate())
 
         self.colon('TYPE', lambda vm: vm.type())
 
@@ -342,6 +332,10 @@ class Sloth:
     # -------------------------------------------------------------------------
     # -- Words ----------------------------------------------------------------
     # -------------------------------------------------------------------------
+
+    # -- Execution --
+
+    def recurse(self): self.comma(self.latestxt)
 
     # -- Parsing numbers --
 
@@ -423,76 +417,25 @@ class Sloth:
         if self.STATE == 0:
             self.push(self.mp)
             self.swap()
-        self.STATE = self.STATE + 1
+        self.STATE = 1
 
     def end_quotation(self):
         self.comma(self.EXIT)
-        self.STATE = self.STATE - 1
+        self.STATE = 0
         a = self.pop()
         self.store(a, self.mp - a)
-
-    # -- Combinators --
-
-    def choose(self):
-        f = self.pop(); t = self.pop(); c = self.pop()
-        if not c == 0:
-            self.eval(t)
-        else:
-            self.eval(f)
-
-    def _binrec(self, q1, q2, q3, q4):
-        self.eval(q1)
-        if self.pop() != 0:
-            self.eval(q2)
-        else:
-            self.eval(q3)
-            self._binrec(q1, q2, q3, q4)
-            self.swap()
-            self._binrec(q1, q2, q3, q4)
-            self.eval(q4)
-
-    def binrec(self):
-        q4 = self.pop(); q3 = self.pop(); q2 = self.pop(); q1 = self.pop()
-        self._binrec(q1, q2, q3, q4)
-
-    # -- Word definition --
-
-    def colondef(self):
-        self.token()
-        u = self.pop(); a = self.pop()
-        w = self.create_symbol(a, u)
-        self.set(w, self.mp)
-        self.cstore(self.flags(w), Sloth.HIDDEN | Sloth.COLON)
-        self.STATE = 1
-
-    def semicolon(self):
-        self.comma(self.EXIT)
-        self.STATE = 0
-        self.cstore(self.flags(self.latest), Sloth.COLON)
-
-    def postpone(self):
-        self.token()
-        u = self.pop(); a = self.pop()
-        w = self.find_symbol(a, u)
-        self.comma(self.get(w))
 
     # --
 
     def type(self):
         l = self.pop(); a = self.pop()
-        try:
-            for i in range(l):
-                print(chr(self.fetch(a + i*Sloth.CHAR)), sep='', end='')
-        except:
-            None
+        for i in range(l):
+            print(chr(self.fetch(a + i*Sloth.CHAR)), sep='', end='')
 
     def trace(self):
         print('[', self.STATE, ']', '', sep='', end='')
         print(self.mp, ' ', self.s[:self.sp], ' ', sep='', end='')
         print(': [', self.ip, '] ', sep = '', end = '')
-        if self.rp > 0:
-            for i in reversed(range(self.rp)):
-                print(':', self.r[i], end = '')
         print(Fore.YELLOW, end='')
         if self.tlen > 0: self.push(self.tok); self.push(self.tlen); self.type()
         print(Style.RESET_ALL, end='')
