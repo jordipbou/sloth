@@ -4,9 +4,10 @@
 # destroyed after ] and enter compilation mode
 
 import sys
-from colorama import Fore, Back, Style
-
 import operator
+
+import getch
+from colorama import Fore, Back, Style
 
 class Sloth:
     def __init__(self):
@@ -22,8 +23,14 @@ class Sloth:
         # Outer interpreter
         self.init_outer()
 
+        # Input/Output
+        self.init_io()
+
         # Bootstrap
         self.bootstrap()
+
+        # Debug
+        self.init_debug()
 
     # -------------------------------------------------------------------------
     # -- Virtual Machine ------------------------------------------------------
@@ -87,7 +94,7 @@ class Sloth:
     def inner(self): 
         t = self.rp
         while t <= self.rp and self.ip >= 0:
-            self.trace()
+            self.trace(3)
             self.execute(self.opcode())
 
     def evaluate(self, q): self.execute(q); self.inner()
@@ -234,7 +241,7 @@ class Sloth:
     def outer(self):
         while self.ipos < self.ilen:
             self.token()
-            self.trace()
+            self.trace(2)
             u = self.pop(); a = self.pop()
             if u == 0:
                 break
@@ -263,11 +270,38 @@ class Sloth:
                             self.comma(f)
                     except ValueError as e:
                         self.throw(-13)
-            self.trace()
+            self.trace(2)
+
+    # -------------------------------------------------------------------------
+    # -- I/O ------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+
+    def init_io(self):
+        self.KEY = 0
+        self.EMIT = 0
+
+    def key(self):
+        if self.KEY == 0:
+           self.push(ord(getch.getch()))
+        else:
+            self.evaluate(self.KEY)
+
+    def emit(self):
+        if self.EMIT == 0:
+            print(chr(self.pop()), sep='', end='')
+        else:
+            self.evaluate(self.EMIT)
 
     # -------------------------------------------------------------------------
     # -- Bootstrapping --------------------------------------------------------
     # -------------------------------------------------------------------------
+
+    def get_ibuf(self): return self.ibuf
+    def set_ibuf(self, v): self.ibuf = v
+    def get_ipos(self): return self.ipos
+    def set_ipos(self, v): self.ipos = v
+    def get_ilen(self): return self.ilen
+    def set_ilen(self, v): self.ilen = v
 
     def str_to_data(self, s, a):
         for i in range(len(s)):
@@ -304,9 +338,16 @@ class Sloth:
 
         self.colon('"', lambda vm: vm.strlit()); self.immediate()
 
+        # Stack shuffling
+
         self.colon('DROP', lambda vm: vm.drop())
         self.colon('DUP', lambda vm: vm.dup())
         self.colon('SWAP', lambda vm: vm.swap())
+
+        self.colon('>R', lambda vm: vm.rpush(vm.pop()))
+        self.colon('R>', lambda vm: vm.push(vm.rpop()))
+
+        # Memory access
 
         self.colon('@', lambda vm: vm.push(vm.fetch(vm.pop())))
         self.colon('!', lambda vm: vm.store(vm.pop(), vm.pop()))
@@ -317,23 +358,64 @@ class Sloth:
         self.colon('CELL', lambda vm: vm.push(Sloth.CELL))
         self.colon('CHAR', lambda vm: vm.push(Sloth.CHAR))
 
+        # Arithmetic
+
         self.colon('+', lambda vm: vm.binop(operator.add))
         self.colon('-', lambda vm: vm.binop(operator.sub))
         self.colon('*', lambda vm: vm.binop(operator.mul))
         self.colon('/', lambda vm: vm.binop(operator.truediv))
         self.colon('MOD', lambda vm: vm.binop(operator.mod))
 
-        self.colon('LSHIFT', lambda vm: vm.binop(operator.lshift))
-        self.colon('RSHIFT', lambda vm: vm.binop(operator.rshift))
+        # Comparison
 
         self.colon('<', lambda vm: vm.binop(operator.lt))
         self.colon('=', lambda vm: vm.binop(operator.eq))
         self.colon('>', lambda vm: vm.binop(operator.gt))
 
+        # Bitwise
+
         self.colon('AND', lambda vm: vm._and())
         self.colon('OR', lambda vm: vm._or())
         self.colon('XOR', lambda vm: vm._xor())
         self.colon('INVERT', lambda vm: vm._invert())
+
+        self.colon('LSHIFT', lambda vm: vm.binop(operator.lshift))
+        self.colon('RSHIFT', lambda vm: vm.binop(operator.rshift))
+
+        # Parsing
+
+        self.colon('IBUF', lambda vm: vm.push(vm.get_ibuf()))
+        self.colon('IBUF!', lambda vm: vm.set_ibuf(vm.pop()))
+        self.colon('IPOS', lambda vm: vm.push(vm.get_ipos()))
+        self.colon('IPOS!', lambda vm: vm.set_ipos(vm.pop()))
+        self.colon('ILEN', lambda vm: vm.push(vm.get_ilen()))
+        self.colon('ILEN!', lambda vm: vm.set_ilen(vm.pop()))
+
+        self.colon('PARSE-NAME', lambda vm: vm.token())
+
+        # Words
+
+        self.colon('CREATE', lambda vm: vm.create())
+        self.colon(':', lambda vm: vm.colondef())
+        self.colon(';', lambda vm: vm.semicolon()); self.immediate()
+        self.colon('POSTPONE', lambda vm: vm.postpone()); self.immediate()
+        self.colon('IMMEDIATE', lambda vm: vm.immediate())
+        self.colon('RECURSE', lambda vm: vm.comma(vm.latestxt))
+
+        self.colon('FIND-NAME', lambda vm: vm.find_name())
+        self.colon('LINK', lambda vm: vm.push(vm.get_link(vm.pop())))
+        self.colon('XT', lambda vm: vm.push(vm.get_xt(vm.pop())))
+        self.colon('XT!', lambda vm: vm.set_xt(vm.pop(), vm.pop()))
+        self.colon('DT', lambda vm: vm.push(vm.get_dt(vm.pop())))
+        self.colon('DT!', lambda vm: vm.set_dt(vm.pop(), vm.pop()))
+        self.colon('NAME', lambda vm: (nt := vm.pop(), vm.push(vm.name_addr(nt)), vm.push(vm.get_namelen(nt))))
+
+        # Input/Output
+
+        self.colon('KEY', lambda vm: vm.key())
+        self.colon('EMIT', lambda vm: vm.emit())
+
+        # --
 
         self.colon('[', lambda vm: vm.start_quotation()); self.immediate()
         self.colon(']', lambda vm: vm.end_quotation()); self.immediate()
@@ -341,13 +423,11 @@ class Sloth:
         self.colon('CHOOSE', lambda vm: vm.choose())
         self.colon('BINREC', lambda vm: vm.binrec())
 
-        self.colon(':', lambda vm: vm.colondef())
-        self.colon(';', lambda vm: vm.semicolon()); self.immediate()
-        self.colon('|', lambda vm: vm.postpone()); self.immediate()
-        self.colon('IMMEDIATE', lambda vm: vm.immediate())
-        self.colon('RECURSE', lambda vm: vm.comma(vm.latestxt))
-
         self.colon('TYPE', lambda vm: vm.type())
+
+        # Debug
+
+        self.colon('TRACE!', lambda vm: vm.set_trace(vm.pop()))
 
     def repl(self):
         while True:
@@ -356,6 +436,7 @@ class Sloth:
             r = self.pop()
             if r == -13:
                 self.push(self.tok); self.push(self.tlen); self.type(); print(' ?')
+            self.trace(1)
 
     # -------------------------------------------------------------------------
     # -- Words ----------------------------------------------------------------
@@ -391,19 +472,36 @@ class Sloth:
         if self.STATE == 0:
             self.push(u)
 
-    # -- Working with symbols --
+    # -- Word definition --
 
-    def find_or_create(self):
+    def create(self):
+        self.token()
+        u = self.pop(); a = self.pop()
+        w = self.create_symbol(a, u)
+
+    def colondef(self):
+        self.token()
+        u = self.pop(); a = self.pop()
+        w = self.create_symbol(a, u)
+        self.set_xt(w, self.get_dt(w))
+        self.set_flag(w, Sloth.HIDDEN)
+        self.set_flag(w, Sloth.COLON)
+        self.STATE = 1
+
+    def semicolon(self):
+        self.comma(self.EXIT)
+        self.STATE = 0
+        self.unset_flag(self.latest, Sloth.HIDDEN)
+
+    def postpone(self):
         self.token()
         u = self.pop(); a = self.pop()
         w = self.find_symbol(a, u)
-        if w == 0:
-            w = self.create_symbol(a, u)
-        return w
+        self.comma(self.get(w))
 
-    def quote(self): w = self.find_or_create(); self.push(w)
-    def set_binding(self): w = self.find_or_create(); self.store(self.binding(w), self.pop())
-    def get_binding(self): w = self.find_or_create(); self.push(self.fetch(self.binding(w)))
+    def find_name(self):
+        u = self.pop(); a = self.pop()
+        self.push(self.find_symbol(a, u))
 
     # -- Quotations --
 
@@ -451,28 +549,6 @@ class Sloth:
         q4 = self.pop(); q3 = self.pop(); q2 = self.pop(); q1 = self.pop()
         self._binrec(q1, q2, q3, q4)
 
-    # -- Word definition --
-
-    def colondef(self):
-        self.token()
-        u = self.pop(); a = self.pop()
-        w = self.create_symbol(a, u)
-        self.set_xt(w, self.get_dt(w))
-        self.set_flag(w, Sloth.HIDDEN)
-        self.set_flag(w, Sloth.COLON)
-        self.STATE = 1
-
-    def semicolon(self):
-        self.comma(self.EXIT)
-        self.STATE = 0
-        self.unset_flag(self.latest, Sloth.HIDDEN)
-
-    def postpone(self):
-        self.token()
-        u = self.pop(); a = self.pop()
-        w = self.find_symbol(a, u)
-        self.comma(self.get(w))
-
     # --
 
     def type(self):
@@ -483,28 +559,36 @@ class Sloth:
         except:
             None
 
-    def trace(self):
-        print('[', self.STATE, '] ', sep='', end='')
-        print(self.mp, ' ', self.s[:self.sp], ' ', sep='', end='')
-        print(': [', self.ip, '] ', sep = '', end = '')
-        if self.rp > 0:
-            for i in reversed(range(self.rp)):
-                print(':', self.r[i], end = '')
-        print(Fore.YELLOW, end='')
-        if self.tlen > 0: self.push(self.tok); self.push(self.tlen); self.type()
-        print(Style.RESET_ALL, end='')
-        if self.ipos < self.ilen: 
-            self.push(self.ibuf + self.ipos)
-            self.push(self.ilen - self.ipos)
-            self.type()
-        print()
-
     def data_to_str(self, a, u):
         s = ''
         for i in range(u):
             s = s + chr(self.cfetch(a + i*Sloth.CHAR))
         return s
 
+
+    # -- Debug helpers --
+
+    def init_debug(self):
+        self.tr = 1
+
+    def set_trace(self, v): self.tr = v
+
+    def trace(self, v):
+        if v <= self.tr:
+            print('[', self.STATE, '] ', sep='', end='')
+            print(self.mp, ' ', self.s[:self.sp], ' ', sep='', end='')
+            print(': [', self.ip, '] ', sep = '', end = '')
+            if self.rp > 0:
+                for i in reversed(range(self.rp)):
+                    print(':', self.r[i], end = '')
+            print(Fore.YELLOW, end='')
+            if self.tlen > 0: self.push(self.tok); self.push(self.tlen); self.type()
+            print(Style.RESET_ALL, end='')
+            if self.ipos < self.ilen: 
+                self.push(self.ibuf + self.ipos)
+                self.push(self.ilen - self.ipos)
+                self.type()
+            print()
 
 def main():
     x = Sloth()
