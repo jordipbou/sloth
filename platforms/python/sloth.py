@@ -1,7 +1,7 @@
 # TODO
 # I need to implement [ ]
 # They must do two things, create a new lexical scope (that will be 
-# destroyed after ] and enter compilation mode
+
 
 import sys
 import operator
@@ -292,6 +292,18 @@ class Sloth:
         else:
             self.evaluate(self.EMIT)
 
+    def included(self):
+        # Save input source
+        u = self.pop(); a = self.pop()
+        with open(self.data_to_str(a, u)) as f:
+            for line in f:
+                self.str_to_data(line, 0)
+                r = self.pop()
+                if r == -13:
+                    self.push(self.tok); self.push(self.tlen); self.type(); print(' ?')
+                self.trace(0)
+        # Restore input source
+
     # -------------------------------------------------------------------------
     # -- Bootstrapping --------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -336,7 +348,7 @@ class Sloth:
 
         self.OUTER = self.noname(lambda vm: vm.outer())
 
-        self.colon('"', lambda vm: vm.strlit()); self.immediate()
+        self.colon('S"', lambda vm: vm.strlit()); self.immediate()
 
         # Stack shuffling
 
@@ -414,6 +426,8 @@ class Sloth:
 
         self.colon('KEY', lambda vm: vm.key())
         self.colon('EMIT', lambda vm: vm.emit())
+
+        self.colon('INCLUDED', lambda vm: vm.included())
 
         # --
 
