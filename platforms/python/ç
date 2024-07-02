@@ -1,0 +1,57 @@
+-1 trace!
+
+: ?: token find [ ilen ipos! ] [ 1 ipos! ] choose ;
+
+?: -- ilen ipos! ; immediate
+
+-- End of line comments can be used now.
+  
+-- ?: (defined above) allows conditional compilation 
+-- of one line definitions.
+
+?: ALLOT	here + here! ;
+?: CELLS	cell * ;
+?: CHARS	char * ;
+
+?: ,		here ! cell allot ;
+?: C,		here c! char allot ;
+
+-- Stack shufflers --
+
+?: 2DUP		over over ;
+
+-- Conditionals --
+
+?: 0<		0 < ;
+?: <		2dup xor 0< [ drop 0< ] [ - 0< ] choose ; 
+?: >		swap < ;
+?: <=		> invert ;
+?: >=		< invert ;
+?: 0=		[ 0 ] [ 0 invert ] choose ;
+?: 0>		0 > ;
+?: 0<>		0= 0= ;
+?: NOT		0= ;
+?: =		- 0= ;
+?: <>		= invert ;
+?: U<		2dup xor 0< [ swap drop 0< ] [ - 0< ] choose ;
+?: U>		swap u< ;
+?: WITHIN	over - >r - r> u< ;
+
+?: SOURCE	ibuf ilen ;
+?: /SOURCE	ibuf ipos char * + ;
+
+-- Input output --
+
+?: CR		10 emit ;
+
+?: PAD		256 here + ;
+
+
+-- Conditional compilation will not work for multiline
+-- definitions !!!
+
+: READLINE		-- ( c-addr u -- c-addr u )
+	[ key ] loop
+;
+
+1 trace!

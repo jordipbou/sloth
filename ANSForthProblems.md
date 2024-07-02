@@ -1,3 +1,16 @@
+- This commentary is very explicative:
+
+https://forth-standard.org/standard/core/POSTPONE#reply-600
+
+"Sure - as I said, precisely explained but essentially incomprehensible."
+
+It refers to how difficult is to understand that POSTPONE compiles immediate
+words but compiles the compilation of a non immediate word.
+
+
+
+
+
 The ideas that led to the development of SLOTH were:
 
 * A very simple implementation for a scripting language very easily embedabble

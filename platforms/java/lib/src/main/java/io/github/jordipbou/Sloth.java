@@ -25,14 +25,14 @@ public class Sloth {
 
 	// -- Parameter stack --
 
-	int p[];
-	int pp;
+	int s[];
+	int sp;
 
-	public void push(int v) { p[pp++] = v; }
-	public int pop() { return p[--pp]; }
+	public void push(int v) { s[sp++] = v; }
+	public int pop() { return s[--sp]; }
 
-	public void place(int a, int v) { p[pp - a - 1] = v; }
-	public int pick(int a) { return p[pp - a - 1]; }
+	public void place(int a, int v) { s[sp - a - 1] = v; }
+	public int pick(int a) { return s[sp - a - 1]; }
 
 	public void swap() { int t = pick(0); place(0, pick(1)); place(1, t); }
 
@@ -107,18 +107,18 @@ public class Sloth {
 
 	public void _throw(int v) { if (v != 0) { throw new SlothException(v); } }
 	public void _catch(int q) {
-		int tpp = pp;
+		int tsp = sp;
 		int trp = rp;
 		try { 
 			execute(q); 
 			push(0);
 		} catch(SlothException x) {
-			pp = tpp;
+			sp = tsp;
 			rp = trp;
 			push(x.v);
 		} catch(Exception e) {
 			e.printStackTrace();
-			pp = tpp;
+			sp = tsp;
 			rp = trp;
 			push(-1000);
 		}
@@ -302,12 +302,12 @@ public class Sloth {
 
 	// -- Constructors --
 
-	public Sloth(int ibufsize, int psize, int rsize, int lsize, int dsize) {
-		p = new int[psize];
+	public Sloth(int ibufsize, int ssize, int rsize, int lsize, int dsize) {
+		s = new int[ssize];
 		r = new int[rsize];
 		l = new int[lsize];
 		d = ByteBuffer.allocateDirect(dsize);
-		pp = rp = lp = state = 0;
+		sp = rp = lp = state = 0;
 		dp = ibufsize;
 		tp = dsize / 2;
 		ibuf = ipos = ilen = 0;
@@ -377,6 +377,8 @@ public class Sloth {
 	// }
 
 	public void leave() { lx = -1; exit(); }
+	public void qleave() { if (pop() != 0) leave(); }
+	public void call_leave() { int q = pop(); if (pop() != 0) { eval(q); leave(); } }
 
 	public void i() { push(ix); }
 	public void j() { push(jx); }
@@ -385,6 +387,10 @@ public class Sloth {
 	public void times() { ipush(); int q = pop(), l = pop(); for (ix = 0; ix < l && lx == 0; ix++) eval(q); ipop(); }
 
 	public void loop() { ipush(); int q = pop(); while (lx == 0) eval(q); ipop(); }
+
+	public void choose() { int f = pop(); int t = pop(); if (pop() != 0) eval(t); else eval(f); }
+	public void when() { int q = pop(); if (pop() != 0) eval(q); }
+	public void unless() { int q = pop(); if (pop() == 0) eval(q); }
 
 	public void bootstrap() {
 		// Reserve space for the input buffer
@@ -420,6 +426,7 @@ public class Sloth {
 		colon("SWAP", (vm) -> swap());
 
 		colon(">R", (vm) -> rpush(pop()));
+		colon("R@", (vm) -> push(rpick(0)));
 		colon("R>", (vm) -> push(rpop()));
 
 		colon("@", (vm) -> push(fetch(pop())));
@@ -462,10 +469,17 @@ public class Sloth {
 		colon("I", (vm) -> i());
 		colon("J", (vm) -> j());
 		colon("K", (vm) -> k());
+		colon("LEAVE", (vm) -> leave());
+		colon("?LEAVE", (vm) -> qleave());
+		colon("?CALL/LEAVE", (vm) -> call_leave());
 
 		colon("LOOP", (vm) -> loop()); // Infinite loop
 
 		colon("WHILE", (vm) -> { if (pop() != 0) leave(); });
+
+		colon("CHOOSE", (vm) -> choose());
+		colon("WHEN", (vm) -> when());
+		colon("UNLESS", (vm) -> unless());
 
 		colon(":", (vm) -> colon());
 		colon(";", (vm) -> semicolon()); set_immediate();
@@ -584,8 +598,8 @@ public class Sloth {
 
 	public void trace(int l) {
 		if (l <= tr) {
-			System.out.printf("%d:%d {%d} <%d> ", dp, tp, state, pp);
-			for (int i = 0; i < pp; i++) System.out.printf("%d ", p[i]);
+			System.out.printf("%d:%d {%d} <%d> ", dp, tp, state, sp);
+			for (int i = 0; i < sp; i++) System.out.printf("%d ", s[i]);
 			if (ip >= 0) 
 				System.out.printf(": [%d] %d ", ip, ip > 0 ? fetch(ip) : 0);
 			for (int i = rp - 1; i >= 0; i--) 
@@ -622,16 +636,6 @@ public class Sloth {
 
 		x.trace(3);
 
-		// // x.str_to_transient(": test [ 1 1 + ] execute ;  test ");
-		// //x.str_to_transient("[ 5 0 [ i i 1 ] doloop [ 1 1 + ] ] 'test def test");
-		// x.str_to_transient("'test 'test ?test");
-		// x.trace(2, 0, 0);
-		// // x.ilen = x.pop(); x.ibuf = x.pop();
-		// // x.trace(2);
-		// x.evaluate();
-		// x.trace(0, 0, 0);
-		// // x.interpret();
-		// // x.trace(0);
 		try {
 			BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 			while (true) {
