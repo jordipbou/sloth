@@ -1,96 +1,120 @@
 -1 trace!
 
-: ?: token find [ ilen ipos! ] [ 1 ipos! ] choose ;
+: ?:		token find [ ilen ipos! ] [ 1 ipos! ] choose ;
 
-?: \ ilen ipos! ; immediate
+?: \		ilen ipos! ; immediate
 
 \ End of line comments can be used now.
 
-\ ?: (defined above) allows conditional compilation 
+\ ?: (defined above) allos conditional compilation 
 \ of one line definitions.
 
-\ List of required primitives:
-\ Stack: DROP SWAP >R R> R@
-\ Comparison: < = >
-\ Arithmetic: + - * / MOD
-\ Bitwise: LSHIFT RSHIFT AND OR XOR INVERT
-\ Memory: ! @ C! C@ CHAR CELL HERE HERE!
-\ Dictionary: FIND-NAME XT
-\ Parsing: TOKEN IBUF IPOS ILEN IBUF! IPOS! ILEN! REFILL
+\ Basic stack shuffling (that don't need conditionals)
 
-\ -- TODO Shouldn't this be directly in CORE
-?: '		token find xt ; \ get xt of word by name
-\ TODO ?: [']		' postpone literal ; immediate
-?: ''		token find ;	\ get nt of word by name
+?: DUP		0 pick ;
+?: OVER		1 pick ;
 
-?: ALLOT	here + here! ;
-?: CELLS	cell * ;
-?: CHARS	char * ;
-
-?: ,		here ! cell allot ;
-?: C,		here c! char allot ;
-
-\ -- Stack shufflers --
-
-?: DUP		>r r@ r> ;
-?: OVER		>r dup r> swap ;
-?: NIP		swap drop ;
+?: 2DROP	drop drop ;
 ?: 2DUP		over over ;
-?: ROT		>r swap r> swap ;
-?: -ROT		rot rot ;
 
-\ -- Conditionals --
+\ Basic control structures
 
-?: 0<		0 < ;
-?: 1<		1 < ;
-?: <		2dup xor 0< [ drop 0< ] [ - 0< ] choose ; 
-?: >		swap < ;
+?: AHEAD	postpone branch here 0 , ; immediate
+?: IF		postpone ?branch here 0 , ; immediate
+?: THEN		here over - swap ! ; immediate
+
+?: ELSE		postpone ahead swap postpone then ; immediate
+
+?: BEGIN	here ; immediate
+?: REPEAT	postpone ?branch here - , ; immediate
+?: AGAIN	postpone branch here - , ; immediate
+
+?: WHILE	postpone if swap ; immediate
+?: REPEAT	postpone again postpone then ; immediate
+
+\ Basic comparisons
+
 ?: <=		> invert ;
 ?: >=		< invert ;
-?: 0=		[ 0 ] [ 0 invert ] choose ;
+?: 0=		if 0 else 0 invert then ;
+?: 0<		0 < ;
 ?: 0>		0 > ;
 ?: 0<>		0= 0= ;
 ?: NOT		0= ;
 ?: =		- 0= ;
 ?: <>		= invert ;
-?: U<		2dup xor 0< [ swap drop 0< ] [ - 0< ] choose ;
+?: U<		2dup xor 0< if swap drop 0< else - 0< then ;
 ?: U>		swap u< ;
-?: WITHIN	over - >r - r> u< ;
+?: WITHIN	over - >r - r> u< ; 
 
-?: SOURCE	ibuf ilen ;
-?: /SOURCE	ibuf ipos char * + ;
+\ Basic arithmetic
 
-\ -- Logic --
+?: 1+		1 + ;
+?: 1-		1 - ;
 
-?: NOR		or invert ;
+\ Basic memory access
 
-\ -- Input output --
+?: CELL+	1 cells + ;
+?: CHAR+	1 chars + ;
 
-?: CR		10 emit ;
+\ /SOURCE allows easy access to current character
+?: /SOURCE ibuf ipos chars + ;
 
-?: PAD		256 here + ;
+?: LITERAL postpone LIT , ; immediate
 
-: READLINE 
+?: CHR token drop c@ ;
+?: [CHR] chr postpone literal ; immediate
+
+\ Parse (advance input) to next )
+?: ( [chr] ) to/char 2drop ; immediate
+
+( Now we can use stack comments too )
+
+?: ['] ' postpone literal ; immediate
+
+?: CR 10 emit ;
+?: TYPE [ dup c@ emit char+ ] times drop ;
+
+?: VARIABLE	create 0 , ;
+?: CONSTANT	create , does> @ ;
+
+\ variable dst variable max variable k variable len
+\ : ACCEPT max ! dst ! 0 k ! 0 len !
+\ 	s" On accept!" type
+\ 	begin
+\ 		len @ max @ < while
+\ 		key dup 10 = over 13 = or if len @ exit then
+\ 		dup 127 = if
+\ 			len @ 0 > if
+\ 				len @ 1- len !
+\ 				8 emit 32 emit 8 emit
+\ 			then
+\ 		else
+\ 			dup emit
+\ 			dst @ len @ chars + c!
+\ 			len @ 1+ len !
+\ 		then
+\ 	repeat
+\ ;
+
+: ACCEPT
 	over >r
-	0 \ ( dst max len -- )
 	[
-		2dup <= ?leave \ ( dst max len -- )
-		key dup 10 = over 13 = or [ drop ] ?call/leave \ ( dst max len key -- )
-		dup 127 = [
-			drop
-			dup 0 > [ \ ( dst max len -- )
-				1 -
-				rot 1 - -rot
+		key dup 10 = over 13 = or if drop leave then
+		dup 127 = if
+			drop i 0 > if
+				i 1- i!
+				1-
 				8 emit 32 emit 8 emit
-			] when
-		] [
+			then
+		else
 			dup emit
-			>r rot r> over c! 1 + -rot
-			1 +
-		] choose
+			over c!
+			1+
+		then
 	]
-	loop
-	nip nip r> swap
+	times
+	r> swap over -
 ;
-1 trace!
 
+2 trace!

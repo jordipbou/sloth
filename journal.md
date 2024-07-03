@@ -1,3 +1,23 @@
+# 2024/07/02
+
+It's difficult to follow myself in this project. I've repeated things
+several times and then I come back again.
+There's something things I don't get completely, and I experiment and
+get to conclusions and start again.
+It's being exhausting.
+
+Let's recapitulate:
+
+* There's a clear separation between the VM and the language Sloth. The
+  intersection point are the words.
+
+* REBOL parsing can be implemented with parsing words, no need to create
+  a dialect as that's exactly what's done in Forth with immediate words.
+
+* The basic "assembler" has to be a Forth (has no connection with the VM
+  outside of words), but has not to be ANS Forth, as it complicates 
+	everything. Later, an ANS Forth layer can be created on top if desired.
+
 # 2024/06/23
 
 It occured to me that Sloth is not a VM, but an word based assembler.

@@ -13,6 +13,13 @@ import java.io.InputStreamReader;
 import java.util.function.Consumer;
 import java.io.FileNotFoundException;
 
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
+import org.jline.utils.NonBlockingReader;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.impl.DefaultParser;
+
 public class Sloth {
 
 	// --------------------------------------------------------------------------
@@ -88,6 +95,7 @@ public class Sloth {
 
 	public int opcode() { int v = fetch(ip); ip += CELL; return v; }
 	public void do_prim(int p) { primitives.get(-1 - p).accept(this); }
+	// TODO: Think about tail call optimization, it failed on some cases (related to R> at the end)
 	public void call(int q) { rpush(ip); ip = q; }
 	public void execute(int q) { if (q < 0) do_prim(q); else call(q); }
 	// Will execute until returning from current level, or an exception is thrown
@@ -124,7 +132,9 @@ public class Sloth {
 		}
 	}
 
-	// -- Dictionary --
+	// --------------------------------------------------------------------------
+	// -- Dictionary ------------------------------------------------------------
+	// --------------------------------------------------------------------------
 
 	int current, latest, latestxt;
 
@@ -227,19 +237,25 @@ public class Sloth {
 
 	public int EXIT;
 	public int NOOP;
-	public int doLIT;
-	public int doSTRING;
-	public int doQUOTATION;
+	public int LIT;
+	public int STRING;
+	public int QUOTATION;
+	public int BRANCH;
+	public int zBRANCH;
 	public int COMPILE;
+	public int DOES;
 
 	public void comma(int v) { store(here(), v); allot(CELL); }
 	public void ccomma(char v) { cstore(here(), v); allot(CHAR); }
 
 	public void compile(int v) { comma(v); }
-	public void literal(int v) { comma(doLIT); comma(v); }
+	public void literal(int v) { comma(LIT); comma(v); }
 
 	// NONAME adds an anonymous primitive that can be called by its xt (position on primitives list)
 	public int noname(Consumer<Sloth> c) { primitives.add(c); return 0 - primitives.size(); }
+
+	public void create() { token(); header(); }
+	public void does() { literal(here() + 16); compile(DOES); compile(EXIT); }
 
 	public int colon(String s, int xt) { header(s); xt(latest, xt); latestxt = xt; set_colon(); return xt;	}
 	public int colon(String s, Consumer<Sloth> c) { return colon(s, noname(c)); }
@@ -325,7 +341,7 @@ public class Sloth {
 		push('"'); to_char(); int l = pop(), a = pop();
 		int old_state = state;
 		if (state == 0) state = -1;
-		compile(doSTRING);
+		compile(STRING);
 		comma(l);
 		push(here());
 		push(l);
@@ -338,7 +354,7 @@ public class Sloth {
 		state += state > 0 ? 1 : -1 ;
 		if (state == -1) push(here() + (2*CELL)); 
 		push(latestxt);
-		compile(doQUOTATION);
+		compile(QUOTATION);
 		push(here());
 		comma(0);
 	}
@@ -380,10 +396,6 @@ public class Sloth {
 	public void qleave() { if (pop() != 0) leave(); }
 	public void call_leave() { int q = pop(); if (pop() != 0) { eval(q); leave(); } }
 
-	public void i() { push(ix); }
-	public void j() { push(jx); }
-	public void k() { push(kx); }
-
 	public void times() { ipush(); int q = pop(), l = pop(); for (ix = 0; ix < l && lx == 0; ix++) eval(q); ipop(); }
 
 	public void loop() { ipush(); int q = pop(); while (lx == 0) eval(q); ipop(); }
@@ -396,18 +408,20 @@ public class Sloth {
 		// Reserve space for the input buffer
 		allot(1024);
 
-		// TODO: The basic primitives should be instantiated in the constructor, shouldn't them?
+		// TODO: The basic primitives should be instantiated in the constructor.
 		EXIT = colon("EXIT", (vm) -> exit());
 		NOOP = colon("NOOP", (vm) -> { /* do nothing */ });
-		doLIT = colon("doLIT", (vm) -> push(opcode()));
-		doSTRING = colon("doSTRING", (vm) -> { int l = opcode(); push(ip); push(l); ip = aligned(ip + (l * CHAR)); });
-		doQUOTATION = colon("doQUOTATION", (vm) -> { int l = opcode(); push(ip); ip += l; });
+		LIT = colon("LIT", (vm) -> push(opcode()));
+		STRING = colon("STRING", (vm) -> { int l = opcode(); push(ip); push(l); ip = aligned(ip + (l * CHAR)); });
+		QUOTATION = colon("QUOTATION", (vm) -> { int l = opcode(); push(ip); ip += l; });
+		BRANCH = colon("BRANCH", (vm) -> { int l = opcode(); ip += l - CELL; });
+		zBRANCH = colon("?BRANCH", (vm) -> { int l = opcode(); if (pop() == 0) ip += l - CELL; });
 
 		COMPILE = colon("COMPILE,", (vm) -> compile(pop()));
 
 		colon("'", (vm) -> { token(); find(); push(xt(pop())); });
 
-		colon("\"", (vm) -> start_string()); set_immediate();
+		colon("S\"", (vm) -> start_string()); set_immediate();
 		colon("[", (vm) -> start_quotation()); set_immediate();
 		colon("]", (vm) -> end_quotation()); set_immediate();
 		colon("EXECUTE", (vm) -> eval(pop()));
@@ -442,8 +456,8 @@ public class Sloth {
 		colon(",", (vm) -> comma(pop()));
 		colon("C,", (vm) -> ccomma((char)pop()));
 
-		colon("CELL", (vm) -> push(CELL));
-		colon("CHAR", (vm) -> push(CHAR));
+		colon("CELLS", (vm) -> push(pop()*CELL));
+		colon("CHARS", (vm) -> push(pop()*CHAR));
 
 		colon("INVERT", (vm) -> place(0, ~pick(0)));
 
@@ -466,9 +480,10 @@ public class Sloth {
 		//colon("DOLOOP", (vm) -> doloop()); // Complex counted loop
 
 		colon("TIMES", (vm) -> times()); // Counted loop
-		colon("I", (vm) -> i());
-		colon("J", (vm) -> j());
-		colon("K", (vm) -> k());
+		colon("I", (vm) -> push(ix));
+		colon("J", (vm) -> push(jx));
+		colon("K", (vm) -> push(kx));
+		colon("I!", (vm) -> { ix = pop(); });
 		colon("LEAVE", (vm) -> leave());
 		colon("?LEAVE", (vm) -> qleave());
 		colon("?CALL/LEAVE", (vm) -> call_leave());
@@ -480,6 +495,10 @@ public class Sloth {
 		colon("CHOOSE", (vm) -> choose());
 		colon("WHEN", (vm) -> when());
 		colon("UNLESS", (vm) -> unless());
+
+		colon("CREATE", (vm) -> create());
+		DOES = noname((vm) -> xt(latest, pop()));
+		colon("DOES>", (vm) -> does()); set_immediate(); 
 
 		colon(":", (vm) -> colon());
 		colon(";", (vm) -> semicolon()); set_immediate();
@@ -637,14 +656,38 @@ public class Sloth {
 		x.trace(3);
 
 		try {
-			BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+			Terminal terminal = TerminalBuilder.terminal();
+			DefaultParser parser = new DefaultParser();
+			parser.setEscapeChars(null);
+			terminal.enterRawMode();
+			NonBlockingReader reader = terminal.reader();
+
+			x.KEY = x.noname((vm) -> { try { vm.push(reader.read()); } catch (IOException ex) { vm.push(-1); }; });
+
+			LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).parser(parser).build();
+
 			while (true) {
-				String line = reader.readLine();
-				x.str_to_ibuf(line);
-				x.interpret();
-			}
-		} catch(IOException e) {
+				try {
+					String line = lineReader.readLine();
+					x.str_to_ibuf(line);
+					x.interpret();
+				} catch (java.io.IOError e) {
+					e.printStackTrace();
+				}
+			} 
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
+
+		// try {
+		// 	BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+		// 	while (true) {
+		// 		String line = reader.readLine();
+		// 		x.str_to_ibuf(line);
+		// 		x.interpret();
+		// 	}
+		// } catch(IOException e) {
+		// 	e.printStackTrace();
+		// }
 	}
 }
