@@ -6,7 +6,7 @@
 
 \ End of line comments can be used now.
 
-\ ?: (defined above) allos conditional compilation 
+\ ?: (defined above) allows conditional compilation 
 \ of one line definitions.
 
 \ Basic stack shuffling (that don't need conditionals)
