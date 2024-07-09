@@ -1,3 +1,10 @@
+// Things that work but I don't know if are necessary:
+// * Locals
+// * Instantaneous words for [[
+
+// Things to work on:
+// * Transient memory allocate and free as "regions" or "stack allocation"
+
 package io.github.jordipbou;
 
 import java.net.URL;
@@ -13,12 +20,12 @@ import java.io.InputStreamReader;
 import java.util.function.Consumer;
 import java.io.FileNotFoundException;
 
-import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
-import org.jline.utils.NonBlockingReader;
-import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
-import org.jline.reader.impl.DefaultParser;
+// import org.jline.terminal.Terminal;
+// import org.jline.terminal.TerminalBuilder;
+// import org.jline.utils.NonBlockingReader;
+// import org.jline.reader.LineReader;
+// import org.jline.reader.LineReaderBuilder;
+// import org.jline.reader.impl.DefaultParser;
 
 public class Sloth {
 
@@ -54,16 +61,18 @@ public class Sloth {
 	public void rplace(int a, int v) { r[rp - a - 1] = v; }
 	public int rpick(int a) { return r[rp - a - 1]; }
 
-	// -- Locals stack --
+	// Not necessary, but interesting... should I incorporate it? It can
+	// be a part of data stack, if needed...
+	// // -- Locals stack --
 
-	int l[];
-	int lp;
+	// int l[];
+	// int lp;
 
-	public void lpush(int v) { l[lp++] = v; }
-	public int lpop() { return l[--lp]; }
+	// public void lpush(int v) { l[lp++] = v; }
+	// public int lpop() { return l[--lp]; }
 
-	public void lplace(int a, int v) { l[lp - a - 1] = v; }
-	public int lpick(int a) { return l[lp - a - 1]; }
+	// public void lplace(int a, int v) { l[lp - a - 1] = v; }
+	// public int lpick(int a) { return l[lp - a - 1]; }
 
 	// -- Memory --
 
@@ -72,9 +81,7 @@ public class Sloth {
 
 	ByteBuffer d;
 	int dp;
-	int tp;
-
-	int state;
+	// int tp;
 
 	public int fetch(int a) { return d.getInt(a); }
 	public void store(int a, int v) { d.putInt(a, v); }
@@ -82,10 +89,19 @@ public class Sloth {
 	public char cfetch(int a) { return d.getChar(a); }
 	public void cstore(int a, char v) { d.putChar(a, v); }
 
-	public int here() { if (state >= 0) return dp; else return tp; }
-	public void allot(int v) { if (state >= 0) { dp += v; tp += v; } else tp += v; }
+	// public int here() { if (state >= 0) return dp; else return tp; }
+	// public void allot(int v) { if (state >= 0) { dp += v; tp += v; } else tp += v; }
+	public int here() { return dp; }
+	public void allot(int v) { dp += v; }
 	public void align() { allot(((here() + (CELL - 1)) & ~(CELL - 1)) - here()); }
 	public int aligned(int a) { return ((a + (CELL - 1)) & ~(CELL - 1)); }
+
+	// -- Transient memory --
+
+	int tp;
+
+	public int there() { return tp; }
+	public int tallot(int v) { int t = tp; tp -= v; return tp; }
 
 	// -- Inner interpreter --
 
@@ -93,9 +109,12 @@ public class Sloth {
 
 	ArrayList<Consumer<Sloth>> primitives;
 
+	// NONAME adds an anonymous primitive that can be called by its xt (position on primitives list)
+	public int noname(Consumer<Sloth> c) { primitives.add(c); return 0 - primitives.size(); }
+
 	public int opcode() { int v = fetch(ip); ip += CELL; return v; }
 	public void do_prim(int p) { primitives.get(-1 - p).accept(this); }
-	// TODO: Think about tail call optimization, it failed on some cases (related to R> at the end)
+	// TODO: Think about tail call optimization, it failed in some cases (related to R> at the end)
 	public void call(int q) { rpush(ip); ip = q; }
 	public void execute(int q) { if (q < 0) do_prim(q); else call(q); }
 	// Will execute until returning from current level, or an exception is thrown
@@ -136,13 +155,24 @@ public class Sloth {
 	// -- Dictionary ------------------------------------------------------------
 	// --------------------------------------------------------------------------
 
-	int current, latest, latestxt;
+	int current, latest, latestxt, latestwid;
+
+	int ORDER;
 
 	public static char HIDDEN = 1;
 	public static char COLON = 2;
 	public static char IMMEDIATE = 4;
+	public static char INSTANTANEOUS = 8;
 
-	public int link(int w) { return fetch(w); }
+	int state, level;
+
+	public void comma(int v) { store(here(), v); allot(CELL); }
+	public void ccomma(char v) { cstore(here(), v); allot(CHAR); }
+
+	public void compile(int v) { comma(v); }
+	public void literal(int v) { comma(LIT); comma(v); }
+
+	public int get_link(int w) { return fetch(w); }
 
 	public int xt(int w) { return fetch(w + CELL); }
 	public void xt(int w, int v) { store(w + CELL, v); }
@@ -150,8 +180,8 @@ public class Sloth {
 	public int dt(int w) { return fetch(w + CELL + CELL); }
 	public void dt(int w, int v) { store(w + CELL + CELL, v); }
 
-	public int wl(int w) { return fetch(w + CELL + CELL + CELL); }
-	public void wl(int w, int v) { store(w + CELL + CELL + CELL, v); }
+	public int get_wl(int w) { return fetch(w + CELL + CELL + CELL); }
+	public void set_wl(int w, int v) { store(w + CELL + CELL + CELL, v); }
 
 	public char flags(int w) { return cfetch(w + CELL + CELL + CELL + CELL); }
 	public void flags(int w, char v) { cstore(w + CELL + CELL + CELL + CELL, v); }
@@ -161,6 +191,7 @@ public class Sloth {
 
 	public void set_colon() { set_flag(latest, COLON); }
 	public void set_immediate() { set_flag(latest, IMMEDIATE); }
+	public void set_instantaneous() { set_flag(latest, INSTANTANEOUS); }
 
 	public char namelen(int w) { return cfetch(w + CELL + CELL + CELL + CELL + CHAR); }
 	public int name(int w) { return w + CELL + CELL + CELL + CELL + CHAR + CHAR; }
@@ -195,37 +226,44 @@ public class Sloth {
 		return true;
 	}
 
-	public void find() {
-		int l = pop(), n = pop(), w = latest;
+	public void find_name_in() {
+		int wid = pop(), l = pop(), a = pop(), w = latest;
 		while (w != 0) {
-			if (compare_without_case(n, l, w) && !has_flag(w, HIDDEN)) break;
-			w = link(w);
+			if (get_wl(w) == wid && compare_without_case(a, l, w) && !has_flag(w, HIDDEN))
+				break;
+			w = get_link(w);
 		}
 		push(w);
 	}
+
+	public void find_name() { eval(ORDER); }
 
 	// -- Input buffer and parsing --
 
 	int ibuf, ilen, ipos, tok, tlen;
 
-	public void token() {
+	public void parse_name() {
 		while (ipos < ilen && cfetch(ibuf + (ipos*CHAR)) <= 32) ipos++;
 		tok = ibuf + (ipos*CHAR);
 		push(tok);
 		tlen = 0;
 		while (ipos < ilen && cfetch(ibuf + (ipos*CHAR)) > 32) { ipos++; tlen++; }
 		push(tlen);
+		if (ipos < ilen) ipos++;
 	}
 
-	public void to_char() {
+	public void parse() {
 		char c = (char)pop();
-		ipos = ipos + 1;
 		push(ibuf + (ipos*CHAR));
 		while (ipos < ilen && cfetch(ibuf + (ipos*CHAR)) != c) ipos++;
 		push(((ibuf + (ipos*CHAR)) - pick(0)) / CHAR);
-		ipos++;
+		if (ipos < ilen) ipos++;
 	}
 
+	// --
+
+	// TODO str_to_ibuf could use tallot to reserve space on the transient memory
+	// side of the memory.
 	public void str_to_ibuf(String s) {
 		for (int i = 0; i < s.length(); i++) cstore(ibuf + (i*CHAR), s.charAt(i));
 		ilen = s.length();
@@ -245,40 +283,33 @@ public class Sloth {
 	public int COMPILE;
 	public int DOES;
 
-	public void comma(int v) { store(here(), v); allot(CELL); }
-	public void ccomma(char v) { cstore(here(), v); allot(CHAR); }
-
-	public void compile(int v) { comma(v); }
-	public void literal(int v) { comma(LIT); comma(v); }
-
-	// NONAME adds an anonymous primitive that can be called by its xt (position on primitives list)
-	public int noname(Consumer<Sloth> c) { primitives.add(c); return 0 - primitives.size(); }
-
-	public void create() { token(); header(); }
+	public void create() { parse_name(); header(); }
 	public void does() { literal(here() + 16); compile(DOES); compile(EXIT); }
 
 	public int colon(String s, int xt) { header(s); xt(latest, xt); latestxt = xt; set_colon(); return xt;	}
 	public int colon(String s, Consumer<Sloth> c) { return colon(s, noname(c)); }
 	public void colon() { 
-		token();
+		parse_name();
 		header(); 
 		xt(latest, dt(latest));
 		latestxt = xt(latest);
 		set_flag(latest, COLON);
 		set_flag(latest, HIDDEN);
 		state = 1;
+		level = 1;
 	}
 
 	public void semicolon() { 
 		compile(EXIT); 
 		state = 0;
+		level = 0;
 		// Don't do this for nonames
 		if (xt(latest) == latestxt) unset_flag(latest, HIDDEN); 
 	};
 
 	public void postpone() {
-		token();
-		find();
+		parse_name();
+		find_name();
 		int w = pop();
 		if (has_flag(w, IMMEDIATE)) {	compile(xt(w));	} 
 		else { literal(xt(w)); compile(COMPILE);	}
@@ -288,12 +319,14 @@ public class Sloth {
 
 	public void interpret() {
 		while (ilen > 0) {
-			token();
+			parse_name();
 			trace(1);
 			if (tlen == 0) { pop(); pop(); break; }
-			find(); int w = pop();
+			find_name(); int w = pop();
 			if (w != 0) {
- 				if (state == 0 || has_flag(w, IMMEDIATE)) {
+ 				if (state == 0 
+				|| (state == 1 && has_flag(w, IMMEDIATE)) 
+				|| (state == 2 && has_flag(w, INSTANTANEOUS))) {
  					if (!has_flag(w, COLON)) push(dt(w));
  					if (xt(w) != 0) eval(xt(w));
  				} else {
@@ -321,16 +354,18 @@ public class Sloth {
 	public Sloth(int ibufsize, int ssize, int rsize, int lsize, int dsize) {
 		s = new int[ssize];
 		r = new int[rsize];
-		l = new int[lsize];
+		// l = new int[lsize];
 		d = ByteBuffer.allocateDirect(dsize);
-		sp = rp = lp = state = 0;
+		sp = rp = /* lp = */ state = 0;
 		dp = ibufsize;
-		tp = dsize / 2;
+		tp = dsize;
+		// tp = dsize / 2;
 		ibuf = ipos = ilen = 0;
 		primitives = new ArrayList<Consumer<Sloth>>();
 		ip = -1;
 		source_id = 0;
 		tr = 3;
+		latestwid = 1;
 	}
 
 	public Sloth() { this(1024, 256, 256, 16, 65536); }
@@ -338,25 +373,28 @@ public class Sloth {
 	// -- Bootstrapping --
 
 	public void start_string() {
-		push('"'); to_char(); int l = pop(), a = pop();
-		int old_state = state;
-		if (state == 0) state = -1;
+		push('"'); parse(); int l = pop(), a = pop();
 		compile(STRING);
 		comma(l);
-		push(here());
-		push(l);
+		if (state == 0) { push(here()); push(l); }
 		for (int i = 0; i < l; i++) ccomma(cfetch(a + (i*CHAR)));
 		align();
-		state = old_state;
+	}
+
+	public void _string() {
+		int l = opcode(); 
+		push(ip); push(l); 
+		ip = aligned(ip + (l * CHAR));
 	}
 
 	public void start_quotation() {
-		state += state > 0 ? 1 : -1 ;
-		if (state == -1) push(here() + (2*CELL)); 
+		if (state == 0) state = 1;
+		level++;
 		push(latestxt);
 		compile(QUOTATION);
 		push(here());
 		comma(0);
+		latestxt = here();
 	}
 
 	public void end_quotation() {
@@ -364,7 +402,8 @@ public class Sloth {
 		int a = pop();
 		store(a, here() - a  - CELL);
 		latestxt = pop();
-		state += state < 0 ? 1 : -1 ;
+		level--;
+		if (level == 0) state = 0;
 	}
 
 	int ix, jx, kx;	// Loop registers
@@ -405,6 +444,8 @@ public class Sloth {
 	public void unless() { int q = pop(); if (pop() == 0) eval(q); }
 
 	public void bootstrap() {
+		current = 1;
+
 		// Reserve space for the input buffer
 		allot(1024);
 
@@ -412,18 +453,20 @@ public class Sloth {
 		EXIT = colon("EXIT", (vm) -> exit());
 		NOOP = colon("NOOP", (vm) -> { /* do nothing */ });
 		LIT = colon("LIT", (vm) -> push(opcode()));
-		STRING = colon("STRING", (vm) -> { int l = opcode(); push(ip); push(l); ip = aligned(ip + (l * CHAR)); });
+		STRING = colon("STRING", (vm) -> _string());
 		QUOTATION = colon("QUOTATION", (vm) -> { int l = opcode(); push(ip); ip += l; });
 		BRANCH = colon("BRANCH", (vm) -> { int l = opcode(); ip += l - CELL; });
 		zBRANCH = colon("?BRANCH", (vm) -> { int l = opcode(); if (pop() == 0) ip += l - CELL; });
 
 		COMPILE = colon("COMPILE,", (vm) -> compile(pop()));
 
-		colon("'", (vm) -> { token(); find(); push(xt(pop())); });
+		ORDER = noname((vm) -> { push(1); find_name_in(); });
+
+		colon("'", (vm) -> { parse_name(); find_name(); push(xt(pop())); });
 
 		colon("S\"", (vm) -> start_string()); set_immediate();
-		colon("[", (vm) -> start_quotation()); set_immediate();
-		colon("]", (vm) -> end_quotation()); set_immediate();
+		colon("[:", (vm) -> start_quotation()); set_immediate();
+		colon(";]", (vm) -> end_quotation()); set_immediate();
 		colon("EXECUTE", (vm) -> eval(pop()));
 		colon("RECURSE", (vm) -> compile(xt(latest))); set_immediate();
 
@@ -490,7 +533,7 @@ public class Sloth {
 
 		colon("LOOP", (vm) -> loop()); // Infinite loop
 
-		colon("WHILE", (vm) -> { if (pop() != 0) leave(); });
+		// 1colon("WHILE", (vm) -> { if (pop() != 0) leave(); });
 
 		colon("CHOOSE", (vm) -> choose());
 		colon("WHEN", (vm) -> when());
@@ -504,6 +547,10 @@ public class Sloth {
 		colon(";", (vm) -> semicolon()); set_immediate();
 		colon("IMMEDIATE", (vm) -> set_immediate());
 		colon("POSTPONE", (vm) -> postpone()); set_immediate();
+		colon("[", (vm) -> { state = 0; }); set_immediate();
+		colon("]", (vm) -> { state = 1; });
+		colon("]]", (vm) -> { state = 2; }); set_immediate();
+		colon("[[", (vm) -> { state = 1; }); set_instantaneous();
 
 		colon("IBUF", (vm) -> push(ibuf));
 		colon("IBUF!", (vm) -> { ibuf = pop(); });
@@ -512,17 +559,30 @@ public class Sloth {
 		colon("ILEN", (vm) -> push(ilen));
 		colon("ILEN!", (vm) -> { ilen = pop(); });
 
-		colon("TOKEN", (vm) -> token());
-		colon("TO/CHAR", (vm) -> to_char());
-		colon("FIND", (vm) -> find());
+		colon("REFILL", (vm) -> refill());
+
+		colon("PARSE-NAME", (vm) -> parse_name());
+		colon("PARSE", (vm) -> parse());
+		colon("FIND-NAME", (vm) -> find_name());
+		colon("FIND-NAME-IN", (vm) -> find_name_in());
+
+		colon("SET-ORDER-XT", (vm) -> { ORDER = pop(); });
+
+		colon("WORDLIST", (vm) -> push(++latestwid));
+		colon("SET-CURRENT", (vm) -> { current = pop(); });
+		colon("GET-CURRENT", (vm) -> push(current));
+
+		colon("NT>XT", (vm) -> push(xt(pop())));
+		colon("IMMEDIATE?", (vm) -> push(has_flag(pop(), IMMEDIATE) ? -1 : 0));
 
 		colon("KEY", (vm) -> key());
 		colon("EMIT", (vm) -> emit());
+		colon("ACCEPT", (vm) -> accept());
 
-		colon(">L", (vm) -> lpush(pop()));
-		colon("L>", (vm) -> push(lpop()));
-		colon("L@", (vm) -> push(lpick(pop())));
-		colon("L!", (vm) -> { int a = pop(); lplace(a, pop()); });
+		// colon(">L", (vm) -> lpush(pop()));
+		// colon("L>", (vm) -> push(lpop()));
+		// colon("L@", (vm) -> push(lpick(pop())));
+		// colon("L!", (vm) -> { int a = pop(); lplace(a, pop()); });
 	}
 
 	public int KEY = 0;
@@ -530,6 +590,23 @@ public class Sloth {
 	public void key() {
 		if (KEY != 0) eval(KEY);
 		else try { push(System.in.read()); } catch (IOException e) { e.printStackTrace(); };
+	}
+
+	public int ACCEPT = 0;
+
+	public void accept() {
+		if (ACCEPT != 0) eval(ACCEPT);
+		else {
+			try {
+				BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+				String line = reader.readLine();
+				str_to_ibuf(line);
+				push(line.length());
+			} catch(IOException e) {
+				// TODO Should this throw a Sloth exception?
+				e.printStackTrace();
+			}
+		}
 	}
 
 	public int EMIT = 0;
@@ -544,30 +621,27 @@ public class Sloth {
 
 	int source_id;
 
-	// public void refill() {
-	// switch (fetch(SOURCE_ID)) {
-	// 	case -1: push(-1); break;
-	// 	case 0: 
-	// 		ibuf = tallot(80);
-	// 		push(ibuf); 
-	// 		push(80); 
-	// 		accept();
-	// 		ilen = pop();
-	// 		store(IPOS, 0);
-	// 		push(-1); 
-	// 		break;
-	// 	default: 
-	// 		try {
-	// 			str_to_transient(last_buffered_reader.readLine());
-	// 			ilen = pop();
-	// 			ibuf = pop();
-	// 			store(IPOS, 0);
-	// 			push(-1);
-	// 		} catch (Exception e) {
-	// 			push(0);
-	// 		}
-	// 	}
-	// }
+	public void refill() {
+	switch (source_id) {
+		case -1: push(-1); break;
+		case 0: 
+			ibuf = tallot(80);
+			push(ibuf); 
+			push(80); 
+			accept();
+			ilen = pop();
+			ipos = 0;
+			push(-1); 
+			break;
+		default: 
+			try {
+				str_to_ibuf(last_buffered_reader.readLine());
+				push(-1);
+			} catch (Exception e) {
+				push(0);
+			}
+		}
+	}
 
 	public void include(String filename) throws FileNotFoundException, IOException {
 		// save previous input buffer, by writing after it
@@ -596,6 +670,7 @@ public class Sloth {
 	 	while (true) {
 	 		String line = last_buffered_reader.readLine();
 	 		if (line == null) break;
+			// System.out.printf("LINE: [[%s]]\n", line);
 			str_to_ibuf(line);
 			try {
 				interpret();
@@ -617,13 +692,14 @@ public class Sloth {
 
 	public void trace(int l) {
 		if (l <= tr) {
-			System.out.printf("%d:%d {%d} <%d> ", dp, tp, state, sp);
+			System.out.printf("%d {%d} <%d> ", dp, state, sp);
 			for (int i = 0; i < sp; i++) System.out.printf("%d ", s[i]);
 			if (ip >= 0) 
 				System.out.printf(": [%d] %d ", ip, ip > 0 ? fetch(ip) : 0);
 			for (int i = rp - 1; i >= 0; i--) 
 				if (r[i] != -1)
 					System.out.printf(": [%d] %d ", r[i], r[i] > 0 ? fetch(r[i]) : r[i]);
+			System.out.printf("|| ");
 			if (tlen > 0) {
 				System.out.printf(" **");
 				for (int i = 0; i < tlen; i++)
@@ -655,39 +731,39 @@ public class Sloth {
 
 		x.trace(3);
 
-		try {
-			Terminal terminal = TerminalBuilder.terminal();
-			DefaultParser parser = new DefaultParser();
-			parser.setEscapeChars(null);
-			terminal.enterRawMode();
-			NonBlockingReader reader = terminal.reader();
-
-			x.KEY = x.noname((vm) -> { try { vm.push(reader.read()); } catch (IOException ex) { vm.push(-1); }; });
-
-			LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).parser(parser).build();
-
-			while (true) {
-				try {
-					String line = lineReader.readLine();
-					x.str_to_ibuf(line);
-					x.interpret();
-				} catch (java.io.IOError e) {
-					e.printStackTrace();
-				}
-			} 
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
 		// try {
-		// 	BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+		// 	Terminal terminal = TerminalBuilder.terminal();
+		// 	DefaultParser parser = new DefaultParser();
+		// 	parser.setEscapeChars(null);
+		// 	terminal.enterRawMode();
+		// 	NonBlockingReader reader = terminal.reader();
+
+		// 	x.KEY = x.noname((vm) -> { try { vm.push(reader.read()); } catch (IOException ex) { vm.push(-1); }; });
+
+		// 	LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).parser(parser).build();
+
 		// 	while (true) {
-		// 		String line = reader.readLine();
-		// 		x.str_to_ibuf(line);
-		// 		x.interpret();
-		// 	}
-		// } catch(IOException e) {
+		// 		try {
+		// 			String line = lineReader.readLine();
+		// 			x.str_to_ibuf(line);
+		// 			x.interpret();
+		// 		} catch (java.io.IOError e) {
+		// 			e.printStackTrace();
+		// 		}
+		// 	} 
+		// } catch (IOException e) {
 		// 	e.printStackTrace();
 		// }
+
+		try {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+			while (true) {
+				String line = reader.readLine();
+				x.str_to_ibuf(line);
+				x.interpret();
+			}
+		} catch(IOException e) {
+			e.printStackTrace();
+		}
 	}
 }

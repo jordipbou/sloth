@@ -1,3 +1,21 @@
+# 2024/07/07
+
+I've find that if I implement the use of wordlists and recognizers
+as executable entities, there's almost nothing to be added on top
+of bootstrapper interpreter, and it can start as a full modern forth
+from the beginning.
+
+I just need to implement a default recognizer for finding words or
+converting to numbers when a word is not found, but that is just
+implemented in the interpreter itself.
+
+Also, wordlists are already implemented as an integer in each header
+so the only thing I need to do is create a find_name_in function and
+modify find_name to use it.
+
+Also, I will come back to ANS Forth as much as possible. Going away
+is not helping me in anyway. I prefer [ ] for quotations, though.
+
 # 2024/07/02
 
 It's difficult to follow myself in this project. I've repeated things

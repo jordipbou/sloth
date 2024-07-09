@@ -1,6 +1,6 @@
 -1 trace!
 
-: ?:		token find [ ilen ipos! ] [ 1 ipos! ] choose ;
+: ?:		parse-name find-name [: ilen ipos! ;] [: 1 ipos! ;] choose ;
 
 ?: \		ilen ipos! ; immediate
 
@@ -26,11 +26,15 @@
 ?: ELSE		postpone ahead swap postpone then ; immediate
 
 ?: BEGIN	here ; immediate
-?: REPEAT	postpone ?branch here - , ; immediate
+?: UNTIL	postpone ?branch here - , ; immediate
 ?: AGAIN	postpone branch here - , ; immediate
 
 ?: WHILE	postpone if swap ; immediate
 ?: REPEAT	postpone again postpone then ; immediate
+
+\ Stack shuffling with conditionals
+
+?: ?DUP		dup if dup then ;
 
 \ Basic comparisons
 
@@ -58,26 +62,63 @@
 ?: CHAR+	1 chars + ;
 
 \ /SOURCE allows easy access to current character
-?: /SOURCE ibuf ipos chars + ;
+?: /SOURCE	ibuf ipos chars + ;
 
-?: LITERAL postpone LIT , ; immediate
+?: LITERAL	postpone LIT , ; immediate
 
-?: CHR token drop c@ ;
-?: [CHR] chr postpone literal ; immediate
+?: CHAR		parse-name drop c@ ;
+?: [CHAR]	char postpone literal ; immediate
 
 \ Parse (advance input) to next )
-?: ( [chr] ) to/char 2drop ; immediate
+?: (		[char] ) parse 2drop ; immediate
 
 ( Now we can use stack comments too )
 
-?: ['] ' postpone literal ; immediate
+?: [']		' postpone literal ; immediate
 
-?: CR 10 emit ;
-?: TYPE [ dup c@ emit char+ ] times drop ;
+?: CR		10 emit ;
+?: TYPE		[: dup c@ emit char+ ;] times drop ;
 
 ?: VARIABLE	create 0 , ;
 ?: CONSTANT	create , does> @ ;
 
+\ --
+
+?: SEARCH-WORDLIST	find-name-in dup if dup nt>xt swap immediate? if 1 else -1 then then ;
+
+\ -- Conditional compilation ------------------------------
+ 
+?: [DEFINED]	parse-name find-name 0<> ;
+?: [UNDEFINED]	parse-name find-name 0= ;
+
+\ Implementation of [IF] [ELSE] [THEN] by ruv, as seen in:
+\ https://forth-standard.org/standard/tools/BracketELSE
+ 
+wordlist dup constant BRACKET-FLOW-WL get-current swap set-current
+: [IF]			1+ ;
+: [ELSE]		dup 1 = if 1- then ;
+: [THEN]		1- ;
+set-current
+
+: [ELSE] \ ( -- )
+ 	1 begin 
+ 		begin 
+ 			parse-name dup while
+			bracket-flow-wl search-wordlist if 
+				execute dup 0= if drop exit then
+			then
+ 		repeat 
+ 		2drop refill 0= 
+ 	until 
+ 	drop
+; immediate
+ 
+: [THEN]	; immediate 
+ 
+: [IF]		0= if postpone [else] then ; immediate
+
+
+ 
 \ variable dst variable max variable k variable len
 \ : ACCEPT max ! dst ! 0 k ! 0 len !
 \ 	s" On accept!" type
@@ -97,24 +138,24 @@
 \ 	repeat
 \ ;
 
-: ACCEPT
-	over >r
-	[
-		key dup 10 = over 13 = or if drop leave then
-		dup 127 = if
-			drop i 0 > if
-				i 1- i!
-				1-
-				8 emit 32 emit 8 emit
-			then
-		else
-			dup emit
-			over c!
-			1+
-		then
-	]
-	times
-	r> swap over -
-;
+\ : ACCEPT
+\	over >r
+\	[:
+\		key dup 10 = over 13 = or if drop leave then
+\		dup 127 = if
+\			drop i 0 > if
+\				i 1- i!
+\				1-
+\				8 emit 32 emit 8 emit
+\			then
+\		else
+\			dup emit
+\			over c!
+\			1+
+\		then
+\	;]
+\	times
+\	r> swap over -
+\ ;
 
 2 trace!
