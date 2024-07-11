@@ -1,23 +1,32 @@
--1 trace!
+0 trace!
 
-: ?:		parse-name find-name [: ilen ipos! ;] [: 1 ipos! ;] choose ;
+: \			source >in ! drop ; immediate
 
-?: \		ilen ipos! ; immediate
+\ End of line comments can be used now. As comments are so
+\ important (to me) to understand the way everything is
+\ implemented an organized, and as there is no performance
+\ reason to never implement \ in host, its the first word
+\ defined and no conditional compilation is used.
 
-\ End of line comments can be used now.
+\ SLOTH v1.0
 
-\ ?: (defined above) allows conditional compilation 
-\ of one line definitions.
+\ Sloth is an ANS Forth implemented on top of a minimal set
+\ of words to allow easy portability between platforms.
+\ At the same time, and to allow high performance when its
+\ needed, conditional compilation is used almost on every
+\ definition to allow implementing words in host as required
+\ without the need to modify this source.
 
-\ Basic stack shuffling (that don't need conditionals)
+\ The second definition allows conditional compilation for
+\ single line definitions.
 
-?: DUP		0 pick ;
-?: OVER		1 pick ;
+: ?: parse-name find-name [: source >in ! drop ;] [: 1 >in ! ;] choose ;
 
-?: 2DROP	drop drop ;
-?: 2DUP		over over ;
+\ -- Control structures -----------------------------------
 
-\ Basic control structures
+\ This words have a good balance between simplicity and
+\ usefulness. Some more complicated words (like DO/LOOP)
+\ are not implemented now.
 
 ?: AHEAD	postpone branch here 0 , ; immediate
 ?: IF		postpone ?branch here 0 , ; immediate
@@ -32,39 +41,38 @@
 ?: WHILE	postpone if swap ; immediate
 ?: REPEAT	postpone again postpone then ; immediate
 
-\ Stack shuffling with conditionals
+\ Now that we have conditional compilation and basic control
+\ structures, we can implement a lot of fundamental words.
 
+\ -- Stack shuffling --------------------------------------
+
+\ The only required primitives for stack shuffling are:
+\ DROP PICK OVER SWAP >R R@ R>
+
+?: DUP		0 pick ;
 ?: ?DUP		dup if dup then ;
+?: ROT		>r swap r> swap ;	
+?: -ROT		rot rot ;
+?: NIP		swap drop ;
+?: TUCK		>r r@ swap r> ;
 
-\ Basic comparisons
+?: 2DROP	drop drop ;
+?: 2DUP		over over ;
+?: 2OVER	3 pick 3 pick ;
+?: 2SWAP	>r -rot r> -rot ;
 
-?: <=		> invert ;
-?: >=		< invert ;
-?: 0=		if 0 else 0 invert then ;
-?: 0<		0 < ;
-?: 0>		0 > ;
-?: 0<>		0= 0= ;
-?: NOT		0= ;
-?: =		- 0= ;
-?: <>		= invert ;
-?: U<		2dup xor 0< if swap drop 0< else - 0< then ;
-?: U>		swap u< ;
-?: WITHIN	over - >r - r> u< ; 
+?: 2>R		]] swap >r >r [[ ; immediate
+?: 2R@		]] r> r> swap 2dup swap >r >r [[ ; immediate
+?: 2R>		]] r> r> swap [[ ; immediate
 
-\ Basic arithmetic
-
-?: 1+		1 + ;
-?: 1-		1 - ;
-
-\ Basic memory access
-
-?: CELL+	1 cells + ;
-?: CHAR+	1 chars + ;
-
-\ /SOURCE allows easy access to current character
-?: /SOURCE	ibuf ipos chars + ;
+\ -- Execution --------------------------------------------
 
 ?: LITERAL	postpone LIT , ; immediate
+
+?: VARIABLE	create 0 , ;
+?: CONSTANT	create , does> @ ;
+
+\ -- Parsing ----------------------------------------------
 
 ?: CHAR		parse-name drop c@ ;
 ?: [CHAR]	char postpone literal ; immediate
@@ -74,20 +82,50 @@
 
 ( Now we can use stack comments too )
 
-?: [']		' postpone literal ; immediate
+\ -- Comparisons ------------------------------------------
 
-?: CR		10 emit ;
-?: TYPE		[: dup c@ emit char+ ;] times drop ;
+?: <= ( x1 x2 -- flag ) > invert ;
+?: >= ( x1 x2 -- flag ) < invert ;
+?: 0= ( x -- flag ) if 0 else 0 invert then ;
+?: 0< ( x -- flag ) 0 < ;
+?: 0> ( x -- flag ) 0 > ;
+?: 0<> ( x -- flag ) 0= 0= ;
+?: NOT ( x1 -- x2 ) 0= ;
+?: = ( x1 x2 -- flag ) - 0= ;
+?: <> ( x1 x2 -- flag ) = invert ;
+?: U< ( u1 u2 -- flag ) 2dup xor 0< if swap drop 0< else - 0< then ;
+?: U> ( u1 u2 -- flag ) swap u< ;
+?: WITHIN ( n1 | u1	n2 | u2 n3 | u3 -- flag ) over - >r - r> u< ; 
 
-?: VARIABLE	create 0 , ;
-?: CONSTANT	create , does> @ ;
+\ -- Arithmetic -------------------------------------------
 
-\ --
+?: 1+		1 + ;
+?: 1-		1 - ;
+
+\ -- Memory -----------------------------------------------
+
+?: CELL+	1 cells + ;
+?: CHAR+	1 chars + ;
+
+?: +! ( n | u a-addr -- ) swap over @ + swap ! ;
+?: 1+! ( a-addr -- ) dup @ 1 + swap ! ;
+
+?: MOVE ( addr1 addr2 u -- ) [: over c@ over c! 1+ swap 1+ swap ;] times 2drop ;
+
+\ -- Input/output -----------------------------------------
+
+?: CR ( -- ) 10 emit ;
+
+?: TYPE ( c-addr u -- ) [: dup c@ emit char+ ;] times drop ;
+
+?: .( ( "ccc<paren>" -- ) [char] ) parse type ;
+
+\ -- Dictionary/Finding names -----------------------------
 
 ?: SEARCH-WORDLIST	find-name-in dup if dup nt>xt swap immediate? if 1 else -1 then then ;
 
 \ -- Conditional compilation ------------------------------
- 
+
 ?: [DEFINED]	parse-name find-name 0<> ;
 ?: [UNDEFINED]	parse-name find-name 0= ;
 
@@ -117,45 +155,40 @@ set-current
  
 : [IF]		0= if postpone [else] then ; immediate
 
+\ -- Forth Words needed to pass test suite ----------------
 
- 
-\ variable dst variable max variable k variable len
-\ : ACCEPT max ! dst ! 0 k ! 0 len !
-\ 	s" On accept!" type
-\ 	begin
-\ 		len @ max @ < while
-\ 		key dup 10 = over 13 = or if len @ exit then
-\ 		dup 127 = if
-\ 			len @ 0 > if
-\ 				len @ 1- len !
-\ 				8 emit 32 emit 8 emit
-\ 			then
-\ 		else
-\ 			dup emit
-\ 			dst @ len @ chars + c!
-\ 			len @ 1+ len !
-\ 		then
-\ 	repeat
-\ ;
+?: /STRING		tuck - >r chars + r> ;		\ ( c-addr1 u1 n -- c-addr2 u2 )
 
-\ : ACCEPT
-\	over >r
-\	[:
-\		key dup 10 = over 13 = or if drop leave then
-\		dup 127 = if
-\			drop i 0 > if
-\				i 1- i!
-\				1-
-\				8 emit 32 emit 8 emit
-\			then
-\		else
-\			dup emit
-\			over c!
-\			1+
-\		then
-\	;]
-\	times
-\	r> swap over -
-\ ;
+\ Puts on stack the non parsed area of source
+?: /SOURCE		source >in @ /string dup 0< if drop 0 then ; \ ( -- c-addr u )
 
-2 trace!
+[UNDEFINED] >COUNTED [IF]
+: >COUNTED ( c-addr u -- c-addr )
+	dup 1+ chars tallot
+	dup >r
+	2dup c!
+	char+ swap chars move
+	r>
+;
+[THEN]
+
+?: COUNT ( c-addr1 -- c-addr2 u ) dup c@ swap char+ swap ;
+
+[UNDEFINED] WORD [IF]
+variable wlen
+: WORD ( char "<chars>ccc<char>" -- c-addr )
+	>r 
+	begin /source nip 0> while /source drop c@ r@ = while >in 1+! repeat then
+	/source drop 0 wlen !
+	begin /source nip 0> while /source drop c@ r@ <> while >in 1+! wlen 1+! repeat then
+	wlen @	
+	>counted
+	r> drop
+;
+[THEN]
+
+\ -- Testing --
+
+: dotests 0 trace! s" ../../../forth2012-test-suite/src/runtests.fth" included 1 trace! ;
+
+1 trace!
