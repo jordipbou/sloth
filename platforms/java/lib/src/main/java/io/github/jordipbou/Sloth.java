@@ -404,6 +404,8 @@ public class Sloth {
 		colon("R@", (vm) -> push(rpick(0)));
 		colon("R>", (vm) -> push(rpop()));
 
+		colon("DEPTH", (vm) -> push(sp));
+
 		// -- Arithmetic --
 		colon("+", (vm) -> { int a = pop(); int b = pop(); push(b + a); });
 		colon("-", (vm) -> { int a = pop(); int b = pop(); push(b - a); });
@@ -496,10 +498,9 @@ public class Sloth {
 		colon("UNLESS", (vm) -> unless());
 
 		colon("TIMES", (vm) -> times());
-
 		colon("I", (vm) -> push(ix));
-
 		colon("LEAVE", (vm) -> leave());
+		colon("DOLOOP", (vm) -> doloop());
 
 		// -- Strings --
 		colon("S\"", (vm) -> start_string()); set_immediate();
@@ -681,6 +682,12 @@ public class Sloth {
 		else System.out.printf("%c", (char)pop());
 	}
 
+	public void type() {
+		int l = pop(), a = pop(); 
+		for (int i = 0; i < l; i++) 
+			System.out.printf("%c", cfetch(a + i*CHAR));
+	}
+
 	public String last_dir = "";
 	public BufferedReader last_buffered_reader;
 
@@ -791,8 +798,7 @@ public class Sloth {
  					if (fetch(STATE) == 0) push(n);
  					else literal(n);
  				} catch (NumberFormatException e) {
- 					// Throw word not found exception
- 					e.printStackTrace();
+					_throw(-13);
  				}
 			}
 		}
@@ -820,6 +826,25 @@ public class Sloth {
 		int q = pop(), l = pop(); 
 		for (ix = 0; ix < l && lx == 0; ix++) 
 			eval(q); 
+		ipop(); 
+	}
+
+	// Algorithm for doloop taken from pForth (pf_inner.c case ID_PLUS_LOOP)
+	public void doloop() {
+		ipush(); 
+		int q = pop();
+		ix = pop();
+		int l = pop();
+		if (ix != l) {
+			for (int o = ix - l, d = 0;((o ^ (o + d)) & (o ^ d)) >= 0 && lx == 0;) {
+				eval(q);
+				if (lx == 0) { // Avoid pop if we're leaving
+					d = pop();
+					o = ix - l;
+					ix += d;
+				}
+			}
+		}
 		ipop(); 
 	}
 
@@ -900,9 +925,13 @@ public class Sloth {
 		try {
 			BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 			while (true) {
-				String line = reader.readLine();
-				x.str_to_transient(line);
-				x.interpret();
+				try {
+					String line = reader.readLine();
+					x.str_to_transient(line);
+					x.interpret();
+				} catch(SlothException e) {
+					if (e.v == -13) { x.push(x.tok); x.push(x.tlen); x.type(); System.out.println(" ?"); }
+				}
 			}
 		} catch(IOException e) {
 			e.printStackTrace();

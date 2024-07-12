@@ -99,8 +99,14 @@
 
 \ -- Arithmetic -------------------------------------------
 
-?: 1+		1 + ;
-?: 1-		1 - ;
+?: 1+ ( n1 -- n2 ) 1 + ;
+?: 1- ( n1 -- n2 ) 1 - ;
+
+?: 2* ( n1 -- n2 ) 2 * ;
+
+\ -- Bit\Logic --------------------------------------------
+
+?: NEGATE ( n1 -- n2 ) invert 1+ ;
 
 \ -- Memory -----------------------------------------------
 
@@ -122,7 +128,8 @@
 
 \ -- Dictionary/Finding names -----------------------------
 
-?: SEARCH-WORDLIST	find-name-in dup if dup nt>xt swap immediate? if 1 else -1 then then ;
+?: NT>XT+FLAG	dup if dup nt>xt swap immediate? if 1 else -1 then then ;
+?: SEARCH-WORDLIST	find-name-in nt>xt+flag ;
 
 \ -- Conditional compilation ------------------------------
 
@@ -157,6 +164,17 @@ set-current
 
 \ -- Forth Words needed to pass test suite ----------------
 
+\ -- Do/Loop --
+
+?: DO		postpone [: ; immediate
+?: ?DO		postpone [: ; immediate
+?: LOOP		postpone lit 1 , postpone ;] postpone doloop ; immediate
+?: +LOOP	postpone ;] postpone doloop ; immediate
+
+?: UNLOOP	; \ Unloop is a noop in this implementation
+
+\ -- Word and counted strings --
+
 ?: /STRING		tuck - >r chars + r> ;		\ ( c-addr1 u1 n -- c-addr2 u2 )
 
 \ Puts on stack the non parsed area of source
@@ -181,14 +199,18 @@ variable wlen
 	begin /source nip 0> while /source drop c@ r@ = while >in 1+! repeat then
 	/source drop 0 wlen !
 	begin /source nip 0> while /source drop c@ r@ <> while >in 1+! wlen 1+! repeat then
-	wlen @	
+	>in 1+! 
+	wlen @
 	>counted
 	r> drop
+	>in @ /source nip < if >in 1+! then
 ;
 [THEN]
 
+?: FIND			dup count find-name nt>xt+flag dup if rot drop then ;
+
 \ -- Testing --
 
-: dotests 0 trace! s" ../../../forth2012-test-suite/src/runtests.fth" included 1 trace! ;
+: dotests -1 trace! s" ../../../forth2012-test-suite/src/runtests.fth" included 1 trace! ;
 
 1 trace!
