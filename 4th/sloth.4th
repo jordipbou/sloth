@@ -99,6 +99,13 @@
 
 \ -- Arithmetic -------------------------------------------
 
+?: + ( x1 x2 -- x3 ) 0 swap - - ;
+?: * ( x1 x2 -- x3 ) 1 */mod swap drop ;
+?: / ( x1 x2 -- x3 ) 1 swap */mod swap drop ;
+?: */ ( x1 x2 -- x3 ) */mod swap drop ;
+?: MOD ( x1 x2 -- x3 ) 1 swap */mod drop ;
+?: /MOD ( x1 x2 -- x3 ) 1 swap */mod ;
+
 ?: 1+ ( n1 -- n2 ) 1 + ;
 ?: 1- ( n1 -- n2 ) 1 - ;
 
@@ -121,10 +128,14 @@
 ?: +! ( n | u a-addr -- ) swap over @ + swap ! ;
 ?: 1+! ( a-addr -- ) dup @ 1 + swap ! ;
 
+?: 2! ( x1 x2 a-addr -- ) swap over ! cell+ ! ;
+?: 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
+
 ?: MOVE ( addr1 addr2 u -- ) [: over c@ over c! 1+ swap 1+ swap ;] times 2drop ;
 
 \ -- Input/output -----------------------------------------
 
+?: BL ( -- char ) 32 ;
 ?: CR ( -- ) 10 emit ;
 
 ?: TYPE ( c-addr u -- ) [: dup c@ emit char+ ;] times drop ;
@@ -135,6 +146,9 @@
 
 ?: NT>XT+FLAG	dup if dup nt>xt swap immediate? if 1 else -1 then then ;
 ?: SEARCH-WORDLIST	find-name-in nt>xt+flag ;
+
+?: ' ( "<spaces>name" -- xt ) parse-name find-name nt>xt ;
+?: ['] ( C: "<spaces>name" -- ) ( -- xt ) ' postpone literal ; immediate
 
 \ -- Conditional compilation ------------------------------
 
@@ -176,6 +190,44 @@ set-current
 ?: U+D		dup rot + dup rot u< negate ;
 ?: D+-		0< if invert swap invert 1 u+d rot + then ;
 ?: M* ( n1 n2 -- d ) 2dup xor >r abs swap abs um* r> d+- ;
+?: DNEGATE ( d1 -- d2 ) invert swap invert 1 u+d rot + ;
+?: DABS ( d -- ud ) dup 0 < if dnegate then ;
+
+[UNDEFINED] FM/MOD [IF]
+\ Divide d1 by n1, giving the floored quotient n3 and the remainder n2.
+\ Adapted from hForth
+\ Taken from Swapforth
+: FM/MOD \ ( d1 n1 -- n2 n3 )
+    dup >r 2dup xor >r
+    >r dabs r@ abs
+    um/mod
+    r> 0< if
+        swap negate swap
+    then
+    r> 0< if
+        negate         \ negative quotient
+        over if
+            r@ rot - swap 1-
+        then
+    then
+    r> drop
+;
+[THEN]
+
+?: SGN ( u1 n1 -- n2 ) 0< if negate then ;
+
+[UNDEFINED] SM/REM [IF]
+\ Divide d1 by n1, giving the symmetric quotient n3 and the remainder n2.
+\ Taken from SwapForth
+: SM/REM \ ( d1 n1 -- n2 n3 )
+    2dup xor >r     \ combined sign, for quotient
+    over >r         \ sign of dividend, for remainder
+    abs >r dabs r>
+    um/mod          \ ( remainder quotient )
+    swap r> sgn     \ apply to remainder
+    swap r> sgn     \ apply to quotient
+;
+[THEN]
 
 \ -- Do/Loop --
 

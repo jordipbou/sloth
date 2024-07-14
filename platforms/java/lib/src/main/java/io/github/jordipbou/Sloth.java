@@ -232,10 +232,10 @@ public class Sloth {
 
 	public int link(int w) { return fetch(w); }
 
-	public int xt(int w) { return fetch(w + CELL); }
+	public int xt(int w) { if (w != 0) return fetch(w + CELL); else return 0; }
 	public void xt(int w, int v) { store(w + CELL, v); }
 
-	public int dt(int w) { return fetch(w + CELL + CELL); }
+	public int dt(int w) { if (w != 0) return fetch(w + CELL + CELL); else return 0; }
 	public void dt(int w, int v) { store(w + CELL + CELL, v); }
 
 	public int get_wl(int w) { return fetch(w + CELL + CELL + CELL); }
@@ -312,6 +312,8 @@ public class Sloth {
 			push(w);
 		} catch(Exception e) {
 			System.out.printf("WORD THAT GETS ERROR: %d\n", w);
+			for (int i = 0; i < l; i++) System.out.printf("%c", cfetch(a + i*CHAR));
+			System.out.println();
 			e.printStackTrace();
 			System.out.printf("WORDS:\n");
 			w = latest;
@@ -424,13 +426,14 @@ public class Sloth {
 		colon("DEPTH", (vm) -> push(sp));
 
 		// -- Arithmetic --
-		colon("+", (vm) -> { int a = pop(); int b = pop(); push(b + a); });
+		// colon("+", (vm) -> { int a = pop(); int b = pop(); push(b + a); });
 		colon("-", (vm) -> { int a = pop(); int b = pop(); push(b - a); });
-		colon("*", (vm) -> { int a = pop(); int b = pop(); push(b * a); });
-		colon("/", (vm) -> { int a = pop(); int b = pop(); push(b / a); });
-		colon("MOD", (vm) -> { int a = pop(); int b = pop(); push(b % a); });
-
+		// colon("*", (vm) -> { int a = pop(); int b = pop(); push(b * a); });
+		// colon("/", (vm) -> { int a = pop(); int b = pop(); push(b / a); });
+		// colon("MOD", (vm) -> { int a = pop(); int b = pop(); push(b % a); });
+		colon("*/MOD", (vm) -> { long n = lpop(); long d = lpop() * lpop(); push(d % n); push(d / n); });
 		colon("UM*", (vm) -> { long r = upop() * upop(); dpush(r); });
+		colon("UM/MOD", (vm) -> { long u = upop(); long d = dpop(); push(Long.remainderUnsigned(d, u)); push(Long.divideUnsigned(d, u)); });
 
 		// -- Comparison --
 		colon("<", (vm) -> { int a = pop(); int b = pop(); push(b < a ? -1 : 0); });
@@ -522,6 +525,8 @@ public class Sloth {
 
 		colon("TIMES", (vm) -> times());
 		colon("I", (vm) -> push(ix));
+		colon("J", (vm) -> push(jx));
+		colon("K", (vm) -> push(kx));
 		colon("LEAVE", (vm) -> leave());
 		colon("DOLOOP", (vm) -> doloop());
 
@@ -923,7 +928,7 @@ public class Sloth {
 		tr = 3;
 	}
 
-	public Sloth() { this(64, 256, 32, 32, 32, 65536); }
+	public Sloth() { this(64, 256, 32, 32, 32, 128*1024); }
 
 	// --------------------------------------------------------------------------
 	// -- REPL ------------------------------------------------------------------

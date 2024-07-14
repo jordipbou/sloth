@@ -30,11 +30,6 @@
 \ /SOURCE allows easy access to current character
 ?: /SOURCE	source drop ipos chars + ;
 
-?: LITERAL	postpone LIT , ; immediate
-
-?: CHAR		parse-name drop c@ ;
-?: [CHAR]	char postpone literal ; immediate
-
 \ Parse (advance input) to next )
 ?: (		[char] ) parse 2drop ; immediate
 
