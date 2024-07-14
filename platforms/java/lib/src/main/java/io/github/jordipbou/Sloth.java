@@ -329,6 +329,15 @@ public class Sloth {
 
 	public void find_name() { eval(ORDER); }
 
+	public int find_xt(int xt) {
+		int w = latest;
+		while (w != 0) {
+			if (xt(w) == xt) break;
+			w = link(w);
+		}
+		return w;
+	}
+
 	// --------------------------------------------------------------------------
 	// -- Bootstrapping ---------------------------------------------------------
 	// --------------------------------------------------------------------------
@@ -469,6 +478,8 @@ public class Sloth {
 		// restore it when doing ]] [[
 		colon("[[", (vm) -> store(STATE, 1)); set_instantaneous();
 
+		colon("EVALUATE", (vm) -> evaluate());
+
 		// -- Exceptions --
 		colon("THROW", (vm) -> _throw(pop()));
 		colon("CATCH", (vm) -> _catch(pop()));
@@ -517,6 +528,7 @@ public class Sloth {
 
 		colon("NT>XT", (vm) -> push(xt(pop())));
 		colon("IMMEDIATE?", (vm) -> push(has_flag(pop(), IMMEDIATE) ? -1 : 0));
+		colon(">BODY", (vm) -> push(dt(find_xt(pop()))));
 
 		// -- Combinators --
 		colon("CHOOSE", (vm) -> choose());
@@ -643,12 +655,16 @@ public class Sloth {
 
 	// -- Conversion between Java Strings and Forth c-addr/u strings --
 
+	public void set_ibuf() { ilen = pop(); ibuf = pop(); set_ipos(0); }
+
 	public void str_to_transient(String s) {
 		int a = tallot(s.length()*CHAR);
 		str_to_data(s, a);
-		ibuf = a;
-		ilen = s.length();
-		set_ipos(0);
+		push(a);
+		push(s.length());
+		// ibuf = a;
+		// ilen = s.length();
+		// set_ipos(0);
 	}
 
 	public void str_to_data(String s, int a) {
@@ -695,7 +711,7 @@ public class Sloth {
 				BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 				String line = reader.readLine();
 				str_to_transient(line);
-				push(line.length());
+				// push(line.length());
 			} catch(IOException e) {
 				// TODO Should this throw a Sloth exception?
 				e.printStackTrace();
@@ -734,6 +750,7 @@ public class Sloth {
 		default: 
 			try {
 				str_to_transient(last_buffered_reader.readLine());
+				set_ibuf();
 				push(-1);
 			} catch (Exception e) {
 				push(0);
@@ -757,6 +774,7 @@ public class Sloth {
 		int previbuf = ibuf;
 		int previpos = get_ipos();
 		int previlen = ilen;
+		// TODO Change this to a tallot based input buffer !!
 		ibuf = ibuf + (ilen*CHAR);
 
 	 	File file = new File(filename);
@@ -779,9 +797,10 @@ public class Sloth {
 	 	while (true) {
 	 		String line = last_buffered_reader.readLine();
 	 		if (line == null) break;
-			str_to_transient(line);
+			// str_to_transient(line);
 			try {
-				interpret();
+				evaluate(line);
+				// interpret();
 			} catch(Exception e) {
 				// TODO Exceptions should be managed by the inner interpreter
 				System.out.printf("Exception on line: [%s]\n", line);
@@ -832,6 +851,29 @@ public class Sloth {
 		}
 		trace(1);
 	}
+
+	public void evaluate() {
+		int l = pop(), a = pop();
+		// TODO This is save_source, move to its own word
+		int previbuf = ibuf;
+		int previpos = get_ipos();
+		int previlen = ilen;
+		int last_source_id = source_id;
+
+		source_id = -1;
+		ibuf = a;
+		set_ipos(0);
+		ilen = l;
+
+		interpret();
+
+		source_id = last_source_id;
+		ibuf = previbuf;
+		set_ipos(previpos);
+		ilen = previlen;
+	}
+
+	public void evaluate(String s) { str_to_transient(s); evaluate(); }
 
 	// --------------------------------------------------------------------------
 	// -- Combinators -----------------------------------------------------------
@@ -955,8 +997,9 @@ public class Sloth {
 			while (true) {
 				try {
 					String line = reader.readLine();
-					x.str_to_transient(line);
-					x.interpret();
+					//x.str_to_transient(line);
+					//x.interpret();
+					x.evaluate(line);
 				} catch(SlothException e) {
 					if (e.v == -13) { x.push(x.tok); x.push(x.tlen); x.type(); System.out.println(" ?"); }
 				}
