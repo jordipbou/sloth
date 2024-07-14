@@ -42,6 +42,22 @@ public class Sloth {
 	public void place(int a, int v) { s[sp - a - 1] = v; }
 	public int pick(int a) { return s[sp - a - 1]; }
 
+	// Helpers to get the most/least significant bits from a long integer, 
+	// used for working with double cell numbers which are a requirement for
+	// ANS Forth (even when not implementing the optional Double-Number word
+	// set!).
+	public long msp(long v) { return (v & 0xFFFFFFFF00000000L); }
+	public long lsp(long v) { return (v & 0x00000000FFFFFFFFL); }
+
+	public void push(long v) { push((int)lsp(v)); }
+
+	// Push/pop variants (double and unsigned numbers)
+	public void dpush(long v) { push(v); push(v >> 32); }
+	public long dpop() { long b = lpop(); return msp(b << 32) + lsp(lpop()); }
+	public long lpop() { return (long)s[--sp]; }
+	public long upop() { return Integer.toUnsignedLong(s[--sp]); }
+	public long udpop() { long b = upop(); return msp(b << 32) + lsp(upop()); }
+
 	// Swap is a very basic function needed inside Java code to define functions
 	// that interact with the Sloth environment.
 	public void swap() { int t = pick(0); place(0, pick(1)); place(1, t); }
@@ -57,16 +73,17 @@ public class Sloth {
 	public void rplace(int a, int v) { r[rp - a - 1] = v; }
 	public int rpick(int a) { return r[rp - a - 1]; }
 
-	// -- Locals stack ----------------------------------------------------------
+	// TODO Correct lpop name conflict or check if locals stack is needed here
+	// // -- Locals stack ----------------------------------------------------------
 
-	int l[];
-	int lp;
+	// int l[];
+	// int lp;
 
-	public void lpush(int v) { l[lp++] = v; }
-	public int lpop() { return l[--lp]; }
+	// public void lpush(int v) { l[lp++] = v; }
+	// public int lpop() { return l[--lp]; }
 
-	public void lplace(int a, int v) { l[lp - a - 1] = v; }
-	public int lpick(int a) { return l[lp - a - 1]; }
+	// public void lplace(int a, int v) { l[lp - a - 1] = v; }
+	// public int lpick(int a) { return l[lp - a - 1]; }
 
 	// -- Floating point stack --------------------------------------------------
 
@@ -413,6 +430,8 @@ public class Sloth {
 		colon("/", (vm) -> { int a = pop(); int b = pop(); push(b / a); });
 		colon("MOD", (vm) -> { int a = pop(); int b = pop(); push(b % a); });
 
+		colon("UM*", (vm) -> { long r = upop() * upop(); dpush(r); });
+
 		// -- Comparison --
 		colon("<", (vm) -> { int a = pop(); int b = pop(); push(b < a ? -1 : 0); });
 		colon("=", (vm) -> { int a = pop(); int b = pop(); push(b == a ? -1 : 0); });
@@ -423,6 +442,10 @@ public class Sloth {
 		colon("OR", (vm) -> { int a = pop(); int b = pop(); push(b | a); });
 		colon("XOR", (vm) -> { int a = pop(); int b = pop(); push(b ^ a); });
 		colon("INVERT", (vm) -> push(~pop()));
+
+		colon("2/", (vm) -> { int a = pop(); push(a >> 1); });
+		colon("RSHIFT", (vm) -> { int a = pop(); int b = pop(); push(b >>> a); });
+		colon("LSHIFT", (vm) -> { int a = pop(); int b = pop(); push(b << a); });
 
 		// -- Definitions and execution --
 		colon(":", (vm) -> colon());
@@ -882,11 +905,11 @@ public class Sloth {
 	public Sloth(int ssz, int rsz, int lsz, int osz, int fsz, int msz) {
 		s = new int[ssz];
 		r = new int[rsz];
-		l = new int[lsz];
+		// l = new int[lsz];
 		o = new Object[osz];
 		f = new float[fsz];
 		m = ByteBuffer.allocateDirect(msz);
-		sp = rp = lp = op = fp = 0;
+		sp = rp = /* lp = */ op = fp = 0;
 		mp = 0;
 		tp = tx = msz;
 		ibuf = ilen = 0;

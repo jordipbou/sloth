@@ -104,6 +104,11 @@
 
 ?: 2* ( n1 -- n2 ) 2 * ;
 
+?: ABS ( n -- u ) dup 0< if invert 1+ then ;
+
+?: MIN ( n1 n2 -- n3 ) 2dup swap < if swap then drop ;
+?: MAX ( n1 n2 -- n3 ) 2dup < if swap then drop ;
+
 \ -- Bit\Logic --------------------------------------------
 
 ?: NEGATE ( n1 -- n2 ) invert 1+ ;
@@ -163,6 +168,14 @@ set-current
 : [IF]		0= if postpone [else] then ; immediate
 
 \ -- Forth Words needed to pass test suite ----------------
+
+\ -- Double numbers --
+
+?: S>D ( n -- d ) dup 0< ;
+
+?: U+D		dup rot + dup rot u< negate ;
+?: D+-		0< if invert swap invert 1 u+d rot + then ;
+?: M* ( n1 n2 -- d ) 2dup xor >r abs swap abs um* r> d+- ;
 
 \ -- Do/Loop --
 
