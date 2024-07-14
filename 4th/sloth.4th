@@ -199,11 +199,10 @@ variable wlen
 	begin /source nip 0> while /source drop c@ r@ = while >in 1+! repeat then
 	/source drop 0 wlen !
 	begin /source nip 0> while /source drop c@ r@ <> while >in 1+! wlen 1+! repeat then
-	>in 1+! 
+	>in @ source nip < if >in 1+! then
 	wlen @
 	>counted
 	r> drop
-	>in @ /source nip < if >in 1+! then
 ;
 [THEN]
 
@@ -211,6 +210,6 @@ variable wlen
 
 \ -- Testing --
 
-: dotests -1 trace! s" ../../../forth2012-test-suite/src/runtests.fth" included 1 trace! ;
+: dotests -1 trace! s" ../../../forth2012-test-suite/src/runtests.fth" included ;
 
 1 trace!

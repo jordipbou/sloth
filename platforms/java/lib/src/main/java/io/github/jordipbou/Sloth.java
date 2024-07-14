@@ -854,7 +854,7 @@ public class Sloth {
 
 	public void trace(int l) {
 		if (l <= tr) {
-			System.out.printf("%d:%d {%d} <%d> ", mp, tp, fetch(STATE), sp);
+			System.out.printf("L:%d TR:%d %d:%d {%d} <%d> ", l, tr, mp, tp, fetch(STATE), sp);
 			for (int i = 0; i < sp; i++) System.out.printf("%d ", s[i]);
 			if (ip >= 0) 
 				System.out.printf(": [%d] %d ", ip, ip > 0 ? fetch(ip) : 0);
