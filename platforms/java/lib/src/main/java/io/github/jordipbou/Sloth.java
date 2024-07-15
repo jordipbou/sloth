@@ -156,6 +156,9 @@ public class Sloth {
 	public int opcode() { int v = fetch(ip); ip += CELL; return v; }
 	public void do_prim(int p) { primitives.get(-1 - p).accept(this); }
 	// TODO: Test tail call optimization, it failed in some cases (related to R> at the end)
+	// and also with DO/LOOP
+	// public boolean tail() { return !(ip >= 0) || fetch(ip) == EXIT; }
+	// public void call(int q) { if (!tail()) rpush(ip); ip = q; }
 	public void call(int q) { rpush(ip); ip = q; }
 
 	public void execute(int q) { if (q < 0) do_prim(q); else call(q); }
@@ -172,7 +175,11 @@ public class Sloth {
 	public void inner() {	int t = rp; while (t <= rp && ip >= 0) { trace(3); execute(opcode()); } }
 
 	// Eval allows calling Sloth code from Java.
-	public void eval(int q) { execute(q); inner(); }
+	// When calling a Sloth word from Java, inner interpreter has to be started to continue
+	// executing all the opcodes that form that word but, if executing a primitive and the
+	// inner interpreter is called when the return stack is not empty it will continue
+	// executing the next opcode, and that will be an error.
+	public void eval(int q) { execute(q); if (q >= 0) inner(); }
 
 	// -- Exceptions ------------------------------------------------------------
 
@@ -481,7 +488,7 @@ public class Sloth {
 		// restore it when doing ]] [[
 		colon("[[", (vm) -> store(STATE, 1)); set_instantaneous();
 
-		colon("EVALUATE", (vm) -> evaluate());
+		colon("EVALUATE", (vm) -> evaluate(-1));
 
 		// -- Exceptions --
 		colon("THROW", (vm) -> _throw(pop()));
@@ -715,7 +722,6 @@ public class Sloth {
 				BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 				String line = reader.readLine();
 				str_to_transient(line);
-				// push(line.length());
 			} catch(IOException e) {
 				// TODO Should this throw a Sloth exception?
 				e.printStackTrace();
@@ -774,13 +780,6 @@ public class Sloth {
 	}
 
 	public void include(String filename) throws FileNotFoundException, IOException {
-		// save previous input buffer, by writing after it
-		int previbuf = ibuf;
-		int previpos = get_ipos();
-		int previlen = ilen;
-		// TODO Change this to a tallot based input buffer !!
-		ibuf = ibuf + (ilen*CHAR);
-
 	 	File file = new File(filename);
 		if (!file.exists()) {
 			file = new File(last_dir + filename);
@@ -795,16 +794,11 @@ public class Sloth {
 		BufferedReader prevReader = last_buffered_reader;
 	 	last_buffered_reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
 
-		int last_source_id = source_id;
-		source_id = 1;
-
 	 	while (true) {
 	 		String line = last_buffered_reader.readLine();
 	 		if (line == null) break;
-			// str_to_transient(line);
 			try {
-				evaluate(line);
-				// interpret();
+				evaluate(line, 1);
 			} catch(Exception e) {
 				// TODO Exceptions should be managed by the inner interpreter
 				System.out.printf("Exception on line: [%s]\n", line);
@@ -813,7 +807,6 @@ public class Sloth {
 			}
 	 	}
 
-		source_id = last_source_id;
 		last_buffered_reader.close();
 		last_buffered_reader = prevReader;
 		last_dir = prevDir;
@@ -824,7 +817,7 @@ public class Sloth {
 	public int BASE;
 
 	public void interpret() {
-		while (ilen > 0) {
+		while (get_ipos() < ilen) {
 			parse_name();
 			trace(2);
 			if (tlen == 0) { pop(); pop(); break; }
@@ -842,6 +835,7 @@ public class Sloth {
  					if (xt(w) != 0) compile(xt(w));
  				}
 			} else {
+				// TODO Move this to >number ?
  				StringBuilder sb = new StringBuilder();
  				for (int i = 0; i < tlen; i++) sb.append(cfetch(tok + (i*CHAR)));
  				try {
@@ -856,15 +850,17 @@ public class Sloth {
 		trace(1);
 	}
 
-	public void evaluate() {
+	public void evaluate(int sid) {
 		int l = pop(), a = pop();
-		// TODO This is save_source, move to its own word
+		// TODO This is save_source, maybe move to its own word?
 		int previbuf = ibuf;
 		int previpos = get_ipos();
 		int previlen = ilen;
 		int last_source_id = source_id;
+		int prevtok = tok;
+		int prevtlen = tlen;
 
-		source_id = -1;
+		source_id = sid; // -1;
 		ibuf = a;
 		set_ipos(0);
 		ilen = l;
@@ -875,9 +871,11 @@ public class Sloth {
 		ibuf = previbuf;
 		set_ipos(previpos);
 		ilen = previlen;
+		tlen = prevtlen;
+		tok = prevtok;
 	}
 
-	public void evaluate(String s) { str_to_transient(s); evaluate(); }
+	public void evaluate(String s, int sid) { str_to_transient(s); evaluate(sid); }
 
 	// --------------------------------------------------------------------------
 	// -- Combinators -----------------------------------------------------------
@@ -1014,7 +1012,7 @@ public class Sloth {
 					String line = reader.readLine();
 					//x.str_to_transient(line);
 					//x.interpret();
-					x.evaluate(line);
+					x.evaluate(line, -1);
 				} catch(SlothException e) {
 					if (e.v == -13) { x.push(x.tok); x.push(x.tlen); x.type(); System.out.println(" ?"); }
 				}

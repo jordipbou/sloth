@@ -316,12 +316,3 @@ variable wlen
 : dotests -1 trace! s" ../../../forth2012-test-suite/src/runtests.fth" included ;
 
 1 trace!
-
-: GD6
-	0 SWAP 0 DO
-		I 1+ 0 DO 
-			I J + 3 = IF I UNLOOP I UNLOOP EXIT THEN 
-		1+ LOOP
-    LOOP 
-;
-
