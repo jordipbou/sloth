@@ -125,8 +125,10 @@
 ?: CELL+	1 cells + ;
 ?: CHAR+	1 chars + ;
 
+?: 0! ( a-addr -- ) 0 swap ! ;
 ?: +! ( n | u a-addr -- ) swap over @ + swap ! ;
 ?: 1+! ( a-addr -- ) dup @ 1 + swap ! ;
+?: 1-! ( a-addr -- ) dup @ 1 - swap ! ;
 
 ?: 2! ( x1 x2 a-addr -- ) swap over ! cell+ ! ;
 ?: 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
@@ -180,6 +182,11 @@ set-current
 : [THEN]	; immediate 
  
 : [IF]		0= if postpone [else] then ; immediate
+
+\ -- True/False constants ---------------------------------
+
+[UNDEFINED] TRUE [IF] 0 invert constant TRUE [THEN]
+[UNDEFINED] FALSE [IF] 0 constant FALSE [THEN]
 
 \ -- Forth Words needed to pass test suite ----------------
 
@@ -236,7 +243,7 @@ set-current
 ?: LOOP		postpone lit 1 , postpone ;] postpone doloop ; immediate
 ?: +LOOP	postpone ;] postpone doloop ; immediate
 
-?: UNLOOP	; \ Unloop is a noop in this implementation
+\ ?: UNLOOP	; \ Unloop is a noop in this implementation
 
 \ -- Word and counted strings --
 
@@ -273,8 +280,48 @@ variable wlen
 
 ?: FIND			dup count find-name nt>xt+flag dup if rot drop then ;
 
+[UNDEFINED] N>R [IF]
+\ Reference implementation in ANS Forth document
+: N>R ( xn .. x1 N -- ) ( R: -- x1 .. xn n )
+\ Transfer N items and count to the return stack.
+   dup                        \ xn .. x1 N N --
+   begin
+      dup
+   while
+      rot r> swap >r >r      \ xn .. N N -- ; R: .. x1 --
+      1-                      \ xn .. N 'N -- ; R: .. x1 --
+   repeat
+   drop                       \ N -- ; R: x1 .. xn --
+   r> swap >r >r
+;
+[THEN]
+
+[UNDEFINED] NR> [IF]
+\ Reference implementation in ANS Forth document
+: NR> ( -- xn .. x1 N ) ( R: x1 .. xn N -- )
+\ Pull N items and count off the return stack.
+   R> R> SWAP >R dup
+   BEGIN
+      dup
+   WHILE
+      R> R> SWAP >R -ROT
+      1-
+   repeat
+   DROP
+;
+[THEN]
+
 \ -- Testing --
 
 : dotests -1 trace! s" ../../../forth2012-test-suite/src/runtests.fth" included ;
 
 1 trace!
+
+: GD6
+	0 SWAP 0 DO
+		I 1+ 0 DO 
+			I J + 3 = IF I UNLOOP I UNLOOP EXIT THEN 
+		1+ LOOP
+    LOOP 
+;
+

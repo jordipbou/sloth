@@ -73,6 +73,9 @@ public class Sloth {
 	public void rplace(int a, int v) { r[rp - a - 1] = v; }
 	public int rpick(int a) { return r[rp - a - 1]; }
 
+	public void from_r() { push(rpop()); }
+	public void to_r() { rpush(pop()); }
+
 	// TODO Correct lpop name conflict or check if locals stack is needed here
 	// // -- Locals stack ----------------------------------------------------------
 
@@ -539,8 +542,9 @@ public class Sloth {
 		colon("I", (vm) -> push(ix));
 		colon("J", (vm) -> push(jx));
 		colon("K", (vm) -> push(kx));
-		colon("LEAVE", (vm) -> leave());
 		colon("DOLOOP", (vm) -> doloop());
+		colon("LEAVE", (vm) -> leave());
+		colon("UNLOOP", (vm) -> unloop());
 
 		// -- Strings --
 		colon("S\"", (vm) -> start_string()); set_immediate();
@@ -889,7 +893,7 @@ public class Sloth {
 	public void ipush() { rpush(kx); kx = jx; jx = ix; lx = 0; }
 	public void ipop() { lx = 0; ix = jx; jx = kx; kx = rpop(); }
 
-	public void leave() { lx = -1; exit(); }
+	public void leave() { lx = 1; exit(); }
 
 	public void times() { 
 		ipush(); 
@@ -897,6 +901,15 @@ public class Sloth {
 		for (ix = 0; ix < l && lx == 0; ix++) 
 			eval(q); 
 		ipop(); 
+	}
+
+	public void unloop() { 
+		lx--;
+		if (lx == -1) {
+			ix = jx; jx = kx; kx = rpick(1);
+		} else if (lx == -2) {
+			ix = jx; jx = kx; kx = rpick(3);
+		}
 	}
 
 	// Algorithm for doloop taken from pForth (pf_inner.c case ID_PLUS_LOOP)
@@ -915,7 +928,9 @@ public class Sloth {
 				}
 			}
 		}
-		ipop(); 
+		if (lx == 0 || lx == 1) { ipop(); /* Leave case */ }
+		else if (lx == -1) { lx = 0; rpop(); /* 1 unloop case */ }
+		else if (lx == -2) { lx = -1; rpop(); exit(); /* 2 unloop case */ }
 	}
 
 	// --------------------------------------------------------------------------
