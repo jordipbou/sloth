@@ -124,6 +124,8 @@
 
 ?: CELL+	1 cells + ;
 ?: CHAR+	1 chars + ;
+?: CELL-	1 cells - ;
+?: CHAR-	1 chars - ;
 
 ?: 0! ( a-addr -- ) 0 swap ! ;
 ?: +! ( n | u a-addr -- ) swap over @ + swap ! ;
@@ -139,6 +141,9 @@
 
 ?: BL ( -- char ) 32 ;
 ?: CR ( -- ) 10 emit ;
+
+?: SPACE ( -- ) bl emit ;
+?: SPACES ( n -- ) begin dup 0> while space 1- repeat drop ;
 
 ?: TYPE ( c-addr u -- ) [: dup c@ emit char+ ;] times drop ;
 
@@ -190,15 +195,26 @@ set-current
 
 \ -- Forth Words needed to pass test suite ----------------
 
+\ -- Setting BASE independent of current BASE setting --
+\ ( as seen on https://forth-standard.org/standard/core/HEX#reply-816 )
+
+base @ \ remember current BASE value
+1 2* base !	\ get to binary
+?: DECIMAL	1010 base ! ;
+?: HEX		10000 base ! ;
+base ! \ restore previous base
+
 \ -- Double numbers --
 
 ?: S>D ( n -- d ) dup 0< ;
 
 ?: U+D		dup rot + dup rot u< negate ;
+?: D+		>r rot u+d rot + r> + ;
 ?: D+-		0< if invert swap invert 1 u+d rot + then ;
 ?: M* ( n1 n2 -- d ) 2dup xor >r abs swap abs um* r> d+- ;
 ?: DNEGATE ( d1 -- d2 ) invert swap invert 1 u+d rot + ;
 ?: DABS ( d -- ud ) dup 0 < if dnegate then ;
+?: UD/MOD	>r 0 r@ um/mod r> swap >r um/mod r> ;
 
 [UNDEFINED] FM/MOD [IF]
 \ Divide d1 by n1, giving the floored quotient n3 and the remainder n2.
@@ -300,14 +316,111 @@ variable wlen
 \ Reference implementation in ANS Forth document
 : NR> ( -- xn .. x1 N ) ( R: x1 .. xn N -- )
 \ Pull N items and count off the return stack.
-   R> R> SWAP >R dup
-   BEGIN
+   r> r> swap >r dup
+   begin
       dup
-   WHILE
-      R> R> SWAP >R -ROT
+   while
+      r> r> swap >r -rot
       1-
    repeat
-   DROP
+   drop
+;
+[THEN]
+
+\ -- Numeric output -- (taken from SwapForth?)
+
+variable hld
+create <hold 100 chars dup allot <hold + constant hold>
+
+: <# ( -- ) hold> hld ! ;
+: hold ( char -- ) hld @ char- dup hld ! c! ;
+: # ( d1 -- d2 ) base @ ud/mod rot 9 over < if 7 + then 48 + hold ;
+: #s ( d1 -- d2 ) begin # over over or 0= until ;
+: #> ( d -- c-addr u ) drop drop hld @ hold> over - 1 chars / ;
+
+: sign		0 < if 45 hold then ;
+
+: ud.r ( d n -- ) >r <# #s #> r> over - spaces type ;
+: ud.		0 ud.r space ;
+: u.r		0 swap ud.r ;
+: u.0		ud. ;
+: d.r ( d n -- ) >r swap over dabs <# #s rot sign #> r> over - spaces type ;
+: d.		0 d.r space ;
+: .r		>r dup 0 < r> d.r ;
+: .		dup 0 <  d. ;
+
+: ? ( addr -- ) @ . ;
+
+[UNDEFINED] ASCII [IF]
+\ ASCII taken from pForth
+: ASCII ( <char> -- char , state smart )
+        bl parse drop c@
+        state @
+        \ IF [compile] literal \ This was changed as I don't have [compile] in SLOTH
+		IF postpone literal
+        THEN
+; immediate
+[THEN]
+
+[UNDEFINED] DIGIT [IF]
+\ DIGIT Taken from pFORTH
+\ Convert a single character to a number in the given base.
+: DIGIT   ( char base -- n true | char false )
+    >r
+\ convert lower to upper
+    dup ascii a < not
+    if
+        ascii a - ascii A +
+    then
+
+    dup dup ascii A 1- >
+    if ascii A - ascii 9 + 1+
+    else ( char char )
+        dup ascii 9 >
+        if
+            ( between 9 and A is bad )
+            drop 0 ( trigger error below )
+        then
+    then
+    ascii 0 -
+    dup r> <
+    if dup 1+ 0>
+        if nip true
+        else drop false
+        then
+    else drop false
+    then
+;
+[THEN]
+
+[UNDEFINED] >NUMBER [IF]
+\ >NUMBER taken from pForth
+: >NUMBER ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 , convert till bad char , CORE )
+    >r
+    begin
+        r@ 0>    \ any characters left?
+        if
+            dup c@ base @
+            digit ( ud1 c-addr , n true | char false )
+            if
+                true
+            else
+                drop false
+            then
+        else
+            false
+        then
+    while ( -- ud1 c-addr n  )
+        swap >r  ( -- ud1lo ud1hi n  )
+        swap  base @ ( -- ud1lo n ud1hi base  )
+        um* drop ( -- ud1lo n ud1hi*baselo  )
+        rot  base @ ( -- n ud1hi*baselo ud1lo base )
+        um* ( -- n ud1hi*baselo ud1lo*basello ud1lo*baselhi )
+        d+  ( -- ud2 )
+        r> char+     \ increment char*
+        r> 1- >r  \ decrement count
+    repeat
+    r>
 ;
 [THEN]
 
