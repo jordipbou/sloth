@@ -351,11 +351,11 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 : UD.R ( d n -- ) >r <# #s #> r> over - spaces type ;
 : UD.		0 ud.r space ;
 : U.R		0 swap ud.r ;
-: U.		ud. ;
+: U. ( u -- ) 0 ud. ;
 : D.R ( d n -- ) >r swap over dabs <# #s rot sign #> r> over - spaces type ;
 : D.		0 d.r space ;
 : .R		>r dup 0 < r> d.r ;
-: .		dup 0 <  d. ;
+: .			dup 0 < d. ;
 
 : ? ( addr -- ) @ . ;
 

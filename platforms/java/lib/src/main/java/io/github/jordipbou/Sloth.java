@@ -723,10 +723,12 @@ public class Sloth {
 	public void accept() {
 		if (ACCEPT != 0) eval(ACCEPT);
 		else {
+			int l = pop(), a = pop();
 			try {
 				BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 				String line = reader.readLine();
-				str_to_transient(line);
+				for (int i = 0; i < line.length(); i++) cstore(a + i*CHAR, line.charAt(i));
+				push(line.length());
 			} catch(IOException e) {
 				// TODO Should this throw a Sloth exception?
 				e.printStackTrace();
