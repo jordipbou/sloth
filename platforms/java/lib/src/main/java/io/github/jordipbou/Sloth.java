@@ -122,6 +122,9 @@ public class Sloth {
 	public char cfetch(int a) { return m.getChar(a); }
 	public void cstore(int a, char v) { m.putChar(a, v); }
 
+	public byte bfetch(int a) { return m.get(a); }
+	public void bstore(int a, byte v) { m.put(a, v); }
+
 	public int here() { return mp; }
 	public int allot(int v) { int t = mp; mp += v; return t; }
 	public void align() { allot(((here() + (CELL - 1)) & ~(CELL - 1)) - here()); }
@@ -499,6 +502,8 @@ public class Sloth {
 		colon("!", (vm) -> { int a = pop(); store(a, pop()); });
 		colon("C@", (vm) -> push(cfetch(pop())));
 		colon("C!", (vm) -> { int a = pop(); cstore(a, (char)pop()); });
+		colon("B@", (vm) -> push(bfetch(pop())));
+		colon("B!", (vm) -> { int a = pop(); bstore(a, (byte)pop()); });
 
 		colon("HERE", (vm) -> push(here()));
 		colon("ALLOT", (vm) -> allot(pop()));

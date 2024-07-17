@@ -135,7 +135,13 @@
 ?: 2! ( x1 x2 a-addr -- ) swap over ! cell+ ! ;
 ?: 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
 
-?: MOVE ( addr1 addr2 u -- ) [: over c@ over c! 1+ swap 1+ swap ;] times 2drop ;
+?: BMOVE> ( addr1 addr2 u -- ) >r r@ 1- + swap r@ 1- + swap r> [: over b@ over b! 1- swap 1- swap ;] times 2drop ;
+?: <BMOVE ( addr1 addr2 u -- ) [: over b@ over b! 1+ swap 1+ swap ;] times 2drop ;
+?: MOVE ( addr1 addr2 u -- ) >r 2dup u< if r> bmove> else r> <bmove then ;
+?: CMOVE> ( c-addr1 c-addr2 u -- ) chars bmove> ;
+?: CMOVE ( c-addr1 c-addr2 u -- ) chars <bmove ;
+
+?: FILL ( c-addr u char -- ) -rot [: 2dup c! char+ ;] times 2drop ;
 
 \ -- Input/output -----------------------------------------
 
@@ -148,6 +154,8 @@
 ?: TYPE ( c-addr u -- ) [: dup c@ emit char+ ;] times drop ;
 
 ?: .( ( "ccc<paren>" -- ) [char] ) parse type ;
+
+?: ." ( C: "ccc<quote>" -- ) ( -- ) postpone s" state @ if postpone type else type then ; immediate
 
 \ -- Dictionary/Finding names -----------------------------
 
@@ -329,24 +337,24 @@ variable wlen
 
 \ -- Numeric output -- (taken from SwapForth?)
 
-variable hld
-create <hold 100 chars dup allot <hold + constant hold>
+variable HLD
+create <HOLD 100 chars dup allot <hold + constant HOLD>
 
 : <# ( -- ) hold> hld ! ;
-: hold ( char -- ) hld @ char- dup hld ! c! ;
+: HOLD ( char -- ) hld @ char- dup hld ! c! ;
 : # ( d1 -- d2 ) base @ ud/mod rot 9 over < if 7 + then 48 + hold ;
-: #s ( d1 -- d2 ) begin # over over or 0= until ;
+: #S ( d1 -- d2 ) begin # over over or 0= until ;
 : #> ( d -- c-addr u ) drop drop hld @ hold> over - 1 chars / ;
 
-: sign		0 < if 45 hold then ;
+: SIGN		0 < if 45 hold then ;
 
-: ud.r ( d n -- ) >r <# #s #> r> over - spaces type ;
-: ud.		0 ud.r space ;
-: u.r		0 swap ud.r ;
-: u.0		ud. ;
-: d.r ( d n -- ) >r swap over dabs <# #s rot sign #> r> over - spaces type ;
-: d.		0 d.r space ;
-: .r		>r dup 0 < r> d.r ;
+: UD.R ( d n -- ) >r <# #s #> r> over - spaces type ;
+: UD.		0 ud.r space ;
+: U.R		0 swap ud.r ;
+: U.		ud. ;
+: D.R ( d n -- ) >r swap over dabs <# #s rot sign #> r> over - spaces type ;
+: D.		0 d.r space ;
+: .R		>r dup 0 < r> d.r ;
 : .		dup 0 <  d. ;
 
 : ? ( addr -- ) @ . ;
