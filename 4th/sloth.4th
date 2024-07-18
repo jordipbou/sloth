@@ -260,10 +260,50 @@ base ! \ restore previous base
 ;
 [THEN]
 
+\ Return stack manipulation
+
+[UNDEFINED] N>R [IF]
+\ Reference implementation in ANS Forth document
+: N>R ( xn .. x1 N -- ) ( R: -- x1 .. xn n )
+\ Transfer N items and count to the return stack.
+   dup                        \ xn .. x1 N N --
+   begin
+      dup
+   while
+      rot r> swap >r >r      \ xn .. N N -- ; R: .. x1 --
+      1-                      \ xn .. N 'N -- ; R: .. x1 --
+   repeat
+   drop                       \ N -- ; R: x1 .. xn --
+   r> swap >r >r
+;
+[THEN]
+
+[UNDEFINED] NR> [IF]
+\ Reference implementation in ANS Forth document
+: NR> ( -- xn .. x1 N ) ( R: x1 .. xn N -- )
+\ Pull N items and count off the return stack.
+   r> r> swap >r dup
+   begin
+      dup
+   while
+      r> r> swap >r -rot
+      1-
+   repeat
+   drop
+;
+[THEN]
+
 \ -- Do/Loop --
 
-?: DO		postpone [: ; immediate
-?: ?DO		postpone [: ; immediate
+\ DO/?DO/LOOP/+LOOP is one of the things I don't like about the ANS Forth
+\ standard. IF/ELSE/THEN or BEGIN/WHILE/REPEAT have one word that does one
+\ thing. You can mix them and get different results, different constructions,
+\ but the word meaning is clear and easily implemented.
+\ DO/?DO/LOOP/+LOOP is a combination of words with different semantics that
+\ have to work together.
+
+?: DO		postpone lit 1 , postpone [: ; immediate
+?: ?DO		postpone lit 1 , postpone [: ; immediate
 ?: LOOP		postpone lit 1 , postpone ;] postpone doloop ; immediate
 ?: +LOOP	postpone ;] postpone doloop ; immediate
 
@@ -304,37 +344,6 @@ variable wlen
 
 ?: FIND			dup count find-name nt>xt+flag dup if rot drop then ;
 
-[UNDEFINED] N>R [IF]
-\ Reference implementation in ANS Forth document
-: N>R ( xn .. x1 N -- ) ( R: -- x1 .. xn n )
-\ Transfer N items and count to the return stack.
-   dup                        \ xn .. x1 N N --
-   begin
-      dup
-   while
-      rot r> swap >r >r      \ xn .. N N -- ; R: .. x1 --
-      1-                      \ xn .. N 'N -- ; R: .. x1 --
-   repeat
-   drop                       \ N -- ; R: x1 .. xn --
-   r> swap >r >r
-;
-[THEN]
-
-[UNDEFINED] NR> [IF]
-\ Reference implementation in ANS Forth document
-: NR> ( -- xn .. x1 N ) ( R: x1 .. xn N -- )
-\ Pull N items and count off the return stack.
-   r> r> swap >r dup
-   begin
-      dup
-   while
-      r> r> swap >r -rot
-      1-
-   repeat
-   drop
-;
-[THEN]
-
 \ -- Numeric output -- (taken from SwapForth?)
 
 variable HLD
@@ -359,16 +368,16 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 
 : ? ( addr -- ) @ . ;
 
-[UNDEFINED] ASCII [IF]
-\ ASCII taken from pForth
-: ASCII ( <char> -- char , state smart )
-        bl parse drop c@
-        state @
-        \ IF [compile] literal \ This was changed as I don't have [compile] in SLOTH
-		IF postpone literal
-        THEN
-; immediate
-[THEN]
+\ [UNDEFINED] ASCII [IF]
+\ \ ASCII taken from pForth
+\ : ASCII ( <char> -- char , state smart )
+\         bl parse drop c@
+\         state @
+\         \ IF [compile] literal \ This was changed as I don't have [compile] in SLOTH
+\ 		IF postpone literal
+\         THEN
+\ ; immediate
+\ [THEN]
 
 [UNDEFINED] DIGIT [IF]
 \ DIGIT Taken from pFORTH
@@ -376,21 +385,21 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 : DIGIT   ( char base -- n true | char false )
     >r
 \ convert lower to upper
-    dup ascii a < not
+    dup [char] a < not
     if
-        ascii a - ascii A +
+        [char] a - [char] A +
     then
 
-    dup dup ascii A 1- >
-    if ascii A - ascii 9 + 1+
+    dup dup [char] A 1- >
+    if [char] A - [char] 9 + 1+
     else ( char char )
-        dup ascii 9 >
+        dup [char] 9 >
         if
             ( between 9 and A is bad )
             drop 0 ( trigger error below )
         then
     then
-    ascii 0 -
+    [char] 0 -
     dup r> <
     if dup 1+ 0>
         if nip true

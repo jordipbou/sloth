@@ -477,6 +477,7 @@ public class Sloth {
 		colon(";", (vm) -> semicolon()); set_immediate();
 		colon("POSTPONE", (vm) -> postpone()); set_immediate();
 		colon("IMMEDIATE", (vm) -> set_immediate()); 
+	 	colon(":NONAME", (vm) -> { push(here()); latestxt = here(); store(STATE, 1); });
 		colon("[:", (vm) -> start_quotation()); set_immediate();
 		colon(";]", (vm) -> end_quotation()); set_immediate();
 		colon("EXECUTE", (vm) -> eval(pop()));
@@ -845,13 +846,24 @@ public class Sloth {
 				// TODO Move this to >number ?
  				StringBuilder sb = new StringBuilder();
  				for (int i = 0; i < tlen; i++) sb.append(cfetch(tok + (i*CHAR)));
- 				try {
- 					int n = Integer.parseInt(sb.toString(), fetch(BASE));
- 					if (fetch(STATE) == 0) push(n);
- 					else literal(n);
- 				} catch (NumberFormatException e) {
-					_throw(-13);
- 				}
+				if (sb.charAt(0) == '\'') {
+					if (fetch(STATE) == 0) push((int)sb.charAt(1));
+					else literal((int)sb.charAt(1));
+				} else {
+					int b = fetch(BASE);
+					String sn;
+					if (sb.charAt(0) == '#') { b = 10; sn = sb.substring(1); }
+					else if (sb.charAt(0) == '$') { b = 16; sn = sb.substring(1); }
+					else if (sb.charAt(0) == '%') { b = 2; sn = sb.substring(1); }
+					else sn = sb.toString();
+	 				try {
+	 					int n = Integer.parseInt(sn, b);
+	 					if (fetch(STATE) == 0) push(n);
+	 					else literal(n);
+	 				} catch (NumberFormatException e) {
+						_throw(-13);
+	 				}
+				}
 			}
 		}
 		trace(1);
@@ -921,18 +933,54 @@ public class Sloth {
 	public void doloop() {
 		ipush(); 
 		int q = pop();
+		int do_first_loop = pop();
 		ix = pop();
 		int l = pop();
-		if (ix != l) {
-			for (int o = ix - l, d = 0;((o ^ (o + d)) & (o ^ d)) >= 0 && lx == 0;) {
-				eval(q);
-				if (lx == 0) { // Avoid pop if we're leaving
-					d = pop();
-					o = ix - l;
-					ix += d;
-				}
+
+		int o = ix - l, d = 0;
+
+		// First iteration is executed always on a DO
+		if (do_first_loop == 1) { 
+			eval(q);
+			if (lx == 0) {
+				d = pop();
+				o = ix - l;
+				ix += d;
 			}
 		}
+
+		while (((o ^ (o + d)) & (o ^ d)) >= 0 && lx == 0) {
+			eval(q);
+			if (lx == 0) { // Avoid pop if we're leaving
+				d = pop();
+				o = ix - l;
+				ix += d;
+			}
+		}
+
+
+		// if (do_first_loop == 1) {
+		// 	int o = ix - l, d = 0;
+		// 	do {
+		// 		eval(q);
+		// 		if (lx == 0) {
+		// 			d = pop();
+		// 			o = ix - l;
+		// 			ix += d;
+		// 		} else {
+		// 			break;
+		// 		}
+		// 	} while(((o ^ (o + d)) & (o ^ d)) >= 0);
+		// } else {
+		// 		for (int o = ix - l, d = 0;(((o ^ (o + d)) & (o ^ d))) >= 0 && lx == 0;) {
+		// 			eval(q);
+		// 			if (lx == 0) { // Avoid pop if we're leaving
+		// 				d = pop();
+		// 				o = ix - l;
+		// 				ix += d;
+		// 			}
+		// 		}
+		// }
 		if (lx == 0 || lx == 1) { ipop(); /* Leave case */ }
 		else if (lx == -1) { lx = 0; rpop(); /* 1 unloop case */ }
 		else if (lx == -2) { lx = -1; rpop(); exit(); /* 2 unloop case */ }
@@ -990,7 +1038,7 @@ public class Sloth {
 		tr = 3;
 	}
 
-	public Sloth() { this(64, 256, 32, 32, 32, 128*1024); }
+	public Sloth() { this(64, 256, 32, 32, 32, 512*1024); }
 
 	// --------------------------------------------------------------------------
 	// -- REPL ------------------------------------------------------------------
