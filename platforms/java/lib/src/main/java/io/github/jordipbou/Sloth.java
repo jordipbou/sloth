@@ -458,14 +458,15 @@ public class Sloth {
 		colon("UM/MOD", (vm) -> { long u = upop(); long d = dpop(); push(Long.remainderUnsigned(d, u)); push(Long.divideUnsigned(d, u)); });
 
 		// -- Comparison --
-		colon("<", (vm) -> { int a = pop(); int b = pop(); push(b < a ? -1 : 0); });
-		colon("=", (vm) -> { int a = pop(); int b = pop(); push(b == a ? -1 : 0); });
-		colon(">", (vm) -> { int a = pop(); int b = pop(); push(b > a ? -1 : 0); });
+		colon("0<", (vm) -> push(pop() < 0 ? -1 : 0));
+		// colon("<", (vm) -> { int a = pop(); int b = pop(); push(b < a ? -1 : 0); });
+		// colon("=", (vm) -> { int a = pop(); int b = pop(); push(b == a ? -1 : 0); });
+		// colon(">", (vm) -> { int a = pop(); int b = pop(); push(b > a ? -1 : 0); });
 
 		// -- Bits --
 		colon("AND", (vm) -> { int a = pop(); int b = pop(); push(b & a); });
-		colon("OR", (vm) -> { int a = pop(); int b = pop(); push(b | a); });
-		colon("XOR", (vm) -> { int a = pop(); int b = pop(); push(b ^ a); });
+		// colon("OR", (vm) -> { int a = pop(); int b = pop(); push(b | a); });
+		// colon("XOR", (vm) -> { int a = pop(); int b = pop(); push(b ^ a); });
 		colon("INVERT", (vm) -> push(~pop()));
 
 		colon("2/", (vm) -> { int a = pop(); push(a >> 1); });
@@ -515,8 +516,8 @@ public class Sloth {
 		colon("TALLOT", (vm) -> push(tallot(pop())));
 		colon("TFREE", (vm) -> tfree());
 
-		colon(",", (vm) -> comma(pop()));
-		colon("C,", (vm) -> ccomma((char)pop()));
+		// colon(",", (vm) -> comma(pop()));
+		// colon("C,", (vm) -> ccomma((char)pop()));
 
 		colon("CELLS", (vm) -> push(pop()*CELL));
 		colon("CHARS", (vm) -> push(pop()*CHAR));

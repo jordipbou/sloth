@@ -2,11 +2,7 @@
 
 : \			source >in ! drop ; immediate
 
-\ End of line comments can be used now. As comments are so
-\ important (to me) to understand the way everything is
-\ implemented an organized, and as there is no performance
-\ reason to never implement \ in host, its the first word
-\ defined and no conditional compilation is used.
+\ End of line comments can be used now.
 
 \ SLOTH v1.0
 
@@ -21,6 +17,13 @@
 \ single line definitions.
 
 : ?: parse-name find-name [: source >in ! drop ;] [: 1 >in ! ;] choose ;
+
+\ -- Compilation ------------------------------------------
+
+?: ,		here ! 1 cells allot ;
+?: C,		here c! 1 chars allot ;
+
+?: LITERAL	postpone LIT , ; immediate
 
 \ -- Control structures -----------------------------------
 
@@ -44,6 +47,19 @@
 \ Now that we have conditional compilation and basic control
 \ structures, we can implement a lot of fundamental words.
 
+\ -- Variables and constants ------------------------------
+
+?: VARIABLE	create 0 , ;
+?: CONSTANT	create , does> @ ;
+
+?: '		parse-name find-name nt>xt ;
+?: [']		' postpone literal ; immediate
+
+?: VALUE	create , does> @ ;
+?: DEFER	create 0 , does> @ execute ;
+?: TO		state @ if postpone ['] postpone >body postpone ! else ' >body ! then ; immediate
+?: IS		state @ if postpone to else ['] to execute then ; immediate 
+
 \ -- Stack shuffling --------------------------------------
 
 \ The only required primitives for stack shuffling are:
@@ -59,43 +75,22 @@
 ?: 2DROP	drop drop ;
 ?: 2DUP		over over ;
 ?: 2OVER	3 pick 3 pick ;
+
 ?: 2SWAP	>r -rot r> -rot ;
 
 ?: 2>R		]] swap >r >r [[ ; immediate
 ?: 2R@		]] r> r> swap 2dup swap >r >r [[ ; immediate
 ?: 2R>		]] r> r> swap [[ ; immediate
 
-\ -- Execution --------------------------------------------
-
-?: LITERAL	postpone LIT , ; immediate
-
-?: VARIABLE	create 0 , ;
-?: CONSTANT	create , does> @ ;
-
 \ -- Parsing ----------------------------------------------
 
 ?: CHAR		parse-name drop c@ ;
 ?: [CHAR]	char postpone literal ; immediate
 
-\ Parse (advance input) to next )
+\ Parse (advance input) to next ) -- not multiline --
 ?: (		[char] ) parse 2drop ; immediate
 
 ( Now we can use stack comments too )
-
-\ -- Comparisons ------------------------------------------
-
-?: <= ( x1 x2 -- flag ) > invert ;
-?: >= ( x1 x2 -- flag ) < invert ;
-?: 0= ( x -- flag ) if 0 else 0 invert then ;
-?: 0< ( x -- flag ) 0 < ;
-?: 0> ( x -- flag ) 0 > ;
-?: 0<> ( x -- flag ) 0= 0= ;
-?: NOT ( x1 -- x2 ) 0= ;
-?: = ( x1 x2 -- flag ) - 0= ;
-?: <> ( x1 x2 -- flag ) = invert ;
-?: U< ( u1 u2 -- flag ) 2dup xor 0< if swap drop 0< else - 0< then ;
-?: U> ( u1 u2 -- flag ) swap u< ;
-?: WITHIN ( n1 | u1	n2 | u2 n3 | u3 -- flag ) over - >r - r> u< ; 
 
 \ -- Arithmetic -------------------------------------------
 
@@ -111,14 +106,35 @@
 
 ?: 2* ( n1 -- n2 ) 2 * ;
 
-?: ABS ( n -- u ) dup 0< if invert 1+ then ;
+\ -- Bit\Logic --------------------------------------------
+
+?: NEGATE ( n1 -- n2 ) invert 1+ ;
+
+?: OR ( x1 x2 -- x3 ) invert swap invert and invert ;
+?: XOR ( x1 x2 -- x3 ) over over invert and >r swap invert and r> or ;
+
+\ -- Comparisons ------------------------------------------
+
+?: < ( n1 n2 -- flag ) 2dup xor 0< if drop 0< else - 0< then ;
+?: > ( n1 n2 -- flag ) swap < ;
+?: <= ( x1 x2 -- flag ) > invert ;
+?: >= ( x1 x2 -- flag ) < invert ;
+?: 0= ( x -- flag ) if 0 else 0 invert then ;
+\ ?: 0< ( x -- flag ) 0 < ; \ This has to be a primitive...
+?: 0> ( x -- flag ) 0 > ;
+?: 0<> ( x -- flag ) 0= 0= ;
+?: NOT ( x1 -- x2 ) 0= ;
+?: = ( x1 x2 -- flag ) - 0= ;
+?: <> ( x1 x2 -- flag ) = invert ;
+?: U< ( u1 u2 -- flag ) 2dup xor 0< if swap drop 0< else - 0< then ;
+?: U> ( u1 u2 -- flag ) swap u< ;
+?: WITHIN ( n1 | u1	n2 | u2 n3 | u3 -- flag ) over - >r - r> u< ; 
 
 ?: MIN ( n1 n2 -- n3 ) 2dup swap < if swap then drop ;
 ?: MAX ( n1 n2 -- n3 ) 2dup < if swap then drop ;
 
-\ -- Bit\Logic --------------------------------------------
-
-?: NEGATE ( n1 -- n2 ) invert 1+ ;
+\ ABS is not comparison but I need 0< defined ...
+?: ABS ( n -- u ) dup 0< if invert 1+ then ;
 
 \ -- Memory -----------------------------------------------
 
@@ -162,9 +178,6 @@
 ?: NT>XT+FLAG	dup if dup nt>xt swap immediate? if 1 else -1 then then ;
 ?: SEARCH-WORDLIST	find-name-in nt>xt+flag ;
 
-?: ' ( "<spaces>name" -- xt ) parse-name find-name nt>xt ;
-?: ['] ( C: "<spaces>name" -- ) ( -- xt ) ' postpone literal ; immediate
-
 \ -- Conditional compilation ------------------------------
 
 ?: [DEFINED]	parse-name find-name 0<> ;
@@ -201,18 +214,7 @@ set-current
 [UNDEFINED] TRUE [IF] 0 invert constant TRUE [THEN]
 [UNDEFINED] FALSE [IF] 0 constant FALSE [THEN]
 
-\ -- Forth Words needed to pass test suite ----------------
-
-\ -- Setting BASE independent of current BASE setting --
-\ ( as seen on https://forth-standard.org/standard/core/HEX#reply-816 )
-
-base @ \ remember current BASE value
-1 2* base !	\ get to binary
-?: DECIMAL	1010 base ! ;
-?: HEX		10000 base ! ;
-base ! \ restore previous base
-
-\ -- Double numbers --
+\ -- Double numbers ---------------------------------------
 
 ?: S>D ( n -- d ) dup 0< ;
 
@@ -225,9 +227,9 @@ base ! \ restore previous base
 ?: UD/MOD	>r 0 r@ um/mod r> swap >r um/mod r> ;
 
 [UNDEFINED] FM/MOD [IF]
-\ Divide d1 by n1, giving the floored quotient n3 and the remainder n2.
-\ Adapted from hForth
-\ Taken from Swapforth
+\ Divide d1 by n1, giving the floored quotient n3 and the 
+\ remainder n2.
+\ Taken from Swapforth (Adapted from hForth)
 : FM/MOD \ ( d1 n1 -- n2 n3 )
     dup >r 2dup xor >r
     >r dabs r@ abs
@@ -248,7 +250,8 @@ base ! \ restore previous base
 ?: SGN ( u1 n1 -- n2 ) 0< if negate then ;
 
 [UNDEFINED] SM/REM [IF]
-\ Divide d1 by n1, giving the symmetric quotient n3 and the remainder n2.
+\ Divide d1 by n1, giving the symmetric quotient n3 and the 
+\ remainder n2.
 \ Taken from SwapForth
 : SM/REM \ ( d1 n1 -- n2 n3 )
     2dup xor >r     \ combined sign, for quotient
@@ -259,6 +262,81 @@ base ! \ restore previous base
     swap r> sgn     \ apply to quotient
 ;
 [THEN]
+
+\ -- Numeric output (taken from SwapForth?) ---------------
+
+variable HLD
+create <HOLD 100 chars dup allot <hold + constant HOLD>
+
+?: <# ( -- ) hold> hld ! ;
+?: HOLD ( char -- ) hld @ char- dup hld ! c! ;
+?: # ( d1 -- d2 ) base @ ud/mod rot 9 over < if 7 + then 48 + hold ;
+?: #S ( d1 -- d2 ) begin # over over or 0= until ;
+?: #> ( d -- c-addr u ) drop drop hld @ hold> over - 1 chars / ;
+
+?: SIGN		0 < if 45 hold then ;
+
+?: UD.R ( d n -- ) >r <# #s #> r> over - spaces type ;
+?: UD.		0 ud.r space ;
+?: U.R		0 swap ud.r ;
+?: U. ( u -- ) 0 ud. ;
+?: D.R ( d n -- ) >r swap over dabs <# #s rot sign #> r> over - spaces type ;
+?: D.		0 d.r space ;
+?: .R		>r dup 0 < r> d.r ;
+?: .			dup 0 < d. ;
+
+?: ? ( addr -- ) @ . ;
+
+
+
+\ \ -- Recognizers ------------------------------------------
+\ 
+\ \ Reference implementation taken from:
+\ \ https://forth-standard.org/proposals/minimalistic-core-api-for-recognizers#reply-515
+\ 
+\ defer forth-recognize ( addr u -- i*x translator-xt / notfound )
+\ : interpret ( i*x -- j*x )
+\   BEGIN
+\       ?stack parse-name dup  WHILE
+\       forth-recognize execute
+\   REPEAT ;
+\ 
+\ : lit,  ( n -- )  postpone literal ;
+\ : notfound ( state -- ) -13 throw ;
+\ : translate: ( xt-interpret xt-compile xt-postpone "name" -- )
+\   create , , ,
+\   does> state @ 2 + cells + @ execute ;
+\ :noname name>interpret execute ;
+\ :noname name>compile execute ;
+\ :noname name>compile swap lit, compile, ;
+\ translate: translate-nt ( nt -- )
+\ ' noop
+\ ' lit,
+\ :noname lit, postpone lit, ;
+\ translate: translate-num ( n -- )
+\ 
+\ : rec-nt ( addr u -- nt nt-translator / notfound )
+\   forth-wordlist find-name-in dup IF  ['] translate-nt  ELSE  drop ['] notfound  THEN ;
+\ : rec-num ( addr u -- n num-translator / notfound )
+\   0. 2swap >number 0= IF  2drop ['] translate-num  ELSE  2drop drop ['] notfound  THEN ;
+\ 
+\ : minimal-recognize ( addr u -- nt nt-translator / n num-translator / notfound )
+\   2>r 2r@ rec-nt dup ['] notfound = IF  drop 2r@ rec-num  THEN  2rdrop ;
+\ 
+\ ' minimal-recognizer is forth-recognize
+
+
+
+\ -- Forth Words needed to pass test suite ----------------
+
+\ -- Setting BASE independent of current BASE setting --
+\ ( as seen on https://forth-standard.org/standard/core/HEX#reply-816 )
+
+base @ \ remember current BASE value
+1 2* base !	\ get to binary
+?: DECIMAL	1010 base ! ;
+?: HEX		10000 base ! ;
+base ! \ restore previous base
 
 \ Return stack manipulation
 
@@ -344,40 +422,7 @@ variable wlen
 
 ?: FIND			dup count find-name nt>xt+flag dup if rot drop then ;
 
-\ -- Numeric output -- (taken from SwapForth?)
-
-variable HLD
-create <HOLD 100 chars dup allot <hold + constant HOLD>
-
-: <# ( -- ) hold> hld ! ;
-: HOLD ( char -- ) hld @ char- dup hld ! c! ;
-: # ( d1 -- d2 ) base @ ud/mod rot 9 over < if 7 + then 48 + hold ;
-: #S ( d1 -- d2 ) begin # over over or 0= until ;
-: #> ( d -- c-addr u ) drop drop hld @ hold> over - 1 chars / ;
-
-: SIGN		0 < if 45 hold then ;
-
-: UD.R ( d n -- ) >r <# #s #> r> over - spaces type ;
-: UD.		0 ud.r space ;
-: U.R		0 swap ud.r ;
-: U. ( u -- ) 0 ud. ;
-: D.R ( d n -- ) >r swap over dabs <# #s rot sign #> r> over - spaces type ;
-: D.		0 d.r space ;
-: .R		>r dup 0 < r> d.r ;
-: .			dup 0 < d. ;
-
-: ? ( addr -- ) @ . ;
-
-\ [UNDEFINED] ASCII [IF]
-\ \ ASCII taken from pForth
-\ : ASCII ( <char> -- char , state smart )
-\         bl parse drop c@
-\         state @
-\         \ IF [compile] literal \ This was changed as I don't have [compile] in SLOTH
-\ 		IF postpone literal
-\         THEN
-\ ; immediate
-\ [THEN]
+\ -- Number conversion --
 
 [UNDEFINED] DIGIT [IF]
 \ DIGIT Taken from pFORTH
