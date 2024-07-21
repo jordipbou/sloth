@@ -543,6 +543,21 @@ public class Sloth {
 		colon("SET-CURRENT", (vm) -> { current = pop(); });
 		colon("GET-CURRENT", (vm) -> push(current));
 
+		colon("'", (vm) -> {
+			parse_name();
+			find_name();
+			int nt = pop();
+			if (!has_flag(nt, COLON)) push(dt(nt));
+			if (xt(nt) != 0) push(xt(nt));
+		});
+		colon("[']", (vm) -> {
+			parse_name();
+			find_name();
+			int nt = pop();
+			if (!has_flag(nt, COLON)) literal(dt(nt));
+			if (xt(nt) != 0) compile(xt(nt));
+		});
+
 		colon("NT>XT", (vm) -> push(xt(pop())));
 		colon("IMMEDIATE?", (vm) -> push(has_flag(pop(), IMMEDIATE) ? -1 : 0));
 		colon(">BODY", (vm) -> push(dt(find_xt(pop()))));

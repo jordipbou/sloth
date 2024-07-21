@@ -52,8 +52,12 @@
 ?: VARIABLE	create 0 , ;
 ?: CONSTANT	create , does> @ ;
 
-?: '		parse-name find-name nt>xt ;
-?: [']		' postpone literal ; immediate
+\ I have a problem here I have not previously found.
+\ I can't tick deferred words or created words and then
+\ execute them. That's a big problem.
+
+\ ?: '		parse-name find-name nt>xt ;
+\ ?: [']		' postpone literal ; immediate
 
 ?: VALUE	create , does> @ ;
 ?: DEFER	create 0 , does> @ execute ;
@@ -186,7 +190,8 @@
 \ Implementation of [IF] [ELSE] [THEN] by ruv, as seen in:
 \ https://forth-standard.org/standard/tools/BracketELSE
  
-wordlist dup constant BRACKET-FLOW-WL get-current swap set-current
+wordlist dup constant BRACKET-FLOW-WL 
+get-current swap set-current
 : [IF]			1+ ;
 : [ELSE]		dup 1 = if 1- then ;
 : [THEN]		1- ;
@@ -289,12 +294,36 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 
 
 
+
+
+
+\ \ -- Stacks -----------------------------------------------
+\ 
+\ \ Taken from:
+\ \ https://forth-standard.org/proposals/minimalistic-core-api-for-recognizers#reply-515
+\ 
+\ : STACK: ( size "name" -- ) create 0 , cells allot ;
+\ 
+\ : SET-STACK ( item-n .. item-1 n stack-id -- )
+\   2dup ! cell+ swap cells bounds
+\   ?do i ! cell +loop 
+\ ;
+\ 
+\ : GET-STACK ( stack-id -- item-n .. item-1 n )
+\   dup @ >R R@ CELLS + R@ BEGIN
+\     ?DUP
+\   WHILE
+\     1- OVER @ ROT CELL - ROT
+\   REPEAT
+\   DROP R> ;
+
 \ \ -- Recognizers ------------------------------------------
 \ 
 \ \ Reference implementation taken from:
 \ \ https://forth-standard.org/proposals/minimalistic-core-api-for-recognizers#reply-515
 \ 
 \ defer forth-recognize ( addr u -- i*x translator-xt / notfound )
+\
 \ : interpret ( i*x -- j*x )
 \   BEGIN
 \       ?stack parse-name dup  WHILE
@@ -325,6 +354,11 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 \ 
 \ ' minimal-recognizer is forth-recognize
 
+\ \ -- Recognizers extensions -------------------------------
+\ 
+\ : set-forth-recognize ( xt -- ) is forth-recognize ;
+\ 
+\ : forth-recognizer ( -- xt ) action-of forth-recognize ;
 
 
 \ -- Forth Words needed to pass test suite ----------------
