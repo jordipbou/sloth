@@ -234,9 +234,8 @@ public class Sloth {
 	int ORDER = 0;
 
 	public static char HIDDEN = 1;
-	public static char COLON = 2;
-	public static char IMMEDIATE = 4;
-	public static char INSTANTANEOUS = 8;
+	public static char IMMEDIATE = 2;
+	public static char INSTANTANEOUS = 4;
 
 	public void comma(int v) { store(here(), v); allot(CELL); }
 	public void ccomma(char v) { cstore(here(), v); allot(CHAR); }
@@ -248,30 +247,25 @@ public class Sloth {
 	public int xt(int w) { if (w != 0) return fetch(w + CELL); else return 0; }
 	public void xt(int w, int v) { store(w + CELL, v); }
 
-	public int dt(int w) { if (w != 0) return fetch(w + CELL + CELL); else return 0; }
-	public void dt(int w, int v) { store(w + CELL + CELL, v); }
+	public int get_wl(int w) { return fetch(w + 2*CELL); }
+	public void set_wl(int w, int v) { store(w + 2*CELL, v); }
 
-	public int get_wl(int w) { return fetch(w + CELL + CELL + CELL); }
-	public void set_wl(int w, int v) { store(w + CELL + CELL + CELL, v); }
-
-	public char flags(int w) { return cfetch(w + CELL + CELL + CELL + CELL); }
-	public void flags(int w, char v) { cstore(w + CELL + CELL + CELL + CELL, v); }
+	public char flags(int w) { return cfetch(w + 3*CELL); }
+	public void flags(int w, char v) { cstore(w + 3*CELL, v); }
 	public void set_flag(int w, char v) { flags(w, (char)(flags(w) | v)); }
 	public void unset_flag(int w, char v) { flags(w, (char)(flags(w) & ~v)); }
 	public boolean has_flag(int w, char v) { return (flags(w) & v) == v; }
 
-	public void set_colon() { set_flag(latest, COLON); }
 	public void set_immediate() { set_flag(latest, IMMEDIATE); }
 	public void set_instantaneous() { set_flag(latest, INSTANTANEOUS); }
 
-	public char namelen(int w) { return cfetch(w + CELL + CELL + CELL + CELL + CHAR); }
-	public int name(int w) { return w + CELL + CELL + CELL + CELL + CHAR + CHAR; }
+	public char namelen(int w) { return cfetch(w + 3*CELL + CHAR); }
+	public int name(int w) { return w + 3*CELL + 2*CHAR; }
 
 	public void start_header() {
 		align();
-		int w = here();	comma(latest); latest = w;	// LINK (and NT address)
+		int nt = here(); comma(latest); latest = nt;	// LINK (and NT address)
 		comma(0);																		// XT
-		comma(0);																		// DT
 		comma(current);															// WORDLIST
 		ccomma((char)0);														// Flags
 	}
@@ -294,10 +288,11 @@ public class Sloth {
 
 	public void end_header() {
 		align();
-		dt(latest, here());
+		xt(latest, here());
 	}
 
 	public void header(String s) { start_header(); header_name(s); end_header(); }
+
 	public void header() { start_header(); header_name(); end_header(); }
 
 	// -- Finding words --
@@ -362,7 +357,15 @@ public class Sloth {
 
 	// This helper function will create a named variable in the Forth environemnt.
 
-	public int variable(String s) { header(s); allot(CELL); return dt(latest); }
+	// public int variable(String s) { header(s); allot(CELL); return dt(latest); }
+	public int variable(String s) {
+		header(s);
+		literal(xt(latest) + 4*CELL);
+		compile(EXIT);
+		compile(EXIT);
+		comma(0);
+		return here() - CELL;
+	}
 
 	// The next function helps with the creation of colon definitions from Java
 	// code.
@@ -375,7 +378,7 @@ public class Sloth {
 		header(s);
 		xt(latest, xt);
 		latestxt = xt;
-		set_colon();
+		// set_colon();
 		return xt;
 	}
 
@@ -484,7 +487,7 @@ public class Sloth {
 		colon("EXECUTE", (vm) -> eval(pop()));
 		colon("RECURSE", (vm) -> compile(xt(latest))); set_immediate();
 		colon("CREATE", (vm) -> create());
-		DOES = noname((vm) -> xt(latest, pop()));
+		DOES = noname((vm) -> store(xt(latest) + 2*CELL, pop()));
 		colon("DOES>", (vm) -> does()); set_immediate(); 
 		colon("[", (vm) -> store(STATE, 0)); set_immediate();
 		colon("]", (vm) -> store(STATE, 1));
@@ -547,20 +550,18 @@ public class Sloth {
 			parse_name();
 			find_name();
 			int nt = pop();
-			if (!has_flag(nt, COLON)) push(dt(nt));
-			if (xt(nt) != 0) push(xt(nt));
+			push(xt(nt));
 		});
 		colon("[']", (vm) -> {
 			parse_name();
 			find_name();
 			int nt = pop();
-			if (!has_flag(nt, COLON)) literal(dt(nt));
-			if (xt(nt) != 0) compile(xt(nt));
-		});
+			literal(xt(nt));
+		}); set_immediate();
 
 		colon("NT>XT", (vm) -> push(xt(pop())));
 		colon("IMMEDIATE?", (vm) -> push(has_flag(pop(), IMMEDIATE) ? -1 : 0));
-		colon(">BODY", (vm) -> push(dt(find_xt(pop()))));
+		colon(">BODY", (vm) -> push(pop() + 4*CELL));
 
 		// -- Combinators --
 		colon("CHOOSE", (vm) -> choose());
@@ -630,15 +631,23 @@ public class Sloth {
 
 	public void literal(int v) { comma(LIT); comma(v); }
 
-	public void create() { parse_name(); header(); }
+	public void create() { // parse_name(); header(); }
+		parse_name();
+		header();
+		literal(here() + 4*CELL);
+		// Two exits are compiled to ensure the second one is used when
+		// patching the first one with DOES>
+		compile(EXIT);
+		compile(EXIT);
+	}
 	public void does() { literal(here() + 16); compile(DOES); compile(EXIT); }
 
 	public void colon() { 
 		parse_name();
 		header(); 
-		xt(latest, dt(latest));
+		// xt(latest, dt(latest));
 		latestxt = xt(latest);
-		set_flag(latest, COLON);
+		// set_flag(latest, COLON);
 		set_flag(latest, HIDDEN);
 		store(STATE, 1);
 		level = 1;
@@ -850,13 +859,9 @@ public class Sloth {
  				if (fetch(STATE) == 0
 				|| (fetch(STATE) == 1 && has_flag(w, IMMEDIATE)) 
 				|| (fetch(STATE) == 2 && has_flag(w, INSTANTANEOUS))) {
-					// TODO This should be something like name>interpret
- 					if (!has_flag(w, COLON)) push(dt(w));
- 					if (xt(w) != 0) eval(xt(w));
+					eval(xt(w));
  				} else {
-					// TODO This should be something like name>compile
- 					if (!has_flag(w, COLON)) literal(dt(w));
- 					if (xt(w) != 0) compile(xt(w));
+					compile(xt(w));
  				}
 			} else {
 				// TODO Move this to >number ?
