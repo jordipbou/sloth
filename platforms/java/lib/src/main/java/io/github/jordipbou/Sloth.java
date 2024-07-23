@@ -53,8 +53,8 @@ public class Sloth {
 
 	// Push/pop variants (double and unsigned numbers)
 	public void dpush(long v) { push(v); push(v >> 32); }
-	public long dpop() { long b = lpop(); return msp(b << 32) + lsp(lpop()); }
-	public long lpop() { return (long)s[--sp]; }
+	public long dpop() { long b = xpop(); return msp(b << 32) + lsp(xpop()); }
+	public long xpop() { return (long)s[--sp]; }
 	public long upop() { return Integer.toUnsignedLong(s[--sp]); }
 	public long udpop() { long b = upop(); return msp(b << 32) + lsp(upop()); }
 
@@ -76,17 +76,16 @@ public class Sloth {
 	public void from_r() { push(rpop()); }
 	public void to_r() { rpush(pop()); }
 
-	// TODO Correct lpop name conflict or check if locals stack is needed here
-	// // -- Locals stack ----------------------------------------------------------
+	// -- Locals stack ----------------------------------------------------------
 
-	// int l[];
-	// int lp;
+	int l[];
+	int lp;
 
-	// public void lpush(int v) { l[lp++] = v; }
-	// public int lpop() { return l[--lp]; }
+	public void lpush(int v) { l[lp++] = v; }
+	public int lpop() { return l[--lp]; }
 
-	// public void lplace(int a, int v) { l[lp - a - 1] = v; }
-	// public int lpick(int a) { return l[lp - a - 1]; }
+	public void lplace(int a, int v) { l[lp - a - 1] = v; }
+	public int lpick(int a) { return l[lp - a - 1]; }
 
 	// -- Floating point stack --------------------------------------------------
 
@@ -456,7 +455,7 @@ public class Sloth {
 		// colon("*", (vm) -> { int a = pop(); int b = pop(); push(b * a); });
 		// colon("/", (vm) -> { int a = pop(); int b = pop(); push(b / a); });
 		// colon("MOD", (vm) -> { int a = pop(); int b = pop(); push(b % a); });
-		colon("*/MOD", (vm) -> { long n = lpop(); long d = lpop() * lpop(); push(d % n); push(d / n); });
+		colon("*/MOD", (vm) -> { long n = xpop(); long d = xpop() * xpop(); push(d % n); push(d / n); });
 		colon("UM*", (vm) -> { long r = upop() * upop(); dpush(r); });
 		colon("UM/MOD", (vm) -> { long u = upop(); long d = dpop(); push(Long.remainderUnsigned(d, u)); push(Long.divideUnsigned(d, u)); });
 
@@ -484,7 +483,7 @@ public class Sloth {
 	 	colon(":NONAME", (vm) -> { push(here()); latestxt = here(); store(STATE, 1); });
 		colon("[:", (vm) -> start_quotation()); set_immediate();
 		colon(";]", (vm) -> end_quotation()); set_immediate();
-		colon("EXECUTE", (vm) -> eval(pop()));
+		EXECUTE = colon("EXECUTE", (vm) -> eval(pop()));
 		colon("RECURSE", (vm) -> compile(xt(latest))); set_immediate();
 		colon("CREATE", (vm) -> create());
 		DOES = noname((vm) -> store(xt(latest) + 2*CELL, pop()));
@@ -559,7 +558,22 @@ public class Sloth {
 			literal(xt(nt));
 		}); set_immediate();
 
-		colon("NT>XT", (vm) -> push(xt(pop())));
+		colon("NAME>INTERPRET", (vm) -> push(xt(pop())));
+		colon("NAME>COMPILE", (vm) -> {
+			int nt = pop();
+			if (nt == 0) {
+				push(NOOP);
+			} else {
+				if (has_flag(nt, IMMEDIATE)) {
+					push(nt);
+					push(EXECUTE);
+				} else {
+					push(nt);
+					push(COMPILE);
+				}
+				// TODO: What should happen if it has instantaneous flag ?
+			}
+		});
 		colon("IMMEDIATE?", (vm) -> push(has_flag(pop(), IMMEDIATE) ? -1 : 0));
 		colon(">BODY", (vm) -> push(pop() + 4*CELL));
 
@@ -599,6 +613,7 @@ public class Sloth {
 	int zBRANCH; 
 	int DOES;
 	int COMPILE;
+	int EXECUTE;
 	int STATE;
 
 	// -- Quotations and definitions --
@@ -1013,7 +1028,7 @@ public class Sloth {
 
 	public void trace(int l) {
 		if (l <= tr) {
-			System.out.printf("L:%d TR:%d %d:%d {%d} <%d> ", l, tr, mp, tp, fetch(STATE), sp);
+			System.out.printf("%d:%d {%d} <%d> ", mp, tp, fetch(STATE), sp);
 			for (int i = 0; i < sp; i++) System.out.printf("%d ", s[i]);
 			if (ip >= 0) 
 				System.out.printf(": [%d] %d ", ip, ip > 0 ? fetch(ip) : 0);

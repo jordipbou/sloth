@@ -56,8 +56,8 @@
 \ I can't tick deferred words or created words and then
 \ execute them. That's a big problem.
 
-\ ?: '		parse-name find-name nt>xt ;
-\ ?: [']		' postpone literal ; immediate
+\ ?: '		parse-name find-name name>interpret ;
+\ ?: [']	' postpone literal ; immediate
 
 ?: VALUE	create , does> @ ;
 ?: DEFER	create 0 , does> @ execute ;
@@ -110,6 +110,8 @@
 
 ?: 2* ( n1 -- n2 ) 2 * ;
 
+?: ABS ( n -- u ) dup 0< if invert 1+ then ;
+
 \ -- Bit\Logic --------------------------------------------
 
 ?: NEGATE ( n1 -- n2 ) invert 1+ ;
@@ -124,7 +126,6 @@
 ?: <= ( x1 x2 -- flag ) > invert ;
 ?: >= ( x1 x2 -- flag ) < invert ;
 ?: 0= ( x -- flag ) if 0 else 0 invert then ;
-\ ?: 0< ( x -- flag ) 0 < ; \ This has to be a primitive...
 ?: 0> ( x -- flag ) 0 > ;
 ?: 0<> ( x -- flag ) 0= 0= ;
 ?: NOT ( x1 -- x2 ) 0= ;
@@ -137,10 +138,9 @@
 ?: MIN ( n1 n2 -- n3 ) 2dup swap < if swap then drop ;
 ?: MAX ( n1 n2 -- n3 ) 2dup < if swap then drop ;
 
-\ ABS is not comparison but I need 0< defined ...
-?: ABS ( n -- u ) dup 0< if invert 1+ then ;
-
 \ -- Memory -----------------------------------------------
+
+?: CELL		1 cells ;
 
 ?: CELL+	1 cells + ;
 ?: CHAR+	1 chars + ;
@@ -179,7 +179,7 @@
 
 \ -- Dictionary/Finding names -----------------------------
 
-?: NT>XT+FLAG	dup if dup nt>xt swap immediate? if 1 else -1 then then ;
+?: NT>XT+FLAG	dup if dup name>interpret swap immediate? if 1 else -1 then then ;
 ?: SEARCH-WORDLIST	find-name-in nt>xt+flag ;
 
 \ -- Conditional compilation ------------------------------
@@ -294,28 +294,63 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 
 
 
+\ -- Do/Loop (implemented with combinators) ---------------
+
+\ TODO Implement the combinators in high level Forth itself
+\ TODO Implement DO/LOOP in non-combinator high level way
+
+\ DO/?DO/LOOP/+LOOP is one of the things I don't like about the ANS Forth
+\ standard. IF/ELSE/THEN or BEGIN/WHILE/REPEAT have one word that does one
+\ thing. You can mix them and get different results, different constructions,
+\ but the word meaning is clear and easily implemented.
+\ DO/?DO/LOOP/+LOOP is a combination of words with different semantics that
+\ have to work together.
+
+?: DO		postpone lit 1 , postpone [: ; immediate
+?: ?DO		postpone lit 0 , postpone [: ; immediate
+?: LOOP		postpone lit 1 , postpone ;] postpone doloop ; immediate
+?: +LOOP	postpone ;] postpone doloop ; immediate
+
+\ ?: UNLOOP	; \ Unloop is a noop in this implementation
 
 
 
-\ \ -- Stacks -----------------------------------------------
-\ 
-\ \ Taken from:
-\ \ https://forth-standard.org/proposals/minimalistic-core-api-for-recognizers#reply-515
-\ 
-\ : STACK: ( size "name" -- ) create 0 , cells allot ;
-\ 
-\ : SET-STACK ( item-n .. item-1 n stack-id -- )
-\   2dup ! cell+ swap cells bounds
-\   ?do i ! cell +loop 
-\ ;
-\ 
-\ : GET-STACK ( stack-id -- item-n .. item-1 n )
-\   dup @ >R R@ CELLS + R@ BEGIN
-\     ?DUP
-\   WHILE
-\     1- OVER @ ROT CELL - ROT
-\   REPEAT
-\   DROP R> ;
+?: BOUNDS ( c-addr u -- c-addr c-addr ) over + swap ;
+
+
+\ Words needed to implement recognizers and outer interpreters<
+\ rearrange later
+
+
+\ -- Stacks -----------------------------------------------
+
+\ Taken from:
+\ https://forth-standard.org/proposals/minimalistic-core-api-for-recognizers#reply-515
+
+\ TODO Some things must be conditionally compiled in whole,
+\ like a module, as some words will not work if its not the
+\ same implementation
+
+[undefined] STACK: [if]
+: STACK: ( size "name" -- ) create 0 , cells allot ;
+[then]
+
+[undefined] SET-STACK [if]
+: SET-STACK ( item-n .. item-1 n stack-id -- )
+	2dup ! cell+ swap cells bounds
+	?do i ! cell +loop 
+;
+[then]
+
+[undefined] GET-STACK [if]
+: GET-STACK ( stack-id -- item-n .. item-1 n )
+	dup @ >r r@ cells + r@ begin
+		?dup while
+		1- over @ rot cell - rot
+	repeat
+	drop r> 
+;
+[then]
 
 \ \ -- Recognizers ------------------------------------------
 \ 
@@ -323,18 +358,21 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 \ \ https://forth-standard.org/proposals/minimalistic-core-api-for-recognizers#reply-515
 \ 
 \ defer forth-recognize ( addr u -- i*x translator-xt / notfound )
-\
+\ 
 \ : interpret ( i*x -- j*x )
-\   BEGIN
-\       ?stack parse-name dup  WHILE
-\       forth-recognize execute
-\   REPEAT ;
+\ 	begin
+\ 		\ ?stack \ TODO: ?stack is not implemented right now
+\ 		parse-name dup while
+\ 		forth-recognize execute
+\ 	repeat
+\ ;
 \ 
 \ : lit,  ( n -- )  postpone literal ;
 \ : notfound ( state -- ) -13 throw ;
 \ : translate: ( xt-interpret xt-compile xt-postpone "name" -- )
-\   create , , ,
-\   does> state @ 2 + cells + @ execute ;
+\ 	create , , ,
+\ 	does> state @ 2 + cells + @ execute 
+\ ;
 \ :noname name>interpret execute ;
 \ :noname name>compile execute ;
 \ :noname name>compile swap lit, compile, ;
@@ -353,12 +391,14 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 \   2>r 2r@ rec-nt dup ['] notfound = IF  drop 2r@ rec-num  THEN  2rdrop ;
 \ 
 \ ' minimal-recognizer is forth-recognize
-
+\ 
 \ \ -- Recognizers extensions -------------------------------
 \ 
 \ : set-forth-recognize ( xt -- ) is forth-recognize ;
 \ 
 \ : forth-recognizer ( -- xt ) action-of forth-recognize ;
+
+
 
 
 \ -- Forth Words needed to pass test suite ----------------
@@ -404,22 +444,6 @@ base ! \ restore previous base
    drop
 ;
 [THEN]
-
-\ -- Do/Loop --
-
-\ DO/?DO/LOOP/+LOOP is one of the things I don't like about the ANS Forth
-\ standard. IF/ELSE/THEN or BEGIN/WHILE/REPEAT have one word that does one
-\ thing. You can mix them and get different results, different constructions,
-\ but the word meaning is clear and easily implemented.
-\ DO/?DO/LOOP/+LOOP is a combination of words with different semantics that
-\ have to work together.
-
-?: DO		postpone lit 1 , postpone [: ; immediate
-?: ?DO		postpone lit 1 , postpone [: ; immediate
-?: LOOP		postpone lit 1 , postpone ;] postpone doloop ; immediate
-?: +LOOP	postpone ;] postpone doloop ; immediate
-
-\ ?: UNLOOP	; \ Unloop is a noop in this implementation
 
 \ -- Word and counted strings --
 
@@ -523,5 +547,5 @@ variable wlen
 \ -- Testing --
 
 : dotests -1 trace! s" ../../../forth2012-test-suite/src/runtests.fth" included ;
-
+ 
 1 trace!
