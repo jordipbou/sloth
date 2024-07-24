@@ -13,25 +13,27 @@ import java.util.function.Consumer;
 import java.io.FileNotFoundException;
 
 public class Sloth {
-	// --------------------------------------------------------------------------
-	// -- Virtual Machine -------------------------------------------------------
-	// --------------------------------------------------------------------------
+	// ------------------------------------------------------
+	// -- Virtual Machine -----------------------------------
+	// ------------------------------------------------------
 
-	// The virtual machine is a typical two stack Forth machine, but it knows
-	// nothing of the language implemented on top of it. It does not need
-	// bootstrapping and can load an image file and execute directly from it.
+	// The virtual machine is a typical two stack Forth 
+	// machine, but it knows nothing of the language 
+	// implemented on top of it. It can load an image file 
+	// and execute directly from it.
 
-	// -- Debugging -------------------------------------------------------------
+	// -- Debugging -----------------------------------------
 
-	// The tr register is used to set the level of debugging, helpful during
-	// the development of the virtual machine and the bootstrapping of Sloth.
+	// The tr register is used to set the level of debugging, 
+	// helpful during the development of the virtual machine 
+	// and the bootstrapping of Sloth.
 
 	int tr;
 
-	// -- Parameter stack -------------------------------------------------------
+	// -- Parameter stack -----------------------------------
 
-	// The parameter stack is implemented with a Java array. Its size is defined
-	// on the constructor.
+	// The parameter stack is implemented with a Java array. 
+	// Its size is defined on the constructor.
 
 	int s[];
 	int sp;
@@ -40,12 +42,19 @@ public class Sloth {
 	public int pop() { return s[--sp]; }
 
 	public void place(int a, int v) { s[sp - a - 1] = v; }
-	public int pick(int a) { return s[sp - a - 1]; }
 
-	// Helpers to get the most/least significant bits from a long integer, 
-	// used for working with double cell numbers which are a requirement for
-	// ANS Forth (even when not implementing the optional Double-Number word
-	// set!).
+	// This four methods are the only stack shuffling 
+	// primitives required by Sloth.
+	public int pick(int a) { return s[sp - a - 1]; }
+	public void drop() { pop(); }
+	public void over() { push(pick(1)); }
+	public void swap() { int t = pick(0); place(0, pick(1)); place(1, t); }
+
+	// Helpers to get the most/least significant bits from a 
+	// long integer, used for working with double cell 
+	// numbers which are a requirement for ANS Forth (even 
+	// when not implementing the optional Double-Number word
+	// set! as they are required for numeric output).
 	public long msp(long v) { return (v & 0xFFFFFFFF00000000L); }
 	public long lsp(long v) { return (v & 0x00000000FFFFFFFFL); }
 
@@ -58,11 +67,7 @@ public class Sloth {
 	public long upop() { return Integer.toUnsignedLong(s[--sp]); }
 	public long udpop() { long b = upop(); return msp(b << 32) + lsp(upop()); }
 
-	// Swap is a very basic function needed inside Java code to define functions
-	// that interact with the Sloth environment.
-	public void swap() { int t = pick(0); place(0, pick(1)); place(1, t); }
-
-	// -- Address stack ---------------------------------------------------------
+	// -- Address stack -------------------------------------
 
 	int r[];
 	int rp;
@@ -76,7 +81,7 @@ public class Sloth {
 	public void from_r() { push(rpop()); }
 	public void to_r() { rpush(pop()); }
 
-	// -- Locals stack ----------------------------------------------------------
+	// -- Locals stack --------------------------------------
 
 	int l[];
 	int lp;
@@ -87,7 +92,7 @@ public class Sloth {
 	public void lplace(int a, int v) { l[lp - a - 1] = v; }
 	public int lpick(int a) { return l[lp - a - 1]; }
 
-	// -- Floating point stack --------------------------------------------------
+	// -- Floating point stack ------------------------------
 
 	float f[];
 	int fp;
@@ -95,10 +100,14 @@ public class Sloth {
 	public void fpush(float v) { f[fp++] = v; }
 	public float fpop() { return f[--fp]; }
 
-	// -- Objects stack ---------------------------------------------------------
+	// -- Objects stack -------------------------------------
 
-	// Being a Java implementation of Sloth, it needs access to Java objects to
-	// be really useful as an scripting language for Java applications.
+	// Being a Java implementation of Sloth, it needs access 
+	// to Java objects to be really useful as an scripting 
+	// language for Java applications.
+
+	// TODO: Check BlueJ project and jShell to see how they
+	// manage to make Java interactive.
 
 	Object o[];
 	int op;
@@ -106,7 +115,7 @@ public class Sloth {
 	public void opush(Object v) { o[op++] = v; }
 	public Object opop() { return o[--op]; }
 
-	// -- Memory ----------------------------------------------------------------
+	// -- Memory --------------------------------------------
 
 	public int CELL = 4;
 	public int CHAR = 2;
@@ -135,58 +144,82 @@ public class Sloth {
 	public int tallot(int v) { tp -= v; return tp; }
 	public void tfree() { tp = tx; }
 
-	// -- Objects memory --------------------------------------------------------
+	// -- Objects memory ------------------------------------
 
-	// As Java objects can not be stored as an integer (or long), an hashtable
-	// of number->object is created to map memory addresses inside Sloth to
-	// Java objects.
+	// As Java objects can not be stored as an integer 
+	// (or long), a hashtable of number->object is created 
+	// to map memory addresses inside Sloth to Java objects.
+	// When working with Java, performance is not the main
+	// concern as it will work on big processors with big
+	// memory, so this should work ok.
 
 	HashMap<Integer, Object> om;
 
 	public Object ofetch(int a) { return om.get(a); }
 	public void ostore(int a, Object v) { om.put(a, v); }
 
-	// -- Inner interpreter -----------------------------------------------------
+	// -- Inner interpreter ---------------------------------
 
 	int ip;
 
 	ArrayList<Consumer<Sloth>> primitives;
 
-	// NONAME adds an anonymous primitive that can be called by its xt (position on primitives list)
-	public int noname(Consumer<Sloth> c) { primitives.add(c); return 0 - primitives.size(); }
+	// NONAME adds an anonymous primitive that can be called 
+	// by its xt (position on primitives list)
+	public int noname(Consumer<Sloth> c) { 
+		primitives.add(c); 
+		return 0 - primitives.size(); 
+	}
 
 	public int opcode() { int v = fetch(ip); ip += CELL; return v; }
 	public void do_prim(int p) { primitives.get(-1 - p).accept(this); }
-	// TODO: Test tail call optimization, it failed in some cases (related to R> at the end)
-	// and also with DO/LOOP
-	// public boolean tail() { return !(ip >= 0) || fetch(ip) == EXIT; }
-	// public void call(int q) { if (!tail()) rpush(ip); ip = q; }
 	public void call(int q) { rpush(ip); ip = q; }
 
 	public void execute(int q) { if (q < 0) do_prim(q); else call(q); }
 	public void exit() { if (rp > 0) ip = rpop(); else ip = -1; }
 
-	// The interaction between Sloth and Java is complicated, and this has been
-	// designed to allow calling from Sloth to Java primitives and from that
-	// primitives to Sloth code again without breaking anything. To be able to
-	// do that, the inner interpreter only exists to the level of the return
-	// address in which it started. If the return address pointer goes below (by
-	// calling exit) it just returns from the function to Java code again.
-	// This is really helpful to create combinators that call Sloth code from
-	// Java.
-	public void inner() {	int t = rp; while (t <= rp && ip >= 0) { trace(3); execute(opcode()); } }
+	// The interaction between Sloth and Java is complicated, 
+	// and this has been designed to allow calling from 
+	// Sloth to Java primitives and from that primitives to 
+	// Sloth code again without breaking anything. 
+	// To be able to do that, the inner interpreter only 
+	// exits to the level of the return address in which it 
+	//started. If the return address pointer goes below (by
+	// calling exit) it just returns from the function to 
+	// Java code again.
+	// This is really helpful to create combinators that call 
+	// Sloth code from Java.
+	public void inner() {	
+		int t = rp; 
+		while (t <= rp && ip >= 0) { 
+			trace(3); 
+			execute(opcode()); 
+		} 
+	}
 
 	// Eval allows calling Sloth code from Java.
-	// When calling a Sloth word from Java, inner interpreter has to be started to continue
-	// executing all the opcodes that form that word but, if executing a primitive and the
-	// inner interpreter is called when the return stack is not empty it will continue
-	// executing the next opcode, and that will be an error.
-	public void eval(int q) { execute(q); if (q >= 0) inner(); }
+	// When calling a Sloth word from Java, inner interpreter 
+	// has to be started to continue executing all the 
+	// opcodes that form that word but, if executing a 
+	// primitive and the inner interpreter is called when the 
+	// return stack is not empty it will continue/ executing 
+	// the next opcode thinking that we are inside a non 
+	// primitive word and that will be an error.
+	public void eval(int q) { 
+		execute(q); 
+		if (q >= 0) inner(); 
+	}
 
-	// -- Exceptions ------------------------------------------------------------
+	// -- Exceptions ----------------------------------------
 
-	// This implementation of Forth exceptions allow its use both in Sloth and
-	// inside Java code.
+	// This implementation of Forth exceptions allow its use 
+	// both in Sloth and inside Java code.
+	// It just reuses the Java exception system and
+	// implements an Sloth exception as a RuntimeException,
+	// not needing to declare it on every method.
+	// If the exception is thrown from Java with _throw or
+	// from inside Sloth with throw, it will just bubble up
+	// until a _catch/catch its found.
 
 	public class SlothException extends RuntimeException {
 		public int v;
@@ -194,7 +227,11 @@ public class Sloth {
 		public SlothException(int v) { this.v = v; }
 	}
 
-	public void _throw(int v) { if (v != 0) { throw new SlothException(v); } }
+	public void _throw(int v) { 
+		if (v != 0)
+			throw new SlothException(v); 
+	}
+
 	public void _catch(int q) {
 		int tsp = sp;
 		int trp = rp;
@@ -206,6 +243,10 @@ public class Sloth {
 			rp = trp;
 			push(x.v);
 		} catch(Exception e) {
+			// Here we catch every possible exception (not just
+			// the SlothExceptions) to not break the interactive
+			// environment. Its up to the user to decide if the
+			// exception is severe enough to restart the system.
 			e.printStackTrace();
 			sp = tsp;
 			rp = trp;
@@ -213,27 +254,41 @@ public class Sloth {
 		}
 	}
 
-	// -- Save/load image -------------------------------------------------------
+	// -- Save/load image -----------------------------------
 
-	// TODO Useful to create turnkey applications ?
+	// Useful to create turnkey applications, and to
+	// test new implementations without needing the bootstrap
+	// part.
 
-	// --------------------------------------------------------------------------
-	// -- Dictionary ------------------------------------------------------------
-	// --------------------------------------------------------------------------
+	// TODO: Not implemented yet.
 
-	// This dictionary implementation does not need to know how the virtual
-	// machine works, it just needs access to fetch/store/cfetch/cstore/here/allot
-	// to work on the memory of the virtual machine.
+	// ------------------------------------------------------
+	// -- Symbol table / Dictionary -------------------------
+	// ------------------------------------------------------
+
+	// This dictionary implementation does not need to know 
+	// how the virtual machine works, it just needs access to 
+	// fetch/store/cfetch/cstore/here/allot to work on the 
+	// memory of the virtual machine.
 
 	int current = 1, latest = 0, latestxt = 0, latestwid = 1;
 
-	// ORDER is the xt of an executable order (its executed to search one
-	// or more wordlists). Just by modifying it from SLOTH its possible to reuse
-	// the find function in Java without having to implement a search order.
+	// ORDER is the xt of the default executable search order 
+	// (its executed to search one or more wordlists). 
+	// Just by modifying it from SLOTH its possible to reuse
+	// the find function in Java without having to implement 
+	// a search order.
+
+	// TODO: I'm not totally sure this is needed, as the
+	// search order will be implemented with deferred words
+	// and finding should be reimplemented in Sloth anyway 
+	// the less dependency with Java variables the best.
 	int ORDER = 0;
 
 	public static char HIDDEN = 1;
 	public static char IMMEDIATE = 2;
+	// Instantaneous flag allow use of ]] [[ without a
+	// complicated implementation.
 	public static char INSTANTANEOUS = 4;
 
 	public void comma(int v) { store(here(), v); allot(CELL); }
@@ -876,6 +931,8 @@ public class Sloth {
 				|| (fetch(STATE) == 2 && has_flag(w, INSTANTANEOUS))) {
 					eval(xt(w));
  				} else {
+					// If state is 2 it should be postponed, not just
+					// compiled !!
 					compile(xt(w));
  				}
 			} else {

@@ -82,7 +82,10 @@
 
 ?: 2SWAP	>r -rot r> -rot ;
 
-?: 2>R		]] swap >r >r [[ ; immediate
+\ TODO: This not working as ]] ... [[ means that those
+\ two words are not working properly
+\ ?: 2>R		]] swap >r >r [[ ; immediate
+?: 2>R		postpone swap postpone >r postpone >r ; immediate
 ?: 2R@		]] r> r> swap 2dup swap >r >r [[ ; immediate
 ?: 2R>		]] r> r> swap [[ ; immediate
 
@@ -313,6 +316,70 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 
 \ ?: UNLOOP	; \ Unloop is a noop in this implementation
 
+\ -- Number conversion --
+
+[undefined] DIGIT [if]
+\ DIGIT Taken from pFORTH
+\ Convert a single character to a number in the given base.
+: DIGIT   ( char base -- n true | char false )
+    >r
+\ convert lower to upper
+    dup [char] a < not
+    if
+        [char] a - [char] A +
+    then
+
+    dup dup [char] A 1- >
+    if [char] A - [char] 9 + 1+
+    else ( char char )
+        dup [char] 9 >
+        if
+            ( between 9 and A is bad )
+            drop 0 ( trigger error below )
+        then
+    then
+    [char] 0 -
+    dup r> <
+    if dup 1+ 0>
+        if nip true
+        else drop false
+        then
+    else drop false
+    then
+;
+[then]
+
+[undefined] >NUMBER [if]
+\ >NUMBER taken from pForth
+: >NUMBER ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 , convert till bad char , CORE )
+    >r
+    begin
+        r@ 0>    \ any characters left?
+        if
+            dup c@ base @
+            digit ( ud1 c-addr , n true | char false )
+            if
+                true
+            else
+                drop false
+            then
+        else
+            false
+        then
+    while ( -- ud1 c-addr n  )
+        swap >r  ( -- ud1lo ud1hi n  )
+        swap  base @ ( -- ud1lo n ud1hi base  )
+        um* drop ( -- ud1lo n ud1hi*baselo  )
+        rot  base @ ( -- n ud1hi*baselo ud1lo base )
+        um* ( -- n ud1hi*baselo ud1lo*basello ud1lo*baselhi )
+        d+  ( -- ud2 )
+        r> char+     \ increment char*
+        r> 1- >r  \ decrement count
+    repeat
+    r>
+;
+[then]
+
 
 
 ?: BOUNDS ( c-addr u -- c-addr c-addr ) over + swap ;
@@ -352,51 +419,76 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 ;
 [then]
 
-\ \ -- Recognizers ------------------------------------------
-\ 
-\ \ Reference implementation taken from:
-\ \ https://forth-standard.org/proposals/minimalistic-core-api-for-recognizers#reply-515
-\ 
-\ defer forth-recognize ( addr u -- i*x translator-xt / notfound )
-\ 
-\ : interpret ( i*x -- j*x )
-\ 	begin
-\ 		\ ?stack \ TODO: ?stack is not implemented right now
-\ 		parse-name dup while
-\ 		forth-recognize execute
-\ 	repeat
-\ ;
-\ 
-\ : lit,  ( n -- )  postpone literal ;
-\ : notfound ( state -- ) -13 throw ;
-\ : translate: ( xt-interpret xt-compile xt-postpone "name" -- )
-\ 	create , , ,
-\ 	does> state @ 2 + cells + @ execute 
-\ ;
-\ :noname name>interpret execute ;
-\ :noname name>compile execute ;
-\ :noname name>compile swap lit, compile, ;
-\ translate: translate-nt ( nt -- )
-\ ' noop
-\ ' lit,
-\ :noname lit, postpone lit, ;
-\ translate: translate-num ( n -- )
-\ 
-\ : rec-nt ( addr u -- nt nt-translator / notfound )
-\   forth-wordlist find-name-in dup IF  ['] translate-nt  ELSE  drop ['] notfound  THEN ;
-\ : rec-num ( addr u -- n num-translator / notfound )
-\   0. 2swap >number 0= IF  2drop ['] translate-num  ELSE  2drop drop ['] notfound  THEN ;
-\ 
-\ : minimal-recognize ( addr u -- nt nt-translator / n num-translator / notfound )
-\   2>r 2r@ rec-nt dup ['] notfound = IF  drop 2r@ rec-num  THEN  2rdrop ;
-\ 
-\ ' minimal-recognizer is forth-recognize
-\ 
-\ \ -- Recognizers extensions -------------------------------
-\ 
-\ : set-forth-recognize ( xt -- ) is forth-recognize ;
-\ 
-\ : forth-recognizer ( -- xt ) action-of forth-recognize ;
+\ -- Recognizers ------------------------------------------
+
+\ Reference implementation taken from:
+\ https://forth-standard.org/proposals/minimalistic-core-api-for-recognizers#reply-515
+
+defer forth-recognize ( addr u -- i*x translator-xt / notfound )
+
+: interpret ( i*x -- j*x )
+	begin
+		\ ?stack \ TODO: ?stack is not implemented right now
+		parse-name dup while
+		forth-recognize execute
+	repeat
+;
+
+: lit,  ( n -- )  postpone literal ;
+: notfound ( state -- ) -13 throw ;
+: translate: ( xt-interpret xt-compile xt-postpone "name" -- )
+	create , , ,
+	does> state @ 2 + cells + @ execute 
+;
+:noname name>interpret execute ;
+:noname name>compile execute ;
+:noname name>compile swap lit, compile, ;
+translate: translate-nt ( nt -- )
+' noop
+' lit,
+:noname lit, postpone lit, ;
+translate: translate-num ( n -- )
+
+: rec-nt ( addr u -- nt nt-translator / notfound )
+	1 \ forth-wordlist \ TODO: Still don't have wordlists correctly
+	find-name-in dup if
+		['] translate-nt
+	else
+		drop ['] notfound
+	then
+;
+: rec-num ( addr u -- n num-translator / notfound )
+	0 0 \ 0. \ double number literals are not implemented yet
+	2swap >number 0= if
+		2drop ['] translate-num
+	else
+		2drop drop ['] notfound
+	then
+;
+
+: minimal-recognize ( addr u -- nt nt-translator / n num-translator / notfound )
+	2>r
+	2r@
+	rec-nt
+	dup
+	[']
+	notfound
+	=
+	if
+	drop
+	2r@
+	rec-num
+	then
+	2rdrop
+;
+
+' minimal-recognizer is forth-recognize
+
+\ -- Recognizers extensions -------------------------------
+
+: set-forth-recognize ( xt -- ) is forth-recognize ;
+
+: forth-recognizer ( -- xt ) action-of forth-recognize ;
 
 
 
@@ -479,70 +571,6 @@ variable wlen
 [THEN]
 
 ?: FIND			dup count find-name nt>xt+flag dup if rot drop then ;
-
-\ -- Number conversion --
-
-[UNDEFINED] DIGIT [IF]
-\ DIGIT Taken from pFORTH
-\ Convert a single character to a number in the given base.
-: DIGIT   ( char base -- n true | char false )
-    >r
-\ convert lower to upper
-    dup [char] a < not
-    if
-        [char] a - [char] A +
-    then
-
-    dup dup [char] A 1- >
-    if [char] A - [char] 9 + 1+
-    else ( char char )
-        dup [char] 9 >
-        if
-            ( between 9 and A is bad )
-            drop 0 ( trigger error below )
-        then
-    then
-    [char] 0 -
-    dup r> <
-    if dup 1+ 0>
-        if nip true
-        else drop false
-        then
-    else drop false
-    then
-;
-[THEN]
-
-[UNDEFINED] >NUMBER [IF]
-\ >NUMBER taken from pForth
-: >NUMBER ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 , convert till bad char , CORE )
-    >r
-    begin
-        r@ 0>    \ any characters left?
-        if
-            dup c@ base @
-            digit ( ud1 c-addr , n true | char false )
-            if
-                true
-            else
-                drop false
-            then
-        else
-            false
-        then
-    while ( -- ud1 c-addr n  )
-        swap >r  ( -- ud1lo ud1hi n  )
-        swap  base @ ( -- ud1lo n ud1hi base  )
-        um* drop ( -- ud1lo n ud1hi*baselo  )
-        rot  base @ ( -- n ud1hi*baselo ud1lo base )
-        um* ( -- n ud1hi*baselo ud1lo*basello ud1lo*baselhi )
-        d+  ( -- ud2 )
-        r> char+     \ increment char*
-        r> 1- >r  \ decrement count
-    repeat
-    r>
-;
-[THEN]
 
 \ -- Testing --
 
