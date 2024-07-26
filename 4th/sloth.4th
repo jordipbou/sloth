@@ -47,22 +47,23 @@
 \ Now that we have conditional compilation and basic control
 \ structures, we can implement a lot of fundamental words.
 
-\ -- Variables and constants ------------------------------
+\ -- Variables, constants and defer words -----------------
 
 ?: VARIABLE	create 0 , ;
 ?: CONSTANT	create , does> @ ;
 
-\ I have a problem here I have not previously found.
-\ I can't tick deferred words or created words and then
-\ execute them. That's a big problem.
-
-\ ?: '		parse-name find-name name>interpret ;
-\ ?: [']	' postpone literal ; immediate
+?: '		parse-name find-name name>interpret ;
+?: [']	' postpone literal ; immediate
 
 ?: VALUE	create , does> @ ;
 ?: DEFER	create 0 , does> @ execute ;
 ?: TO		state @ if postpone ['] postpone >body postpone ! else ' >body ! then ; immediate
 ?: IS		state @ if postpone to else ['] to execute then ; immediate 
+
+?: DEFER@	>body @ ;
+?: DEFER!	>body ! ;
+
+?: ACTION-OF state @ if ]] ['] defer@ [[ else ' defer@ then ; immediate
 
 \ -- Stack shuffling --------------------------------------
 
@@ -82,12 +83,11 @@
 
 ?: 2SWAP	>r -rot r> -rot ;
 
-\ TODO: This not working as ]] ... [[ means that those
-\ two words are not working properly
-\ ?: 2>R		]] swap >r >r [[ ; immediate
-?: 2>R		postpone swap postpone >r postpone >r ; immediate
+?: 2>R		]] swap >r >r [[ ; immediate
 ?: 2R@		]] r> r> swap 2dup swap >r >r [[ ; immediate
 ?: 2R>		]] r> r> swap [[ ; immediate
+
+?: 2RDROP	]] r> r> drop drop [[ ; immediate
 
 \ -- Parsing ----------------------------------------------
 
@@ -166,6 +166,8 @@
 
 ?: FILL ( c-addr u char -- ) -rot [: 2dup c! char+ ;] times 2drop ;
 
+?: BOUNDS ( c-addr u -- c-addr c-addr ) over + swap ;
+
 \ -- Input/output -----------------------------------------
 
 ?: BL ( -- char ) 32 ;
@@ -221,6 +223,39 @@ set-current
 
 [UNDEFINED] TRUE [IF] 0 invert constant TRUE [THEN]
 [UNDEFINED] FALSE [IF] 0 constant FALSE [THEN]
+
+\ -- Return stack manipulation of multiple items ----------
+
+[UNDEFINED] N>R [IF]
+\ Reference implementation in ANS Forth document
+: N>R ( xn .. x1 N -- ) ( R: -- x1 .. xn n )
+\ Transfer N items and count to the return stack.
+   dup                        \ xn .. x1 N N --
+   begin
+      dup
+   while
+      rot r> swap >r >r      \ xn .. N N -- ; R: .. x1 --
+      1-                      \ xn .. N 'N -- ; R: .. x1 --
+   repeat
+   drop                       \ N -- ; R: x1 .. xn --
+   r> swap >r >r
+;
+[THEN]
+
+[UNDEFINED] NR> [IF]
+\ Reference implementation in ANS Forth document
+: NR> ( -- xn .. x1 N ) ( R: x1 .. xn N -- )
+\ Pull N items and count off the return stack.
+   r> r> swap >r dup
+   begin
+      dup
+   while
+      r> r> swap >r -rot
+      1-
+   repeat
+   drop
+;
+[THEN]
 
 \ -- Double numbers ---------------------------------------
 
@@ -295,8 +330,6 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 
 ?: ? ( addr -- ) @ . ;
 
-
-
 \ -- Do/Loop (implemented with combinators) ---------------
 
 \ TODO Implement the combinators in high level Forth itself
@@ -314,9 +347,20 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 ?: LOOP		postpone lit 1 , postpone ;] postpone doloop ; immediate
 ?: +LOOP	postpone ;] postpone doloop ; immediate
 
-\ ?: UNLOOP	; \ Unloop is a noop in this implementation
+\ -- Setting BASE independent of current BASE setting --
+\ ( as seen on https://forth-standard.org/standard/core/HEX#reply-816 )
+
+[undefined] BASE [if] variable BASE [then]
+
+base @ \ remember current BASE value
+1 2* base !	\ get to binary
+?: DECIMAL	1010 base ! ;
+?: HEX		10000 base ! ;
+base ! \ restore previous base
 
 \ -- Number conversion --
+
+\ TODO: This number conversion seems to be pretty basic.
 
 [undefined] DIGIT [if]
 \ DIGIT Taken from pFORTH
@@ -380,36 +424,22 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 ;
 [then]
 
-
-
-?: BOUNDS ( c-addr u -- c-addr c-addr ) over + swap ;
-
-
-\ Words needed to implement recognizers and outer interpreters<
-\ rearrange later
-
-
 \ -- Stacks -----------------------------------------------
 
 \ Taken from:
 \ https://forth-standard.org/proposals/minimalistic-core-api-for-recognizers#reply-515
 
-\ TODO Some things must be conditionally compiled in whole,
-\ like a module, as some words will not work if its not the
-\ same implementation
-
-[undefined] STACK: [if]
+[undefined] STACK: 
+[undefined] SET-STACK 
+[undefined] GET-STACK
+and and [if]
 : STACK: ( size "name" -- ) create 0 , cells allot ;
-[then]
 
-[undefined] SET-STACK [if]
 : SET-STACK ( item-n .. item-1 n stack-id -- )
 	2dup ! cell+ swap cells bounds
 	?do i ! cell +loop 
 ;
-[then]
 
-[undefined] GET-STACK [if]
 : GET-STACK ( stack-id -- item-n .. item-1 n )
 	dup @ >r r@ cells + r@ begin
 		?dup while
@@ -421,7 +451,7 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 
 \ -- Recognizers ------------------------------------------
 
-\ Reference implementation taken from:
+\ Minimal reference implementation taken from:
 \ https://forth-standard.org/proposals/minimalistic-core-api-for-recognizers#reply-515
 
 defer forth-recognize ( addr u -- i*x translator-xt / notfound )
@@ -467,22 +497,13 @@ translate: translate-num ( n -- )
 ;
 
 : minimal-recognize ( addr u -- nt nt-translator / n num-translator / notfound )
-	2>r
-	2r@
-	rec-nt
-	dup
-	[']
-	notfound
-	=
-	if
-	drop
-	2r@
-	rec-num
+	2>r	2r@	rec-nt dup ['] notfound	= if
+		drop 2r@ rec-num
 	then
 	2rdrop
 ;
 
-' minimal-recognizer is forth-recognize
+' minimal-recognize is forth-recognize
 
 \ -- Recognizers extensions -------------------------------
 
@@ -494,48 +515,6 @@ translate: translate-num ( n -- )
 
 
 \ -- Forth Words needed to pass test suite ----------------
-
-\ -- Setting BASE independent of current BASE setting --
-\ ( as seen on https://forth-standard.org/standard/core/HEX#reply-816 )
-
-base @ \ remember current BASE value
-1 2* base !	\ get to binary
-?: DECIMAL	1010 base ! ;
-?: HEX		10000 base ! ;
-base ! \ restore previous base
-
-\ Return stack manipulation
-
-[UNDEFINED] N>R [IF]
-\ Reference implementation in ANS Forth document
-: N>R ( xn .. x1 N -- ) ( R: -- x1 .. xn n )
-\ Transfer N items and count to the return stack.
-   dup                        \ xn .. x1 N N --
-   begin
-      dup
-   while
-      rot r> swap >r >r      \ xn .. N N -- ; R: .. x1 --
-      1-                      \ xn .. N 'N -- ; R: .. x1 --
-   repeat
-   drop                       \ N -- ; R: x1 .. xn --
-   r> swap >r >r
-;
-[THEN]
-
-[UNDEFINED] NR> [IF]
-\ Reference implementation in ANS Forth document
-: NR> ( -- xn .. x1 N ) ( R: x1 .. xn N -- )
-\ Pull N items and count off the return stack.
-   r> r> swap >r dup
-   begin
-      dup
-   while
-      r> r> swap >r -rot
-      1-
-   repeat
-   drop
-;
-[THEN]
 
 \ -- Word and counted strings --
 

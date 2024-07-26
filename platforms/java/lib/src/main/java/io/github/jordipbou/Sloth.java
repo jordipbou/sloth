@@ -600,18 +600,18 @@ public class Sloth {
 		colon("SET-CURRENT", (vm) -> { current = pop(); });
 		colon("GET-CURRENT", (vm) -> push(current));
 
-		colon("'", (vm) -> {
-			parse_name();
-			find_name();
-			int nt = pop();
-			push(xt(nt));
-		});
-		colon("[']", (vm) -> {
-			parse_name();
-			find_name();
-			int nt = pop();
-			literal(xt(nt));
-		}); set_immediate();
+		// colon("'", (vm) -> {
+		// 	parse_name();
+		// 	find_name();
+		// 	int nt = pop();
+		// 	push(xt(nt));
+		// });
+		// colon("[']", (vm) -> {
+		// 	parse_name();
+		// 	find_name();
+		// 	int nt = pop();
+		// 	literal(xt(nt));
+		// }); set_immediate();
 
 		colon("NAME>INTERPRET", (vm) -> push(xt(pop())));
 		colon("NAME>COMPILE", (vm) -> {
@@ -731,12 +731,21 @@ public class Sloth {
 		if (xt(latest) == latestxt) unset_flag(latest, HIDDEN); 
 	};
 
+	public void postpone(int nt) {
+		if (has_flag(nt, IMMEDIATE)) compile(xt(nt));
+		else {
+			literal(xt(nt));
+			compile(COMPILE);
+		}
+	}
+
 	public void postpone() {
 		parse_name();
 		find_name();
-		int w = pop();
-		if (has_flag(w, IMMEDIATE)) {	compile(xt(w));	} 
-		else { literal(xt(w)); compile(COMPILE);	}
+		postpone(pop());
+		// int w = pop();
+		// if (has_flag(w, IMMEDIATE)) {	compile(xt(w));	} 
+		// else { literal(xt(w)); compile(COMPILE);	}
 	}
 
 	// -- Input buffer and parsing --
@@ -931,9 +940,8 @@ public class Sloth {
 				|| (fetch(STATE) == 2 && has_flag(w, INSTANTANEOUS))) {
 					eval(xt(w));
  				} else {
-					// If state is 2 it should be postponed, not just
-					// compiled !!
-					compile(xt(w));
+					if (fetch(STATE) == 1) compile(xt(w));
+					else /* STATE == 2 */ postpone(w);
  				}
 			} else {
 				// TODO Move this to >number ?
@@ -1051,47 +1059,49 @@ public class Sloth {
 			}
 		}
 
-
-		// if (do_first_loop == 1) {
-		// 	int o = ix - l, d = 0;
-		// 	do {
-		// 		eval(q);
-		// 		if (lx == 0) {
-		// 			d = pop();
-		// 			o = ix - l;
-		// 			ix += d;
-		// 		} else {
-		// 			break;
-		// 		}
-		// 	} while(((o ^ (o + d)) & (o ^ d)) >= 0);
-		// } else {
-		// 		for (int o = ix - l, d = 0;(((o ^ (o + d)) & (o ^ d))) >= 0 && lx == 0;) {
-		// 			eval(q);
-		// 			if (lx == 0) { // Avoid pop if we're leaving
-		// 				d = pop();
-		// 				o = ix - l;
-		// 				ix += d;
-		// 			}
-		// 		}
-		// }
 		if (lx == 0 || lx == 1) { ipop(); /* Leave case */ }
-		else if (lx == -1) { lx = 0; rpop(); /* 1 unloop case */ }
-		else if (lx == -2) { lx = -1; rpop(); exit(); /* 2 unloop case */ }
+		else if (lx < 0) { lx++; rpop(); exit(); /* unloop case */ }
 	}
 
-	// --------------------------------------------------------------------------
-	// -- Debugging -------------------------------------------------------------
-	// --------------------------------------------------------------------------
+	// ------------------------------------------------------
+	// -- Debugging -----------------------------------------
+	// ------------------------------------------------------
 
 	public void trace(int l) {
 		if (l <= tr) {
 			System.out.printf("%d:%d {%d} <%d> ", mp, tp, fetch(STATE), sp);
 			for (int i = 0; i < sp; i++) System.out.printf("%d ", s[i]);
-			if (ip >= 0) 
-				System.out.printf(": [%d] %d ", ip, ip > 0 ? fetch(ip) : 0);
+			if (ip >= 0) {
+				// System.out.printf(": [%d] %d ", ip, ip > 0 ? fetch(ip) : 0);
+				int nt = find_xt(fetch(ip));
+				if (nt != 0) {
+					System.out.printf(": [%d] ", ip);
+					push(name(nt)); push(namelen(nt)); type();
+					System.out.printf(" ");
+				} else {
+					System.out.printf(": [%d] %d ", ip, ip > 0 ? fetch(ip) : 0);
+				}
+			}
 			for (int i = rp - 1; i >= 0; i--) 
-				if (r[i] != -1)
-					System.out.printf(": [%d] %d ", r[i], r[i] > 0 ? fetch(r[i]) : r[i]);
+				if (r[i] != -1) {
+					// System.out.printf(": [%d] %d ", r[i], r[i] > 0 ? fetch(r[i]) : r[i]);
+					// TODO: Try to find the nearest xt and put
+					// the distance from it
+					int xt = r[i];
+					int nt = 0;
+					while (xt > 0) {
+						nt = find_xt(xt);
+						if (nt != 0) break;
+						xt -= CELL;
+					}
+					if (nt != 0) {
+						System.out.printf(": ");
+						push(name(nt)); push(namelen(nt)); type();
+						System.out.printf(" ");
+					} else {
+						System.out.printf(": [%d]", r[i]);
+					}
+				}
 			System.out.printf("|| ");
 			if (tlen > 0) {
 				System.out.printf(" **");
