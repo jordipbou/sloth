@@ -566,8 +566,9 @@ public class Sloth {
 
 		colon("HERE", (vm) -> push(here()));
 		colon("ALLOT", (vm) -> allot(pop()));
-		colon("ALIGN", (vm) -> align());
-		colon("ALIGNED", (vm) -> push(aligned(pop())));
+		// colon("ALIGN", (vm) -> align());
+		// colon("ALIGNED", (vm) -> push(aligned(pop())));
+		colon("UNUSED", (vm) -> push(m.capacity() - here()));
 
 		colon("THERE", (vm) -> push(there()));
 		colon("TALLOT", (vm) -> push(tallot(pop())));
@@ -613,7 +614,7 @@ public class Sloth {
 		// 	literal(xt(nt));
 		// }); set_immediate();
 
-		colon("NAME>INTERPRET", (vm) -> push(xt(pop())));
+// 		colon("NAME>INTERPRET", (vm) -> push(xt(pop())));
 		colon("NAME>COMPILE", (vm) -> {
 			int nt = pop();
 			if (nt == 0) {

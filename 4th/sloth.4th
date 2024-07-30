@@ -23,6 +23,9 @@
 ?: ,		here ! 1 cells allot ;
 ?: C,		here c! 1 chars allot ;
 
+\ PLATFORM DEPENDENT
+\ A system that prefers to pass everything thru the stack
+\ (like ILO) could compile a literal as , postpone LIT
 ?: LITERAL	postpone LIT , ; immediate
 
 \ -- Control structures -----------------------------------
@@ -31,14 +34,21 @@
 \ usefulness. Some more complicated words (like DO/LOOP)
 \ are not implemented now.
 
+\ PLATFORM DEPENDENT (see comment for LITERAL)
 ?: AHEAD	postpone branch here 0 , ; immediate
+\ PLATFORM DEPENDENT (see comment for LITERAL)
 ?: IF		postpone ?branch here 0 , ; immediate
+\ I'm not sure if THEN is platform dependent, will it
+\ work correctly if AHEAD or IF are compiled with
+\ the literal first?
 ?: THEN		here over - swap ! ; immediate
 
 ?: ELSE		postpone ahead swap postpone then ; immediate
 
 ?: BEGIN	here ; immediate
+\ PLATFORM DEPENDENT (see comment for LITERAL)
 ?: UNTIL	postpone ?branch here - , ; immediate
+\ PLATFORM DEPENDENT (see comment for LITERAL)
 ?: AGAIN	postpone branch here - , ; immediate
 
 ?: WHILE	postpone if swap ; immediate
@@ -46,24 +56,6 @@
 
 \ Now that we have conditional compilation and basic control
 \ structures, we can implement a lot of fundamental words.
-
-\ -- Variables, constants and defer words -----------------
-
-?: VARIABLE	create 0 , ;
-?: CONSTANT	create , does> @ ;
-
-?: '		parse-name find-name name>interpret ;
-?: [']	' postpone literal ; immediate
-
-?: VALUE	create , does> @ ;
-?: DEFER	create 0 , does> @ execute ;
-?: TO		state @ if postpone ['] postpone >body postpone ! else ' >body ! then ; immediate
-?: IS		state @ if postpone to else ['] to execute then ; immediate 
-
-?: DEFER@	>body @ ;
-?: DEFER!	>body ! ;
-
-?: ACTION-OF state @ if ]] ['] defer@ [[ else ' defer@ then ; immediate
 
 \ -- Stack shuffling --------------------------------------
 
@@ -76,6 +68,7 @@
 ?: -ROT		rot rot ;
 ?: NIP		swap drop ;
 ?: TUCK		>r r@ swap r> ;
+?: ROLL		dup if swap >r 1 - recurse r> swap exit then drop ;
 
 ?: 2DROP	drop drop ;
 ?: 2DUP		over over ;
@@ -150,6 +143,9 @@
 ?: CELL-	1 cells - ;
 ?: CHAR-	1 chars - ;
 
+?: ALIGNED ( addr -- a-addr ) cell+ 1- 1 cells 1- invert and ;
+?: ALIGN ( -- ) here aligned here - allot ;
+
 ?: 0! ( a-addr -- ) 0 swap ! ;
 ?: +! ( n | u a-addr -- ) swap over @ + swap ! ;
 ?: 1+! ( a-addr -- ) dup @ 1 + swap ! ;
@@ -158,9 +154,14 @@
 ?: 2! ( x1 x2 a-addr -- ) swap over ! cell+ ! ;
 ?: 2@ ( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
 
+\ BMOVE deals with adress units and BMOVE> and <BMOVE are
+\ used to implement MOVE with also deals with adress
+\ units.
 ?: BMOVE> ( addr1 addr2 u -- ) >r r@ 1- + swap r@ 1- + swap r> [: over b@ over b! 1- swap 1- swap ;] times 2drop ;
 ?: <BMOVE ( addr1 addr2 u -- ) [: over b@ over b! 1+ swap 1+ swap ;] times 2drop ;
 ?: MOVE ( addr1 addr2 u -- ) >r 2dup u< if r> bmove> else r> <bmove then ;
+\ CMOVE deals with CHARS and can be implemented with
+\ MOVE.
 ?: CMOVE> ( c-addr1 c-addr2 u -- ) chars bmove> ;
 ?: CMOVE ( c-addr1 c-addr2 u -- ) chars <bmove ;
 
@@ -168,6 +169,31 @@
 
 ?: BOUNDS ( c-addr u -- c-addr c-addr ) over + swap ;
 
+\ -- Variables, constants and defer words -----------------
+
+?: VARIABLE	create 0 , ;
+?: CONSTANT	create , does> @ ;
+
+\ PLATFORM DEPENDENT
+?: NAME>INTERPRET dup 0= if 0 else cell+ @ then ;
+
+?: '		parse-name find-name name>interpret ;
+?: [']		' postpone literal ; immediate
+
+?: VALUE	create , does> @ ;
+?: DEFER	create 0 , does> @ execute ;
+?: TO		state @ if postpone ['] postpone >body postpone ! else ' >body ! then ; immediate
+?: IS		state @ if postpone to else ['] to execute then ; immediate 
+
+?: DEFER@	>body @ ;
+?: DEFER!	>body ! ;
+
+?: ACTION-OF state @ if ]] ['] defer@ [[ else ' defer@ then ; immediate
+
+\ -- Header/Colon -----------------------------------------
+
+\ Now that I have the ability to copy blocks of memory
+\ its easier to create header.
 \ -- Input/output -----------------------------------------
 
 ?: BL ( -- char ) 32 ;
@@ -512,6 +538,17 @@ translate: translate-num ( n -- )
 : forth-recognizer ( -- xt ) action-of forth-recognize ;
 
 
+\ -- Transient memory -------------------------------------
+
+\ Its difficult to define transient memory here as I use it
+\ for bootstrapping....
+
+\ [UNDEFINED] THERE [IF]
+\ variable (THERE)
+\ here unused + (there) !
+\ : THERE (there) @ ;
+\ : TALLOT (there) @ dup >r - (there) ! r> ;
+\ [THEN]
 
 
 \ -- Forth Words needed to pass test suite ----------------
