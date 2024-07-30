@@ -174,11 +174,16 @@
 ?: VARIABLE	create 0 , ;
 ?: CONSTANT	create , does> @ ;
 
+\ PLATFORM DEPENDENT - NON ANS
+\ ?: IMMEDIATE?  -- TODO
 \ PLATFORM DEPENDENT
 ?: NAME>INTERPRET dup 0= if 0 else cell+ @ then ;
 
 ?: '		parse-name find-name name>interpret ;
 ?: [']		' postpone literal ; immediate
+
+\ PLATFORM DEPENDENT
+?: NAME>COMPILE dup 0<> if dup immediate? if name>interpret ['] execute else name>interpret ['] compile, then then ;
 
 ?: VALUE	create , does> @ ;
 ?: DEFER	create 0 , does> @ execute ;

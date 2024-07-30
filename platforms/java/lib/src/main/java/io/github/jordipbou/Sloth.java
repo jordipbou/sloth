@@ -614,22 +614,22 @@ public class Sloth {
 		// 	literal(xt(nt));
 		// }); set_immediate();
 
-// 		colon("NAME>INTERPRET", (vm) -> push(xt(pop())));
-		colon("NAME>COMPILE", (vm) -> {
-			int nt = pop();
-			if (nt == 0) {
-				push(NOOP);
-			} else {
-				if (has_flag(nt, IMMEDIATE)) {
-					push(nt);
-					push(EXECUTE);
-				} else {
-					push(nt);
-					push(COMPILE);
-				}
-				// TODO: What should happen if it has instantaneous flag ?
-			}
-		});
+		// colon("NAME>INTERPRET", (vm) -> push(xt(pop())));
+		// colon("NAME>COMPILE", (vm) -> {
+		// 	int nt = pop();
+		// 	if (nt == 0) {
+		// 		push(NOOP);
+		// 	} else {
+		// 		if (has_flag(nt, IMMEDIATE)) {
+		// 			push(xt(nt));
+		// 			push(EXECUTE);
+		// 		} else {
+		// 			push(xt(nt));
+		// 			push(COMPILE);
+		// 		}
+		// 		// TODO: What should happen if it has instantaneous flag ?
+		// 	}
+		// });
 		colon("IMMEDIATE?", (vm) -> push(has_flag(pop(), IMMEDIATE) ? -1 : 0));
 		colon(">BODY", (vm) -> push(pop() + 4*CELL));
 
