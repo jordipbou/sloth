@@ -530,6 +530,9 @@ public class Sloth {
 		colon("RSHIFT", (vm) -> { int a = pop(); int b = pop(); push(b >>> a); });
 		colon("LSHIFT", (vm) -> { int a = pop(); int b = pop(); push(b << a); });
 
+		colon("LATEST@", (vm) -> push(latest));
+		colon("LATEST!", (vm) -> { latest = pop(); });
+
 		// -- Definitions and execution --
 		colon(":", (vm) -> colon());
 		colon(";", (vm) -> semicolon()); set_immediate();

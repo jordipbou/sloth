@@ -169,6 +169,18 @@
 
 ?: BOUNDS ( c-addr u -- c-addr c-addr ) over + swap ;
 
+\ -- Header/Colon -----------------------------------------
+
+\ Now that I have the ability to copy blocks of memory
+\ its easier to create headers.
+
+\ PLATFORM DEPENDENT
+?: >XT ( nt u -- ) swap cell+ ! ;
+\ PLATFORM DEPENDENT
+?: HEADER ( c-addr u -- ) align here latest@ , latest! 0 , get-current , 0 c, dup c, here swap dup allot cmove align latest@ here >xt ;
+
+?: NAME>STRING ( nt -- c-addr u ) dup 3 cells + char+ c@ swap 3 cells + 2 chars + ;
+
 \ -- Variables, constants and defer words -----------------
 
 ?: VARIABLE	create 0 , ;
@@ -195,10 +207,6 @@
 
 ?: ACTION-OF state @ if ]] ['] defer@ [[ else ' defer@ then ; immediate
 
-\ -- Header/Colon -----------------------------------------
-
-\ Now that I have the ability to copy blocks of memory
-\ its easier to create header.
 \ -- Input/output -----------------------------------------
 
 ?: BL ( -- char ) 32 ;
