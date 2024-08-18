@@ -16,6 +16,8 @@
 \ The second definition allows conditional compilation for
 \ single line definitions.
 
+\ TODO: Is it possible to do some magic to not need choose here?
+
 : ?: parse-name find-name [: source >in ! drop ;] [: 1 >in ! ;] choose ;
 
 \ -- Compilation ------------------------------------------
@@ -176,10 +178,20 @@
 
 \ PLATFORM DEPENDENT
 ?: >XT ( nt u -- ) swap cell+ ! ;
-\ PLATFORM DEPENDENT
-?: HEADER ( c-addr u -- ) align here latest@ , latest! 0 , get-current , 0 c, dup c, here swap dup allot cmove align latest@ here >xt ;
 
-?: NAME>STRING ( nt -- c-addr u ) dup 3 cells + char+ c@ swap 3 cells + 2 chars + ;
+\ PLATFORM DEPENDENT
+?: HEADER ( c-addr u -- ) align here latest@ , latest! 0 , get-current , 0 c, dup c, here swap dup chars allot cmove align latest@ here >xt ;
+
+\ PLATFORM DEPENDENT
+?: NAME>LINK ( nt1 -- nt2 ) @ ;
+\ PLATFORM DEPENDENT
+?: NAME>XT ( nt -- xt ) cell+ @ ;
+\ PLATFORM DEPENDENT
+?: NAME>WORDLIST ( nt -- wordlist ) 2 cells + @ ;
+\ PLATFORM DEPENDENT
+?: NAME>FLAGS ( nt -- flag ) 3 cells + c@ ;
+\ PLATFORM DEPENDENT
+?: NAME>STRING ( nt -- c-addr u ) dup 3 cells + char+ c@ swap 3 cells + 2 chars + swap ;
 
 \ -- Variables, constants and defer words -----------------
 
@@ -187,14 +199,15 @@
 ?: CONSTANT	create , does> @ ;
 
 \ PLATFORM DEPENDENT - NON ANS
-\ ?: IMMEDIATE?  -- TODO
-\ PLATFORM DEPENDENT
-?: NAME>INTERPRET dup 0= if 0 else cell+ @ then ;
+2 constant IMMEDIATE-FLAG
+\ PLATFORM DEPENDENT - NON ANS
+?: IMMEDIATE? ( -- flag ) NAME>FLAGS IMMEDIATE-FLAG AND ;
+
+?: NAME>INTERPRET dup 0= if 0 else name>xt then ;
 
 ?: '		parse-name find-name name>interpret ;
 ?: [']		' postpone literal ; immediate
 
-\ PLATFORM DEPENDENT
 ?: NAME>COMPILE dup 0<> if dup immediate? if name>interpret ['] execute else name>interpret ['] compile, then then ;
 
 ?: VALUE	create , does> @ ;
@@ -206,6 +219,14 @@
 ?: DEFER!	>body ! ;
 
 ?: ACTION-OF state @ if ]] ['] defer@ [[ else ' defer@ then ; immediate
+
+\ -- Markers ----------------------------------------------
+
+\ TODO: What should marker do?
+\ Store current here and on execution set here to that value.
+\ Store current latest and on execution set latest to that value.
+
+?: MARKER ( "<spaces>name" -- ) here latest@ parse-name header ]] literal latest! here literal - allot exit [[ ;
 
 \ -- Input/output -----------------------------------------
 
