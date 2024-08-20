@@ -542,7 +542,7 @@ public class Sloth {
 		colon("[:", (vm) -> start_quotation()); set_immediate();
 		colon(";]", (vm) -> end_quotation()); set_immediate();
 		EXECUTE = colon("EXECUTE", (vm) -> eval(pop()));
-		colon("RECURSE", (vm) -> compile(xt(latest))); set_immediate();
+		colon("RECURSE", (vm) -> compile(latestxt)); set_immediate();
 		colon("CREATE", (vm) -> create());
 		DOES = noname((vm) -> store(xt(latest) + 2*CELL, pop()));
 		colon("DOES>", (vm) -> does()); set_immediate(); 
@@ -1054,12 +1054,14 @@ public class Sloth {
 			}
 		}
 
-		while (((o ^ (o + d)) & (o ^ d)) >= 0 && lx == 0) {
-			eval(q);
-			if (lx == 0) { // Avoid pop if we're leaving
-				d = pop();
-				o = ix - l;
-				ix += d;
+		if (!(do_first_loop == 0 && o == 0)) {
+			while (((o ^ (o + d)) & (o ^ d)) >= 0 && lx == 0) {
+				eval(q);
+				if (lx == 0) { // Avoid pop if we're leaving
+					d = pop();
+					o = ix - l;
+					ix += d;
+				}
 			}
 		}
 

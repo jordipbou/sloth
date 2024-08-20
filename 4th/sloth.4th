@@ -171,6 +171,8 @@
 
 ?: BOUNDS ( c-addr u -- c-addr c-addr ) over + swap ;
 
+?: BUFFER: ( u "<spaces>name" -- ; -- a-addr ) create allot ;
+
 \ -- Header/Colon -----------------------------------------
 
 \ Now that I have the ability to copy blocks of memory
@@ -584,6 +586,38 @@ translate: translate-num ( n -- )
 \ : TALLOT (there) @ dup >r - (there) ! r> ;
 \ [THEN]
 
+\ -- CASE/OF/ENDOF ----------------------------------------
+
+\ Copied from SwapForth
+
+( CASE                                       JCB 09:15 07/18/14)
+\ From ANS specification A.3.2.3.2
+
+0 constant case immediate  ( init count of ofs )
+
+: of  ( #of -- orig #of+1 / x -- )
+    1+    ( count ofs )
+    postpone over  postpone = ( copy and test case value)
+    postpone if    ( add orig to control flow stack )
+    postpone drop  ( discards case value if = )
+    swap           ( bring count back now )
+; immediate
+
+: endof ( orig1 #of -- orig2 #of )
+    >r   ( move off the stack in case the control-flow )
+         ( stack is the data stack. )
+    postpone else
+    r>   ( we can bring count back now )
+; immediate
+
+: endcase  ( orig1..orign #of -- )
+    postpone drop  ( discard case value )
+    begin
+        dup
+    while
+        swap postpone then 1-
+    repeat drop
+; immediate
 
 \ -- Forth Words needed to pass test suite ----------------
 
@@ -605,6 +639,8 @@ translate: translate-num ( n -- )
 [THEN]
 
 ?: COUNT ( c-addr1 -- c-addr2 u ) dup c@ swap char+ swap ;
+
+\ TODO: C"
 
 [UNDEFINED] WORD [IF]
 variable wlen
