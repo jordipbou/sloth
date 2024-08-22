@@ -148,6 +148,9 @@
 ?: ALIGNED ( addr -- a-addr ) cell+ 1- 1 cells 1- invert and ;
 ?: ALIGN ( -- ) here aligned here - allot ;
 
+\ PLATFORM DEPENDENT - NON ANS
+?: HERE,	here 2 cells + postpone literal ;
+
 ?: 0! ( a-addr -- ) 0 swap ! ;
 ?: +! ( n | u a-addr -- ) swap over @ + swap ! ;
 ?: 1+! ( a-addr -- ) dup @ 1 + swap ! ;
@@ -640,7 +643,18 @@ translate: translate-num ( n -- )
 
 ?: COUNT ( c-addr1 -- c-addr2 u ) dup c@ swap char+ swap ;
 
-\ TODO: C"
+[UNDEFINED] C" [IF]
+\ PLATFORM DEPENDENT
+: C" ( "ccc<quote>" -- ; -- c-addr )
+  [char] " parse
+  here 4 cells + postpone literal
+  postpone ahead -rot
+  dup c,
+  here over chars allot
+  swap cmove
+  postpone then
+; immediate
+[THEN]
 
 [UNDEFINED] WORD [IF]
 variable wlen
