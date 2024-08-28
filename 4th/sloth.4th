@@ -626,6 +626,10 @@ translate: translate-num ( n -- )
 
 \ -- Input buffer --
 
+\ SAVE-INPUT and RESTORE-INPUT are ANS words (from CORE EXT)
+\ that don't have a lot of use (it seems) as seen in the
+\ proposal to obsolescent them.
+
 \ PLATFORM DEPENDENT
 ?: SAVE-INPUT source >in @ 3 ;
 
