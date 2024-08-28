@@ -172,6 +172,8 @@
 
 ?: FILL ( c-addr u char -- ) -rot [: 2dup c! char+ ;] times 2drop ;
 
+?: ERASE ( addr u -- ) [: 0 over ! ;] times drop ;
+
 ?: BOUNDS ( c-addr u -- c-addr c-addr ) over + swap ;
 
 ?: BUFFER: ( u "<spaces>name" -- ; -- a-addr ) create allot ;
@@ -243,7 +245,7 @@
 
 ?: TYPE ( c-addr u -- ) [: dup c@ emit char+ ;] times drop ;
 
-?: .( ( "ccc<paren>" -- ) [char] ) parse type ;
+?: .( ( "ccc<paren>" -- ) [char] ) parse type ; immediate
 
 ?: ." ( C: "ccc<quote>" -- ) ( -- ) postpone s" state @ if postpone type else type then ; immediate
 
@@ -394,6 +396,10 @@ create <HOLD 100 chars dup allot <hold + constant HOLD>
 ?: .			dup 0 < d. ;
 
 ?: ? ( addr -- ) @ . ;
+
+\ Added to pass ANS tests. Implementation copied from ANS Standard.
+
+?: HOLDS ( c-addr u -- ) chars begin dup while char- 2dup + c@ hold repeat 2drop ;
 
 \ -- Do/Loop (implemented with combinators) ---------------
 
@@ -588,6 +594,8 @@ translate: translate-num ( n -- )
 \ : THERE (there) @ ;
 \ : TALLOT (there) @ dup >r - (there) ! r> ;
 \ [THEN]
+
+?: PAD ( -- c-addr ) 84 chars tallot ;
 
 \ -- CASE/OF/ENDOF ----------------------------------------
 
