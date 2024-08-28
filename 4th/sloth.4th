@@ -624,6 +624,14 @@ translate: translate-num ( n -- )
 
 \ -- Forth Words needed to pass test suite ----------------
 
+\ -- Input buffer --
+
+\ PLATFORM DEPENDENT
+?: SAVE-INPUT source >in @ 3 ;
+
+\ PLATFORM DEPENDENT
+?: RESTORE-INPUT drop >in ! source! 0 ;
+
 \ -- Word and counted strings --
 
 ?: /STRING		tuck - >r chars + r> ;		\ ( c-addr1 u1 n -- c-addr2 u2 )
