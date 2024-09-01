@@ -916,10 +916,16 @@ public class Sloth {
 			try {
 				evaluate(line, 1);
 			} catch(Exception e) {
-				// TODO Exceptions should be managed by the inner interpreter
 				System.out.printf("Exception on line: [%s]\n", line);
-				e.printStackTrace();
-				break;
+				if (e instanceof SlothException) {
+					last_buffered_reader.close();
+					last_buffered_reader = prevReader;
+					last_dir = prevDir;
+					throw e;
+				} else {
+					e.printStackTrace();
+					break;
+				}
 			}
 	 	}
 

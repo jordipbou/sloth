@@ -172,7 +172,7 @@
 
 ?: FILL ( c-addr u char -- ) -rot [: 2dup c! char+ ;] times 2drop ;
 
-?: ERASE ( addr u -- ) [: 0 over ! ;] times drop ;
+?: ERASE ( addr u -- ) [: 0 over b! 1+ ;] times drop ;
 
 ?: BOUNDS ( c-addr u -- c-addr c-addr ) over + swap ;
 
@@ -595,7 +595,7 @@ translate: translate-num ( n -- )
 \ : TALLOT (there) @ dup >r - (there) ! r> ;
 \ [THEN]
 
-?: PAD ( -- c-addr ) 84 chars tallot ;
+?: PAD ( -- c-addr ) here 170 + aligned ;
 
 \ -- CASE/OF/ENDOF ----------------------------------------
 
@@ -629,6 +629,134 @@ translate: translate-num ( n -- )
         swap postpone then 1-
     repeat drop
 ; immediate
+
+\ -- DUMP utility (from minimal forth) --------------------
+\ Code has been adapted to not redefine words/constants.
+
+\ Dump utility in Minimal Forth         uh 2021-08-11
+
+\ This source code provides a simle hex dump utility.
+\
+\ It does not require number output conversion U. U.R . .R <# # #S #> SIGN or HOLD
+\
+\ Memory is accessed by C@ output is perfomed by EMIT.
+\ So this dump utility can be used also on quite limited systems.
+\
+\ Usage:
+\
+\   <addr> <len> DUMP
+\
+\ or
+\
+\   <addr> <len> ADJUSTED DUMP   \ to start the dump at an even b/line boundary
+
+
+\ definitions missing from Minimal Forth
+
+[UNDEFINED] MIN [IF]
+: min ( n1 n2 -- n3 )
+   over over > IF swap THEN drop ;
+[THEN]
+
+[UNDEFINED] BL [IF] 32 Constant bl [THEN]
+
+[UNDEFINED] SPACE [IF]
+." Redefining SPACE" cr
+: space ( -- )
+   bl emit ;
+[THEN]
+
+[UNDEFINED] SPACES [IF]
+: spaces ( u -- )
+   BEGIN dup WHILE space 1 - REPEAT drop ;
+[THEN]
+
+[UNDEFINED] /STRING [IF]
+: /string ( c-addr1 u1 n -- c-addr2 u2 )
+	\ This definition was not using chars but memory units
+	swap over - >r chars + r> ;
+[THEN]
+
+[UNDEFINED] 2DROP [IF]
+: 2drop ( x1 x2 -- )
+   drop drop ;
+[THEN]
+
+[UNDEFINED] 2DUP [IF]
+: 2dup ( x1 x2 -- x1 x2 x1 x2 )
+   over over ;
+[THEN]
+
+[UNDEFINED] '.' [IF] 46 Constant '.' [THEN]
+[UNDEFINED] '0' [IF] 48 Constant '0' [THEN]
+[UNDEFINED] ':' [IF] 58 Constant ':' [THEN]
+[UNDEFINED] 'A' [IF] 65 Constant 'A' [THEN]
+
+\ ---- Dump utility
+
+[UNDEFINED] .HEXDIGIT [IF]
+: .hexdigit ( x -- )
+     15 and  dup 10 < IF '0' + ELSE  10 - 'A' + THEN emit ;
+[THEN]
+
+[UNDEFINED] .HEX [IF]
+: .hex ( x -- )
+     dup  4 rshift .hexdigit  .hexdigit ;
+[THEN]
+
+[UNDEFINED] .ADDR [IF]
+: .addr ( x -- )
+     0 BEGIN ( x i ) over WHILE  over 8 rshift  swap 1 + REPEAT swap drop
+       BEGIN ( x i )  dup WHILE  swap .hex 1 - REPEAT drop ;
+[THEN]
+
+[UNDEFINED] B/LINE [IF] 16 Constant b/line ( -- x ) [THEN]
+
+[UNDEFINED] .H [IF]
+: .h ( addr len -- )
+   b/line min dup >r
+   BEGIN \ ( addr len )
+     dup
+   WHILE \ ( addr len )
+	 \ As chars are 2 here, I change this to b@
+     \ over c@ .hex space
+	 over b@ .hex space
+     1 /string
+   REPEAT 2drop
+   b/line r> - 3 * spaces ;
+[THEN]
+
+[UNDEFINED] .A [IF]
+: .a ( addr1 len1 -- )
+   b/line min
+   BEGIN \ ( addr len )
+     dup
+   WHILE
+     over c@ dup bl < IF drop '.' THEN emit
+     1 /string
+   REPEAT 2drop ;
+[THEN]
+
+[UNDEFINED] DUMP-LINE [IF]
+: dump-line ( addr len1 -- addr len2 )
+   over .addr ':' emit space   2dup .h space space  2dup .a
+   dup  b/line  min /string ;
+[THEN]
+
+[UNDEFINED] DUMP [IF]
+: dump ( addr len -- )
+   BEGIN
+     dup
+   WHILE \ ( addr len )
+     cr dump-line
+   REPEAT 2drop ;
+[THEN]
+
+[UNDEFINED] ADJUSTED [IF]
+: adjusted ( addr1 u1 -- addr2 u2 ) \ adjust addr len as in "adjusted dump"
+    swap     b/line /     b/line *
+    swap 1 - b/line / 1 + b/line * ;
+[THEN]
 
 \ -- Forth Words needed to pass test suite ----------------
 
