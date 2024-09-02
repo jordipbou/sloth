@@ -245,7 +245,11 @@
 ?: CR ( -- ) 10 emit ;
 
 ?: SPACE ( -- ) bl emit ;
-?: SPACES ( n -- ) begin dup while space 1- repeat drop ;
+\ When implementing spaces, I've seen it as this:
+\ begin dup while space 1- repeat drop
+\ but that has the problem of doing infinite spaces
+\ if, for some reason, n is negative.
+?: SPACES ( n -- ) begin dup 0> while space 1- repeat drop ;
 
 ?: TYPE ( c-addr u -- ) [: dup c@ emit char+ ;] times drop ;
 
@@ -825,8 +829,18 @@ variable wlen
 ; immediate
 [THEN]
 
+\ -- Environmental queries --------------------------------
+
+?: ENVIRONMENT? ( c-addr u -- false | i*x true ) 2drop false ;
+
 \ -- S\" ANS Forth reference implementation ---------------
 \ Taken from decimal http://www.forth200x.org/escaped-strings.html
+
+\ TODO:
+\ This implementation (and the use of counted strings in general)
+\ have a problem with chars not being equal to a byte.
+\ If we use counted strings we have to take into account 
+\ that a char and a byte are not the same...
 
 : c+!           \ c c-addr --
 \ *G Add character C to the contents of address C-ADDR.
@@ -835,7 +849,10 @@ variable wlen
 
 : addchar       \ char string --
 \ *G Add the character to the end of the counted string.
-  tuck count + c!
+  \ When doing the count, and to add one more char, it
+  \ must be converted to char size.
+  \ tuck count + c!
+  tuck count chars + c!
   1 swap c+!
 ;
 
@@ -843,7 +860,9 @@ variable wlen
 \ *G Add the string described by C-ADDR U to the counted string at
 \ ** $DEST. The strings must not overlap.
   >r
-  tuck  r@ count +  swap cmove          \ add source to end
+  \ This line does not deal with char sizes correctly
+  \ tuck r@ count + swap cmove				\ add source to end
+  tuck  r@ count chars +  swap cmove          \ add source to end
   r> c+!                                \ add length to count
 ;
 
@@ -905,7 +924,9 @@ create CRLF$    \ -- addr ; CR/LF as counted string
     1 /string  crlf$ count r> append  exit
   then
   over c@ [char] a [char] z 1+ within if
-    over c@ [char] a - EscapeTable + c@  r> addchar
+	\ This line is not dealing with char sizes well
+    \ over c@ [char] a - EscapeTable + c@  r> addchar
+	over c@ [char] a - chars EscapeTable + c@ r> addchar
   else
     over c@ r> addchar
   then
@@ -954,10 +975,7 @@ create pocket  \ -- addr
 \ *G A tempory buffer to hold processed string.
 \    This would normally be an internal system buffer.
 
-\ TODO While I don't have environment queries, let's
-\ just create the buffer.
-\ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
-256
+s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 1 chars + allot
 
 : readEscaped	\ "ccc" -- c-addr
@@ -976,6 +994,7 @@ create pocket  \ -- addr
   readEscaped count  state @
   if  postpone sliteral  then
 ; IMMEDIATE
+
 \ -- Testing --
 
 : dotests -1 trace! s" ../../../forth2012-test-suite/src/runtests.fth" included ;
