@@ -588,6 +588,7 @@ public class Sloth {
 		colon("SOURCE!", (vm) -> { int l = pop(); int a = pop(); ibuf = a; ilen = l; });
 
 		colon("REFILL", (vm) -> refill());
+		colon("SOURCE-ID", (vm) -> push(source_id));
 
 		colon("PARSE-NAME", (vm) -> parse_name());
 		colon("PARSE", (vm) -> parse());
@@ -865,7 +866,7 @@ public class Sloth {
 
 	public void refill() {
 	switch (source_id) {
-		case -1: push(-1); break;
+		case -1: push(0); break;
 		case 0:
 			push(ibuf); push(80);
 			accept();
