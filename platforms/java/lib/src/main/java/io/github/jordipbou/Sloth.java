@@ -499,9 +499,10 @@ public class Sloth {
 		colon("SWAP", (vm) -> swap());
 
 		colon(">R", (vm) -> rpush(pop()));
-		colon("R@", (vm) -> push(rpick(0)));
+		// NOT NEEDED colon("R@", (vm) -> push(rpick(0)));
 		colon("R>", (vm) -> push(rpop()));
 
+		// DEPTH its required by ANS tests
 		colon("DEPTH", (vm) -> push(sp));
 
 		// -- Arithmetic --
@@ -546,9 +547,9 @@ public class Sloth {
 		colon("CREATE", (vm) -> create());
 		DOES = noname((vm) -> store(xt(latest) + 2*CELL, pop()));
 		colon("DOES>", (vm) -> does()); set_immediate(); 
-		colon("[", (vm) -> store(STATE, 0)); set_immediate();
-		colon("]", (vm) -> store(STATE, 1));
-		colon("]]", (vm) -> store(STATE, 2)); set_immediate();
+		// NOT NEEDED colon("[", (vm) -> store(STATE, 0)); set_immediate();
+		// NOT NEEDED colon("]", (vm) -> store(STATE, 1));
+		// NOT NEEDED colon("]]", (vm) -> store(STATE, 2)); set_immediate();
 		// TODO An internal variable could be used to store previous state and
 		// restore it when doing ]] [[
 		colon("[[", (vm) -> store(STATE, 1)); set_instantaneous();

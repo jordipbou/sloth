@@ -59,13 +59,26 @@
 \ Now that we have conditional compilation and basic control
 \ structures, we can implement a lot of fundamental words.
 
+\ -- Interpreter/Compiler control -------------------------
+
+?: ]		1 state ! ;
+?: [		0 state ! ; immediate
+
+?: ]]		2 state ! ; immediate
+
+\ TODO To implement [[ here I need to implement instantaneous,
+\ and that's one word for another word. Does it makes sense?
+
 \ -- Stack shuffling --------------------------------------
 
 \ The only required primitives for stack shuffling are:
-\ DROP PICK OVER SWAP >R R@ R>
+\ DROP PICK OVER SWAP >R R>
 
 ?: DUP		0 pick ;
 ?: ?DUP		dup if dup then ;
+
+?: R@		]] r> dup >r [[ ; immediate
+
 ?: ROT		>r swap r> swap ;	
 ?: -ROT		rot rot ;
 ?: NIP		swap drop ;
@@ -592,16 +605,6 @@ translate: translate-num ( n -- )
 
 
 \ -- Transient memory -------------------------------------
-
-\ Its difficult to define transient memory here as I use it
-\ for bootstrapping....
-
-\ [UNDEFINED] THERE [IF]
-\ variable (THERE)
-\ here unused + (there) !
-\ : THERE (there) @ ;
-\ : TALLOT (there) @ dup >r - (there) ! r> ;
-\ [THEN]
 
 ?: PAD ( -- c-addr ) here 170 + aligned ;
 
