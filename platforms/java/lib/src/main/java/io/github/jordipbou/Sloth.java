@@ -235,12 +235,15 @@ public class Sloth {
 	public void _catch(int q) {
 		int tsp = sp;
 		int trp = rp;
+		int tip = ip;
 		try { 
-			execute(q); 
+			// execute(q); 
+			eval(q);
 			push(0);
 		} catch(SlothException x) {
 			sp = tsp;
 			rp = trp;
+			ip = tip;
 			push(x.v);
 		} catch(Exception e) {
 			// Here we catch every possible exception (not just
@@ -544,9 +547,10 @@ public class Sloth {
 		colon(";]", (vm) -> end_quotation()); set_immediate();
 		EXECUTE = colon("EXECUTE", (vm) -> eval(pop()));
 		colon("RECURSE", (vm) -> compile(latestxt)); set_immediate();
-		colon("CREATE", (vm) -> create());
-		DOES = noname((vm) -> store(xt(latest) + 2*CELL, pop()));
-		colon("DOES>", (vm) -> does()); set_immediate(); 
+		// colon("CREATE", (vm) -> create());
+		// DOES = noname((vm) -> store(xt(latest) + 2*CELL, pop()));
+		DOES = colon("DOES", (vm) -> store(xt(latest) + 2*CELL, pop()));
+		// colon("DOES>", (vm) -> does()); set_immediate(); 
 		// NOT NEEDED colon("[", (vm) -> store(STATE, 0)); set_immediate();
 		// NOT NEEDED colon("]", (vm) -> store(STATE, 1));
 		// NOT NEEDED colon("]]", (vm) -> store(STATE, 2)); set_immediate();
@@ -707,16 +711,16 @@ public class Sloth {
 
 	public void literal(int v) { comma(LIT); comma(v); }
 
-	public void create() { // parse_name(); header(); }
-		parse_name();
-		header();
-		literal(here() + 4*CELL);
-		// Two exits are compiled to ensure the second one is used when
-		// patching the first one with DOES>
-		compile(EXIT);
-		compile(EXIT);
-	}
-	public void does() { literal(here() + 16); compile(DOES); compile(EXIT); }
+	// public void create() { // parse_name(); header(); }
+	// 	parse_name();
+	// 	header();
+	// 	literal(here() + 4*CELL);
+	// 	// Two exits are compiled to ensure the second one is used when
+	// 	// patching the first one with DOES>
+	// 	compile(EXIT);
+	// 	compile(EXIT);
+	// }
+	// public void does() { literal(here() + 16); compile(DOES); compile(EXIT); }
 
 	public void colon() { 
 		parse_name();

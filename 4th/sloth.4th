@@ -77,6 +77,12 @@
 ?: DUP		0 pick ;
 ?: ?DUP		dup if dup then ;
 
+\ Although OVER can be easily defined by PICK its used on the
+\ definition of THEN above. Its possible to change the THEN
+\ definition to use 1 PICK or to define THEN as a primitive.
+\ Until then, here it is.
+?: OVER		1 pick ;
+
 ?: R@		]] r> dup >r [[ ; immediate
 
 ?: ROT		>r swap r> swap ;	
@@ -189,8 +195,6 @@
 
 ?: BOUNDS ( c-addr u -- c-addr c-addr ) over + swap ;
 
-?: BUFFER: ( u "<spaces>name" -- ; -- a-addr ) create allot ;
-
 \ -- Header/Colon -----------------------------------------
 
 \ Now that I have the ability to copy blocks of memory
@@ -212,6 +216,16 @@
 ?: NAME>FLAGS ( nt -- flag ) 3 cells + c@ ;
 \ PLATFORM DEPENDENT
 ?: NAME>STRING ( nt -- c-addr u ) dup 3 cells + char+ c@ swap 3 cells + 2 chars + swap ;
+
+\ PLATFORM DEPENDENT
+?: CREATE parse-name header here 4 cells + postpone literal postpone exit postpone exit ;
+\ PLATFORM DEPENDENT
+?: DOES> here 4 cells + postpone literal postpone does postpone exit ; immediate
+
+\ -- BUFFER: ----------------------------------------------
+\ I could not create BUFFER: until I had CREATE defined
+
+?: BUFFER: ( u "<spaces>name" -- ; -- a-addr ) create allot ;
 
 \ -- Variables, constants and defer words -----------------
 
@@ -997,6 +1011,12 @@ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
   readEscaped count  state @
   if  postpone sliteral  then
 ; IMMEDIATE
+
+\ Taken from ANS reference implementation
+?: ABORT ( i*x -- ) ( R: j*x -- ) -1 throw ;
+\ Taken from SwapForth
+\ ?: ABORT" postpone if postpone ." postpone abort postpone then ; immediate
+?: ABORT" postpone if postpone ." -2 postpone literal postpone throw postpone then ; immediate
 
 \ -- Testing --
 
