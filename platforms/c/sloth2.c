@@ -60,7 +60,7 @@ void init(X* x, CELL d, CELL sz) {
 
 void push(X* x, CELL v) { x->s[x->sp] = v; x->sp++; }
 CELL pop(X* x) { x->sp--; return x->s[x->sp]; }
-int pick(X* x, CELL a) { return x->s[x->sp - a - 1]; }
+CELL pick(X* x, CELL a) { return x->s[x->sp - a - 1]; }
 
 /* Return stack */
 
@@ -71,33 +71,33 @@ CELL rpick(X* x, CELL a) { return x->r[x->rp - a - 1]; }
 /* Memory */
 
 /* 
-STORE/FETCH/CSTORE/CFETCH work on absolute address units,
+STORE/FETCH/CSTORE/cfetch work on to_absolute address units,
 not just inside SLOTH dictionary (memory block).
 */
-#define STORE(x, a, v)	*((CELL*)(a)) = ((CELL)(v))
-#define FETCH(x, a)			*((CELL*)(a))
-#define CSTORE(x, a, v)	*((CHAR*)(a)) = ((CHAR)(v))
-#define CFETCH(x, a)		*((CHAR*)(a))
+void store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
+CELL fetch(X* x, CELL a) { return *((CELL*)a); }
+void cstore(X* x, CELL a, CHAR v) { *((CHAR*)a) = v; }
+CHAR cfetch(X* x, CELL a) { return *((CHAR*)a); }
 
 /*
-HERE/ALLOT/ALIGN/ALIGNED word on relative address units.
+here/ALLOT/align/alignED word on to_relative address units.
 */
-#define HERE(x)			((x)->h)
-#define ALLOT(x, v)	((x)->h += (v))
-#define ALIGN(x)		((x)->h) = (((x)->h) + (sizeof(CELL) - 1)) & ~(sizeof(CELL) - 1)
-#define ALIGNED(x, a) (((a) + (sizeof(CELL) - 1)) & ~(sizeof(CELL) - 1))
+CELL here(X* x) { return x->h; }
+void allot(X* x, CELL v) { x->h += v; }
+void align(X* x) { x->h = (x->h + (sCELL - 1)) & ~(sCELL - 1); }
+CELL aligned(X* x, CELL a) { return (a + (sCELL - 1)) & ~(sCELL - 1); }
 
 /*
-The next two macros allow transforming from relative to
-absolute address.
+The next two macros allow transforming from to_relative to
+to_absolute address.
 */
-#define ABS(x, a)	(((x)->d) + (a))
-#define REL(x, a) ((a) - ((x)->d))
+CELL to_abs(X* x, CELL a) { return (CELL)(x->d + a); }
+CELL to_rel(X* x, CELL a) { return a - x->d; }
 
 /* Inner interpreter */
 
 CELL op(X* x) { 
-	CELL o = FETCH(x, x->ip); 
+	CELL o = fetch(x, x->ip);
 	x->ip += sCELL;
 	return o; 
 }
@@ -168,6 +168,13 @@ void throw(X* x, CELL e) {
 /* -- Virtual machine primitives ---------------------- */
 /* ---------------------------------------------------- */
 
+/* 
+TODO: This primitives are implemented using only functions
+and macros from the previous section thus making it
+easier to port to other platforms.
+TODO: Ensure there are enough functions to allow that.
+*/
+
 void _noop(X* x) { }
 void _exit(X* x) { x->ip = x->rp > 0 ? rpop(x) : -1; }
 void _lit(X* x) { push(x, op(x)); }
@@ -210,10 +217,10 @@ void _or(X* x) { CELL a = pop(x); push(x, pop(x) | a); }
 void _xor(X* x) { CELL a = pop(x); push(x, pop(x) ^ a); }
 void _invert(X* x) { push(x, ~pop(x)); }
 
-void _fetch(X* x) { push(x, FETCH(x, pop(x))); }
-void _store(X* x) { CELL a = pop(x); STORE(x, a, pop(x)); }
-void _cfetch(X* x) { push(x, CFETCH(x, pop(x))); }
-void _cstore(X* x) { CELL a = pop(x); CSTORE(x, a, pop(x)); }
+void _fetch(X* x) { push(x, fetch(x, pop(x))); }
+void _store(X* x) { CELL a = pop(x); store(x, a, pop(x)); }
+void _cfetch(X* x) { push(x, cfetch(x, pop(x))); }
+void _cstore(X* x) { CELL a = pop(x); cstore(x, a, pop(x)); }
 
 void _catch(X* x) { catch(x, pop(x)); }
 void _throw(X* x) { throw(x, pop(x)); }
@@ -298,46 +305,70 @@ void save_image(X* x, char* filename) {
 /* ---------------------------------------------------- */
 
 #define EXIT					-2
+#define LIT						-3
+#define COMPILE				-4
 
 #define LATEST				0
 #define STATE					sCELL
 #define IBUF					2*sCELL
 #define IPOS					3*sCELL
-#define ILEN					3*sCELL
+#define ILEN					4*sCELL
+#define ORDER					5*sCELL
 
-#define COMMA(x, v)		{ STORE((x), ABS(x, HERE(x)), (v)); ALLOT((x), sCELL); }
-#define CCOMMA(x, v)	{ CSTORE((x), ABS(x, HERE(x)), (v)); ALLOT((x), sCHAR); }
+void set(X* x, CELL a, CELL v) { store(x, to_abs(x, a), v); }
+CELL get(X* x, CELL a) { return fetch(x, to_abs(x, a)); }
 
-#define COMPILE(x, xt)	COMMA(x, xt)
+void cset(X* x, CELL a, CHAR v) { cstore(x, to_abs(x, a), v); }
+CHAR cget(X* x, CELL a) { return cfetch(x, to_abs(x, a)); }
+
+void comma(X* x, CELL v) { set(x, here(x), v); allot(x, sCELL); }
+void ccomma(X* x, CHAR v) { set(x, here(x), v); allot(x, sCHAR); }
+
+void compile(X* x, CELL xt) { comma(x, xt); }
+void literal(X* x, CELL n) { comma(x, LIT); comma(x, n); }
+
+void _compile(X* x) { compile(x, pop(x)); }
 
 #define HIDDEN				1
 #define IMMEDIATE			2
 #define INSTANT				4
 
-#define SET_XT(x, w, v)				STORE((x), ABS(x, ((w) + sCELL)), (v))
-#define GET_FLAGS(x, w)				CFETCH((x), ABS(x, ((w) + 3*sizeof(CELL))))
-#define SET_FLAGS(x, w, v)		CSTORE((x), ABS(x, ((w) + 3*sizeof(CELL))), GET_FLAGS((x), (w)) | (v))
-#define UNSET_FLAGS(x, w, v)	CSTORE((x), ABS(x, ((w) + 3*sizeof(CELL))), GET_FLAGS((x), (w)) & ~(v))
+CELL get_link(X* x, CELL w) { return get(x, w); }
 
-void set_hidden(X* x) { SET_FLAGS(x, FETCH(x, ABS(x, LATEST)), HIDDEN); }
-void set_immediate(X* x) { SET_FLAGS(x, FETCH(x, ABS(x, LATEST)), IMMEDIATE); }
-void set_instant(X* x) { SET_FLAGS(x, FETCH(x, ABS(x, LATEST)), INSTANT); }
+void set_xt(X* x, CELL w, CELL xt) { set(x, w + sCELL, xt); }
+CELL get_xt(X* x, CELL w) { return get(x, w + sCELL); }
 
-void unset_hidden(X* x) { UNSET_FLAGS(x, FETCH(x, ABS(x, LATEST)), HIDDEN); }
+CELL get_wl(X* x, CELL w) { return get(x, w + 2*sCELL); }
+
+CHAR get_flags(X* x, CELL w) { return cget(x, w + 3*sCELL); }
+void set_flag(X* x, CELL w, CHAR v) { cset(x, w + 3*sCELL, get_flags(x, w) | v); }
+void unset_flag(X* x, CELL w, CHAR v) { cset(x, w + 3*sCELL, get_flags(x, w) & ~v); }
+
+CELL has_flag(X* x, CELL w, CELL v) { return get_flags(x, w) & v; }
+
+CHAR get_namelen(X* x, CELL w) { return cget(x, w + 3*sCELL + sCHAR); }
+
+CELL get_name_addr(X* x, CELL w) { return to_abs(x, w + 3*sCELL + 2*sCHAR); }
+
+void set_hidden(X* x) { set_flag(x, get(x, LATEST), HIDDEN); }
+void set_immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
+void set_instant(X* x) { set_flag(x, get(x, LATEST), INSTANT); }
+
+void unset_hidden(X* x) { unset_flag(x, get(x, LATEST), HIDDEN); }
 
 CELL header(X* x, CELL n, CELL l) {
 	CELL w, i;
-	ALIGN(x);
-	w = HERE(x); 
-	COMMA(x, FETCH(x, ABS(x, LATEST))); /* link */
-	STORE(x, ABS(x, LATEST), w);
-	COMMA(x, 0);	/* xt */
-	COMMA(x, 1);	/* wordlist */
-	CCOMMA(x, 0);	/* flags */
-	CCOMMA(x, l);	/* namelen */
-	for (i = 0; i < l; i++) CCOMMA(x, FETCH(x, n + i));
-	ALIGN(x);
-	SET_XT(x, ABS(x, w), HERE(x));
+	align(x);
+	w = here(x); 
+	comma(x, get(x, LATEST)); /* link */
+	set(x, LATEST, w);
+	comma(x, 0);	/* xt */
+	comma(x, 1);	/* wordlist */
+	ccomma(x, 0);	/* flags */
+	ccomma(x, l);	/* namelen */
+	for (i = 0; i < l; i++) ccomma(x, fetch(x, n + i));
+	align(x);
+	set_xt(x, w, here(x));
 	return w;
 }
 
@@ -348,22 +379,22 @@ CELL primitive(X* x, F f) {
 
 CELL code(X* x, char* name, CELL xt) {
 	CELL w = header(x, (CELL)name, strlen(name));
-	SET_XT(x, ABS(x, w), xt);
+	set_xt(x, w, xt);
 	return xt; 
 }
 
 /* -- Additional code words -----------------------------*/
 
 void _parse_name(X* x) {
-	CELL ibuf = FETCH(x, ABS(x, IBUF));
-	CELL ilen = FETCH(x, ABS(x, ILEN));
-	CELL ipos = FETCH(x, ABS(x, IPOS));
-	while (ipos < ilen && CFETCH(x, ibuf + ipos) < 33) ipos++;
+	CELL ibuf = get(x, IBUF);
+	CELL ilen = get(x, ILEN);
+	CELL ipos = get(x, IPOS);
+	while (ipos < ilen && cfetch(x, ibuf + ipos) < 33) ipos++;
 	push(x, ibuf + ipos);
-	while (ipos < ilen && CFETCH(x, ibuf + ipos) > 32) ipos++;
+	while (ipos < ilen && cfetch(x, ibuf + ipos) > 32) ipos++;
 	push(x, ibuf + ipos - pick(x, 0));
 	if (ipos < ilen) ipos++;
-	STORE(x, ABS(x, IPOS), ipos);
+	set(x, IPOS, ipos);
 }
 
 void _colon(X* x) {
@@ -371,38 +402,90 @@ void _colon(X* x) {
 	_parse_name(x); l = pop(x); t = pop(x);
 	header(x, t, l); 
 	set_hidden(x);
-	STORE(x, ABS(x, STATE), 1);
+	set(x, STATE, 1);
 	/* x->level = 1; */
 }
 
 void _semicolon(X* x) {
-	COMPILE(x, EXIT); 
-	STORE(x, ABS(x, STATE), 0);
+	compile(x, EXIT); 
+	set(x, STATE, 0);
 	/* x->level = 0; */
 	unset_hidden(x);
+}
+
+int compare_without_case(X* x, CELL w, CELL t, CELL l) {
+	int i;
+	if (get_namelen(x, w) != l) return 0;
+	for (i = 0; i < l; i++) {
+		CHAR a = cfetch(x, t + i);
+		CHAR b = cfetch(x, get_name_addr(x, w) + i);
+		if (a >= 97 && a <= 122) a -= 32;
+		if (b >= 97 && b <= 122) b -= 32;
+		if (a != b) return 0;
+	}
+	return 1;
+}
+
+void _find_name_in(X* x) {
+	CELL wid = pop(x), l = pop(x), a = pop(x), w = get(x, LATEST);
+	while (w != 0) {
+		if (get_wl(x, w) == wid && compare_without_case(x, w, a, l) && !has_flag(x, w, HIDDEN)) break;
+		w = get_link(x, w);
+	}
+	push(x, w);
+}
+
+void _find_name(X* x) { eval(x, get(x, ORDER)); }
+
+void _default_order(X* x) { push(x, 1); _find_name_in(x); }
+
+void postpone(X* x, CELL nt) {
+	if (has_flag(x, nt, IMMEDIATE)) compile(x, get_xt(x, nt));
+	else {
+		literal(x, get_xt(x, nt));
+		compile(x, COMPILE);
+	}
 }
 
 /* -- Outer interpreter --------------------------------*/
 
 void interpret(X* x) {
-	CELL w;	
-	while (FETCH(x, ABS(x, IPOS)) < FETCH(x, ABS(x, ILEN))) {
+	CELL w, tok, tlen, n;
+	char buf[15]; char *endptr;
+	printf("------- Interpreting >> [%ld] %.*s", get(x, IPOS), (int)get(x, ILEN), (char*)get(x, IBUF));
+	while ((get(x, IPOS)) < (get(x, ILEN))) {
 		_parse_name(x);
-		if (FETCH(x, ABS(x, ILEN)) == 0) { pop(x); pop(x); return; }
+		if (pick(x, 0) == 0) { pop(x); pop(x); return; }
+		tok = pick(x, 1); tlen = pick(x, 0);
+		printf("TOKEN: [%.*s]\n", tlen, tok);
 		_find_name(x);
 		w = pop(x);
 		if (w != 0) {
-			if (FETCH(x, ABS(x, STATE)) == 0
-			|| (FETCH(x, ABS(x, STATE)) == 1 && HAS_FLAG(x, w, IMMEDIATE))
-			|| (FETCH(x, ABS(x, STATE)) == 2 && HAS_FLAG(x, w, INSTANT))) {
-				eval(x, GET_XT(w));
+			if (get(x, STATE) == 0
+			|| (get(x, STATE) == 1 && has_flag(x, w, IMMEDIATE))
+			|| (get(x, STATE) == 2 && has_flag(x, w, INSTANT))) {
+				eval(x, get_xt(x, w));
 			} else {
-				if (FETCH(x, ABS(x, STATE)) == 1) COMPILE(x, GET_XT(x, w));
-				else /* STATE == 2 */ _postpone(x, w);
+				if (get(x, STATE) == 1) { 
+					compile(x, get_xt(x, w));
+				} else { /* STATE == 2 */ 
+					postpone(x, w);
+				}
+			}
 		} else {
-			/* TODO: Convert to char 'a and to number (with prefix) */
-			/* See both JAVA and C to do it */
+			printf("TOK: %ld TLEN: %d\n", tok, tlen);
+			printf("Converting to number the string [%.*s]\n", tlen, (char*)tok);
+			strncpy(buf, (char*)tok, tlen);
+			buf[tlen] = 0;
+			n = strtol(buf, &endptr, 10);	
+			if (*endptr == '\0') {
+				if (get(x, STATE) == 0) push(x, n);
+				else literal(x, n);
+			} else {
+				printf("%.*s ?\n", (int)tlen, (char*)tok);
+			}
 		}
+		trace(x, 2);
 	}
 }
 
@@ -411,22 +494,22 @@ void interpret(X* x) {
 void evaluate(X* x, char* buf, CELL len, CELL sid) {
 	/* Save previous source */
 	char source[1024];
-	CELL ibuf = FETCH(x, ABS(x, IBUF));
-	CELL ilen = FETCH(x, ABS(x, ILEN));
-	CELL ipos = FETCH(x, ABS(x, IPOS));
+	CELL ibuf = get(x, IBUF);
+	CELL ilen = get(x, ILEN);
+	CELL ipos = get(x, IPOS);
 
 	strncpy(source, (char*)ibuf, ilen);
 
-	STORE(x, ABS(x, IBUF), buf);
-	STORE(x, ABS(x, ILEN), len);	
-	STORE(x, ABS(x, IPOS), 0);
+	set(x, IBUF, (CELL)buf);
+	set(x, ILEN, len);	
+	set(x, IPOS, 0);
 
 	interpret(x);
 
 	/* Restore previous source */
-	STORE(x, ABS(x, IBUF), ibuf);
-	STORE(x, ABS(x, ILEN), ilen);
-	STORE(x, ABS(x, IPOS), ipos);
+	set(x, IBUF, ibuf);
+	set(x, ILEN, ilen);
+	set(x, IPOS, ipos);
 }
 
 void _included(X* x) {
@@ -437,26 +520,34 @@ void _included(X* x) {
 	CELL l = pop(x);
 	CELL a = pop(x);
 	strncpy(filename, (char*)a, (size_t)l);
+	filename[l] = 0;
 
 	f = fopen(filename, "r");
 
-	while (fgets(linebuf, 1024, f)) {
-		evaluate(x, linebuf, strlen(linebuf), (CELL)f);
-	}
+	if (f) {
+		while (fgets(linebuf, 1024, f)) {
+			printf(">> %s", linebuf);
+			evaluate(x, linebuf, strlen(linebuf), (CELL)f);
+		}
 
-	fclose(f);
+		fclose(f);
+	} else {
+		/* TODO: Manage error */
+	}
 }
 
 void bootstrap(X* x) {
-	COMMA(x, 0); /* LATEST */
-	COMMA(x, 0); /* STATE */
-	COMMA(x, 0); /* IBUF */
-	COMMA(x, 0); /* ILEN */
-	COMMA(x, 0); /* IPOS */
+	comma(x, 0); /* LATEST */
+	comma(x, 0); /* STATE */
+	comma(x, 0); /* IBUF */
+	comma(x, 0); /* ILEN */
+	comma(x, 0); /* IPOS */
+	comma(x, primitive(x, &_default_order)); /* ORDER */
 
 	code(x, "NOOP", primitive(x, &_noop));
 	code(x, "EXIT", primitive(x, &_exit));
 	code(x, "LIT", primitive(x, &_lit));
+	code(x, "COMPILE,", primitive(x, &_compile));
 	code(x, "BRANCH", primitive(x, &_branch));
 	code(x, "ZBRANCH", primitive(x, &_zbranch));
 
@@ -503,6 +594,7 @@ void bootstrap(X* x) {
 	/* This code words are not in the basic primitive set */
 
 	code(x, "PARSE-NAME", primitive(x, &_parse_name));
+	code(x, "FIND-NAME", primitive(x, &_find_name));
 
 	code(x, ":", primitive(x, &_colon));
 	code(x, ";", primitive(x, &_semicolon)); set_immediate(x);
@@ -535,6 +627,7 @@ int main() {
 	free(x);
 	*/
 	/* Image creation */
+	/*
 	X* x = malloc(sizeof(X));
 	x->p = malloc(sizeof(P));
 	x->p->p = malloc(sizeof(F) * PSIZE);
@@ -545,6 +638,25 @@ int main() {
 	bootstrap(x);
 
 	save_image(x, "test2.slimg");
+
+	free((void*)x->d);
+	free(x->p);
+	free(x);
+	*/
+	/* REPL */
+	char *filename = "../../4th/sloth.4th";
+	X* x = malloc(sizeof(X));
+	x->p = malloc(sizeof(P));
+	x->p->p = malloc(sizeof(F) * PSIZE);
+	x->p->last = 0;
+	x->p->sz = PSIZE;
+	x->d = (CELL)malloc(DSIZE);
+	init(x, x->d, DSIZE);
+	bootstrap(x);
+
+	push(x, (CELL)filename);
+	push(x, strlen(filename));
+	_included(x);
 
 	free((void*)x->d);
 	free(x->p);
