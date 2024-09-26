@@ -97,7 +97,7 @@ CELL to_rel(X* x, CELL a) { return a - x->d; }
 /* Inner interpreter */
 
 CELL op(X* x) { 
-	CELL o = fetch(x, x->ip);
+	CELL o = fetch(x, to_abs(x, x->ip));
 	x->ip += sCELL;
 	return o; 
 }
@@ -122,14 +122,14 @@ void trace(X* x, CELL l) {
 	for (i = 0; i < x->sp; i++) {
 		printf("%ld ", x->s[i]);
 	}
-	printf("\n");
+	printf(": (%ld) [%ld]\n", x->ip, x->rp);
 }
 
 void inner(X* x) { 
 	CELL t = x->rp; 
 	trace(x, 3);
 	while (t <= x->rp && x->ip >= 0) { 
-		execute(x, op(x)); 
+		execute(x, op(x));
 		trace(x, 3);
 	} 
 }
@@ -176,7 +176,7 @@ TODO: Ensure there are enough functions to allow that.
 */
 
 void _noop(X* x) { }
-void _exit(X* x) { x->ip = x->rp > 0 ? rpop(x) : -1; }
+void _exit(X* x) { x->ip = (x->rp > 0) ? rpop(x) : -1; }
 void _lit(X* x) { push(x, op(x)); }
 void _branch(X* x) { x->ip += op(x); }
 void _zbranch(X* x) { x->ip += pop(x) > 0 ? op(x) - sCELL : 0; }
@@ -452,8 +452,8 @@ void postpone(X* x, CELL nt) {
 void interpret(X* x) {
 	CELL w, tok, tlen, n;
 	char buf[15]; char *endptr;
-	printf("------- Interpreting >> [%ld] %.*s", get(x, IPOS), (int)get(x, ILEN), (char*)get(x, IBUF));
 	while ((get(x, IPOS)) < (get(x, ILEN))) {
+		printf("------- Interpreting >> [%ld] %.*s", get(x, IPOS), (int)get(x, ILEN), (char*)get(x, IBUF));
 		_parse_name(x);
 		if (pick(x, 0) == 0) { pop(x); pop(x); return; }
 		tok = pick(x, 1); tlen = pick(x, 0);
@@ -485,6 +485,7 @@ void interpret(X* x) {
 				printf("%.*s ?\n", (int)tlen, (char*)tok);
 			}
 		}
+		printf("IPOS: %ld ILEN: %ld\n", get(x, IPOS), get(x, ILEN));
 		trace(x, 2);
 	}
 }
@@ -536,7 +537,20 @@ void _included(X* x) {
 	}
 }
 
+void _source(X* x) {
+	push(x, get(x, IBUF));
+	push(x, get(x, ILEN));
+}
+
+void _in(X* x) {
+	push(x, to_abs(x, IPOS));
+}
+
 void bootstrap(X* x) {
+	/* Let's ensure basic primitives have their correct position
+	on the primitives table. */
+	primitives(x);
+
 	comma(x, 0); /* LATEST */
 	comma(x, 0); /* STATE */
 	comma(x, 0); /* IBUF */
@@ -544,12 +558,12 @@ void bootstrap(X* x) {
 	comma(x, 0); /* IPOS */
 	comma(x, primitive(x, &_default_order)); /* ORDER */
 
-	code(x, "NOOP", primitive(x, &_noop));
-	code(x, "EXIT", primitive(x, &_exit));
-	code(x, "LIT", primitive(x, &_lit));
-	code(x, "COMPILE,", primitive(x, &_compile));
-	code(x, "BRANCH", primitive(x, &_branch));
-	code(x, "ZBRANCH", primitive(x, &_zbranch));
+	code(x, "NOOP", -1);
+	code(x, "EXIT", -2);
+	code(x, "LIT", -3);
+	code(x, "COMPILE,", -4);
+	code(x, "BRANCH", -5);
+	code(x, "ZBRANCH", -6);
 
 	code(x, "DROP", primitive(x, &_drop));
 	code(x, "PICK", primitive(x, &_pick));
@@ -598,8 +612,12 @@ void bootstrap(X* x) {
 
 	code(x, ":", primitive(x, &_colon));
 	code(x, ";", primitive(x, &_semicolon)); set_immediate(x);
+	code(x, "IMMEDIATE", primitive(x, &set_immediate));
 
 	code(x, "INCLUDED", primitive(x, &_included));
+
+	code(x, "SOURCE", primitive(x, &_source));
+	code(x, ">IN", primitive(x, &_in));
 }
 
 /* ---------------------------------------------------- */
