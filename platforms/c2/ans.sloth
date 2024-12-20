@@ -1,0 +1,16 @@
+: ?: 32 word find swap drop 0 = 1 + source swap drop over * swap 1 swap - + >in ! ;
+
+?: \ source >in ! drop ; immediate
+
+\ End of line comments can be used now.
+
+\ The previous definition allows for conditional compilation of
+\ one line words on any ANS Forth..
+
+\ Although I would prefer using PARSE-NAME instead of WORD and
+\ FIND-NAME instead of FIND, they are not standarized yet.
+
+\ SLOTH v1.0
+
+
+
