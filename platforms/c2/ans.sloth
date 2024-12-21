@@ -12,5 +12,45 @@
 
 \ SLOTH v1.0
 
+\ -- Compilation ------------------------------------------
+
+?: ,		here ! 1 cells allot ;
+?: C,		here c! 1 chars allot ;
+
+\ PLATFORM DEPENDENT
+\ A system that prefers to pass everything thru the stack
+\ (like ILO) could compile a literal as , postpone LIT
+
+?: LITERAL	postpone LIT , ; immediate
+
+\ -- Control structures -----------------------------------
+
+\ This words have a good balance between simplicity and
+\ usefulness. Some more complicated words (like DO/LOOP)
+\ are not implemented now.
+
+\ PLATFORM DEPENDENT (see comment for LITERAL)
+?: AHEAD	postpone branch here 0 , ; immediate
+\ PLATFORM DEPENDENT (see comment for LITERAL)
+?: IF		postpone ?branch here 0 , ; immediate
+\ I'm not sure if THEN is platform dependent, will it
+\ work correctly if AHEAD or IF are compiled with
+\ the literal first?
+?: THEN		here over - swap ! ; immediate
+
+?: ELSE		postpone ahead swap postpone then ; immediate
+
+?: BEGIN	here ; immediate
+\ PLATFORM DEPENDENT (see comment for LITERAL)
+?: UNTIL	postpone ?branch here - , ; immediate
+\ PLATFORM DEPENDENT (see comment for LITERAL)
+?: AGAIN	postpone branch here - , ; immediate
+
+?: WHILE	postpone if swap ; immediate
+?: REPEAT	postpone again postpone then ; immediate
+
+\ Now that we have conditional compilation and basic control
+\ structures, we can implement a lot of fundamental words.
+
 
 

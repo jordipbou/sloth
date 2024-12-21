@@ -130,6 +130,7 @@ void execute(X* x, CELL q) {
 }
 
 void trace(X* x, char * d, CELL l) {
+/*
 	CELL i;
 	printf("[[%s]] <%ld|%ld|%ld> [%ld] ", d, x->h, fetch(x, x->d), fetch(x, x->d + sCELL), x->sp);
 	for (i = 0; i < x->sp; i++) {
@@ -137,6 +138,7 @@ void trace(X* x, char * d, CELL l) {
 	}
 	printf(": (%ld) [%ld] ", x->ip, x->rp);
 	printf("<< %.*s (%ld)\n", (int)x->tlen, (char *)x->tok, x->tlen);
+*/
 }
 
 /* TODO: Tracing should not be part of this implementation, */
@@ -145,11 +147,8 @@ void trace(X* x, char * d, CELL l) {
 void inner(X* x) { 
 	/* DEBUG */ CELL o; /* \DEBUG */
 	CELL t = x->rp;
-	trace(x, "INNER1", 3);
 	while (t <= x->rp && x->ip >= 0) { 
-		o = op(x); /* DEBUG */
-		execute(x, o); /* op(x)); DEBUG */
-		printf("(%ld) ", o); trace(x, "INNER2", 3);
+		execute(x, op(x));
 	} 
 }
 
@@ -422,16 +421,6 @@ void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
 
 void unset_hidden(X* x) { unset_flag(x, get(x, LATEST), HIDDEN); }
 
-/* Postponing words */
-
-void postpone(X* x, CELL nt) {
-	if (has_flag(x, nt, IMMEDIATE)) compile(x, nt);
-	else {
-		literal(x, nt);
-		compile(x, COMPILE);
-	}
-}
-
 /* Finding words */
 
 /* Helper function to compare a string and a word's name */
@@ -529,23 +518,30 @@ void _word(X* x) {
 	}
 	end = ibuf + ipos;	
 	/* Now, copy it to the counted string buffer */
-	/* DEBUG */ printf("WORD: (%ld) ", end - start); /* \DEBUG */
 	cstore(x, to_abs(x, here(x) + CBUF), end - start);
 	for (i = 0; i < (end - start); i++) {
-		/* DEBUG */ printf("%c", cfetch(x, start + i*sCHAR)); /* \DEBUG */
 		cstore(x, to_abs(x, here(x) + CBUF + sCHAR + i*sCHAR), cfetch(x, start + i*sCHAR));
 	}
-	/* DEBUG */ printf("\n"); /* \DEBUG */
 	push(x, to_abs(x, here(x) + CBUF));
 	/* If we are not at the end of the input buffer, */
 	/* skip c after the word, but its not part of the counted */
 	/* string */
 	if (ipos < ilen) ipos++;
 	set(x, IPOS, ipos);
-	/* DEBUG Here we store the parsed string at tok and tlen */
-	x->tok = to_abs(x, here(x) + CBUF + sCHAR);
-	x->tlen = end - start;
-	/* \DEBUG */
+}
+
+/* Postponing words */
+
+void _postpone(X* x) {
+	push(x, 32); _word(x);
+	_find(x);
+	if (pick(x, 0) == 0) { /* TODO THROW Undefined word */ }
+	if (pop(x) == 1 /* IMMEDIATE WORD */) {
+		compile(x, pop(x));
+	} else /* NORMAL WORD */ {
+		literal(x, pop(x));
+		compile(x, COMPILE);
+	}
 }
 
 /* Outer interpreter */
@@ -577,19 +573,6 @@ void _interpret(X* x) {
 			} else {
 				compile(x, pop(x));
 			}
-			/*
-			_to_name(x);
-			trace(x, 3);
-			nt = pop(x);
-			if (get(x, STATE) == 0
-			|| (get(x, STATE) == 1 && has_flag(x, nt, IMMEDIATE))
-			|| (get(x, STATE) == 2 && has_flag(x, nt, INSTANT))) {
-				eval(x, nt);	
-			} else {
-				if (get(x, STATE) == 1) compile(x, nt);
-				else */ /* STATE == 2 */ /* postpone(x, nt);
-			} 
-			*/
 		} else {
 			_drop(x);
 			strncpy(buf, (char*)x->tok, x->tlen);
@@ -601,13 +584,6 @@ void _interpret(X* x) {
 			} else {
 				/* TODO Word not found, should throw an exception? */
 				printf("%.*s ?\n", (int)x->tlen, (char*)x->tok);
-				/* Print all words */
-				n = get(x, LATEST);
-				while (n != 0) {
-					printf("[%ld] %.*s ", n, (int)get_namelen(x, n), (char *)get_name_addr(x, n));
-					n = get_link(x, n);
-				}
-				printf("\n");
 			}
 		}
 	}
@@ -685,21 +661,16 @@ void _colon(X* x) {
 }
 
 void _semicolon(X* x) {
-	/* DEBUG */
-	CELL xt, op;
-	/* \DEBUG */
 	compile(x, EXIT);
 	set(x, STATE, 0);
 	unset_hidden(x);
-	/* DEBUG Print compilation */
-	xt = get_xt(x, get(x, LATEST));
-	while ((op = get(x, xt)) != EXIT) {
-		printf("%ld ", op);
-		xt += sCELL;
-	}
-	printf("%ld \n", (CELL)EXIT);
-	/* \DEBUG */
 }
+
+void _here(X* x) { push(x, to_abs(x, here(x))); }
+void _allot(X* x) { allot(x, pop(x)); }
+
+void _cells(X* x) { push(x, pop(x) * sCELL); }
+void _chars(X* x) { push(x, pop(x) * sCHAR); }
 
 /* Helpers to add functions to the dictionary as words */
 
@@ -708,11 +679,6 @@ CELL primitive(X* x, F f) {
 	return 0 - x->p->last; 
 }
 
-/* TODO Ok, I have a problem here. In my previous iteration I */
-/* defined primitives as those that have a negative XT. */
-/* Now, NT and XT are equal, so it's not possible to have a */
-/* negative XT anymore. */
-/* How can I solve this? */
 CELL code(X* x, char* name, CELL xt) {
 	CELL w = header(x, (CELL)name, strlen(name));
 	set_xt(x, w, xt);
@@ -787,11 +753,20 @@ void bootstrap(X* x) {
 	code(x, ">IN", primitive(x, &_in));
 	code(x, ";", primitive(x, &_semicolon)); _immediate(x);
 	code(x, "IMMEDIATE", primitive(x, &_immediate));
+	code(x, "POSTPONE", primitive(x, &_postpone)); _immediate(x);
+	code(x, "HERE", primitive(x, &_here));
+	code(x, "ALLOT", primitive(x, &_allot));
+	code(x, "CELLS", primitive(x, &_cells));
+	code(x, "CHARS", primitive(x, &_chars));
 }
 
 /* ---------------------------------------------------- */
 /* -- Main -------------------------------------------- */
 /* ---------------------------------------------------- */
+
+void _repl(X* x) {
+	/* TODO */
+}
 
 int main() {
 	CELL w;
@@ -809,6 +784,8 @@ int main() {
 	push(x, (CELL)filename);
 	push(x, strlen(filename));
 	_included(x);
+
+	_repl(x);
 
 	free((void*)x->d);
 	free(x->p);
