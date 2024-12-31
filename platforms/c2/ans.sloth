@@ -17,11 +17,16 @@
 ?: ,		here ! 1 cells allot ;
 ?: C,		here c! 1 chars allot ;
 
+\ POSTPONE its a long word that also does not show that its 
+\ a parsing word. This definition corrects both problems:
+
+?: P:		postpone postpone ; immediate
+
 \ PLATFORM DEPENDENT
 \ A system that prefers to pass everything thru the stack
 \ (like ILO) could compile a literal as , postpone LIT
 
-?: LITERAL	postpone LIT , ; immediate
+?: LITERAL	p: LIT , ; immediate
 
 \ -- Control structures -----------------------------------
 
@@ -30,27 +35,131 @@
 \ are not implemented now.
 
 \ PLATFORM DEPENDENT (see comment for LITERAL)
-?: AHEAD	postpone branch here 0 , ; immediate
+?: AHEAD	p: branch here 0 , ; immediate
 \ PLATFORM DEPENDENT (see comment for LITERAL)
-?: IF		postpone ?branch here 0 , ; immediate
+?: IF		p: ?branch here 0 , ; immediate
 \ I'm not sure if THEN is platform dependent, will it
 \ work correctly if AHEAD or IF are compiled with
 \ the literal first?
 ?: THEN		here over - swap ! ; immediate
 
-?: ELSE		postpone ahead swap postpone then ; immediate
+?: ELSE		p: ahead swap p: then ; immediate
 
 ?: BEGIN	here ; immediate
 \ PLATFORM DEPENDENT (see comment for LITERAL)
-?: UNTIL	postpone ?branch here - , ; immediate
+?: UNTIL	p: ?branch here - , ; immediate
 \ PLATFORM DEPENDENT (see comment for LITERAL)
-?: AGAIN	postpone branch here - , ; immediate
+?: AGAIN	p: branch here - , ; immediate
 
-?: WHILE	postpone if swap ; immediate
-?: REPEAT	postpone again postpone then ; immediate
+?: WHILE	p: if swap ; immediate
+?: REPEAT	p: again p: then ; immediate
 
 \ Now that we have conditional compilation and basic control
 \ structures, we can implement a lot of fundamental words.
 
+\ -- Stack shuffling --------------------------------------
 
+\ The only required primitives for stack shuffling are:
+\ DROP PICK OVER SWAP >R R>
 
+?: DUP		0 pick ;
+?: ?DUP		dup if dup then ;
+
+\ Although OVER can be easily defined by PICK its used on the
+\ definition of THEN above. Its possible to change the THEN
+\ definition to use 1 PICK or to define THEN as a primitive.
+\ Until then, here it is.
+?: OVER		1 pick ;
+
+?: R@     p: r> p: dup p: >r ; immediate
+
+?: ROT		>r swap r> swap ;	
+?: -ROT		rot rot ;
+?: NIP		swap drop ;
+?: TUCK		>r r@ swap r> ;
+
+?: ROLL		dup if swap >r 1 - recurse r> swap exit then drop ;
+
+?: 2DROP	drop drop ;
+?: 2DUP		over over ;
+?: 2OVER	3 pick 3 pick ;
+
+?: 2SWAP	>r -rot r> -rot ;
+
+?: 2>R		p: swap p: >r p: >r ; immediate
+?: 2R@		p: r> p: r> p: swap p: 2dup p: swap p: >r p: >r ; immediate
+?: 2R>		p: r> p: r> p: swap ; immediate
+
+?: 2RDROP	p: r> p: r> p: drop p: drop ; immediate
+
+\ -- Arithmetic -------------------------------------------
+
+?: +			0 swap - - ;
+?: *			1 */mod swap drop ;
+?: /			1 swap */mod swap drop ;
+?: */			*/mod swap drop ;
+?: MOD		1 swap */mod drop ;
+?: /MOD		1 swap */mod ;
+
+?: 1+			1 + ;
+?: 1-			1 - ;
+
+?: 2*			2 * ;
+
+?: ABS		dup 0 < if invert 1+ then ;
+
+\ -- Bit\Logic --------------------------------------------
+
+?: NEGATE invert 1+ ;
+
+?: OR			invert swap invert and invert ;
+?: XOR		over over invert and >r swap invert and r> or ;
+
+\ -- Comparisons ------------------------------------------
+
+?: <			2dup xor 0< if drop 0< else - 0< then ;
+?: >			swap < ;
+?: <=			> invert ;
+?: >=			< invert ;
+?: 0=			if 0 else 0 invert then ;
+?: 0>			0 > ;
+?: 0<>		0= 0= ;
+?: 0<			0 < ;
+?: NOT		0= ;
+?: =			- 0= ;
+?: <>			= invert ;
+?: U<			2dup xor 0< if swap drop 0< else - 0< then ;
+?: U>			swap u< ;
+?: WITHIN over - >r - r> u< ; 
+
+?: MIN		2dup > if swap then drop ;
+?: MAX		2dup < if swap then drop ;
+
+\ -- Memory -----------------------------------------------
+
+?: CELL		1 cells ;
+
+?: CELL+	1 cells + ;
+?: CHAR+	1 chars + ;
+?: CELL-	1 cells - ;
+?: CHAR-	1 chars - ;
+
+?: ALIGNED	cell+ 1- 1 cells 1- invert and ; \ ( addr -- a-addr )
+?: ALIGN		here aligned here - allot ; \ ( -- )
+
+\ PLATFORM DEPENDENT - NON ANS
+?: HERE,	here 2 cells + p: literal ;
+
+?: 0!		0 swap ! ; \ ( a-addr -- )
+?: +!		swap over @ + swap ! ; \ ( n | u a-addr -- )
+?: 1+!	dup @ 1 + swap ! ; \ ( a-addr -- )
+?: 1-!	dup @ 1 - swap ! ; \ ( a-addr -- )
+
+?: 2!		swap over ! cell+ ! ; \ ( x1 x2 a-addr -- )
+?: 2@		dup cell+ @ swap @ ; \ ( a-addr -- x1 x2 )
+
+\ TODO I do need loops of some kind now:
+\ [: ;] times
+\ do loop
+\ for next
+\ ...whatever

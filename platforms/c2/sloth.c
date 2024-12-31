@@ -130,25 +130,26 @@ void execute(X* x, CELL q) {
 }
 
 void trace(X* x, char * d, CELL l) {
-/*
 	CELL i;
-	printf("[[%s]] <%ld|%ld|%ld> [%ld] ", d, x->h, fetch(x, x->d), fetch(x, x->d + sCELL), x->sp);
-	for (i = 0; i < x->sp; i++) {
-		printf("%ld ", x->s[i]);
+	if (l > 3) {
+		printf("[[%s]] <%ld|%ld|%ld> [%ld] ", d, x->h, fetch(x, x->d), fetch(x, x->d + sCELL), x->sp);
+		for (i = 0; i < x->sp; i++) {
+			printf("%ld ", x->s[i]);
+		}
+		printf(": (%ld) [%ld] ", x->ip, x->rp);
+		printf("<< %.*s (%ld)\n", (int)x->tlen, (char *)x->tok, x->tlen);
 	}
-	printf(": (%ld) [%ld] ", x->ip, x->rp);
-	printf("<< %.*s (%ld)\n", (int)x->tlen, (char *)x->tok, x->tlen);
-*/
 }
 
 /* TODO: Tracing should not be part of this implementation, */
 /* as an inner interpreter with tracing can be implemented  */
-/* in Forth, an speed is not a problem if we are tracing.   */
+/* in Forth, and speed is not a problem if we are tracing.   */
 void inner(X* x) { 
 	/* DEBUG */ CELL o; /* \DEBUG */
 	CELL t = x->rp;
 	while (t <= x->rp && x->ip >= 0) { 
 		execute(x, op(x));
+		/* trace(x, "INNER", 4); */
 	} 
 }
 
@@ -196,8 +197,8 @@ TODO: Ensure there are enough functions to allow that.
 void _noop(X* x) { }
 void _exit(X* x) { x->ip = (x->rp > 0) ? rpop(x) : -1; }
 void _lit(X* x) { push(x, op(x)); }
-void _branch(X* x) { x->ip += op(x); }
-void _zbranch(X* x) { x->ip += pop(x) > 0 ? op(x) - sCELL : 0; }
+void _branch(X* x) { x->ip += op(x) - sCELL; }
+void _zbranch(X* x) { x->ip += pop(x) == 0 ? (op(x) - sCELL) : sCELL; }
 
 void _drop(X* x) { pop(x); }
 void _pick(X* x) { push(x, pick(x, pop(x))); }
@@ -672,6 +673,38 @@ void _allot(X* x) { allot(x, pop(x)); }
 void _cells(X* x) { push(x, pop(x) * sCELL); }
 void _chars(X* x) { push(x, pop(x) * sCHAR); }
 
+void _recurse(X* x) {
+	CELL xt = get_xt(x, get(x, LATEST));
+	compile(x, xt);
+}
+
+/* Words needed for testing, will not be needed after */
+
+void _see(X* x) {
+	CELL nt, ip, op;
+	_to_name(x);
+	nt = pop(x);
+	printf("LINK: %ld\n", get_link(x, nt));
+	printf("XT: %ld\n", get_xt(x, nt));
+	printf("WORDLIST: %ld\n", get_wordlist(x, nt));
+	printf("FLAGS: %d\n", (char)get_flags(x, nt));
+	printf("NAME: %.*s\n", (int)get_namelen(x, nt), (char *)get_name_addr(x, nt));
+	if (get_xt(x, nt) > 0) {
+		ip = to_abs(x, get_xt(x, nt));
+		while ((op = fetch(x, ip)) != EXIT) {
+			printf("%ld ", op);
+			ip += sCELL;
+		}
+		printf("%d\n", EXIT);
+	}
+}
+
+void _see_colon(X* x) {
+	push(x, 32); _word(x);
+	_find(x); _drop(x);
+	_see(x);
+}
+
 /* Helpers to add functions to the dictionary as words */
 
 CELL primitive(X* x, F f) { 
@@ -701,7 +734,7 @@ void bootstrap(X* x) {
 	code(x, "EXIT", primitive(x, &_exit));
 	code(x, "LIT", primitive(x, &_lit));
 	code(x, "BRANCH", primitive(x, &_branch));
-	code(x, "ZBRANCH", primitive(x, &_zbranch));
+	code(x, "?BRANCH", primitive(x, &_zbranch));
 	code(x, "COMPILE,", primitive(x, &_compile));
 
 	code(x, "DROP", primitive(x, &_drop));
@@ -758,20 +791,39 @@ void bootstrap(X* x) {
 	code(x, "ALLOT", primitive(x, &_allot));
 	code(x, "CELLS", primitive(x, &_cells));
 	code(x, "CHARS", primitive(x, &_chars));
+	code(x, "RECURSE", primitive(x, &_recurse)); _immediate(x);
+
+	/* Words for testing, will not be needed after */
+
+	code(x, "SEE", primitive(x, &_see));
+	code(x, "SEE:", primitive(x, &_see_colon));
+}
+
+/* ---------------------------------------------------- */
+/* -- REPL -- only for testing purposes --------------- */
+/* ---------------------------------------------------- */
+
+void repl(X* x) {
+	char buf[80];
+	while (1) {
+		printf("[IN] >> ");
+		if (fgets(buf, 80, stdin) != 0) {
+			evaluate_str(x, buf, strlen(buf), -1);	
+			trace(x, "[OUT] ", 4);
+		} else {
+			/* TODO: Error */
+		}
+	}
 }
 
 /* ---------------------------------------------------- */
 /* -- Main -------------------------------------------- */
 /* ---------------------------------------------------- */
 
-void _repl(X* x) {
-	/* TODO */
-}
-
 int main() {
 	CELL w;
-
 	char *filename = "ans.sloth";
+
 	X* x = malloc(sizeof(X));
 	x->p = malloc(sizeof(P));
 	x->p->p = malloc(sizeof(F) * PSIZE);
@@ -785,7 +837,7 @@ int main() {
 	push(x, strlen(filename));
 	_included(x);
 
-	_repl(x);
+	repl(x);
 
 	free((void*)x->d);
 	free(x->p);
