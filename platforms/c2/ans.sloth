@@ -4,29 +4,29 @@
 
 \ End of line comments can be used now.
 
-\ The previous definition allows for conditional compilation of
-\ one line words on any ANS Forth..
+\ The first definition allows for conditional 
+\ compilation of one line words on any ANS Forth..
 
-\ Although I would prefer using PARSE-NAME instead of WORD and
-\ FIND-NAME instead of FIND, they are not standarized yet.
+\ -- Stack comments ---------------------------------------
+
+?: ( 41 word drop ; immediate
 
 \ SLOTH v1.0
 
+\ TODO Explain SLOTH
+
 \ -- Compilation ------------------------------------------
 
-?: ,		here ! 1 cells allot ;
-?: C,		here c! 1 chars allot ;
+?: , ( x -- ) here ! 1 cells allot ;
+?: C, ( char -- ) here c! 1 chars allot ;
 
 \ POSTPONE its a long word that also does not show that its 
 \ a parsing word. This definition corrects both problems:
 
-?: P:		postpone postpone ; immediate
+?: P: ( "<spaces>name" -- ) postpone postpone ; immediate
 
 \ PLATFORM DEPENDENT
-\ A system that prefers to pass everything thru the stack
-\ (like ILO) could compile a literal as , postpone LIT
-
-?: LITERAL	p: LIT , ; immediate
+?: LITERAL ( C: x -- ) ( -- x ) p: LIT , ; immediate
 
 \ -- Control structures -----------------------------------
 
@@ -34,132 +34,144 @@
 \ usefulness. Some more complicated words (like DO/LOOP)
 \ are not implemented now.
 
-\ PLATFORM DEPENDENT (see comment for LITERAL)
-?: AHEAD	p: branch here 0 , ; immediate
-\ PLATFORM DEPENDENT (see comment for LITERAL)
-?: IF		p: ?branch here 0 , ; immediate
-\ I'm not sure if THEN is platform dependent, will it
-\ work correctly if AHEAD or IF are compiled with
-\ the literal first?
-?: THEN		here over - swap ! ; immediate
+\ PLATFORM DEPENDENT (depends on implementation of BRANCH)
+?: AHEAD ( C: -- orig ) ( -- ) p: branch here 0 , ; immediate
+\ PLATFORM DEPENDENT (depends on implementation of ?BRANCH)
+?: IF ( C: -- orig ) ( x -- ) p: ?branch here 0 , ; immediate
+?: THEN ( C: -- orig ) ( -- ) here over - swap ! ; immediate
+?: ELSE ( C: orig1 -- orig2 ) ( -- ) p: ahead swap p: then ; immediate
 
-?: ELSE		p: ahead swap p: then ; immediate
+?: BEGIN ( C: -- dest ) ( -- ) here ; immediate
+\ PLATFORM DEPENDENT (depends on implementation of ?BRANCH)
+?: UNTIL ( C: dest -- ) ( x -- ) p: ?branch here - , ; immediate
+\ PLATFORM DEPENDENT (depends on implementation of BRANCH)
+?: AGAIN ( C: dest -- ) ( -- ) p: branch here - , ; immediate
+?: WHILE ( C: dest -- orig dest ) ( x -- ) p: if swap ; immediate
+?: REPEAT	( C: orig dest -- ) ( -- ) p: again p: then ; immediate
 
-?: BEGIN	here ; immediate
-\ PLATFORM DEPENDENT (see comment for LITERAL)
-?: UNTIL	p: ?branch here - , ; immediate
-\ PLATFORM DEPENDENT (see comment for LITERAL)
-?: AGAIN	p: branch here - , ; immediate
+\ ---------------------------------------------------------
 
-?: WHILE	p: if swap ; immediate
-?: REPEAT	p: again p: then ; immediate
-
-\ Now that we have conditional compilation and basic control
-\ structures, we can implement a lot of fundamental words.
+\ Now that we have conditional compilation and basic 
+\ control structures, we can implement a lot of fundamental 
+\ words.
 
 \ -- Stack shuffling --------------------------------------
 
 \ The only required primitives for stack shuffling are:
 \ DROP PICK OVER SWAP >R R>
 
-?: DUP		0 pick ;
-?: ?DUP		dup if dup then ;
+?: DUP ( x -- x x ) 0 pick ;
+?: ?DUP	( x -- 0 | x x ) dup if dup then ;
 
-\ Although OVER can be easily defined by PICK its used on the
-\ definition of THEN above. Its possible to change the THEN
-\ definition to use 1 PICK or to define THEN as a primitive.
-\ Until then, here it is.
-?: OVER		1 pick ;
+?: R@ ( -- x ) ( R: x -- x ) p: r> p: dup p: >r ; immediate
 
-?: R@     p: r> p: dup p: >r ; immediate
+?: ROT ( x1 x2 x3 -- x2 x3 x1 ) >r swap r> swap ;	
+?: -ROT ( x1 x2 x3 -- x3 x1 x2 ) rot rot ;
+?: NIP ( x1 x2 -- x2 ) swap drop ;
+?: TUCK ( x1 x2 -- x2 x1 x2 ) >r r@ swap r> ;
 
-?: ROT		>r swap r> swap ;	
-?: -ROT		rot rot ;
-?: NIP		swap drop ;
-?: TUCK		>r r@ swap r> ;
+( xu xu-1 ... x0 u -- xu-1 ... x0 xu )
+?: ROLL dup if swap >r 1 - recurse r> swap exit then drop ;
 
-?: ROLL		dup if swap >r 1 - recurse r> swap exit then drop ;
+?: 2DROP ( x1 x2 -- ) drop drop ;
+?: 2DUP ( x1 x2 -- x1 x2 x1 x2 ) over over ;
+?: 2OVER ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 ) 3 pick 3 pick ;
 
-?: 2DROP	drop drop ;
-?: 2DUP		over over ;
-?: 2OVER	3 pick 3 pick ;
+?: 2SWAP ( x1 x2 x3 x4 -- x3 x4 x1 x2 ) >r -rot r> -rot ;
 
-?: 2SWAP	>r -rot r> -rot ;
+?: 2>R ( x1 x2 -- ) ( R: -- x1 x2 ) p: swap p: >r p: >r ; immediate
+?: 2R@ ( -- x1 x2 ) ( R: x1 x2 -- x1 x2 ) p: r> p: r> p: swap p: 2dup p: swap p: >r p: >r ; immediate
+?: 2R> ( -- x1 x2 ) ( R: x1 x2 -- ) p: r> p: r> p: swap ; immediate
 
-?: 2>R		p: swap p: >r p: >r ; immediate
-?: 2R@		p: r> p: r> p: swap p: 2dup p: swap p: >r p: >r ; immediate
-?: 2R>		p: r> p: r> p: swap ; immediate
-
-?: 2RDROP	p: r> p: r> p: drop p: drop ; immediate
+?: 2RDROP	( x1 x2 -- ) p: r> p: r> p: drop p: drop ; immediate
 
 \ -- Arithmetic -------------------------------------------
 
-?: +			0 swap - - ;
-?: *			1 */mod swap drop ;
-?: /			1 swap */mod swap drop ;
-?: */			*/mod swap drop ;
-?: MOD		1 swap */mod drop ;
-?: /MOD		1 swap */mod ;
+?: + ( n1 | u1 n2 | u2 -- n3 | u3 ) 0 swap - - ;
+?: * ( n1 | u1 n2 | u2 -- n3 | u3 ) 1 */mod swap drop ;
+?: / ( n1 n2 -- n3 ) 1 swap */mod swap drop ;
+?: */ ( n1 n2 n3 -- n4 ) */mod swap drop ;
+?: MOD ( n1 n2 -- n3 ) 1 swap */mod drop ;
+?: /MOD	( n1 n2 -- n3 n4 ) 1 swap */mod ;
 
-?: 1+			1 + ;
-?: 1-			1 - ;
+?: 1+ ( n1 | u1 -- n2 | u2 ) 1 + ;
+?: 1- ( n1 | u1 -- n2 | u2 ) 1 - ;
 
-?: 2*			2 * ;
+?: 2* ( x1 -- x2 ) 2 * ;
 
-?: ABS		dup 0 < if invert 1+ then ;
+?: ABS ( n -- u ) dup 0 < if invert 1+ then ;
 
 \ -- Bit\Logic --------------------------------------------
 
-?: NEGATE invert 1+ ;
+?: NEGATE ( n1 -- n2 ) invert 1+ ;
 
-?: OR			invert swap invert and invert ;
-?: XOR		over over invert and >r swap invert and r> or ;
+?: OR	( x1 x2 -- x3 ) invert swap invert and invert ;
+?: XOR ( x1 x2 -- x3 ) over over invert and >r swap invert and r> or ;
 
 \ -- Comparisons ------------------------------------------
 
-?: <			2dup xor 0< if drop 0< else - 0< then ;
-?: >			swap < ;
-?: <=			> invert ;
-?: >=			< invert ;
-?: 0=			if 0 else 0 invert then ;
-?: 0>			0 > ;
-?: 0<>		0= 0= ;
-?: 0<			0 < ;
-?: NOT		0= ;
-?: =			- 0= ;
-?: <>			= invert ;
-?: U<			2dup xor 0< if swap drop 0< else - 0< then ;
-?: U>			swap u< ;
-?: WITHIN over - >r - r> u< ; 
+?: < ( n1 n2 -- flag ) 2dup xor 0< if drop 0< else - 0< then ;
+?: > ( n1 n2 -- flag ) swap < ;
+?: <=	( n1 n2 -- flag ) > invert ;
+?: >=	( n1 n2 -- flag ) < invert ;
+?: 0=	( x -- flag ) if 0 else 0 invert then ;
+?: 0> ( x -- flag ) 0 > ;
+?: 0<> ( x -- flag ) 0= 0= ;
+?: 0< ( x -- flag ) 0 < ;
+?: NOT ( x1 -- x2 ) 0= ;
+?: = ( x1 x2 -- flag ) - 0= ;
+?: <> ( x1 x2 -- flag ) = invert ;
+?: U<	( u1 u2 -- flag ) 2dup xor 0< if swap drop 0< else - 0< then ;
+?: U>	( u1 u2 -- flag ) swap u< ;
+?: WITHIN ( n1 | u1 n2 | u2 n3 | u3 -- flag ) over - >r - r> u< ; 
 
-?: MIN		2dup > if swap then drop ;
-?: MAX		2dup < if swap then drop ;
+?: MIN ( n1 n2 -- n3 ) 2dup > if swap then drop ;
+?: MAX ( n1 n2 -- n3 ) 2dup < if swap then drop ;
 
 \ -- Memory -----------------------------------------------
 
-?: CELL		1 cells ;
+?: CELL ( -- u ) 1 cells ;
 
-?: CELL+	1 cells + ;
-?: CHAR+	1 chars + ;
-?: CELL-	1 cells - ;
-?: CHAR-	1 chars - ;
+?: CELL+ ( a-addr1 -- a-addr2 ) 1 cells + ;
+?: CHAR+ ( c-addr1 -- c-addr2 ) 1 chars + ;
+?: CELL- ( a-addr1 -- a-addr2 ) 1 cells - ;
+?: CHAR- ( c-addr1 -- c-addr2 ) 1 chars - ;
 
-?: ALIGNED	cell+ 1- 1 cells 1- invert and ; \ ( addr -- a-addr )
-?: ALIGN		here aligned here - allot ; \ ( -- )
+?: ALIGNED ( addr -- a-addr ) cell+ 1- 1 cells 1- invert and ;
+?: ALIGN ( -- ) here aligned here - allot ;
 
 \ PLATFORM DEPENDENT - NON ANS
-?: HERE,	here 2 cells + p: literal ;
+?: HERE, ( x -- ) here 2 cells + p: literal ;
 
-?: 0!		0 swap ! ; \ ( a-addr -- )
-?: +!		swap over @ + swap ! ; \ ( n | u a-addr -- )
-?: 1+!	dup @ 1 + swap ! ; \ ( a-addr -- )
-?: 1-!	dup @ 1 - swap ! ; \ ( a-addr -- )
+?: 0! ( a-addr -- ) 0 swap ! ;
+?: +! ( n | u a-addr -- ) swap over @ + swap ! ;
+?: 1+! ( a-addr -- ) dup @ 1 + swap ! ;
+?: 1-! ( a-addr -- ) dup @ 1 - swap ! ;
 
-?: 2!		swap over ! cell+ ! ; \ ( x1 x2 a-addr -- )
-?: 2@		dup cell+ @ swap @ ; \ ( a-addr -- x1 x2 )
+?: 2! ( x1 x2 a-addr -- ) swap over ! cell+ ! ;
+?: 2@	( a-addr -- x1 x2 ) dup cell+ @ swap @ ;
 
-\ TODO I do need loops of some kind now:
-\ [: ;] times
-\ do loop
-\ for next
-\ ...whatever
+\ ANS Forth talks about address units (the minimum
+\ addresable unit in memory space), but offers no
+\ words to work with them (except of MOVE).
+
+\ B@ and B! allow working with address units which
+\ normally are the same as characters. In cases where
+\ that is not true (like the Java implementation of SLOTH)
+\ then B@ and B! must be defined in the bootstrap code.
+
+?: B@		C@ ;
+?: B!		C! ;
+
+\ MOVE deals with address units.
+
+\ TODO Lets deal with weird cases when I can test everything
+
+?: MOVE ( addr1 addr2 u -- ) begin dup 0> while >r over b@ over b! 1+ swap 1+ swap r> 1- repeat drop drop drop ;
+
+?: FILL ( c-addr u char -- ) -rot begin dup 0> while >r 2dup c! char+ r> 1- repeat drop drop drop ;
+
+?: ERASE ( addr u -- ) begin dup 0> while >r 0 over b! 1+ r> 1- repeat drop drop ;
+
+\ BOUNDS is not an ANS word, but its useful.
+?: BOUNDS ( c-addr u -- c-addr1 c-addr2 ) over + swap ;
