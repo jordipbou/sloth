@@ -188,7 +188,7 @@ void throw(X* x, CELL e) {
 /* ---------------------------------------------------- */
 
 /* 
-TODO: This primitives are implemented using only functions
+This primitives are implemented using only functions
 and macros from the previous section thus making it
 easier to port to other platforms.
 TODO: Ensure there are enough functions to allow that.
@@ -197,6 +197,7 @@ TODO: Ensure there are enough functions to allow that.
 void _noop(X* x) { }
 void _exit(X* x) { x->ip = (x->rp > 0) ? rpop(x) : -1; }
 void _lit(X* x) { push(x, op(x)); }
+void _rip(X* x) { push(x, to_abs(x, x->ip) + op(x) - sCELL); }
 void _branch(X* x) { x->ip += op(x) - sCELL; }
 void _zbranch(X* x) { x->ip += pop(x) == 0 ? (op(x) - sCELL) : sCELL; }
 
@@ -220,7 +221,7 @@ void _rshift(X* x) { CELL a = pop(x); push(x, pop(x) >> a); }
 void _lshift(X* x) { CELL a = pop(x); push(x, pop(x) << a); }
 
 /* 
-To implement this words, check:
+TODO To implement this words, check:
 pforth/csrc/pf_inner.c (around line 700)
 */
 void _times_slash_mod(X* x) { /* TODO */ }
@@ -248,50 +249,51 @@ void primitives(X* x) {
 	x->p->p[0] = &_noop;
 	x->p->p[1] = &_exit;
 	x->p->p[2] = &_lit;
-	x->p->p[3] = &_branch;
-	x->p->p[4] = &_zbranch;
+	x->p->p[3] = &_rip;
+	x->p->p[4] = &_branch;
+	x->p->p[5] = &_zbranch;
 
-	x->p->p[5] = &_drop;
-	x->p->p[6] = &_pick;
-	x->p->p[7] = &_over;
-	x->p->p[8] = &_swap;
+	x->p->p[6] = &_drop;
+	x->p->p[7] = &_pick;
+	x->p->p[8] = &_over;
+	x->p->p[9] = &_swap;
 
-	x->p->p[9] = &_r_to;
-	x->p->p[10] = &_r_fetch;
-	x->p->p[11] = &_r_from;
+	x->p->p[10] = &_r_to;
+	x->p->p[11] = &_r_fetch;
+	x->p->p[12] = &_r_from;
 
-	x->p->p[12] = &_add;
-	x->p->p[13] = &_sub;
-	x->p->p[14] = &_mul;
-	x->p->p[15] = &_div;
-	x->p->p[16] = &_mod;
+	x->p->p[13] = &_add;
+	x->p->p[14] = &_sub;
+	x->p->p[15] = &_mul;
+	x->p->p[16] = &_div;
+	x->p->p[17] = &_mod;
 
-	x->p->p[17] = &_two_slash;
-	x->p->p[18] = &_rshift;
-	x->p->p[19] = &_lshift;
+	x->p->p[18] = &_two_slash;
+	x->p->p[19] = &_rshift;
+	x->p->p[20] = &_lshift;
 
-	x->p->p[20] = &_times_slash_mod;
-	x->p->p[21] = &_um_times;
-	x->p->p[22] = &_um_slash_mod;
+	x->p->p[21] = &_times_slash_mod;
+	x->p->p[22] = &_um_times;
+	x->p->p[23] = &_um_slash_mod;
 
-	x->p->p[23] = &_lt;
-	x->p->p[24] = &_eq;
-	x->p->p[25] = &_gt;
+	x->p->p[24] = &_lt;
+	x->p->p[25] = &_eq;
+	x->p->p[26] = &_gt;
 
-	x->p->p[26] = &_and;
-	x->p->p[27] = &_or;
-	x->p->p[28] = &_xor;
-	x->p->p[29] = &_invert;
+	x->p->p[27] = &_and;
+	x->p->p[28] = &_or;
+	x->p->p[29] = &_xor;
+	x->p->p[30] = &_invert;
 
-	x->p->p[30] = &_fetch;
-	x->p->p[31] = &_store;
-	x->p->p[32] = &_cfetch;
-	x->p->p[33] = &_cstore;
+	x->p->p[31] = &_fetch;
+	x->p->p[32] = &_store;
+	x->p->p[33] = &_cfetch;
+	x->p->p[34] = &_cstore;
 
-	x->p->p[34] = &_catch;
-	x->p->p[35] = &_throw;
+	x->p->p[35] = &_catch;
+	x->p->p[36] = &_throw;
 
-	x->p->last = 36;
+	x->p->last = 37;
 }
 
 /* Loading and saving already bootstrapped images */
@@ -336,9 +338,10 @@ void save_image(X* x, char* filename) {
 #define NOOP					-1	/* Not used in C code? */
 #define EXIT					-2
 #define LIT						-3
-#define BRANCH				-4  /* Not used in C code? */
-#define ZBRANCH				-5  /* Not used in C code? */
-#define COMPILE				-6
+#define RIP						-4
+#define BRANCH				-5  /* Not used in C code? */
+#define ZBRANCH				-6  /* Not used in C code? */
+#define COMPILE				-7
 
 /* These constants represent variable positions needed */
 /* in C code */
@@ -349,6 +352,7 @@ void save_image(X* x, char* filename) {
 #define ILEN					4*sCELL
 /* Not used in this impl. #define ORDER					5*sCELL */
 #define SOURCE_ID			6*sCELL
+#define DOES					7*sCELL
 
 /* Word flags */
 #define HIDDEN				1
@@ -678,6 +682,42 @@ void _recurse(X* x) {
 	compile(x, xt);
 }
 
+/* DOES compiles a call in the new CREATEd word, replacing */
+/* the first EXIT compiled on CREATE, to call to the part */
+/* after the DOES> compiled in the defining word. */
+
+void _does(X* x) {
+	set(x, get_xt(x, get(x, LATEST)) + 2*sCELL, pop(x));
+}
+
+/* CREATE parses the next word in the input buffer, creates */
+/* a new header for it and then compiles some code. */
+/* The compiled code is 4 CELLS long and has a RIP instruction */
+/* a displacement of 4 CELLS and to EXIT instructions. */
+/* The RIP instruction will load the address after the last */
+/* EXIT instruction onto the stack. That's the address used */
+/* by created words. */
+/* The first EXIT instruction exists to be replaced with a */
+/* call if CREATE DOES> is used. */
+/* The last EXIT is the real end of the word. */
+void _create(X* x) {
+	push(x, 32); _word(x);
+	x->tok = pick(x, 0) + sCHAR;
+	x->tlen = cfetch(x, pop(x));
+	header(x, x->tok, x->tlen);
+	compile(x, RIP); compile(x, 4*sCELL); 
+	compile(x, EXIT); compile(x, EXIT);
+}
+
+/* DOES> its an immediate word that compiles a literal */
+/* to the relative address of the words after the DOES>, */
+/* and then compiles a DOES and an EXIT instructions. */
+
+void _does_gt(X* x) {
+	literal(x, here(x) + 4*sCELL);
+	compile(x, get(x, DOES)); compile(x, EXIT);
+}
+
 /* Words needed for testing, will not be needed after */
 
 void _see(X* x) {
@@ -727,12 +767,15 @@ void bootstrap(X* x) {
 	comma(x, 0); /* IBUF */
 	comma(x, 0); /* IPOS */
 	comma(x, 0); /* ILEN */
+	comma(x, 0); /* SOURCE_ID */
+	comma(x, 0); /* DOES */
 
 	/* Insert primitives into the dictionary */
 
 	code(x, "NOOP", primitive(x, &_noop));
 	code(x, "EXIT", primitive(x, &_exit));
 	code(x, "LIT", primitive(x, &_lit));
+	code(x, "RIP", primitive(x, &_rip));
 	code(x, "BRANCH", primitive(x, &_branch));
 	code(x, "?BRANCH", primitive(x, &_zbranch));
 	code(x, "COMPILE,", primitive(x, &_compile));
@@ -792,6 +835,9 @@ void bootstrap(X* x) {
 	code(x, "CELLS", primitive(x, &_cells));
 	code(x, "CHARS", primitive(x, &_chars));
 	code(x, "RECURSE", primitive(x, &_recurse)); _immediate(x);
+	set(x, DOES, code(x, "DOES", primitive(x, &_does)));
+	code(x, "CREATE", primitive(x, &_create));
+	code(x, "DOES>", primitive(x, &_does_gt)); _immediate(x);
 
 	/* Words for testing, will not be needed after */
 
