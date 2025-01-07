@@ -7,13 +7,13 @@
 \ The first definition allows for conditional 
 \ compilation of one line words on any ANS Forth..
 
-\ -- Stack comments ---------------------------------------
-
-?: ( 41 word drop ; immediate
-
 \ SLOTH v1.0
 
 \ TODO Explain SLOTH
+
+\ -- Stack comments ---------------------------------------
+
+?: ( 41 word drop ; immediate
 
 \ -- Compilation ------------------------------------------
 
@@ -27,6 +27,15 @@
 
 \ PLATFORM DEPENDENT
 ?: LITERAL ( C: x -- ) ( -- x ) p: LIT , ; immediate
+
+\ -- Variables and constants ------------------------------
+
+?: VARIABLE ( "<spaces>name" -- ) create 0 , ;
+?: CONSTANT ( x "<spaces>name" -- ) create , does> @ ;
+
+\ --
+
+?: ' ( "<spaces>name" -- xt ) 32 word find drop ; 
 
 \ -- Control structures -----------------------------------
 

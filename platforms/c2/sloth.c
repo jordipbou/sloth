@@ -718,6 +718,8 @@ void _does_gt(X* x) {
 	compile(x, get(x, DOES)); compile(x, EXIT);
 }
 
+void _execute(X* x) { call(x, pop(x)); inner(x); }
+
 /* Words needed for testing, will not be needed after */
 
 void _see(X* x) {
@@ -838,6 +840,7 @@ void bootstrap(X* x) {
 	set(x, DOES, code(x, "DOES", primitive(x, &_does)));
 	code(x, "CREATE", primitive(x, &_create));
 	code(x, "DOES>", primitive(x, &_does_gt)); _immediate(x);
+	code(x, "EXECUTE", primitive(x, &_execute));
 
 	/* Words for testing, will not be needed after */
 
