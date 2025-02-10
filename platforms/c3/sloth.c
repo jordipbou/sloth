@@ -474,7 +474,125 @@ void _w_o(X* x) { /* TODO */ }
 void _write_file(X* x) { /* TODO */ }
 void _write_line(X* x) { /* TODO */ }
 
-/* Helpers to add primitives to the dictionary */
+/* More input/output operations */
+
+void _accept(X* x) { /* TODO */ }
+void _cr(X* x) { printf("\n"); }
+void _dot(X* x) { /* TODO */ }
+void _dot_r(X* x) { /* TODO */ }
+void _dot_quote(X* x) { /* TODO */ }
+void _emit(X* x) { printf("%c", (CHAR)pop(x)); }
+void _expect(X* x) { /* TODO */ }
+void _key(X* x) { /* TODO */ }
+void _space(X* x) { printf(" "); }
+void _spaces(X* x) { /* TODO */ }
+void _type(X* x) { /* TODO */ }
+void _u_dot(X* x) { /* TODO */ }
+void _u_dot_r(X* x) { /* TODO */ }
+
+void _f_dot(X* x) { /* TODO */ }
+void _f_e_dot(X* x) { /* TODO */ }
+void _f_s_dot(X* x) { /* TODO */ }
+
+void _at_x_y(X* x) { /* TODO */ }
+void _e_key(X* x) { /* TODO */ }
+void _e_key_to_char(X* x) { /* TODO */ }
+void _e_key_question(X* x) { /* TODO */ }
+void _emit_question(X* x) { /* TODO */ }
+void _key_question(X* x) { /* TODO */ }
+void _ms(X* x) { /* TODO */ }
+void _page(X* x) { /* TODO */ }
+
+/* Arithmetic and logical operations */
+
+void _abs(X* x) { CELL v = pop(x); push(x, v < 0 ? (0-v) : v); }
+void _d_abs(X* x) { /* TODO */ }
+void _and(X* x) { CELL v = pop(x); push(x, pop(x) & v); }
+void _f_m_slash_mod(X* x) { /* TODO */ }
+void _invert(X* x) { /* TODO */ }
+void _l_shift(X* x) { /* TODO */ }
+void _m_star(X* x) { /* TODO */ }
+void _max(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a > b ? a : b); }
+void _d_max(X* x) { /* TODO */ }
+void _min(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a < b ? a : b); }
+void _d_min(X* x) { /* TODO */ }
+void _minus(X* x) { CELL a = pop(x); push(x, pop(x) - a); }
+void _d_minus(X* x) { /* TODO */ }
+void _mod(X* x) { CELL a = pop(x); push(x, pop(x) % a); }
+void _star_slash_mod(X* x) { /* TODO */ }
+void _slash_mod(X* x) { /* TODO */ }
+void _negate(X* x) { /* TODO */ }
+void _d_negate(X* x) { /* TODO */ }
+void _one_plus(X* x) { push(x, pop(x) + 1); }
+void _one_minus(X* x) { push(x, pop(x) - 1); }
+void _or(X* x) { CELL a = pop(x); push(x, pop(x) | a); }
+void _plus(X* x) { CELL a = pop(x); push(x, pop(x) + a); }
+void _d_plus(X* x) { /* TODO */ }
+void _m_plus(X* x) { /* TODO */ }
+void _plus_store(X* x) { /* TODO */ }
+void _d_plus_store(X* x) { /* TODO */ }
+void _r_shift(X* x) { /* TODO */ }
+void _slash(X* x) { CELL a = pop(x); push(x, pop(x) / a); }
+void _d_slash(X* x) { /* TODO */ }
+void _s_m_slash_rem(X* x) { /* TODO */ }
+void _star(X* x) { /* TODO */ }
+void _star_slash(X* x) { /* TODO */ }
+void _m_star_slash(X* x) { /* TODO */ }
+void _two_star(X* x) { /* TODO */ }
+void _d_two_star(X* x) { /* TODO */ }
+void _two_slash(X* x) { /* TODO */ }
+void _d_two_slash(X* x) { /* TODO */ }
+void _u_m_star(X* x) { /* TODO */ }
+void _u_m_slash_mod(X* x) { /* TODO */ }
+void _xor(X* x) { CELL a = pop(x); push(x, pop(x) ^ a); }
+
+void _f_star(X* x) { /* TODO */ }
+void _f_slash(X* x) { /* TODO */ }
+void _f_plus(X* x) { /* TODO */ }
+void _f_plus_store(X* x) { /* TODO */ }
+void _floor(X* x) { /* TODO */ }
+void _f_max(X* x) { /* TODO */ }
+void _f_min(X* x) { /* TODO */ }
+void _f_negate(X* x) { /* TODO */ }
+void _f_round(X* x) { /* TODO */ }
+
+/* Number-type conversion operators */
+
+void _s_to_d(X* x) { /* TODO */ }
+
+void _d_to_s(X* x) { /* TODO */ }
+
+void _d_to_f(X* x) { /* TODO */ }
+void _f_to_d(X* x) { /* TODO */ }
+
+/* Commands to define data structures */
+
+void _constant(X* x) { /* TODO */ }
+void _value(X* x) { /* TODO */ }
+void _variable(X* x) { /* TODO */ }
+
+void _two_constant(X* x) { /* TODO */ }
+void _two_variable(X* x) { /* TODO */ }
+
+void _f_constant(X* x) { /* TODO */ }
+void _f_variable(X* x) { /* TODO */ }
+
+/* Memory-stack transfer operations */
+
+void _c_fetch(X* x) { push(x, cfetch(x, pop(x))); }
+void _c_store(X* x) { CELL a = pop(x); cstore(x, a, pop(x)); }
+void _fetch(X* x) { push(x, fetch(x, pop(x))); }
+void _two_fetch(X* x) { /* TODO */ }
+void _store(X* x) { CELL a = pop(x); store(x, a, pop(x)); }
+void _two_store(X* x) { /* TODO */ }
+void _to(X* x) { /* TODO */ }
+
+void _f_fetch(X* x) { /* TODO */ }
+void _f_store(X* x) { /* TODO */ }
+
+/* LOCAL (TODO): void _to(X* x) { } */
+
+/* -- Helpers to add primitives to the dictionary ------ */
 
 CELL primitive(X* x, F f) { 
 	x->p->p[x->p->last++] = f; 
@@ -590,6 +708,117 @@ void bootstrap(X* x) {
 	code(x, "-TRAILING", primitive(x, &_dash_trailing));
 	code(x, ">FLOAT", primitive(x, &_to_float));
 	code(x, "REPRESENT", primitive(x, &_represent));
+
+	/* More input/output operations */
+
+	code(x, "ACCEPT", primitive(x, &_accept));
+	code(x, "CR", primitive(x, &_cr));
+	code(x, ".", primitive(x, &_dot));
+	code(x, ".R", primitive(x, &_dot_r));
+	code(x, "EMIT", primitive(x, &_emit));
+	code(x, "EXPECT", primitive(x, &_expect));
+	code(x, "KEY", primitive(x, &_key));
+	code(x, "SPACE", primitive(x, &_space));
+	code(x, "SPACES", primitive(x, &_spaces));
+	code(x, "TYPE", primitive(x, &_type));
+	code(x, "U.", primitive(x, &_u_dot));
+	code(x, "U.R", primitive(x, &_u_dot_r));
+	code(x, "F.", primitive(x, &_f_dot));
+	code(x, "FE.", primitive(x, &_f_e_dot));
+	code(x, "FS.", primitive(x, &_f_s_dot));
+	code(x, "AT-XY", primitive(x, &_at_x_y));
+	code(x, "EKEY", primitive(x, &_e_key));
+	code(x, "EKEY>CHAR", primitive(x, &_e_key_to_char));
+	code(x, "EKEY?", primitive(x, &_e_key_question));
+	code(x, "EMIT?", primitive(x, &_emit_question));
+	code(x, "KEY?", primitive(x, &_key_question));
+	code(x, "MS", primitive(x, &_ms));
+	code(x, "PAGE", primitive(x, &_page));
+
+	/* Arithmetic and logical operations */
+
+	code(x, "ABS", primitive(x, &_abs));
+	code(x, "DABS", primitive(x, &_d_abs));
+	code(x, "AND", primitive(x, &_and));
+	code(x, "FM/MOD", primitive(x, &_f_m_slash_mod));
+	code(x, "INVERT", primitive(x, &_invert));
+	code(x, "LSHIFT", primitive(x, &_l_shift));
+	code(x, "M*", primitive(x, &_m_star));
+	code(x, "MAX", primitive(x, &_max));
+	code(x, "DMAX", primitive(x, &_d_max));
+	code(x, "MIN", primitive(x, &_min));
+	code(x, "DMIN", primitive(x, &_d_min));
+	code(x, "-", primitive(x, &_minus));
+	code(x, "D-", primitive(x, &_d_minus));
+	code(x, "MOD", primitive(x, &_mod));
+	code(x, "*/MOD", primitive(x, &_star_slash_mod));
+	code(x, "/MOD", primitive(x, &_slash_mod));
+	code(x, "NEGATE", primitive(x, &_negate));
+	code(x, "1+", primitive(x, &_one_plus));
+	code(x, "1-", primitive(x, &_one_minus));
+	code(x, "OR", primitive(x, &_or));
+	code(x, "+", primitive(x, &_plus));
+	code(x, "D+", primitive(x, &_d_plus));
+	code(x, "M+", primitive(x, &_m_plus));
+	code(x, "+!", primitive(x, &_plus_store));
+	code(x, "D+!", primitive(x, &_d_plus_store));
+	code(x, "RSHIFT", primitive(x, &_r_shift));
+	code(x, "/", primitive(x, &_slash));
+	code(x, "D/", primitive(x, &_d_slash));
+	code(x, "SM/REM", primitive(x, &_s_m_slash_rem));
+	code(x, "*", primitive(x, &_star));
+	code(x, "M*/", primitive(x, &_m_star_slash));
+	code(x, "2*", primitive(x, &_two_star));
+	code(x, "D2*", primitive(x, &_d_two_star));
+	code(x, "2/", primitive(x, &_two_slash));
+	code(x, "D2/", primitive(x, &_d_two_slash));
+	code(x, "UM*", primitive(x, &_u_m_star));
+	code(x, "UM/MOD", primitive(x, &_u_m_slash_mod));
+	code(x, "XOR", primitive(x, &_xor));
+
+	code(x, "F*", primitive(x, &_f_star));
+	code(x, "F/", primitive(x, &_f_slash));
+	code(x, "F+", primitive(x, &_f_plus));
+	code(x, "F+!", primitive(x, &_f_plus_store));
+	code(x, "FLOOR", primitive(x, &_floor));
+	code(x, "FMAX", primitive(x, &_f_max));
+	code(x, "FMIN", primitive(x, &_f_min));
+	code(x, "FNEGATE", primitive(x, &_f_negate));
+	code(x, "FROUND", primitive(x, &_f_round));
+
+	/* Number-type conversion operators */
+
+	code(x, "S>D", primitive(x, &_s_to_d));
+	code(x, "D>S", primitive(x, &_d_to_s));
+	code(x, "D>F", primitive(x, &_d_to_f));
+	code(x, "F>D", primitive(x, &_f_to_d));
+
+	/* Commands to define data structures */
+
+	code(x, "CONSTANT", primitive(x, &_constant));
+	code(x, "VALUE", primitive(x, &_value));
+	code(x, "VARIABLE", primitive(x, &_variable));
+
+	code(x, "2CONSTANT", primitive(x, &_two_constant));
+	code(x, "2VARIABLE", primitive(x, &_two_variable));
+
+	code(x, "FCONSTANT", primitive(x, &_f_constant));
+	code(x, "FVARIABLE", primitive(x, &_f_variable));
+
+	/* Memory-stack transfer operations */
+
+	code(x, "C@", primitive(x, &_c_fetch));
+	code(x, "C!", primitive(x, &_c_store));
+	code(x, "@", primitive(x, &_fetch));
+	code(x, "2@", primitive(x, &_two_fetch));
+	code(x, "!", primitive(x, &_store));
+	code(x, "2!", primitive(x, &_two_store));
+	code(x, "TO", primitive(x, &_to));
+
+	code(x, "F@", primitive(x, &_f_fetch));
+	code(x, "F!", primitive(x, &_f_store));
+
+	/* LOCAL: code(x, "TO", primitive(x, &_to)); */
 
 }
 
