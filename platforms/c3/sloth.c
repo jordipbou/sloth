@@ -296,12 +296,6 @@ void unset_flag(X* x, CELL w, CHAR v) {
 	cset(x, w + 3*sCELL, get_flags(x, w) & ~v); 
 }
 
-void set_hidden(X* x) { set_flag(x, get(x, LATEST), HIDDEN); }
-void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
-
-void unset_hidden(X* x) { unset_flag(x, get(x, LATEST), HIDDEN); }
-
-
 /* -- Primitives -------------------------------------- */
 
 void _exit(X* x) { x->ip = (x->rp > 0) ? rpop(x) : -1; }
@@ -592,6 +586,171 @@ void _f_store(X* x) { /* TODO */ }
 
 /* LOCAL (TODO): void _to(X* x) { } */
 
+/* Comparison operations */
+
+void _equals(X* x) { CELL a = pop(x); push(x, pop(x) == a ? -1 : 0); }
+void _greater_than(X* x) { CELL a = pop(x); push(x, pop(x) > a ? -1 : 0); }
+void _less_than(X* x) { CELL a = pop(x); push(x, pop(x) < a ? -1 : 0); }
+void _not_equals(X* x) { CELL a = pop(x); push(x, pop(x) != a ? -1 : 0); }
+void _u_less_than(X* x) { /* TODO */ }
+void _u_greater_than(X* x) { /* TODO */ }
+void _within(X* x) { /* TODO */ }
+void _zero_equals(X* x) { push(x, pop(x) == 0 ? -1 : 0); }
+void _zero_greater_than(X* x) { push(x, pop(x) > 0 ? -1 : 0); }
+void _zero_less_than(X* x) { push(x, pop(x) < 0 ? -1 : 0); }
+void _zero_not_equals(X* x) { push(x, pop(x) != 0 ? -1 : 0); }
+
+void _f_less_than(X* x) { /* TODO */ }
+void _f_zero_equals(X* x) { /* TODO */ }
+void _f_zero_less_than(X* x) { /* TODO */ }
+
+/* System constants & facilities for generating ASCII values */
+
+void _bl(X* x) { push(x, 32); }
+void _char(X* x) { /* TODO */ }
+void _bracket_char(X* x) { /* TODO */ }
+void _false(X* x) { push(x, 0); }
+void _true(X* x) { push(x, -1); }
+
+/* Forming definite loops */
+
+void _do(X* x) { /* TODO */ }
+void _question_do(X* x) { /* TODO */ }
+void _i(X* x) { /* TODO */ }
+void _j(X* x) { /* TODO */ }
+void _leave(X* x) { /* TODO */ }
+void _unloop(X* x) { /* TODO */ }
+void _loop(X* x) { /* TODO */ }
+void _plus_loop(X* x) { /* TODO */ }
+
+/* Forming indefinite loops (compiling-mode only) */
+
+void _begin(X* x) { /* TODO */ }
+void _again(X* x) { /* TODO */ }
+void _until(X* x) { /* TODO */ }
+void _while(X* x) { /* TODO */ }
+void _repeat(X* x) { /* TODO */ }
+
+/* More facilities for defining routines (compiling-mode only) */
+
+void _abort(X* x) { /* TODO */ }
+void _abort_quote(X* x) { /* TODO */ }
+void _c_quote(X* x) { /* TODO */ }
+void _case(X* x) { /* TODO */ }
+void _of(X* x) { /* TODO */ }
+void _endof(X* x) { /* TODO */ }
+void _endcase(X* x) { /* TODO */ }
+void _colon(X* x) { /* TODO */ }
+void _colon_no_name(X* x) { /* TODO */ }
+void _semicolon(X* x) { /* TODO */ }
+/* Basic primitive -- void _exit(X* x) */
+void _if(X* x) { /* TODO */ }
+void _else(X* x) { /* TODO */ }
+void _then(X* x) { /* TODO */ }
+void _left_bracket(X* x) { /* TODO */ }
+void _quit(X* x) { /* TODO */ }
+void _recurse(X* x) { /* TODO */ }
+void _right_bracket(X* x) { /* TODO */ }
+void _s_quote(X* x) { /* TODO */ }
+
+void _catch(X* x) { /* TODO */ }
+void _throw(X* x) { /* TODO */ }
+
+void _code(X* x) { /* TODO */ }
+void _semicolon_code(X* x) { /* TODO */ }
+
+void _paren_local_paren(X* x) { /* TODO */ }
+void _locals(X* x) { /* TODO */ }
+
+/* Manipulating stack items */
+
+void _drop(X* x) { pop(x); }
+void _two_drop(X* x) { pop(x); pop(x); }
+void _dup(X* x) { push(x, pick(x, 0)); }
+void _two_dup(X* x) { push(x, pick(x, 1)); push(x, pick(x, 1)); }
+void _question_dup(X* x) { if (pick(x, 0) != 0) _dup(x); }
+void _nip(X* x) { CELL v = pop(x); pop(x); push(x, v); }
+void _over(X* x) { push(x, pick(x, 1)); }
+void _two_over(X* x) { push(x, pick(x, 3)); push(x, pick(x, 3)); }
+void _pick(X* x) {  push(x, pick(x, pop(x))); }
+void _two_to_r(X* x) { CELL a = pop(x); rpush(x, pop(x)); rpush(x, a); }
+void _to_r(X* x) { rpush(x, pop(x)); }
+void _two_r_from(X* x) { CELL a = rpop(x); push(x, rpop(x)); push(x, a); }
+void _r_fetch(X* x) { push(x, rpick(x, 0)); }
+void _two_r_fetch(X* x) { push(x, rpick(x, 1)); push(x, rpick(x, 0)); }
+void _roll(X* x) { /* TODO */ }
+void _rot(X* x) { CELL a = pop(x); CELL b = pop(x); CELL c = pop(x); push(x, b); push(x, a); push(x, c); }
+void _swap(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a); push(x, b); }
+void _two_swap(X* x) { CELL a = pop(x); CELL b = pop(x); CELL c = pop(x); CELL d = pop(x); push(x, b); push(x, a); push(x, d); push(x, c); }
+void _tuck(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a); push(x, b); push(x, a); }
+
+void _two_rot(X* x) { /* TODO */ }
+
+void _f_depth(X* x) { /* TODO */ }
+void _f_drop(X* x) { /* TODO */ }
+void _f_dup(X* x) { /* TODO */ }
+void _f_over(X* x) { /* TODO */ }
+void _f_rot(X* x) { /* TODO */ }
+void _f_swap(X* x) { /* TODO */ }
+
+/* Constructing compiler and interpreter system extensions */
+
+void _align(X* x) { /* TODO */ }
+void _f_align(X* x) { /* TODO */ }
+void _aligned(X* x) { /* TODO */ }
+void _f_aligned(X* x) { /* TODO */ }
+void _allot(X* x) { /* TODO */ }
+void _to_body(X* x) { /* TODO */ }
+void _c_comma(X* x) { /* TODO */ }
+void _cell_plus(X* x) { /* TODO */ }
+void _float_plus(X* x) { /* TODO */ }
+void _cells(X* x) { /* TODO */ }
+void _floats(X* x) { /* TODO */ }
+void _char_plus(X* x) { /* TODO */ }
+void _chars(X* x) { /* TODO */ }
+void _comma(X* x) { /* TODO */ }
+void _compile_comma(X* x) { /* TODO */ }
+void _bracket_compile(X* x) { /* TODO */ }
+void _create(X* x) { /* TODO */ }
+void _does(X* x) { /* TODO */ }
+void _evaluate(X* x) { /* TODO */ }
+void _execute(X* x) { /* TODO */ }
+void _here(X* x) { /* TODO */ }
+void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
+void _to_in(X* x) { /* TODO */ }
+void _bracket_tick(X* x) { /* TODO */ }
+void _literal(X* x) { /* TODO */ }
+void _pad(X* x) { /* TODO */ }
+void _parse(X* x) { /* TODO */ }
+void _postpone(X* x) { /* TODO */ }
+/* void _query(X* x) */
+void _refill(X* x) { /* TODO */ }
+void _restore_input(X* x) { /* TODO */ }
+void _save_input(X* x) { /* TODO */ }
+void _source(X* x) { /* TODO */ }
+void _source_id(X* x) { /* TODO */ }
+void _span(X* x) { /* TODO */ }
+void _state(X* x) { /* TODO */ }
+/* void _tib(X* x) */
+/* void _number_tib(X* x) */
+void _tick(X* x) { /* TODO */ }
+void _word(X* x) { /* TODO */ }
+
+void _find(X* x) { /* TODO */ }
+void _search_wordlist(X* x) { /* TODO */ }
+
+void _s_literal(X* x) { /* TODO */ }
+
+void _two_literal(X* x) { /* TODO */ }
+
+void _f_literal(X* x) { /* TODO */ }
+
+/* BLOCK */ void _blk(X* x) { /* TODO */ }
+
+void _ahead(X* x) { /* TODO */ }
+void _c_s_pick(X* x) { /* TODO */ }
+void _c_s_roll(X* x) { /* TODO */ }
+
 /* -- Helpers to add primitives to the dictionary ------ */
 
 CELL primitive(X* x, F f) { 
@@ -819,6 +978,168 @@ void bootstrap(X* x) {
 	code(x, "F!", primitive(x, &_f_store));
 
 	/* LOCAL: code(x, "TO", primitive(x, &_to)); */
+
+	/* Comparison operations */
+	code(x, "=", primitive(x, &_equals));
+	code(x, ">", primitive(x, &_greater_than));
+	code(x, "<", primitive(x, &_less_than));
+	code(x, "<>", primitive(x, &_not_equals));
+	code(x, "U<", primitive(x, &_u_less_than));
+	code(x, "U>", primitive(x, &_u_greater_than));
+	code(x, "WITHIN", primitive(x, &_within));
+	code(x, "0=", primitive(x, &_zero_equals));
+	code(x, "0>", primitive(x, &_zero_greater_than));
+	code(x, "0<", primitive(x, &_zero_less_than));
+	code(x, "0<>", primitive(x, &_zero_not_equals));
+
+	code(x, "F<", primitive(x, &_f_less_than));
+	code(x, "F0=", primitive(x, &_f_zero_equals));
+	code(x, "F0<", primitive(x, &_f_zero_less_than));
+
+	/* System constants & facilities for generating ASCII values */
+
+	code(x, "BL", primitive(x, &_bl));
+	code(x, "CHAR", primitive(x, &_char));
+	code(x, "[CHAR]", primitive(x, &_bracket_char));
+	code(x, "FALSE", primitive(x, &_false));
+	code(x, "TRUE", primitive(x, &_true));
+
+	/* Forming definite loops */
+
+	code(x, "DO", primitive(x, &_do));
+	code(x, "?DO", primitive(x, &_question_do));
+	code(x, "I", primitive(x, &_i));
+	code(x, "J", primitive(x, &_j));
+	code(x, "UNLOOP", primitive(x, &_unloop));
+	code(x, "LOOP", primitive(x, &_loop));
+	code(x, "+LOOP", primitive(x, &_plus_loop));
+
+	/* Forming indefinite loops (compiling-mode only) */
+
+	code(x, "BEGIN", primitive(x, &_begin));
+	code(x, "AGAIN", primitive(x, &_again));
+	code(x, "UNTIL", primitive(x, &_until));
+	code(x, "WHILE", primitive(x, &_while));
+	code(x, "REPEAT", primitive(x, &_repeat));
+
+	/* More facilities for defining routines (compiling-mode only) */
+
+	code(x, "ABORT", primitive(x, &_abort));
+	code(x, "ABORT\"", primitive(x, &_abort_quote));
+	code(x, "C\"", primitive(x, &_c_quote));
+	code(x, "CASE", primitive(x, &_case));
+	code(x, "OF", primitive(x, &_of));
+	code(x, "ENDOF", primitive(x, &_endof));
+	code(x, "ENDCASE", primitive(x, &_endcase));
+	code(x, ":", primitive(x, &_colon));
+	code(x, ":NONAME", primitive(x, &_colon_no_name));
+	code(x, ";", primitive(x, &_semicolon));
+	code(x, "EXIT", primitive(x, &_exit));
+	code(x, "IF", primitive(x, &_if));
+	code(x, "ELSE", primitive(x, &_else));
+	code(x, "[", primitive(x, &_left_bracket));
+	code(x, "QUIT", primitive(x, &_quit));
+	code(x, "RECURSE", primitive(x, &_recurse));
+	code(x, "]", primitive(x, &_right_bracket));
+	code(x, "S\"", primitive(x, &_s_quote));
+
+	code(x, "CATCH", primitive(x, &_catch));
+	code(x, "THROW", primitive(x, &_throw));
+
+	code(x, "CODE", primitive(x, &_code));
+	code(x, ";CODE", primitive(x, &_semicolon_code));
+
+	code(x, "(LOCAL)", primitive(x, &_paren_local_paren));
+	code(x, "LOCALS", primitive(x, &_locals));
+
+	/* Manipulating stack items */
+
+	code(x, "DROP", primitive(x, &_drop));
+	code(x, "2DROP", primitive(x, &_two_drop));
+	code(x, "DUP", primitive(x, &_dup));
+	code(x, "2DUP", primitive(x, &_two_dup));
+	code(x, "?DUP", primitive(x, &_question_dup));
+	code(x, "NIP", primitive(x, &_nip));
+	code(x, "OVER", primitive(x, &_over));
+	code(x, "2OVER", primitive(x, &_two_over));
+	code(x, "PICK", primitive(x, &_pick));
+	code(x, "2>R", primitive(x, &_two_to_r));
+	code(x, ">R", primitive(x, &_to_r));
+	code(x, "2R>", primitive(x, &_two_r_from));
+	code(x, "R@", primitive(x, &_r_fetch));
+	code(x, "2R@", primitive(x, &_two_r_fetch));
+	code(x, "ROLL", primitive(x, &_roll));
+	code(x, "ROT", primitive(x, &_rot));
+	code(x, "SWAP", primitive(x, &_swap));
+	code(x, "2SWAP", primitive(x, &_two_swap));
+	code(x, "TUCK", primitive(x, &_tuck));
+
+	code(x, "2ROT", primitive(x, &_two_rot));
+
+	code(x, "FDEPTH", primitive(x, &_f_depth));
+	code(x, "FDROP", primitive(x, &_f_drop));
+	code(x, "FDUP", primitive(x, &_f_dup));
+	code(x, "FOVER", primitive(x, &_f_over));
+	code(x, "FROT", primitive(x, &_f_rot));
+	code(x, "FSWAP", primitive(x, &_f_swap));
+
+	/* Constructing compiler and interpreter system extensions */
+
+	code(x, "ALIGN", primitive(x, &_align));
+	code(x, "FALIGN", primitive(x, &_f_align));
+	code(x, "ALIGNED", primitive(x, &_aligned));
+	code(x, "FALIGNED", primitive(x, &_f_aligned));
+	code(x, "ALLOT", primitive(x, &_allot));
+	code(x, ">BODY", primitive(x, &_to_body));
+	code(x, "C,", primitive(x, &_c_comma));
+	code(x, "CELL+", primitive(x, &_cell_plus));
+	code(x, "FLOAT+", primitive(x, &_float_plus));
+	code(x, "CELLS", primitive(x, &_cells));
+	code(x, "FLOATS", primitive(x, &_floats));
+	code(x, "CHAR+", primitive(x, &_char_plus));
+	code(x, "CHARS", primitive(x, &_chars));
+	code(x, "COMMA", primitive(x, &_comma));
+	code(x, "COMPILE,", primitive(x, &_compile_comma));
+	code(x, "[COMPILE]", primitive(x, &_bracket_compile));
+	code(x, "CREATE", primitive(x, &_create));
+	code(x, "DOES>", primitive(x, &_does));
+	code(x, "EVALUATE", primitive(x, &_evaluate));
+	code(x, "EXECUTE", primitive(x, &_execute));
+	code(x, "HERE", primitive(x, &_here));
+	code(x, "IMMEDIATE", primitive(x, &_immediate));
+	code(x, ">IN", primitive(x, &_to_in));
+	code(x, "[']", primitive(x, &_bracket_tick));
+	code(x, "LITERAL", primitive(x, &_literal));
+	code(x, "PAD", primitive(x, &_pad));
+	code(x, "PARSE", primitive(x, &_parse));
+	code(x, "POSTPONE", primitive(x, &_postpone));
+	/* code(x, "QUERY", primitive(x, &_query)); */
+	code(x, "REFILL", primitive(x, &_refill));
+	code(x, "RESTORE-INPUT", primitive(x, &_restore_input));
+	code(x, "SAVE-INPUT", primitive(x, &_save_input));
+	code(x, "SOURCE", primitive(x, &_source));
+	code(x, "SOURCE-ID", primitive(x, &_source_id));
+	code(x, "SPAN", primitive(x, &_span));
+	code(x, "STATE", primitive(x, &_state));
+	/* code(x, "TIB", primitive(x, &_tib)); */
+	/* code(x, "#TIB", primitive(x, &_number_tib)); */
+	code(x, "'", primitive(x, &_tick));
+	code(x, "WORD", primitive(x, &_word));
+
+	code(x, "FIND", primitive(x, &_find));
+	code(x, "SEARCH-WORDLIST", primitive(x, &_search_wordlist));
+
+	code(x, "SLITERAL", primitive(x, &_s_literal));
+
+	code(x, "2LITERAL", primitive(x, &_two_literal));
+
+	code(x, "FLITERAL", primitive(x, &_f_literal));
+
+	code(x, "BLK", primitive(x, &_blk));
+
+	code(x, "AHEAD", primitive(x, &_ahead));
+	code(x, "CS-PICK", primitive(x, &_c_s_pick));
+	code(x, "CS-ROLL", primitive(x, &_c_s_roll));
 
 }
 
