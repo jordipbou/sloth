@@ -36,7 +36,7 @@ typedef intptr_t CELL;
 #define STACK_SIZE 64
 #define RETURN_STACK_SIZE 64
 #define DSIZE 65536
-#define PSIZE 256
+#define PSIZE 512
 
 struct VM;
 typedef void (*F)(struct VM*);
@@ -193,6 +193,9 @@ void save_image(X* x, char* filename) {
 
 /* -- Constants --------------------------------------- */
 
+/* Displacement of counted string buffer from here */
+#define CBUF					64
+
 /* Relative addresses of variables accessed both from C */
 /* and Forth. */
 
@@ -257,7 +260,6 @@ CELL header(X* x, CELL n, CELL l) {
 	comma(x, get(x, LATEST)); /* Store link to latest */
 	set(x, LATEST, w); /* Set NT as latest */
 	comma(x, 0); /* Reserve space for XT */
-	comma(x, 1); /* Store wordlist (default wordlist id: 1) */
 	ccomma(x, 0); /* Flags (default flags: 0) */
 	ccomma(x, l); /* Name length */
 	for (i = 0; i < l; i++) ccomma(x, fetch(x, n + i)); /* Name */
@@ -271,16 +273,14 @@ CELL get_link(X* x, CELL w) { return get(x, w); }
 CELL get_xt(X* x, CELL w) { return get(x, w + sCELL); }
 void set_xt(X* x, CELL w, CELL xt) { set(x, w + sCELL, xt); }
 
-CELL get_wordlist(X* x, CELL w) { return get(x, w + 2*sCELL); }
-
-CHAR get_flags(X* x, CELL w) { return cget(x, w + 3*sCELL); }
+CHAR get_flags(X* x, CELL w) { return cget(x, w + 2*sCELL); }
 CELL has_flag(X* x, CELL w, CELL v) { return get_flags(x, w) & v; }
 
 CHAR get_namelen(X* x, CELL w) { 
-	return cget(x, w + 3*sCELL + sCHAR); 
+	return cget(x, w + 2*sCELL + sCHAR); 
 }
 CELL get_name_addr(X* x, CELL w) { 
-	return to_abs(x, w + 3*sCELL + 2*sCHAR); 
+	return to_abs(x, w + 2*sCELL + 2*sCHAR); 
 }
 
 /* Setting flags */
@@ -303,6 +303,126 @@ void _lit(X* x) { push(x, op(x)); }
 void _rip(X* x) { push(x, to_abs(x, x->ip) + op(x) - sCELL); }
 
 void _compile(X* x) { compile(x, pop(x)); }
+
+/* Parsing input */
+
+/* I would prefer using PARSE-NAME but its not yet */
+/* standarized and there's no need to implement two */
+/* words with almost the same functionality. */
+void _word(X* x) {
+	/* The region to store WORD counted strings starts */
+	/* at here + CBUF. */
+	CHAR c = (CHAR)pop(x);
+	CELL ibuf = get(x, IBUF);
+	CELL ilen = get(x, ILEN);
+	CELL ipos = get(x, IPOS);
+	CELL start, end, i;
+	/* First, ignore c until not c is found */
+	/* The Forth Standard says that if the control character is */
+	/* the space (hex 20) then control characters may be treated */
+	/* as delimiters. */
+	if (c == 32) {
+		while (ipos < ilen && cfetch(x, ibuf + ipos) <= c) ipos++;
+	} else {
+		while (ipos < ilen && cfetch(x, ibuf + ipos) == c) ipos++;
+	}
+	start = ibuf + ipos;
+	/* Next, continue parsing until c is found again */
+	if (c == 32) {
+		while (ipos < ilen && cfetch(x, ibuf + ipos) > c) ipos++;
+	} else {
+		while (ipos < ilen && cfetch(x, ibuf + ipos) != c) ipos++;
+	}
+	end = ibuf + ipos;	
+	/* Now, copy it to the counted string buffer */
+	cstore(x, to_abs(x, here(x) + CBUF), end - start);
+	for (i = 0; i < (end - start); i++) {
+		cstore(x, to_abs(x, here(x) + CBUF + sCHAR + i*sCHAR), cfetch(x, start + i*sCHAR));
+	}
+	push(x, to_abs(x, here(x) + CBUF));
+	/* If we are not at the end of the input buffer, */
+	/* skip c after the word, but its not part of the counted */
+	/* string */
+	if (ipos < ilen) ipos++;
+	set(x, IPOS, ipos);
+}
+
+/* Finding words */
+
+/* Helper function to compare a string and a word's name */
+/* without case sensitivity. */
+int compare_without_case(X* x, CELL w, CELL t, CELL l) {
+	int i;
+	if (get_namelen(x, w) != l) return 0;
+	for (i = 0; i < l; i++) {
+		CHAR a = cfetch(x, t + i);
+		CHAR b = cfetch(x, get_name_addr(x, w) + i);
+		if (a >= 97 && a <= 122) a -= 32;
+		if (b >= 97 && b <= 122) b -= 32;
+		if (a != b) return 0;
+	}
+	return 1;
+}
+
+void _find(X* x) {
+	/* Let's get the address and length from the counted */
+	/* string on the stack. */
+	CELL cstring = pop(x);
+	CHAR l = cfetch(x, cstring);
+	CELL a = cstring + sCHAR;
+	/* Let's find the word, starting from LATEST */
+	CELL w = get(x, LATEST);
+	while (w != 0) {
+		if (compare_without_case(x, w, a, l) && !has_flag(x, w, HIDDEN)) break;
+		w = get_link(x, w);
+	}
+	if (w == 0) {
+		push(x, cstring);
+		push(x, 0);
+	} else if (has_flag(x, w, IMMEDIATE)) {
+		push(x, get_xt(x, w));
+		push(x, 1);
+	} else {
+		push(x, get_xt(x, w));
+		push(x, -1);
+	}
+}
+
+/* Outer interpreter */
+
+/* INTERPRET is not an ANS word ??!! */
+void _interpret(X* x) {
+	CELL nt, flag, n;
+	CELL tok, tlen;
+	char buf[15]; char *endptr;
+	while (get(x, IPOS) < get(x, ILEN)) {
+		push(x, 32); _word(x);
+		tok = pick(x, 0) + sCHAR;
+		tlen = cfetch(x, pick(x, 0));
+		if (tlen == 0) { pop(x); return; }
+		_find(x);
+		if ((flag = pop(x)) != 0) {
+			if (get(x, STATE) == 0
+			|| (get(x, STATE) == 1 && flag == 1)) {
+				eval(x, pop(x));	
+			} else {
+				compile(x, pop(x));
+			}
+		} else {
+			pop(x);
+			strncpy(buf, (char*)tok, tlen);
+			buf[tlen] = 0;
+			n = strtol(buf, &endptr, 10);	
+			if (*endptr == '\0') {
+				if (get(x, STATE) == 0) push(x, n);
+				else literal(x, n);
+			} else {
+				/* TODO Word not found, throw an exception? */
+				printf("%.*s ?\n", (int)tlen, (char*)tok);
+			}
+		}
+	}
+}
 
 /* Commands that can help you start or end work sessions */
 
@@ -392,9 +512,57 @@ void _editor(X* x) { /* TODO */ }
 
 /* Source code preprocessing, interpreting & auditing commands */
 
-void _dot_paren(X* x) { /* TODO */ }
+void _dot_paren(X* x) { 
+	while (get(x, IPOS) < get(x, ILEN)
+	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != ')') {
+		set(x, IPOS, get(x, IPOS) + 1);
+	}
+	if (get(x, IPOS) != get(x, ILEN)) 
+		set(x, IPOS, get(x, IPOS) + 1);
+}
 void _include_file(X* x) { /* TODO */ }
-void _included(X* x) { /* TODO */ }
+void _included(X* x) {
+	FILE *f;
+	char filename[1024];
+	char linebuf[1024];
+
+	CELL previbuf = get(x, IBUF);
+	CELL previpos = get(x, IPOS);
+	CELL previlen = get(x, ILEN);
+
+	CELL prevsourceid = get(x, SOURCE_ID);
+
+	CELL l = pop(x);
+	CELL a = pop(x);
+	strncpy(filename, (char*)a, (size_t)l);
+	filename[l] = 0;
+
+	f = fopen(filename, "r");
+
+	if (f) {
+		set(x, SOURCE_ID, (CELL)f);
+
+		while (fgets(linebuf, 1024, f)) {
+			printf(">> %s", linebuf);
+
+			set(x, IBUF, (CELL)linebuf);
+			set(x, IPOS, 0);
+			set(x, ILEN, strlen(linebuf));
+
+			_interpret(x);
+		}
+
+		set(x, SOURCE_ID, prevsourceid);
+	} else {
+		/* TODO: Manage error */
+	}
+
+	set(x, IBUF, previbuf);
+	set(x, IPOS, previpos);
+	set(x, ILEN, previlen);
+
+	fclose(f);
+}
 void _load(X* x) { /* TODO */ }
 void _thru(X* x) { /* TODO */ }
 void _bracket_if(X* x) { /* TODO */ }
@@ -403,7 +571,7 @@ void _bracket_then(X* x) { /* TODO */ }
 
 /* Comment-introducing operations */
 
-void _backslash(X* x) { /* TODO */ }
+void _backslash(X* x) { set(x, IPOS, get(x, ILEN)); }
 void _paren(X* x) { /* TODO */ }
 
 /* Dynamic memory operations */
@@ -734,9 +902,8 @@ void _state(X* x) { /* TODO */ }
 /* void _tib(X* x) */
 /* void _number_tib(X* x) */
 void _tick(X* x) { /* TODO */ }
-void _word(X* x) { /* TODO */ }
-
-void _find(X* x) { /* TODO */ }
+/* Already defined: void _word(X* x) */
+/* Already defined: void _find(X* x) */
 void _search_wordlist(X* x) { /* TODO */ }
 
 void _s_literal(X* x) { /* TODO */ }
@@ -824,7 +991,7 @@ void bootstrap(X* x) {
 
 	/* Source code preprocessing, interpreting & auditing commands */
 
-	code(x, ".(", primitive(x, &_dot_paren));
+	code(x, ".(", primitive(x, &_dot_paren)); _immediate(x);
 	code(x, "INCLUDE-FILE", primitive(x, &_include_file));
 	code(x, "INCLUDED", primitive(x, &_included));
 	code(x, "LOAD", primitive(x, &_load));
@@ -1143,6 +1310,14 @@ void bootstrap(X* x) {
 
 }
 
+/* Helpers to work with files from C */
+
+void include(X* x, char* f) {
+	push(x, (CELL)f);
+	push(x, strlen(f));
+	_included(x);
+}
+
 /* ---------------------------------------------------- */
 /* -- main -------------------------------------------- */
 /* ---------------------------------------------------- */
@@ -1156,15 +1331,9 @@ int main() {
 	x->d = (CELL)malloc(DSIZE);
 	init(x, x->d, DSIZE);
 
-	set(x, 0, 17);
-	push(x, to_abs(x, 0));
-	_question(x);
-	push(x, to_abs(x, 0));
-	_question(x);
-	push(x, 11);
-	push(x, 13);
-	_dot_s(x);
-	_dot_s(x);
+	bootstrap(x);
+
+	include(x, "../../forth2012-test-suite/src/runtests.fth");
 
 	free((void*)x->d);
 	free(x->p);
