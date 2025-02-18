@@ -412,7 +412,7 @@ void _interpret(X* x) {
 			pop(x);
 			strncpy(buf, (char*)tok, tlen);
 			buf[tlen] = 0;
-			n = strtol(buf, &endptr, 10);	
+			n = strtol(buf, &endptr, get(x, BASE));	
 			if (*endptr == '\0') {
 				if (get(x, STATE) == 0) push(x, n);
 				else literal(x, n);
@@ -543,8 +543,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			printf(">> %s", linebuf);
-
+			printf(">>>> %s", linebuf);
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
@@ -553,15 +552,15 @@ void _included(X* x) {
 		}
 
 		set(x, SOURCE_ID, prevsourceid);
+
+		fclose(f);
 	} else {
-		/* TODO: Manage error */
+		printf("ERROR: Can't open file (%.*s)\n", (int)l, (char*)a);
 	}
 
 	set(x, IBUF, previbuf);
 	set(x, IPOS, previpos);
 	set(x, ILEN, previlen);
-
-	fclose(f);
 }
 void _load(X* x) { /* TODO */ }
 void _thru(X* x) { /* TODO */ }
@@ -572,7 +571,15 @@ void _bracket_then(X* x) { /* TODO */ }
 /* Comment-introducing operations */
 
 void _backslash(X* x) { set(x, IPOS, get(x, ILEN)); }
-void _paren(X* x) { /* TODO */ }
+void _paren(X* x) {
+	/* ( should be able to work multiline if reading from file */
+	while (get(x, IPOS) < get(x, ILEN)
+	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != ')') {
+		set(x, IPOS, get(x, IPOS) + 1);
+	}
+	if (get(x, IPOS) != get(x, ILEN))
+		set(x, IPOS, get(x, IPOS) + 1);
+}
 
 /* Dynamic memory operations */
 
@@ -648,7 +655,11 @@ void _expect(X* x) { /* TODO */ }
 void _key(X* x) { /* TODO */ }
 void _space(X* x) { printf(" "); }
 void _spaces(X* x) { /* TODO */ }
-void _type(X* x) { /* TODO */ }
+void _type(X* x) { 
+	CELL l = pop(x); 
+	CELL a = pop(x);
+	printf("%.*s", (int)l, (char*)a); 
+}
 void _u_dot(X* x) { /* TODO */ }
 void _u_dot_r(X* x) { /* TODO */ }
 
@@ -691,7 +702,11 @@ void _or(X* x) { CELL a = pop(x); push(x, pop(x) | a); }
 void _plus(X* x) { CELL a = pop(x); push(x, pop(x) + a); }
 void _d_plus(X* x) { /* TODO */ }
 void _m_plus(X* x) { /* TODO */ }
-void _plus_store(X* x) { /* TODO */ }
+void _plus_store(X* x) {
+	CELL a = pop(x);
+	CELL n = pop(x);
+	store(x, a, fetch(x, a) + n);
+}
 void _d_plus_store(X* x) { /* TODO */ }
 void _r_shift(X* x) { /* TODO */ }
 void _slash(X* x) { CELL a = pop(x); push(x, pop(x) / a); }
@@ -819,8 +834,18 @@ void _left_bracket(X* x) { /* TODO */ }
 void _quit(X* x) { /* TODO */ }
 void _recurse(X* x) { /* TODO */ }
 void _right_bracket(X* x) { /* TODO */ }
-void _s_quote(X* x) { /* TODO */ }
-
+void _s_quote(X* x) { 
+	CELL l = 0;
+	push(x, get(x, IBUF) + get(x, IPOS));
+	while (get(x, IPOS) < get(x, ILEN)
+	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != '"') {
+		l++;
+		set(x, IPOS, get(x, IPOS) + 1);
+	}
+	push(x, l);
+	if (get(x, IPOS) < get(x, ILEN))
+		set(x, IPOS, get(x, IPOS) + 1);
+}
 void _catch(X* x) { /* TODO */ }
 void _throw(X* x) { /* TODO */ }
 
@@ -885,7 +910,7 @@ void _evaluate(X* x) { /* TODO */ }
 void _execute(X* x) { /* TODO */ }
 void _here(X* x) { /* TODO */ }
 void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
-void _to_in(X* x) { /* TODO */ }
+void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
 void _bracket_tick(X* x) { /* TODO */ }
 void _literal(X* x) { /* TODO */ }
 void _pad(X* x) { /* TODO */ }
@@ -895,7 +920,7 @@ void _postpone(X* x) { /* TODO */ }
 void _refill(X* x) { /* TODO */ }
 void _restore_input(X* x) { /* TODO */ }
 void _save_input(X* x) { /* TODO */ }
-void _source(X* x) { /* TODO */ }
+void _source(X* x) { push(x, get(x, IBUF)); push(x, get(x, ILEN)); }
 void _source_id(X* x) { /* TODO */ }
 void _span(X* x) { /* TODO */ }
 void _state(X* x) { /* TODO */ }
@@ -1333,7 +1358,8 @@ int main() {
 
 	bootstrap(x);
 
-	include(x, "../../forth2012-test-suite/src/runtests.fth");
+	chdir("../../forth2012-test-suite/src/");
+	include(x, "runtests.fth");
 
 	free((void*)x->d);
 	free(x->p);
