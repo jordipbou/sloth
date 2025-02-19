@@ -208,6 +208,8 @@ void save_image(X* x, char* filename) {
 #define ILEN					6*sCELL
 #define SOURCE_ID			7*sCELL
 #define DOES					8*sCELL
+#define QLEVEL				9*sCELL
+#define LATESTXT			10*sCELL
 
 /* XTs of primitives that need to be called from C and  */
 /* Forth code. */
@@ -216,6 +218,9 @@ void save_image(X* x, char* filename) {
 #define LIT						-2
 #define RIP						-3
 #define COMPILE				-4
+#define BRANCH				-5
+#define ZBRANCH				-6
+#define QUOTATION			-7
 
 /* -- Helpers ----------------------------------------- */
 
@@ -304,6 +309,32 @@ void _rip(X* x) { push(x, to_abs(x, x->ip) + op(x) - sCELL); }
 
 void _compile(X* x) { compile(x, pop(x)); }
 
+void _branch(X* x) { x->ip += op(x) - sCELL; }
+void _zbranch(X* x) { x->ip += pop(x) == 0 ? (op(x) - sCELL) : sCELL; }
+
+/* Quotations (not in ANS Forth yet) */
+
+void _quotation(X* x) { CELL d = op(x); push(x, x->ip); x->ip += d; }
+void _start_quotation(X* x) {
+	set(x, QLEVEL, get(x, QLEVEL) + 1);
+	if (get(x, STATE) == 0) push(x, here(x) + 2*sCELL);
+	if (get(x, QLEVEL) == 1) set(x, STATE, 1);
+	push(x, get(x, LATESTXT));
+	compile(x, QUOTATION);
+	push(x, to_abs(x, here(x)));
+	comma(x, 0);
+	set(x, LATESTXT, here(x));
+}
+
+void _end_quotation(X* x) {
+	CELL a = pop(x);
+	compile(x, EXIT);
+	store(x, a, to_abs(x, here(x)) - a - sCELL);
+	set(x, LATESTXT, pop(x));
+	set(x, QLEVEL, get(x, QLEVEL) - 1);
+	if (get(x, QLEVEL) == 0) set(x, STATE, 0);
+}
+
 /* Parsing input */
 
 /* I would prefer using PARSE-NAME but its not yet */
@@ -373,7 +404,7 @@ void _find(X* x) {
 	/* Let's find the word, starting from LATEST */
 	CELL w = get(x, LATEST);
 	while (w != 0) {
-		if (compare_without_case(x, w, a, l) && !has_flag(x, w, HIDDEN)) break;
+		if (!has_flag(x, w, HIDDEN) && compare_without_case(x, w, a, l)) break;
 		w = get_link(x, w);
 	}
 	if (w == 0) {
@@ -658,13 +689,7 @@ void _spaces(X* x) { /* TODO */ }
 void _type(X* x) { 
 	CELL l = pop(x); 
 	CELL a = pop(x);
-	if (a < x->d || a > (x->d + x->s)) {
-		printf("ERROOOOR");
-		/* How to know who called here? */
-		exit(-1);
-	} else {
-		printf("%.*s", (int)l, (char*)a); 
-	}
+	printf("%.*s", (int)l, (char*)a); 
 }
 void _u_dot(X* x) { /* TODO */ }
 void _u_dot_r(X* x) { /* TODO */ }
@@ -805,7 +830,9 @@ void _true(X* x) { push(x, -1); }
 
 /* Forming definite loops */
 
-void _do(X* x) { /* TODO */ }
+void _do(X* x) {
+	
+}
 void _question_do(X* x) { /* TODO */ }
 void _i(X* x) { /* TODO */ }
 void _j(X* x) { /* TODO */ }
@@ -824,6 +851,12 @@ void _repeat(X* x) { /* TODO */ }
 
 /* More facilities for defining routines (compiling-mode only) */
 
+void _here(X* x); /* Predefined for if */
+void _over(X* x); /* Predefined for then */
+void _ahead(X* x); /* Predefined for else */
+void _then(X* x); /* Predefined for else */
+void _swap(X* x); /* Predefined for swap */
+
 void _abort(X* x) { /* TODO */ }
 void _abort_quote(X* x) { /* TODO */ }
 void _c_quote(X* x) { /* TODO */ }
@@ -837,6 +870,7 @@ void _colon(X* x) {
 	tok = pick(x, 0) + sCHAR;
 	tlen = cfetch(x, pop(x));
 	header(x, tok, tlen);
+	set(x, LATESTXT, get_xt(x, get(x, LATEST)));
 	set_flag(x, get(x, LATEST), HIDDEN);
 	set(x, STATE, 1);
 }
@@ -844,13 +878,16 @@ void _colon_no_name(X* x) { /* TODO */ }
 void _semicolon(X* x) {
 	compile(x, EXIT);
 	set(x, STATE, 0);
-	unset_flag(x, get(x, LATEST), HIDDEN);
+	/* Don't change flags for nonames */
+	if (get_xt(x, get(x, LATEST)) == get(x, LATESTXT))
+		unset_flag(x, get(x, LATEST), HIDDEN);
+
 }
 
 /* Basic primitive -- void _exit(X* x) */
-void _if(X* x) { /* TODO */ }
-void _else(X* x) { /* TODO */ }
-void _then(X* x) { /* TODO */ }
+void _if(X* x) { compile(x, ZBRANCH); _here(x); comma(x, 0); }
+void _else(X* x) { _ahead(x); _swap(x); _then(x); }
+void _then(X* x) { _here(x); _over(x); _minus(x); _swap(x); _store(x); }
 void _left_bracket(X* x) { /* TODO */ }
 void _quit(X* x) { /* TODO */ }
 void _recurse(X* x) { /* TODO */ }
@@ -945,8 +982,30 @@ void _create(X* x) {
 	compile(x, EXIT); compile(x, EXIT);
 }
 void _does(X* x) { /* TODO */ }
-void _evaluate(X* x) { /* TODO */ }
-void _execute(X* x) { /* TODO */ }
+void _evaluate(X* x) {
+	CELL l = pop(x), a = pop(x);
+
+	CELL previbuf = get(x, IBUF);
+	CELL previpos = get(x, IPOS);
+	CELL previlen = get(x, ILEN);
+
+	CELL prevsourceid = get(x, SOURCE_ID);
+
+	set(x, SOURCE_ID, -1);
+
+	set(x, IBUF, a);
+	set(x, IPOS, 0);
+	set(x, ILEN, l);
+
+	_interpret(x);
+
+	set(x, SOURCE_ID, prevsourceid);
+
+	set(x, IBUF, previbuf);
+	set(x, IPOS, previpos);
+	set(x, ILEN, previlen);
+}
+void _execute(X* x) { eval(x, pop(x)); }
 void _here(X* x) { push(x, to_abs(x, here(x))); }
 void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
 void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
@@ -978,7 +1037,7 @@ void _f_literal(X* x) { /* TODO */ }
 
 /* BLOCK */ void _blk(X* x) { /* TODO */ }
 
-void _ahead(X* x) { /* TODO */ }
+void _ahead(X* x) { compile(x, BRANCH); _here(x); comma(x, 0); }
 void _c_s_pick(X* x) { /* TODO */ }
 void _c_s_roll(X* x) { /* TODO */ }
 
@@ -997,6 +1056,7 @@ CELL code(X* x, char* name, CELL xt) {
 
 void bootstrap(X* x) {
 	comma(x, 0); /* HERE */
+	comma(x, 0); /* BASE */
 	comma(x, 0); /* LATEST */
 	comma(x, 0); /* STATE */
 	comma(x, 0); /* IBUF */
@@ -1004,6 +1064,8 @@ void bootstrap(X* x) {
 	comma(x, 0); /* ILEN */
 	comma(x, 0); /* SOURCE_ID */
 	comma(x, 0); /* DOES */
+	comma(x, 0); /* QLEVEL */
+	comma(x, 0); /* LATESTXT */
 
 	/* Required order primitives */
 
@@ -1011,6 +1073,14 @@ void bootstrap(X* x) {
 	code(x, "LIT", primitive(x, &_lit));
 	code(x, "RIP", primitive(x, &_rip));
 	code(x, "COMPILE,", primitive(x, &_compile));
+	code(x, "BRANCH", primitive(x, &_branch));
+	code(x, "?BRANCH", primitive(x, &_zbranch));
+
+	/* Quotations */
+
+	code(x, "QUOTATION", primitive(x, &_quotation));
+	code(x, "[:", primitive(x, &_start_quotation)); _immediate(x);
+	code(x, ";]", primitive(x, &_end_quotation)); _immediate(x);
 
 	/* Commands that can help you start or end work sessions */
 
@@ -1266,8 +1336,9 @@ void bootstrap(X* x) {
 	code(x, ":NONAME", primitive(x, &_colon_no_name));
 	code(x, ";", primitive(x, &_semicolon)); _immediate(x);
 	code(x, "EXIT", primitive(x, &_exit));
-	code(x, "IF", primitive(x, &_if));
-	code(x, "ELSE", primitive(x, &_else));
+	code(x, "IF", primitive(x, &_if)); _immediate(x);
+	code(x, "ELSE", primitive(x, &_else)); _immediate(x);
+	code(x, "THEN", primitive(x, &_then)); _immediate(x);
 	code(x, "[", primitive(x, &_left_bracket));
 	code(x, "QUIT", primitive(x, &_quit));
 	code(x, "RECURSE", primitive(x, &_recurse));
@@ -1382,6 +1453,23 @@ void include(X* x, char* f) {
 	_included(x);
 }
 
+/* Helper REPL */
+
+void repl(X* x) {
+	char buf[80];
+	while (1) {
+		printf("[IN] >> ");
+		if (fgets(buf, 80, stdin) != 0) {
+			push(x, (CELL)buf);
+			push(x, strlen(buf));
+			_evaluate(x);
+			printf("Data stack: ");	_dot_s(x); printf("\n");
+		} else {
+			/* TODO: Error */
+		}
+	}
+}
+
 /* ---------------------------------------------------- */
 /* -- main -------------------------------------------- */
 /* ---------------------------------------------------- */
@@ -1397,8 +1485,12 @@ int main() {
 
 	bootstrap(x);
 
+	/*
 	chdir("../../forth2012-test-suite/src/");
 	include(x, "runtests.fth");
+	*/
+
+	repl(x);
 
 	free((void*)x->d);
 	free(x->p);
