@@ -290,10 +290,10 @@ CELL get_name_addr(X* x, CELL w) {
 #define INSTANT				4
 
 void set_flag(X* x, CELL w, CHAR v) { 
-	cset(x, w + 3*sCELL, get_flags(x, w) | v); 
+	cset(x, w + 2*sCELL, get_flags(x, w) | v); 
 }
 void unset_flag(X* x, CELL w, CHAR v) { 
-	cset(x, w + 3*sCELL, get_flags(x, w) & ~v); 
+	cset(x, w + 2*sCELL, get_flags(x, w) & ~v); 
 }
 
 /* -- Primitives -------------------------------------- */
@@ -590,7 +590,7 @@ void _resize(X* x) { /* TODO */ }
 /* String operations */
 
 void _convert(X* x) { /* TODO */ }
-void _count(X* x) { /* TODO */ }
+void _count(X* x) { CELL a = pop(x); push(x, a + 1); push(x, cfetch(x, a)); }
 void _erase(X* x) { /* TODO */ }
 void _fill(X* x) { /* TODO */ }
 void _hold(X* x) { /* TODO */ }
@@ -658,7 +658,13 @@ void _spaces(X* x) { /* TODO */ }
 void _type(X* x) { 
 	CELL l = pop(x); 
 	CELL a = pop(x);
-	printf("%.*s", (int)l, (char*)a); 
+	if (a < x->d || a > (x->d + x->s)) {
+		printf("ERROOOOR");
+		/* How to know who called here? */
+		exit(-1);
+	} else {
+		printf("%.*s", (int)l, (char*)a); 
+	}
 }
 void _u_dot(X* x) { /* TODO */ }
 void _u_dot_r(X* x) { /* TODO */ }
@@ -694,7 +700,7 @@ void _d_minus(X* x) { /* TODO */ }
 void _mod(X* x) { CELL a = pop(x); push(x, pop(x) % a); }
 void _star_slash_mod(X* x) { /* TODO */ }
 void _slash_mod(X* x) { /* TODO */ }
-void _negate(X* x) { /* TODO */ }
+void _negate(X* x) { push(x, 0 - pop(x)); }
 void _d_negate(X* x) { /* TODO */ }
 void _one_plus(X* x) { push(x, pop(x) + 1); }
 void _one_minus(X* x) { push(x, pop(x) - 1); }
@@ -715,7 +721,7 @@ void _s_m_slash_rem(X* x) { /* TODO */ }
 void _star(X* x) { /* TODO */ }
 void _star_slash(X* x) { /* TODO */ }
 void _m_star_slash(X* x) { /* TODO */ }
-void _two_star(X* x) { /* TODO */ }
+void _two_star(X* x) { push(x, 2*pop(x)); }
 void _d_two_star(X* x) { /* TODO */ }
 void _two_slash(X* x) { /* TODO */ }
 void _d_two_slash(X* x) { /* TODO */ }
@@ -744,10 +750,12 @@ void _f_to_d(X* x) { /* TODO */ }
 
 /* Commands to define data structures */
 
+void _create(X* x); /* Required pre-definition for variable */
+void _comma(X* x); /* Require pre-definition for variable */
+
 void _constant(X* x) { /* TODO */ }
 void _value(X* x) { /* TODO */ }
-void _variable(X* x) { /* TODO */ }
-
+void _variable(X* x) { _create(x); push(x, 0); _comma(x); }
 void _two_constant(X* x) { /* TODO */ }
 void _two_variable(X* x) { /* TODO */ }
 
@@ -823,9 +831,22 @@ void _case(X* x) { /* TODO */ }
 void _of(X* x) { /* TODO */ }
 void _endof(X* x) { /* TODO */ }
 void _endcase(X* x) { /* TODO */ }
-void _colon(X* x) { /* TODO */ }
+void _colon(X* x) {
+	CELL tok, tlen;
+	push(x, 32); _word(x);
+	tok = pick(x, 0) + sCHAR;
+	tlen = cfetch(x, pop(x));
+	header(x, tok, tlen);
+	set_flag(x, get(x, LATEST), HIDDEN);
+	set(x, STATE, 1);
+}
 void _colon_no_name(X* x) { /* TODO */ }
-void _semicolon(X* x) { /* TODO */ }
+void _semicolon(X* x) {
+	compile(x, EXIT);
+	set(x, STATE, 0);
+	unset_flag(x, get(x, LATEST), HIDDEN);
+}
+
 /* Basic primitive -- void _exit(X* x) */
 void _if(X* x) { /* TODO */ }
 void _else(X* x) { /* TODO */ }
@@ -892,23 +913,41 @@ void _align(X* x) { /* TODO */ }
 void _f_align(X* x) { /* TODO */ }
 void _aligned(X* x) { /* TODO */ }
 void _f_aligned(X* x) { /* TODO */ }
-void _allot(X* x) { /* TODO */ }
+void _allot(X* x) { allot(x, pop(x)); }
 void _to_body(X* x) { /* TODO */ }
 void _c_comma(X* x) { /* TODO */ }
 void _cell_plus(X* x) { /* TODO */ }
 void _float_plus(X* x) { /* TODO */ }
-void _cells(X* x) { /* TODO */ }
+void _cells(X* x) { push(x, pop(x) * sCELL); }
 void _floats(X* x) { /* TODO */ }
 void _char_plus(X* x) { /* TODO */ }
 void _chars(X* x) { /* TODO */ }
-void _comma(X* x) { /* TODO */ }
+void _comma(X* x) { comma(x, pop(x)); }
 void _compile_comma(X* x) { /* TODO */ }
 void _bracket_compile(X* x) { /* TODO */ }
-void _create(X* x) { /* TODO */ }
+/* CREATE parses the next word in the input buffer, creates */
+/* a new header for it and then compiles some code. */
+/* The compiled code is 4 CELLS long and has a RIP instruction */
+/* a displacement of 4 CELLS and to EXIT instructions. */
+/* The RIP instruction will load the address after the last */
+/* EXIT instruction onto the stack. That's the address used */
+/* by created words. */
+/* The first EXIT instruction exists to be replaced with a */
+/* call if CREATE DOES> is used. */
+/* The last EXIT is the real end of the word. */
+void _create(X* x) {
+	CELL tok, tlen;
+	push(x, 32); _word(x);
+	tok = pick(x, 0) + sCHAR;
+	tlen = cfetch(x, pop(x));
+	header(x, tok, tlen);
+	compile(x, RIP); compile(x, 4*sCELL); 
+	compile(x, EXIT); compile(x, EXIT);
+}
 void _does(X* x) { /* TODO */ }
 void _evaluate(X* x) { /* TODO */ }
 void _execute(X* x) { /* TODO */ }
-void _here(X* x) { /* TODO */ }
+void _here(X* x) { push(x, to_abs(x, here(x))); }
 void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
 void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
 void _bracket_tick(X* x) { /* TODO */ }
@@ -1028,7 +1067,7 @@ void bootstrap(X* x) {
 	/* Comment-introducing operations */
 
 	code(x, "\\", primitive(x, &_backslash));
-	code(x, "(", primitive(x, &_paren));
+	code(x, "(", primitive(x, &_paren)); _immediate(x);
 
 	/* Dynamic memory operations */
 
@@ -1225,7 +1264,7 @@ void bootstrap(X* x) {
 	code(x, "ENDCASE", primitive(x, &_endcase));
 	code(x, ":", primitive(x, &_colon));
 	code(x, ":NONAME", primitive(x, &_colon_no_name));
-	code(x, ";", primitive(x, &_semicolon));
+	code(x, ";", primitive(x, &_semicolon)); _immediate(x);
 	code(x, "EXIT", primitive(x, &_exit));
 	code(x, "IF", primitive(x, &_if));
 	code(x, "ELSE", primitive(x, &_else));
