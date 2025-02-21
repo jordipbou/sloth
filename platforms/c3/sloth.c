@@ -195,6 +195,8 @@ void save_image(X* x, char* filename) {
 
 /* Displacement of counted string buffer from here */
 #define CBUF					64
+#define SBUF1					128
+#define SBUF2					256
 
 /* Relative addresses of variables accessed both from C */
 /* and Forth. */
@@ -210,6 +212,10 @@ void save_image(X* x, char* filename) {
 #define DOES					8*sCELL
 #define QLEVEL				9*sCELL
 #define LATESTXT			10*sCELL
+#define IX						11*sCELL
+#define JX						12*sCELL
+#define KX						13*sCELL
+#define LX						14*sCELL
 
 /* XTs of primitives that need to be called from C and  */
 /* Forth code. */
@@ -220,7 +226,11 @@ void save_image(X* x, char* filename) {
 #define COMPILE				-4
 #define BRANCH				-5
 #define ZBRANCH				-6
-#define QUOTATION			-7
+#define STRING				-7
+#define QUOTATION			-8
+#define SQUOTATION		-9
+#define EQUOTATION		-10
+#define DOLOOP				-11
 
 /* -- Helpers ----------------------------------------- */
 
@@ -236,6 +246,7 @@ CHAR cget(X* x, CELL a) { return cfetch(x, to_abs(x, a)); }
 
 CELL here(X* x) { return get(x, HERE); }
 void allot(X* x, CELL v) { set(x, HERE, get(x, HERE) + v); }
+CELL aligned(CELL a) { return (a + (sCELL - 1)) & ~(sCELL - 1); }
 void align(X* x) { 
 	set(x, HERE, (get(x, HERE) + (sCELL - 1)) & ~(sCELL - 1)); 
 }
@@ -312,6 +323,9 @@ void _compile(X* x) { compile(x, pop(x)); }
 void _branch(X* x) { x->ip += op(x) - sCELL; }
 void _zbranch(X* x) { x->ip += pop(x) == 0 ? (op(x) - sCELL) : sCELL; }
 
+/* TODO: Shouldn't be aligned? */
+void _string(X* x) { CELL l = op(x); push(x, to_abs(x, x->ip)); push(x, l); x->ip = aligned(x->ip + l); }
+
 /* Quotations (not in ANS Forth yet) */
 
 void _quotation(X* x) { CELL d = op(x); push(x, x->ip); x->ip += d; }
@@ -333,6 +347,80 @@ void _end_quotation(X* x) {
 	set(x, LATESTXT, pop(x));
 	set(x, QLEVEL, get(x, QLEVEL) - 1);
 	if (get(x, QLEVEL) == 0) set(x, STATE, 0);
+}
+
+/* Loop helpers */
+
+void ipush(X* x) { 
+	rpush(x, get(x, KX));
+	set(x, KX, get(x, JX));
+	set(x, JX, get(x, IX));
+	set(x, LX, 0);
+}
+void ipop(X* x) { 
+	set(x, LX, 0);
+	set(x, IX, get(x, JX));
+	set(x, JX, get(x, KX));
+	set(x, KX, rpop(x));
+}
+
+void _leave(X* x) { set(x, LX, 1); _exit(x); }
+void _unloop(X* x) { 
+	set(x, LX, get(x, LX) - 1);
+	if (get(x, LX) == -1) {
+		set(x, IX, get(x, JX));
+		set(x, JX, get(x, KX));
+		set(x, KX, rpick(x, 1));
+	} else if (get(x, LX) == -2) {
+		set(x, IX, get(x, JX));
+		set(x, JX, get(x, KX));
+		set(x, KX, rpick(x, 3));
+	}
+}
+
+/* Algorithm for doloop taken from pForth */
+/* (pf_inner.c case ID_PLUS_LOOP) */
+void _doloop(X* x) {
+	CELL q, do_first_loop, l, o, d;
+	ipush(x);
+	q = pop(x);
+	do_first_loop = pop(x);
+	set(x, IX, pop(x));
+	l = pop(x);
+
+	o = get(x, IX) - l;
+	d = 0;
+
+	/* First iteration is executed always on a DO */
+	if (do_first_loop == 1) {
+		eval(x, q);
+		if (get(x, LX) == 0) {
+			d = pop(x);
+			o = get(x, IX) - l;
+			set(x, IX, get(x, IX) + d);
+		}
+	}
+
+	if (!(do_first_loop == 0 && o == 0)) {
+		while (((o ^ (o + d)) & (o * d)) >= 0 && get(x, LX) == 0) {
+			eval(x, q);
+			if (get(x, LX) == 0) { /* Avoid pop if we're leaving */
+				d = pop(x);
+				o = get(x, IX) - l;
+				set(x, IX, get(x, IX) + d);
+			}
+		}
+	}
+
+	if (get(x, LX) == 0 || get(x, LX) == 1) { 
+		/* Leave case */
+		ipop(x);
+	} else if (get(x, LX) < 0) {
+		/* Unloop case */
+		set(x, LX, get(x, LX) + 1);
+		rpop(x);
+		_exit(x);
+	}
 }
 
 /* Parsing input */
@@ -515,7 +603,16 @@ void _dot_s(X* x) {
 		printf("%ld ", x->s[i]);
 	}
 }
-void _see(X* x) { /* TODO */ }
+void _see(X* x) { 
+	CELL tok, tlen;
+	push(x, 32); _word(x);
+	tok = pick(x, 0) + sCHAR;
+	tlen = cfetch(x, pick(x, 0));
+	if (tlen == 0) { pop(x); return; }
+	_find(x); 
+	pop(x);
+	printf("XT: %ld\n", pop(x));
+}
 
 /* Commands that change compilation & interpretation settings */
 
@@ -689,7 +786,13 @@ void _spaces(X* x) { /* TODO */ }
 void _type(X* x) { 
 	CELL l = pop(x); 
 	CELL a = pop(x);
-	printf("%.*s", (int)l, (char*)a); 
+	CELL i;
+	CHAR c;
+	for (i = a; i < a + l; i++) {
+		c = cfetch(x, i);
+		if (c >= 32 && c <= 126) printf("%c", c);
+	}
+	/* printf("%.*s", (int)l, (char*)a); */
 }
 void _u_dot(X* x) { /* TODO */ }
 void _u_dot_r(X* x) { /* TODO */ }
@@ -824,22 +927,23 @@ void _f_zero_less_than(X* x) { /* TODO */ }
 
 void _bl(X* x) { push(x, 32); }
 void _char(X* x) { /* TODO */ }
-void _bracket_char(X* x) { /* TODO */ }
+void _bracket_char(X* x) { 
+	push(x, 32); _word(x);
+	push(x, cfetch(x, pop(x) + 1));
+}
 void _false(X* x) { push(x, 0); }
 void _true(X* x) { push(x, -1); }
 
 /* Forming definite loops */
 
-void _do(X* x) {
-	
-}
-void _question_do(X* x) { /* TODO */ }
-void _i(X* x) { /* TODO */ }
-void _j(X* x) { /* TODO */ }
-void _leave(X* x) { /* TODO */ }
-void _unloop(X* x) { /* TODO */ }
-void _loop(X* x) { /* TODO */ }
-void _plus_loop(X* x) { /* TODO */ }
+void _do(X* x) { literal(x, 1); _start_quotation(x); }
+void _question_do(X* x) { literal(x, 0); _start_quotation(x); }
+void _i(X* x) { push(x, get(x, IX)); }
+void _j(X* x) { push(x, get(x, JX)); }
+/* Already defined: void _leave(X* x); */
+/* Already defined: void _unloop(X* x); */
+void _loop(X* x) { literal(x, 1); _end_quotation(x); compile(x, DOLOOP); }
+void _plus_loop(X* x) { _end_quotation(x); compile(x, DOLOOP); }
 
 /* Forming indefinite loops (compiling-mode only) */
 
@@ -893,14 +997,28 @@ void _quit(X* x) { /* TODO */ }
 void _recurse(X* x) { /* TODO */ }
 void _right_bracket(X* x) { /* TODO */ }
 void _s_quote(X* x) { 
+	CELL i;
+	/* Parsing */
 	CELL l = 0;
-	push(x, get(x, IBUF) + get(x, IPOS));
+	CELL a = get(x, IBUF) + get(x, IPOS);;
 	while (get(x, IPOS) < get(x, ILEN)
 	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != '"') {
 		l++;
 		set(x, IPOS, get(x, IPOS) + 1);
 	}
-	push(x, l);
+	if (get(x, STATE) == 0) {
+		/* TODO: Should change between SBUF1 and SBUF2 */
+		for (i = 0; i < l; i++) {
+			cset(x, SBUF1 + i, cfetch(x, a + i));
+		}
+		push(x, to_abs(x, SBUF1));
+		push(x, l);
+	} else {
+		compile(x, STRING);
+		comma(x, l);
+		for (i = a; i < (a + l); i++) ccomma(x, cfetch(x, i));
+		align(x);
+	}
 	if (get(x, IPOS) < get(x, ILEN))
 		set(x, IPOS, get(x, IPOS) + 1);
 }
@@ -927,6 +1045,7 @@ void _pick(X* x) {  push(x, pick(x, pop(x))); }
 void _two_to_r(X* x) { CELL a = pop(x); rpush(x, pop(x)); rpush(x, a); }
 void _to_r(X* x) { rpush(x, pop(x)); }
 void _two_r_from(X* x) { CELL a = rpop(x); push(x, rpop(x)); push(x, a); }
+void _r_from(X* x) { push(x, rpop(x)); }
 void _r_fetch(X* x) { push(x, rpick(x, 0)); }
 void _two_r_fetch(X* x) { push(x, rpick(x, 1)); push(x, rpick(x, 0)); }
 void _roll(X* x) { /* TODO */ }
@@ -1066,6 +1185,10 @@ void bootstrap(X* x) {
 	comma(x, 0); /* DOES */
 	comma(x, 0); /* QLEVEL */
 	comma(x, 0); /* LATESTXT */
+	comma(x, 0); /* IX */
+	comma(x, 0); /* JX */
+	comma(x, 0); /* KX */
+	comma(x, 0); /* LX */
 
 	/* Required order primitives */
 
@@ -1075,12 +1198,17 @@ void bootstrap(X* x) {
 	code(x, "COMPILE,", primitive(x, &_compile));
 	code(x, "BRANCH", primitive(x, &_branch));
 	code(x, "?BRANCH", primitive(x, &_zbranch));
+	code(x, "STRING", primitive(x, &_string));
 
 	/* Quotations */
 
 	code(x, "QUOTATION", primitive(x, &_quotation));
 	code(x, "[:", primitive(x, &_start_quotation)); _immediate(x);
 	code(x, ";]", primitive(x, &_end_quotation)); _immediate(x);
+
+	/* Loop helper */
+
+	code(x, "DOLOOP", primitive(x, &_doloop));
 
 	/* Commands that can help you start or end work sessions */
 
@@ -1301,27 +1429,28 @@ void bootstrap(X* x) {
 
 	code(x, "BL", primitive(x, &_bl));
 	code(x, "CHAR", primitive(x, &_char));
-	code(x, "[CHAR]", primitive(x, &_bracket_char));
+	code(x, "[CHAR]", primitive(x, &_bracket_char)); _immediate(x);
 	code(x, "FALSE", primitive(x, &_false));
 	code(x, "TRUE", primitive(x, &_true));
 
 	/* Forming definite loops */
 
-	code(x, "DO", primitive(x, &_do));
-	code(x, "?DO", primitive(x, &_question_do));
+	code(x, "DO", primitive(x, &_do)); _immediate(x);
+	code(x, "?DO", primitive(x, &_question_do)); _immediate(x);
 	code(x, "I", primitive(x, &_i));
 	code(x, "J", primitive(x, &_j));
+	code(x, "LEAVE", primitive(x, &_leave));
 	code(x, "UNLOOP", primitive(x, &_unloop));
-	code(x, "LOOP", primitive(x, &_loop));
-	code(x, "+LOOP", primitive(x, &_plus_loop));
+	code(x, "LOOP", primitive(x, &_loop)); _immediate(x);
+	code(x, "+LOOP", primitive(x, &_plus_loop)); _immediate(x);
 
 	/* Forming indefinite loops (compiling-mode only) */
 
-	code(x, "BEGIN", primitive(x, &_begin));
-	code(x, "AGAIN", primitive(x, &_again));
-	code(x, "UNTIL", primitive(x, &_until));
-	code(x, "WHILE", primitive(x, &_while));
-	code(x, "REPEAT", primitive(x, &_repeat));
+	code(x, "BEGIN", primitive(x, &_begin)); _immediate(x);
+	code(x, "AGAIN", primitive(x, &_again)); _immediate(x);
+	code(x, "UNTIL", primitive(x, &_until)); _immediate(x);
+	code(x, "WHILE", primitive(x, &_while)); _immediate(x);
+	code(x, "REPEAT", primitive(x, &_repeat)); _immediate(x);
 
 	/* More facilities for defining routines (compiling-mode only) */
 
@@ -1343,7 +1472,7 @@ void bootstrap(X* x) {
 	code(x, "QUIT", primitive(x, &_quit));
 	code(x, "RECURSE", primitive(x, &_recurse));
 	code(x, "]", primitive(x, &_right_bracket));
-	code(x, "S\"", primitive(x, &_s_quote));
+	code(x, "S\"", primitive(x, &_s_quote)); _immediate(x);
 
 	code(x, "CATCH", primitive(x, &_catch));
 	code(x, "THROW", primitive(x, &_throw));
@@ -1368,6 +1497,7 @@ void bootstrap(X* x) {
 	code(x, "2>R", primitive(x, &_two_to_r));
 	code(x, ">R", primitive(x, &_to_r));
 	code(x, "2R>", primitive(x, &_two_r_from));
+	code(x, "R>", primitive(x, &_r_from));
 	code(x, "R@", primitive(x, &_r_fetch));
 	code(x, "2R@", primitive(x, &_two_r_fetch));
 	code(x, "ROLL", primitive(x, &_roll));
@@ -1485,12 +1615,12 @@ int main() {
 
 	bootstrap(x);
 
-	/*
 	chdir("../../forth2012-test-suite/src/");
 	include(x, "runtests.fth");
-	*/
 
+	/*
 	repl(x);
+	*/
 
 	free((void*)x->d);
 	free(x->p);
