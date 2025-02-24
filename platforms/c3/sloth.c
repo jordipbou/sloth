@@ -671,7 +671,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			printf(">>>> %s", linebuf);
+			/* printf(">>>> %s", linebuf); */
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
@@ -881,7 +881,14 @@ void _f_to_d(X* x) { /* TODO */ }
 void _create(X* x); /* Required pre-definition for variable */
 void _comma(X* x); /* Require pre-definition for variable */
 
-void _constant(X* x) { /* TODO */ }
+void _constant(X* x) { 
+	CELL tok, tlen, v = pop(x);
+	push(x, 32); _word(x);
+	tok = pick(x, 0) + sCHAR;
+	tlen = cfetch(x, pop(x));
+	header(x, tok, tlen);
+	literal(x, v); compile(x, EXIT);
+}
 void _value(X* x) { /* TODO */ }
 void _variable(X* x) { _create(x); push(x, 0); _comma(x); }
 void _two_constant(X* x) { /* TODO */ }
@@ -1264,7 +1271,7 @@ void bootstrap(X* x) {
 
 	/* Comment-introducing operations */
 
-	code(x, "\\", primitive(x, &_backslash));
+	code(x, "\\", primitive(x, &_backslash)); _immediate(x);
 	code(x, "(", primitive(x, &_paren)); _immediate(x);
 
 	/* Dynamic memory operations */
