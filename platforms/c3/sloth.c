@@ -210,6 +210,8 @@ void save_image(X* x, char* filename) {
 #define ILEN					6*sCELL
 #define SOURCE_ID			7*sCELL
 #define DOES					8*sCELL
+/* TODO: QLEVEL is not needed anymore but if i delete any of these */
+/* everything breaks. */
 #define QLEVEL				9*sCELL
 #define LATESTXT			10*sCELL
 #define IX						11*sCELL
@@ -330,9 +332,9 @@ void _string(X* x) { CELL l = op(x); push(x, to_abs(x, x->ip)); push(x, l); x->i
 
 void _quotation(X* x) { CELL d = op(x); push(x, x->ip); x->ip += d; }
 void _start_quotation(X* x) {
-	set(x, QLEVEL, get(x, QLEVEL) + 1);
-	if (get(x, STATE) == 0) push(x, here(x) + 2*sCELL);
-	if (get(x, QLEVEL) == 1) set(x, STATE, 1);
+	CELL s = get(x, STATE);
+	set(x, STATE, s <= 0 ? s - 1 : s + 1);
+	if (get(x, STATE) == -1) push(x, here(x) + 2*sCELL);
 	push(x, get(x, LATESTXT));
 	compile(x, QUOTATION);
 	push(x, to_abs(x, here(x)));
@@ -341,12 +343,11 @@ void _start_quotation(X* x) {
 }
 
 void _end_quotation(X* x) {
-	CELL a = pop(x);
+	CELL s = get(x, STATE), a = pop(x);
 	compile(x, EXIT);
 	store(x, a, to_abs(x, here(x)) - a - sCELL);
 	set(x, LATESTXT, pop(x));
-	set(x, QLEVEL, get(x, QLEVEL) - 1);
-	if (get(x, QLEVEL) == 0) set(x, STATE, 0);
+	set(x, STATE, s < 0 ? s + 1 : s - 1);
 }
 
 /* Loop helpers */
@@ -522,7 +523,7 @@ void _interpret(X* x) {
 		_find(x);
 		if ((flag = pop(x)) != 0) {
 			if (get(x, STATE) == 0
-			|| (get(x, STATE) == 1 && flag == 1)) {
+			|| (get(x, STATE) != 0 && flag == 1)) {
 				eval(x, pop(x));	
 			} else {
 				compile(x, pop(x));
@@ -604,14 +605,22 @@ void _dot_s(X* x) {
 	}
 }
 void _see(X* x) { 
-	CELL tok, tlen;
+	CELL tok, tlen, xt, op;
 	push(x, 32); _word(x);
 	tok = pick(x, 0) + sCHAR;
 	tlen = cfetch(x, pick(x, 0));
 	if (tlen == 0) { pop(x); return; }
 	_find(x); 
 	pop(x);
-	printf("XT: %ld\n", pop(x));
+	xt = pop(x);
+	op = cfetch(x, to_abs(x, xt));	
+	printf("%ld ", op);
+	while (op != EXIT) {
+		xt += sCELL;
+		op = cfetch(x, to_abs(x, xt));
+		printf("%ld ", op);
+	}
+	printf("\n");
 }
 
 /* Commands that change compilation & interpretation settings */
@@ -671,7 +680,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			/* printf(">>>> %s", linebuf); */
+			printf(">>>> %s", linebuf);
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
