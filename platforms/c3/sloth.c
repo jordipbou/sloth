@@ -680,7 +680,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			printf(">>>> %s", linebuf);
+			/* printf(">>>> %s", linebuf); */
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
@@ -942,10 +942,13 @@ void _f_zero_less_than(X* x) { /* TODO */ }
 /* System constants & facilities for generating ASCII values */
 
 void _bl(X* x) { push(x, 32); }
-void _char(X* x) { /* TODO */ }
-void _bracket_char(X* x) { 
+void _char(X* x) {
 	push(x, 32); _word(x);
 	push(x, cfetch(x, pop(x) + 1));
+}
+void _bracket_char(X* x) { 
+	push(x, 32); _word(x);
+	literal(x, cfetch(x, pop(x) + 1));
 }
 void _false(X* x) { push(x, 0); }
 void _true(X* x) { push(x, -1); }
