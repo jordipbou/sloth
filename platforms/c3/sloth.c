@@ -26,6 +26,7 @@
 
 typedef int8_t CHAR;
 typedef intptr_t CELL;
+typedef uintptr_t uCELL;
 
 #define sCELL sizeof(CELL)
 #define sCHAR sizeof(CHAR)
@@ -825,8 +826,8 @@ void _abs(X* x) { CELL v = pop(x); push(x, v < 0 ? (0-v) : v); }
 void _d_abs(X* x) { /* TODO */ }
 void _and(X* x) { CELL v = pop(x); push(x, pop(x) & v); }
 void _f_m_slash_mod(X* x) { /* TODO */ }
-void _invert(X* x) { /* TODO */ }
-void _l_shift(X* x) { /* TODO */ }
+void _invert(X* x) { push(x, ~pop(x)); }
+void _l_shift(X* x) { CELL n = pop(x); push(x, pop(x) << n); }
 void _m_star(X* x) { /* TODO */ }
 void _max(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a > b ? a : b); }
 void _d_max(X* x) { /* TODO */ }
@@ -851,7 +852,7 @@ void _plus_store(X* x) {
 	store(x, a, fetch(x, a) + n);
 }
 void _d_plus_store(X* x) { /* TODO */ }
-void _r_shift(X* x) { /* TODO */ }
+void _r_shift(X* x) { CELL n = pop(x); push(x, ((uCELL)pop(x)) >> n); }
 void _slash(X* x) { CELL a = pop(x); push(x, pop(x) / a); }
 void _d_slash(X* x) { /* TODO */ }
 void _s_m_slash_rem(X* x) { /* TODO */ }
@@ -860,7 +861,7 @@ void _star_slash(X* x) { /* TODO */ }
 void _m_star_slash(X* x) { /* TODO */ }
 void _two_star(X* x) { push(x, 2*pop(x)); }
 void _d_two_star(X* x) { /* TODO */ }
-void _two_slash(X* x) { /* TODO */ }
+void _two_slash(X* x) { push(x, pop(x) >> 1); }
 void _d_two_slash(X* x) { /* TODO */ }
 void _u_m_star(X* x) { /* TODO */ }
 void _u_m_slash_mod(X* x) { /* TODO */ }
@@ -927,7 +928,11 @@ void _equals(X* x) { CELL a = pop(x); push(x, pop(x) == a ? -1 : 0); }
 void _greater_than(X* x) { CELL a = pop(x); push(x, pop(x) > a ? -1 : 0); }
 void _less_than(X* x) { CELL a = pop(x); push(x, pop(x) < a ? -1 : 0); }
 void _not_equals(X* x) { CELL a = pop(x); push(x, pop(x) != a ? -1 : 0); }
-void _u_less_than(X* x) { /* TODO */ }
+void _u_less_than(X* x) { 
+	uCELL b = (uCELL)pop(x);
+	uCELL a = (uCELL)pop(x);
+	push(x, a < b ? -1 : 0);
+}
 void _u_greater_than(X* x) { /* TODO */ }
 void _within(X* x) { /* TODO */ }
 void _zero_equals(X* x) { push(x, pop(x) == 0 ? -1 : 0); }
@@ -1623,7 +1628,7 @@ void repl(X* x) {
 /* -- main -------------------------------------------- */
 /* ---------------------------------------------------- */
 
-int main() {
+int main(int argc, char**argv) {
 	X* x = malloc(sizeof(X));
 	x->p = malloc(sizeof(P));
 	x->p->p = malloc(sizeof(F) * PSIZE);
@@ -1634,12 +1639,12 @@ int main() {
 
 	bootstrap(x);
 
-	chdir("../../forth2012-test-suite/src/");
-	include(x, "runtests.fth");
-
-	/*
-	repl(x);
-	*/
+	if (argc == 1) {
+		chdir("../../forth2012-test-suite/src/");
+		include(x, "runtests.fth");
+	} else {
+		repl(x);
+	}
 
 	free((void*)x->d);
 	free(x->p);
