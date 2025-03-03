@@ -28,6 +28,19 @@ typedef int8_t CHAR;
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
 
+#if UINTPTR_MAX == UINT64_MAX
+	#define hCELL_MASK 0xFFFFFFFF
+	#define hCELL_BITS 32
+#endif
+#if UINTPTR_MAX == UINT32_MAX
+	#define hCELL_MASK 0xFFFF
+	#define hCELL_BITS 16 
+#endif
+#if UINTPTR_MAX == UINT16_MAX
+	#define hCELL_MASK 0xFF
+	#define hCELL_BITS 8
+#endif
+
 #define sCELL sizeof(CELL)
 #define sCHAR sizeof(CHAR)
 
@@ -77,6 +90,10 @@ void init(X* x, CELL d, CELL sz) {
 void push(X* x, CELL v) { x->s[x->sp] = v; x->sp++; }
 CELL pop(X* x) { x->sp--; return x->s[x->sp]; }
 CELL pick(X* x, CELL a) { return x->s[x->sp - a - 1]; }
+
+/* Helpers for double numbers */
+
+CELL lower_half(CELL v) { return ((v) & (((uCELL)1 << (sCELL*4)) - 1)); }
 
 /* Return stack */
 
@@ -828,7 +845,43 @@ void _and(X* x) { CELL v = pop(x); push(x, pop(x) & v); }
 void _f_m_slash_mod(X* x) { /* TODO */ }
 void _invert(X* x) { push(x, ~pop(x)); }
 void _l_shift(X* x) { CELL n = pop(x); push(x, pop(x) << n); }
-void _m_star(X* x) { /* TODO */ }
+/* Code for _m_star has been created by claude.ai */
+void _m_star(X* x) {
+	CELL b = pop(x), a = pop(x), high, low;
+
+	/* Convert the signed 64-bit integers to unsigned */
+	/* for bit manipulation */
+	uCELL ua = (uCELL)a;
+	uCELL ub = (uCELL)b;
+
+	/* Compute the full 128-bit product using 32 bit pieces */
+	uCELL a_low = ua & hCELL_MASK;
+	uCELL a_high = ua >> hCELL_BITS;
+	uCELL b_low = ub & hCELL_MASK;
+	uCELL b_high = ub >> hCELL_BITS;
+
+	/* Multiply the components */
+	uCELL low_low = a_low * b_low;
+	uCELL low_high = a_low * b_high;
+	uCELL high_low = a_high * b_low;
+	uCELL high_high = a_high * b_high;
+
+	/* Combine the partial product */
+	uCELL carry = ((low_low >> hCELL_BITS) + (low_high & hCELL_MASK) + (high_low & hCELL_MASK)) >> hCELL_BITS;
+
+	/* Calculate the low 64 bits of the result */
+	low = (uCELL)(low_low + (low_high << hCELL_BITS) + (high_low << hCELL_BITS));
+
+	/* Calculate the high 64 bits of the result */
+	high = (uCELL)(high_high + (low_high >> hCELL_BITS) + (high_low >> hCELL_BITS) + carry);
+
+	/* Adjust for sign */
+	if (a < 0) high -= b;
+	if (b < 0) high -= a;
+
+	push(x, low);
+	push(x, high);
+}
 void _max(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a > b ? a : b); }
 void _d_max(X* x) { /* TODO */ }
 void _min(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a < b ? a : b); }
@@ -856,14 +909,47 @@ void _r_shift(X* x) { CELL n = pop(x); push(x, ((uCELL)pop(x)) >> n); }
 void _slash(X* x) { CELL a = pop(x); push(x, pop(x) / a); }
 void _d_slash(X* x) { /* TODO */ }
 void _s_m_slash_rem(X* x) { /* TODO */ }
-void _star(X* x) { /* TODO */ }
+void _star(X* x) { CELL b = pop(x); push(x, pop(x) * b); }
 void _star_slash(X* x) { /* TODO */ }
 void _m_star_slash(X* x) { /* TODO */ }
 void _two_star(X* x) { push(x, 2*pop(x)); }
 void _d_two_star(X* x) { /* TODO */ }
 void _two_slash(X* x) { push(x, pop(x) >> 1); }
 void _d_two_slash(X* x) { /* TODO */ }
-void _u_m_star(X* x) { /* TODO */ }
+void _u_m_star(X* x) {
+	uCELL b = (uCELL)pop(x), a = (uCELL)pop(x), high, low;
+
+	/* Split each 64-bit integer into 32-bit pieces for multiplication */
+	uCELL a_low = a & hCELL_MASK;
+	uCELL a_high = a >> hCELL_BITS;
+	uCELL b_low = b & hCELL_MASK;
+	uCELL b_high = b >> hCELL_BITS;
+	
+	/* Multiply the 32-bit components */
+	uCELL low_low = a_low * b_low;
+	uCELL low_high = a_low * b_high;
+	uCELL high_low = a_high * b_low;
+	uCELL high_high = a_high * b_high;
+
+	uCELL carry; /* Pre-definition */
+
+	/* Intermediate values for calculating the carries */
+	uCELL mid = low_low >> hCELL_BITS;
+	mid += low_high & hCELL_MASK;
+	mid += high_low & hCELL_MASK;
+	
+	/* Calculate carry for the high part */
+	carry = mid >> hCELL_BITS;
+	
+	/* Calculate the low 64 bits of the result */
+	low = (mid << hCELL_BITS) | (low_low & hCELL_MASK);
+	
+	/* Calculate the high 64 bits of the result */
+	high = high_high + (low_high >> hCELL_BITS) + (high_low >> hCELL_BITS) + carry;
+
+	push(x, low);
+	push(x, high);
+}
 void _u_m_slash_mod(X* x) { /* TODO */ }
 void _xor(X* x) { CELL a = pop(x); push(x, pop(x) ^ a); }
 
@@ -879,7 +965,7 @@ void _f_round(X* x) { /* TODO */ }
 
 /* Number-type conversion operators */
 
-void _s_to_d(X* x) { /* TODO */ }
+void _s_to_d(X* x) { push(x, pick(x, 0) < 0 ? -1 : 0); }
 
 void _d_to_s(X* x) { /* TODO */ }
 
