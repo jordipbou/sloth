@@ -990,7 +990,82 @@ void _d_plus_store(X* x) { /* TODO */ }
 void _r_shift(X* x) { CELL n = pop(x); push(x, ((uCELL)pop(x)) >> n); }
 void _slash(X* x) { CELL a = pop(x); push(x, pop(x) / a); }
 void _d_slash(X* x) { /* TODO */ }
-void _s_m_slash_rem(X* x) { /* TODO */ }
+void _s_m_slash_rem(X* x) {
+	CELL n1 = pop(x), d1_hi = pop(x), d1_lo = pop(x);
+
+	uCELL q, r;
+	
+	/* Track signs */
+	CELL d_neg = (d1_hi < 0);
+	CELL n_neg = (n1 < 0);
+	
+	/* Use unsigned arithmetic for the algorithm */
+	uCELL abs_n1 = n_neg ? (uCELL)-n1 : (uCELL)n1;
+	uCELL abs_d_hi, abs_d_lo;
+	
+	/* Get absolute value of double-word dividend */
+	if (d_neg) {
+		/* Two's complement negation for double word */
+		abs_d_lo = (uCELL)-d1_lo;
+		abs_d_hi = (uCELL)(~d1_hi + (abs_d_lo == 0));
+	} else {
+		abs_d_hi = (uCELL)d1_hi;
+		abs_d_lo = (uCELL)d1_lo;
+	}
+	
+	/* Initialize quotient and remainder */
+	q = 0;
+	r = 0;
+	
+	/* Process 128 bits of the dividend (64 high bits + 64 low bits) 
+	 * using the standard long division algorithm
+	 */
+	
+	/* First the high bits */
+	{
+		CELL i;
+		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
+			/* Shift remainder left by 1 bit and bring in next bit of dividend */
+			r = (r << 1) | ((abs_d_hi >> i) & 1);
+			
+			/* If remainder >= divisor, subtract and set quotient bit */
+			if (r >= abs_n1) {
+				r -= abs_n1;
+				q |= (1UL << i);
+			}
+		}
+	}
+	
+	/* Then the low bits */
+	{
+		CELL i;
+		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
+			/* Shift remainder left by 1 bit and bring in next bit of dividend */
+			r = (r << 1) | ((abs_d_lo >> i) & 1);
+			
+			/* If remainder >= divisor, subtract and set quotient bit */
+			if (r >= abs_n1) {
+				r -= abs_n1;
+				q |= (1UL << i);
+			}
+		}
+	}
+	
+	/* Apply sign to results */
+	{
+		/* For symmetric division (SM/REM):
+		 * 1. Quotient sign depends on operand signs (like normal division)
+		 * 2. Remainder has the same sign as the dividend
+		 * 3. No adjustment needed - we just truncate toward zero
+		 */
+		CELL quotient = (d_neg != n_neg) ? -(CELL)q : q;
+		CELL remainder = d_neg ? -(CELL)r : r;
+		
+		/* Push results back onto the stack */
+		push(x, remainder);
+		push(x, quotient);
+	}
+}
 void _star(X* x) { CELL b = pop(x); push(x, pop(x) * b); }
 void _star_slash(X* x) { /* TODO */ }
 void _m_star_slash(X* x) { /* TODO */ }
