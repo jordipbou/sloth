@@ -9,6 +9,10 @@
 #include<string.h>
 #include<time.h>
 
+/* This were used by Claude's FM/MOD implementation */
+#include <stddef.h>
+#include <limits.h>
+
 /* ---------------------------------------------------- */
 /* ---------------- Virtual machine ------------------- */
 /* ---------------------------------------------------- */
@@ -842,7 +846,85 @@ void _page(X* x) { /* TODO */ }
 void _abs(X* x) { CELL v = pop(x); push(x, v < 0 ? (0-v) : v); }
 void _d_abs(X* x) { /* TODO */ }
 void _and(X* x) { CELL v = pop(x); push(x, pop(x) & v); }
-void _f_m_slash_mod(X* x) { /* TODO */ }
+void _f_m_slash_mod(X* x) {
+	CELL n1 = pop(x), d1_hi = pop(x), d1_lo = pop(x);
+
+	uCELL q, r;
+    
+  /* Track signs */
+  CELL d_neg = (d1_hi < 0);
+  CELL n_neg = (n1 < 0);
+    
+  /* Use unsigned arithmetic for the algorithm */
+  uCELL abs_n1 = n_neg ? (uCELL)-n1 : (uCELL)n1;
+  uCELL abs_d_hi, abs_d_lo;
+    
+  /* Get absolute value of double-word dividend */
+  if (d_neg) {
+    /* Two's complement negation for double word */
+    abs_d_lo = (uCELL)-d1_lo;
+    abs_d_hi = (uCELL)(~d1_hi + (abs_d_lo == 0));
+  } else {
+    abs_d_hi = (uCELL)d1_hi;
+    abs_d_lo = (uCELL)d1_lo;
+  }
+    
+  /* Initialize quotient and remainder */
+  q = 0;
+  r = 0;
+    
+  /* Process 128 bits of the dividend (64 high bits + 64 low bits) 
+  * using the standard long division algorithm
+  */
+    
+  /* First the high bits */
+  {
+    CELL i;
+    for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
+      /* Shift remainder left by 1 bit and bring in next bit of dividend */
+      r = (r << 1) | ((abs_d_hi >> i) & 1);
+            
+      /* If remainder >= divisor, subtract and set quotient bit */
+      if (r >= abs_n1) {
+        r -= abs_n1;
+        q |= (1UL << i);
+      }
+    }
+  }
+    
+  /* Then the low bits */
+  {
+    CELL i;
+    for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
+      /* Shift remainder left by 1 bit and bring in next bit of dividend */
+      r = (r << 1) | ((abs_d_lo >> i) & 1);
+            
+      /* If remainder >= divisor, subtract and set quotient bit */
+      if (r >= abs_n1) {
+        r -= abs_n1;
+        q |= (1UL << i);
+      }
+    }
+  }
+    
+  /* Apply sign to results */
+  {
+    CELL quotient = (d_neg != n_neg) ? -(CELL)q : q;
+    CELL remainder = d_neg ? -(CELL)r : r;
+    
+    /* Adjust for floored division semantics */
+    if ((d_neg != n_neg) && remainder != 0) {
+        quotient--;
+        remainder += n1;
+    }
+    
+    /* Push results back onto the stack */
+		push(x, remainder);
+		push(x, quotient);
+  }
+}
+
+
 void _invert(X* x) { push(x, ~pop(x)); }
 void _l_shift(X* x) { CELL n = pop(x); push(x, pop(x) << n); }
 /* Code for _m_star has been created by claude.ai */
