@@ -972,7 +972,11 @@ void _minus(X* x) { CELL a = pop(x); push(x, pop(x) - a); }
 void _d_minus(X* x) { /* TODO */ }
 void _mod(X* x) { CELL a = pop(x); push(x, pop(x) % a); }
 void _star_slash_mod(X* x) { /* TODO */ }
-void _slash_mod(X* x) { /* TODO */ }
+void _slash_mod(X* x) { 
+	CELL b = pop(x), a = pop(x);
+	push(x, b%a);
+	push(x, b/a);
+}
 void _negate(X* x) { push(x, 0 - pop(x)); }
 void _d_negate(X* x) { /* TODO */ }
 void _one_plus(X* x) { push(x, pop(x) + 1); }
@@ -1303,10 +1307,11 @@ void _semicolon(X* x) {
 void _if(X* x) { compile(x, ZBRANCH); _here(x); comma(x, 0); }
 void _else(X* x) { _ahead(x); _swap(x); _then(x); }
 void _then(X* x) { _here(x); _over(x); _minus(x); _swap(x); _store(x); }
-void _left_bracket(X* x) { /* TODO */ }
+/* TODO: left_bracket and right_bracket will break quotations */
+void _left_bracket(X* x) { set(x, STATE, 0); }
 void _quit(X* x) { /* TODO */ }
 void _recurse(X* x) { /* TODO */ }
-void _right_bracket(X* x) { /* TODO */ }
+void _right_bracket(X* x) { set(x, STATE, 1); }
 void _s_quote(X* x) { 
 	CELL i;
 	/* Parsing */
@@ -1390,7 +1395,7 @@ void _floats(X* x) { /* TODO */ }
 void _char_plus(X* x) { /* TODO */ }
 void _chars(X* x) { /* TODO */ }
 void _comma(X* x) { comma(x, pop(x)); }
-void _compile_comma(X* x) { /* TODO */ }
+void _compile_comma(X* x) { compile(x, pop(x)); }
 void _bracket_compile(X* x) { /* TODO */ }
 /* CREATE parses the next word in the input buffer, creates */
 /* a new header for it and then compiles some code. */
@@ -1440,10 +1445,29 @@ void _here(X* x) { push(x, to_abs(x, here(x))); }
 void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
 void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
 void _bracket_tick(X* x) { /* TODO */ }
-void _literal(X* x) { /* TODO */ }
+void _literal(X* x) { literal(x, pop(x)); }
 void _pad(X* x) { /* TODO */ }
 void _parse(X* x) { /* TODO */ }
-void _postpone(X* x) { /* TODO */ }
+void _postpone(X* x) { 
+	CELL i, xt, tok, tlen;
+	push(x, 32); _word(x);
+	tok = pick(x, 0) + sCHAR;
+	tlen = cfetch(x, pick(x, 0));
+	if (tlen == 0) { pop(x); return; }
+	_find(x); 
+	i = pop(x);
+	xt = pop(x);
+	if (i == 0) { 
+		return;
+	} else if (i == 1) {
+		/* Compile the compilation of the normal word */
+		literal(x, xt);
+		compile(x, COMPILE);
+	} else if (i == -1) {
+		/* Compile the immediate word */
+		compile(x, xt);
+	}
+}
 /* void _query(X* x) */
 void _refill(X* x) { /* TODO */ }
 void _restore_input(X* x) { /* TODO */ }
@@ -1779,10 +1803,10 @@ void bootstrap(X* x) {
 	code(x, "IF", primitive(x, &_if)); _immediate(x);
 	code(x, "ELSE", primitive(x, &_else)); _immediate(x);
 	code(x, "THEN", primitive(x, &_then)); _immediate(x);
-	code(x, "[", primitive(x, &_left_bracket));
+	code(x, "[", primitive(x, &_left_bracket)); _immediate(x);
 	code(x, "QUIT", primitive(x, &_quit));
 	code(x, "RECURSE", primitive(x, &_recurse));
-	code(x, "]", primitive(x, &_right_bracket));
+	code(x, "]", primitive(x, &_right_bracket)); _immediate(x);
 	code(x, "S\"", primitive(x, &_s_quote)); _immediate(x);
 
 	code(x, "CATCH", primitive(x, &_catch));
@@ -1852,7 +1876,7 @@ void bootstrap(X* x) {
 	code(x, "IMMEDIATE", primitive(x, &_immediate));
 	code(x, ">IN", primitive(x, &_to_in));
 	code(x, "[']", primitive(x, &_bracket_tick));
-	code(x, "LITERAL", primitive(x, &_literal));
+	code(x, "LITERAL", primitive(x, &_literal)); _immediate(x);
 	code(x, "PAD", primitive(x, &_pad));
 	code(x, "PARSE", primitive(x, &_parse));
 	code(x, "POSTPONE", primitive(x, &_postpone));
