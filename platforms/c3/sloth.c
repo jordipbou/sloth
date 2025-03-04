@@ -1107,7 +1107,51 @@ void _u_m_star(X* x) {
 	push(x, low);
 	push(x, high);
 }
-void _u_m_slash_mod(X* x) { /* TODO */ }
+void _u_m_slash_mod(X* x) {
+	uCELL u1 = pop(x), ud1_hi = pop(x), ud1_lo = pop(x);
+	
+	/* Initialize quotient and remainder */
+	uCELL q = 0;
+	uCELL r = 0;
+	
+	/* Process 128 bits of the dividend (64 high bits + 64 low bits) 
+	 * using the standard long division algorithm
+	 */
+	
+	/* First the high bits */
+	{
+		CELL i;
+		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
+			/* Shift remainder left by 1 bit and bring in next bit of dividend */
+			r = (r << 1) | ((ud1_hi >> i) & 1);
+			
+			/* If remainder >= divisor, subtract and set quotient bit */
+			if (r >= u1) {
+				r -= u1;
+				q |= (1UL << i);
+			}
+		}
+	}
+	
+	/* Then the low bits */
+	{
+		int i;
+		for (i = sizeof(long) * CHAR_BIT - 1; i >= 0; i--) {
+			/* Shift remainder left by 1 bit and bring in next bit of dividend */
+			r = (r << 1) | ((ud1_lo >> i) & 1);
+			
+			/* If remainder >= divisor, subtract and set quotient bit */
+			if (r >= u1) {
+				r -= u1;
+				q |= (1UL << i);
+			}
+		}
+	}
+	
+	/* Push results back onto the stack */
+	push(x, r);
+	push(x, q);
+}
 void _xor(X* x) { CELL a = pop(x); push(x, pop(x) ^ a); }
 
 void _f_star(X* x) { /* TODO */ }
