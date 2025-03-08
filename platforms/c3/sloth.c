@@ -47,6 +47,7 @@ typedef uintptr_t uCELL;
 
 #define sCELL sizeof(CELL)
 #define sCHAR sizeof(CHAR)
+#define CELL_BITS sCELL*8
 
 /* Predefined sizes */
 /* TODO: they should be modifiable before context creation */
@@ -702,7 +703,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			/* printf(">>>> %s", linebuf); */
+			printf(">>>> %s", linebuf);
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
@@ -1111,49 +1112,37 @@ void _u_m_star(X* x) {
 	push(x, low);
 	push(x, high);
 }
+/* UM/MOD code taken from pForth */
+#define DULT(du1l,du1h,du2l,du2h) ( (du2h<du1h) ? 0 : ( (du2h==du1h) ? (du1l<du2l) : 1) )
 void _u_m_slash_mod(X* x) {
-	uCELL u1 = pop(x), ud1_hi = pop(x), ud1_lo = pop(x);
-	
-	/* Initialize quotient and remainder */
-	uCELL q = 0;
-	uCELL r = 0;
-	
-	/* Process 128 bits of the dividend (64 high bits + 64 low bits) 
-	 * using the standard long division algorithm
-	 */
-	
-	/* First the high bits */
+	uCELL ah, al, q, di, bl, bh, sl, sh;
+	bh = (uCELL)pop(x);
+	bl = 0;
+	ah = (uCELL)pop(x);
+	al = (uCELL)pop(x);
+	q = 0;
+	for( di=0; di<CELL_BITS; di++ )
 	{
-		CELL i;
-		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
-			/* Shift remainder left by 1 bit and bring in next bit of dividend */
-			r = (r << 1) | ((ud1_hi >> i) & 1);
-			
-			/* If remainder >= divisor, subtract and set quotient bit */
-			if (r >= u1) {
-				r -= u1;
-				q |= (1UL << i);
-			}
-		}
+	    if( !DULT(al,ah,bl,bh) )
+	    {
+	        sh = 0;
+	        sl = al - bl;
+	        if( al < bl ) sh = 1; /* Borrow */
+	        sh = ah - bh - sh;
+	        ah = sh;
+	        al = sl;
+	        q |= 1;
+	    }
+	    q = q << 1;
+	    bl = (bl >> 1) | (bh << (CELL_BITS-1));
+	    bh = bh >> 1;
 	}
-	
-	/* Then the low bits */
+	if( !DULT(al,ah,bl,bh) )
 	{
-		int i;
-		for (i = sizeof(long) * CHAR_BIT - 1; i >= 0; i--) {
-			/* Shift remainder left by 1 bit and bring in next bit of dividend */
-			r = (r << 1) | ((ud1_lo >> i) & 1);
-			
-			/* If remainder >= divisor, subtract and set quotient bit */
-			if (r >= u1) {
-				r -= u1;
-				q |= (1UL << i);
-			}
-		}
+	    al = al - bl;
+	    q |= 1;
 	}
-	
-	/* Push results back onto the stack */
-	push(x, r);
+	push(x, al); /* rem */
 	push(x, q);
 }
 void _xor(X* x) { CELL a = pop(x); push(x, pop(x) ^ a); }
@@ -1879,7 +1868,7 @@ void bootstrap(X* x) {
 	code(x, "LITERAL", primitive(x, &_literal)); _immediate(x);
 	code(x, "PAD", primitive(x, &_pad));
 	code(x, "PARSE", primitive(x, &_parse));
-	code(x, "POSTPONE", primitive(x, &_postpone));
+	code(x, "POSTPONE", primitive(x, &_postpone)); _immediate(x);
 	/* code(x, "QUERY", primitive(x, &_query)); */
 	code(x, "REFILL", primitive(x, &_refill));
 	code(x, "RESTORE-INPUT", primitive(x, &_restore_input));
