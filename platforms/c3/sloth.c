@@ -1196,9 +1196,17 @@ void _f_variable(X* x) { /* TODO */ }
 void _c_fetch(X* x) { push(x, cfetch(x, pop(x))); }
 void _c_store(X* x) { CELL a = pop(x); cstore(x, a, pop(x)); }
 void _fetch(X* x) { push(x, fetch(x, pop(x))); }
-void _two_fetch(X* x) { /* TODO */ }
+void _two_fetch(X* x) { 
+	CELL a = pop(x);
+	push(x, fetch(x, a + sCELL));
+	push(x, fetch(x, a));
+}
 void _store(X* x) { CELL a = pop(x); store(x, a, pop(x)); }
-void _two_store(X* x) { /* TODO */ }
+void _two_store(X* x) {
+	CELL a = pop(x);
+	store(x, a, pop(x));
+	store(x, a + sCELL, pop(x));
+}
 void _to(X* x) { /* TODO */ }
 
 void _f_fetch(X* x) { /* TODO */ }
@@ -1437,7 +1445,8 @@ void _execute(X* x) { eval(x, pop(x)); }
 void _here(X* x) { push(x, to_abs(x, here(x))); }
 void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
 void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
-void _bracket_tick(X* x) { /* TODO */ }
+/* Pre-definition */ void _tick(X*);
+void _bracket_tick(X* x) { _tick(x); compile(x, pop(x)); }
 void _literal(X* x) { literal(x, pop(x)); }
 void _pad(X* x) { /* TODO */ }
 void _parse(X* x) { /* TODO */ }
@@ -1471,7 +1480,16 @@ void _span(X* x) { /* TODO */ }
 void _state(X* x) { /* TODO */ }
 /* void _tib(X* x) */
 /* void _number_tib(X* x) */
-void _tick(X* x) { /* TODO */ }
+void _tick(X* x) {
+	CELL tok, tlen;
+	push(x, 32); _word(x);
+	tok = pick(x, 0) + sCHAR;
+	tlen = cfetch(x, pick(x, 0));
+	if (tlen == 0) { pop(x); return; }
+	_find(x);
+	pop(x);
+	push(x, pop(x));
+}
 /* Already defined: void _word(X* x) */
 /* Already defined: void _find(X* x) */
 void _search_wordlist(X* x) { /* TODO */ }
