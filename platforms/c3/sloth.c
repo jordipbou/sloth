@@ -972,11 +972,14 @@ void _d_min(X* x) { /* TODO */ }
 void _minus(X* x) { CELL a = pop(x); push(x, pop(x) - a); }
 void _d_minus(X* x) { /* TODO */ }
 void _mod(X* x) { CELL a = pop(x); push(x, pop(x) % a); }
-void _star_slash_mod(X* x) { /* TODO */ }
+/* Pre-definition */ void _s_m_slash_rem(X*);
+/* Pre-definition */ void _to_r(X*);
+/* Pre-definition */ void _r_from(X*);
+void _star_slash_mod(X* x) { _to_r(x); _m_star(x); _r_from(x); _s_m_slash_rem(x); }
 void _slash_mod(X* x) { 
 	CELL b = pop(x), a = pop(x);
-	push(x, b%a);
-	push(x, b/a);
+	push(x, a%b);
+	push(x, a/b);
 }
 void _negate(X* x) { push(x, 0 - pop(x)); }
 void _d_negate(X* x) { /* TODO */ }
@@ -1072,7 +1075,8 @@ void _s_m_slash_rem(X* x) {
 	}
 }
 void _star(X* x) { CELL b = pop(x); push(x, pop(x) * b); }
-void _star_slash(X* x) { /* TODO */ }
+/* Pre-definition */ void _nip(X*);
+void _star_slash(X* x) { _star_slash_mod(x); _nip(x); }
 void _m_star_slash(X* x) { /* TODO */ }
 void _two_star(X* x) { push(x, 2*pop(x)); }
 void _d_two_star(X* x) { /* TODO */ }
@@ -1376,12 +1380,12 @@ void _aligned(X* x) { /* TODO */ }
 void _f_aligned(X* x) { /* TODO */ }
 void _allot(X* x) { allot(x, pop(x)); }
 void _to_body(X* x) { /* TODO */ }
-void _c_comma(X* x) { /* TODO */ }
-void _cell_plus(X* x) { /* TODO */ }
+void _c_comma(X* x) { ccomma(x, pop(x)); }
+void _cell_plus(X* x) { push(x, pop(x) + sCELL); }
 void _float_plus(X* x) { /* TODO */ }
 void _cells(X* x) { push(x, pop(x) * sCELL); }
 void _floats(X* x) { /* TODO */ }
-void _char_plus(X* x) { /* TODO */ }
+void _char_plus(X* x) { push(x, pop(x) + 1); }
 void _chars(X* x) { /* TODO */ }
 void _comma(X* x) { comma(x, pop(x)); }
 void _compile_comma(X* x) { compile(x, pop(x)); }
@@ -1679,6 +1683,7 @@ void bootstrap(X* x) {
 	code(x, "D/", primitive(x, &_d_slash));
 	code(x, "SM/REM", primitive(x, &_s_m_slash_rem));
 	code(x, "*", primitive(x, &_star));
+	code(x, "*/", primitive(x, &_star_slash));
 	code(x, "M*/", primitive(x, &_m_star_slash));
 	code(x, "2*", primitive(x, &_two_star));
 	code(x, "D2*", primitive(x, &_d_two_star));
@@ -1854,7 +1859,7 @@ void bootstrap(X* x) {
 	code(x, "FLOATS", primitive(x, &_floats));
 	code(x, "CHAR+", primitive(x, &_char_plus));
 	code(x, "CHARS", primitive(x, &_chars));
-	code(x, "COMMA", primitive(x, &_comma));
+	code(x, ",", primitive(x, &_comma));
 	code(x, "COMPILE,", primitive(x, &_compile_comma));
 	code(x, "[COMPILE]", primitive(x, &_bracket_compile));
 	code(x, "CREATE", primitive(x, &_create));
