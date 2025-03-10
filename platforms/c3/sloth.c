@@ -628,13 +628,15 @@ void _dot_s(X* x) {
 	}
 }
 void _see(X* x) { 
-	CELL tok, tlen, xt, op;
+	CELL tok, tlen, i, xt, op;
 	push(x, 32); _word(x);
 	tok = pick(x, 0) + sCHAR;
 	tlen = cfetch(x, pick(x, 0));
 	if (tlen == 0) { pop(x); return; }
+	printf("NAME: %.*s\n", (int)tlen, (char*)tok);
 	_find(x); 
-	pop(x);
+	i = pop(x);
+	printf("IMMEDIATE (1 = YES, -1 = NO): %ld\n", i);
 	xt = pop(x);
 	op = cfetch(x, to_abs(x, xt));	
 	printf("%ld ", op);
@@ -1263,11 +1265,15 @@ void _plus_loop(X* x) { _end_quotation(x); compile(x, DOLOOP); }
 
 /* Forming indefinite loops (compiling-mode only) */
 
-void _begin(X* x) { /* TODO */ }
-void _again(X* x) { /* TODO */ }
-void _until(X* x) { /* TODO */ }
-void _while(X* x) { /* TODO */ }
-void _repeat(X* x) { /* TODO */ }
+/* Pre-definition */ void _here(X*);
+/* Pre-definition */ void _swap(X*);
+/* Pre-definition */ void _if(X*);
+/* Pre-definition */ void _then(X*);
+void _begin(X* x) { _here(x); }
+void _again(X* x) { compile(x, BRANCH); _here(x); _minus(x); _comma(x); }
+void _until(X* x) { compile(x, ZBRANCH); _here(x); _minus(x); _comma(x); }
+void _while(X* x) { _if(x); _swap(x); }
+void _repeat(X* x) { _again(x); _then(x); }
 
 /* More facilities for defining routines (compiling-mode only) */
 
@@ -1446,7 +1452,7 @@ void _here(X* x) { push(x, to_abs(x, here(x))); }
 void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
 void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
 /* Pre-definition */ void _tick(X*);
-void _bracket_tick(X* x) { _tick(x); compile(x, pop(x)); }
+void _bracket_tick(X* x) { _tick(x); literal(x, pop(x)); }
 void _literal(X* x) { literal(x, pop(x)); }
 void _pad(X* x) { /* TODO */ }
 void _parse(X* x) { /* TODO */ }
@@ -1461,11 +1467,11 @@ void _postpone(X* x) {
 	xt = pop(x);
 	if (i == 0) { 
 		return;
-	} else if (i == 1) {
+	} else if (i == -1) {
 		/* Compile the compilation of the normal word */
 		literal(x, xt);
 		compile(x, COMPILE);
-	} else if (i == -1) {
+	} else if (i == 1) {
 		/* Compile the immediate word */
 		compile(x, xt);
 	}
@@ -1477,7 +1483,7 @@ void _save_input(X* x) { /* TODO */ }
 void _source(X* x) { push(x, get(x, IBUF)); push(x, get(x, ILEN)); }
 void _source_id(X* x) { /* TODO */ }
 void _span(X* x) { /* TODO */ }
-void _state(X* x) { /* TODO */ }
+void _state(X* x) { push(x, to_abs(x, STATE)); }
 /* void _tib(X* x) */
 /* void _number_tib(X* x) */
 void _tick(X* x) {
@@ -1887,7 +1893,7 @@ void bootstrap(X* x) {
 	code(x, "HERE", primitive(x, &_here));
 	code(x, "IMMEDIATE", primitive(x, &_immediate));
 	code(x, ">IN", primitive(x, &_to_in));
-	code(x, "[']", primitive(x, &_bracket_tick));
+	code(x, "[']", primitive(x, &_bracket_tick)); _immediate(x);
 	code(x, "LITERAL", primitive(x, &_literal)); _immediate(x);
 	code(x, "PAD", primitive(x, &_pad));
 	code(x, "PARSE", primitive(x, &_parse));
