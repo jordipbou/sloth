@@ -422,11 +422,12 @@ void _doloop(X* x) {
 			d = pop(x);
 			o = get(x, IX) - l;
 			set(x, IX, get(x, IX) + d);
+			/* printf("LX == 0 l %ld o %ld d %ld\n", l, o, d); */
 		}
 	}
 
 	if (!(do_first_loop == 0 && o == 0)) {
-		while (((o ^ (o + d)) & (o * d)) >= 0 && get(x, LX) == 0) {
+		while (((o ^ (o + d)) & (o ^ d)) >= 0 && get(x, LX) == 0) {
 			eval(x, q);
 			if (get(x, LX) == 0) { /* Avoid pop if we're leaving */
 				d = pop(x);
@@ -641,25 +642,22 @@ void _see(X* x) {
 	xt = pop(x);
 	printf("XT: %ld\n", xt);
 	if (xt > 0) {
-		while (op != EXIT) {
+		do {
 			op = fetch(x, to_abs(x, xt));
 			xt += sCELL;
 			printf("%ld ", op);
-			if (op == LIT) { /* LITERAL */
-				op = fetch(x, to_abs(x, xt));
-				xt += sCELL;
-				printf("%ld ", op);
-				if (op == -1) op = 0; /* Ensure not to exit yet */
-			} else if (op == QUOTATION) {
-				q++;
+			if (op == EXIT && q == 0) {
+				break;
 			} else if (op == EXIT && q > 0) {
 				q--;
+			} else if (op == QUOTATION) {
+				q++;
+			} else if (op == LIT) {
 				op = fetch(x, to_abs(x, xt));
 				xt += sCELL;
 				printf("%ld ", op);
-				if (op == -1) op = 0; /* Ensure not to exit yet */
-			}
-		}
+			} 
+		} while (1);
 		printf("\n");
 	} 
 }
