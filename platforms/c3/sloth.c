@@ -628,7 +628,8 @@ void _dot_s(X* x) {
 	}
 }
 void _see(X* x) { 
-	CELL tok, tlen, i, xt, op;
+	CELL tok, tlen, i, xt, op = 0;
+	CELL q = 0;
 	push(x, 32); _word(x);
 	tok = pick(x, 0) + sCHAR;
 	tlen = cfetch(x, pick(x, 0));
@@ -638,14 +639,29 @@ void _see(X* x) {
 	i = pop(x);
 	printf("IMMEDIATE (1 = YES, -1 = NO): %ld\n", i);
 	xt = pop(x);
-	op = cfetch(x, to_abs(x, xt));	
-	printf("%ld ", op);
-	while (op != EXIT) {
-		xt += sCELL;
-		op = cfetch(x, to_abs(x, xt));
-		printf("%ld ", op);
-	}
-	printf("\n");
+	printf("XT: %ld\n", xt);
+	if (xt > 0) {
+		while (op != EXIT) {
+			op = fetch(x, to_abs(x, xt));
+			xt += sCELL;
+			printf("%ld ", op);
+			if (op == LIT) { /* LITERAL */
+				op = fetch(x, to_abs(x, xt));
+				xt += sCELL;
+				printf("%ld ", op);
+				if (op == -1) op = 0; /* Ensure not to exit yet */
+			} else if (op == QUOTATION) {
+				q++;
+			} else if (op == EXIT && q > 0) {
+				q--;
+				op = fetch(x, to_abs(x, xt));
+				xt += sCELL;
+				printf("%ld ", op);
+				if (op == -1) op = 0; /* Ensure not to exit yet */
+			}
+		}
+		printf("\n");
+	} 
 }
 
 /* Commands that change compilation & interpretation settings */
@@ -1317,7 +1333,7 @@ void _then(X* x) { _here(x); _over(x); _minus(x); _swap(x); _store(x); }
 /* TODO: left_bracket and right_bracket will break quotations */
 void _left_bracket(X* x) { set(x, STATE, 0); }
 void _quit(X* x) { /* TODO */ }
-void _recurse(X* x) { /* TODO */ }
+void _recurse(X* x) { compile(x, get(x, LATESTXT)); }
 void _right_bracket(X* x) { set(x, STATE, 1); }
 void _s_quote(X* x) { 
 	CELL i;
@@ -1524,6 +1540,11 @@ CELL code(X* x, char* name, CELL xt) {
 	set_xt(x, w, xt);
 	return xt; 
 }
+
+/* Helper to work with absolute/relative memory addresses */
+
+void _to_abs(X* x) { push(x, pop(x) + x->d); }
+void _to_rel(X* x) { push(x, pop(x) - x->d); }
 
 void bootstrap(X* x) {
 	comma(x, 0); /* HERE */
@@ -1823,7 +1844,7 @@ void bootstrap(X* x) {
 	code(x, "THEN", primitive(x, &_then)); _immediate(x);
 	code(x, "[", primitive(x, &_left_bracket)); _immediate(x);
 	code(x, "QUIT", primitive(x, &_quit));
-	code(x, "RECURSE", primitive(x, &_recurse));
+	code(x, "RECURSE", primitive(x, &_recurse)); _immediate(x);
 	code(x, "]", primitive(x, &_right_bracket)); _immediate(x);
 	code(x, "S\"", primitive(x, &_s_quote)); _immediate(x);
 
@@ -1926,6 +1947,9 @@ void bootstrap(X* x) {
 	code(x, "CS-PICK", primitive(x, &_c_s_pick));
 	code(x, "CS-ROLL", primitive(x, &_c_s_roll));
 
+	/* Helper */
+	code(x, "TO-ABS", primitive(x, &_to_abs));
+	code(x, "TO-REL", primitive(x, &_to_rel));
 }
 
 /* Helpers to work with files from C */
