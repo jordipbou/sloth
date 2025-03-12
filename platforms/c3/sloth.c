@@ -1407,7 +1407,7 @@ void _f_align(X* x) { /* TODO */ }
 void _aligned(X* x) { /* TODO */ }
 void _f_aligned(X* x) { /* TODO */ }
 void _allot(X* x) { allot(x, pop(x)); }
-void _to_body(X* x) { /* TODO */ }
+void _to_body(X* x) { push(x, to_abs(x, pop(x) + 4*sCELL)); }
 void _c_comma(X* x) { ccomma(x, pop(x)); }
 void _cell_plus(X* x) { push(x, pop(x) + sCELL); }
 void _float_plus(X* x) { /* TODO */ }
