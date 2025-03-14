@@ -1437,7 +1437,16 @@ void _create(X* x) {
 	compile(x, RIP); compile(x, 4*sCELL); 
 	compile(x, EXIT); compile(x, EXIT);
 }
-void _does(X* x) { /* TODO */ }
+/* Helper compiled by DOES> that replaces the first EXIT */
+/* compiled by CREATE on the new created word with a call */
+/* to the code after the DOES> in the CREATE DOES> word */
+void _do_does(X* x) {
+	set(x, get_xt(x, get(x, LATEST)) + 2*sCELL, pop(x));
+}
+void _does(X* x) {
+	literal(x, here(x) + 4*sCELL);
+	compile(x, get(x, DOES)); compile(x, EXIT);
+}
 void _evaluate(X* x) {
 	CELL l = pop(x), a = pop(x);
 
@@ -1906,7 +1915,9 @@ void bootstrap(X* x) {
 	code(x, "COMPILE,", primitive(x, &_compile_comma));
 	code(x, "[COMPILE]", primitive(x, &_bracket_compile));
 	code(x, "CREATE", primitive(x, &_create));
-	code(x, "DOES>", primitive(x, &_does));
+	/* NON ANS: Helper compiled by DOES> */
+	set(x, DOES, code(x, "DODOES", primitive(x, &_do_does)));
+	code(x, "DOES>", primitive(x, &_does)); _immediate(x);
 	code(x, "EVALUATE", primitive(x, &_evaluate));
 	code(x, "EXECUTE", primitive(x, &_execute));
 	code(x, "HERE", primitive(x, &_here));
