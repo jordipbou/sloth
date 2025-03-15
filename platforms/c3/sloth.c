@@ -217,9 +217,10 @@ void save_image(X* x, char* filename) {
 /* -- Constants --------------------------------------- */
 
 /* Displacement of counted string buffer from here */
-#define CBUF					64
-#define SBUF1					128
-#define SBUF2					256
+#define CBUF					64	/* Counted string buffer */
+#define SBUF1					128	/* First string buffer */
+#define SBUF2					256	/* Second string buffer */
+#define NBUF					384	/* Pictured numeric output buffer */
 
 /* Relative addresses of variables accessed both from C */
 /* and Forth. */
@@ -233,9 +234,7 @@ void save_image(X* x, char* filename) {
 #define ILEN					6*sCELL
 #define SOURCE_ID			7*sCELL
 #define DOES					8*sCELL
-/* TODO: QLEVEL is not needed anymore but if i delete any of these */
-/* everything breaks. */
-#define QLEVEL				9*sCELL
+#define HLD						9*sCELL
 #define LATESTXT			10*sCELL
 #define IX						11*sCELL
 #define JX						12*sCELL
@@ -769,14 +768,56 @@ void _convert(X* x) { /* TODO */ }
 void _count(X* x) { CELL a = pop(x); push(x, a + 1); push(x, cfetch(x, a)); }
 void _erase(X* x) { /* TODO */ }
 void _fill(X* x) { /* TODO */ }
-void _hold(X* x) { /* TODO */ }
+void _hold(X* x) { 
+	set(x, HLD, get(x, HLD) - 1);
+	cstore(x, get(x, HLD), pop(x));
+}
 void _move(X* x) { /* TODO */ }
 void _to_number(X* x) { /* TODO */ }
-void _less_number_sign(X* x) { /* TODO */ }
-void _number_sign_greater(X* x) { /* TODO */ }
-void _number_sign(X* x) { /* TODO */ }
-void _number_sign_s(X* x) { /* TODO */ }
-void _sign(X* x) { /* TODO */ }
+void _less_number_sign(X* x) {
+	set(x, HLD, to_abs(x, here(x) + NBUF));
+}
+void _number_sign_greater(X* x) { 
+	pop(x); pop(x);
+	push(x, get(x, HLD));
+	push(x, to_abs(x, here(x) + NBUF) - get(x, HLD));
+}
+/* Pre-definition */ void _u_m_slash_mod(X*);
+/* Pre-definition */ void _to_r(X*);
+/* Pre-definition */ void _r_from(X*);
+/* Pre-definition */ void _rot(X*);
+/* Code adapted from lbForth */
+void _number_sign(X* x) {
+	CELL r;
+	push(x, 0);
+	push(x, get(x, BASE));
+	_u_m_slash_mod(x);
+	_to_r(x);
+	push(x, get(x, BASE));
+	_u_m_slash_mod(x);
+	_r_from(x);
+	_rot(x);
+	r = pop(x);
+	if (r > 9) r += 7;
+	r += 48;
+	push(x, r); _hold(x);
+}
+/* Pre-definition */ void _or(X*);
+/* Pre-definition */ void _two_dup(X*);
+/* Pre-definition */ void _zero_equals(X*);
+void _number_sign_s(X* x) {
+	do {
+		_number_sign(x);
+		_two_dup(x);
+		_or(x);
+		_zero_equals(x);
+	} while(pop(x) == 0);
+}
+void _sign(X* x) { 
+	if (pop(x) < 0) {
+		push(x, '-'); _hold(x);
+	} 
+}
 
 void _blank(X* x) { /* TODO */ }
 void _cmove(X* x) { /* TODO */ }
@@ -1563,7 +1604,7 @@ void bootstrap(X* x) {
 	comma(x, 0); /* ILEN */
 	comma(x, 0); /* SOURCE_ID */
 	comma(x, 0); /* DOES */
-	comma(x, 0); /* QLEVEL */
+	comma(x, 0); /* HLD */
 	comma(x, 0); /* LATESTXT */
 	comma(x, 0); /* IX */
 	comma(x, 0); /* JX */
