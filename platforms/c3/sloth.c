@@ -767,15 +767,39 @@ void _resize(X* x) { /* TODO */ }
 void _convert(X* x) { /* TODO */ }
 void _count(X* x) { CELL a = pop(x); push(x, a + 1); push(x, cfetch(x, a)); }
 void _erase(X* x) { /* TODO */ }
-void _fill(X* x) { /* TODO */ }
+void _fill(X* x) { 
+	CHAR c = (CHAR)pop(x);
+	CELL u = pop(x);
+	CELL addr = pop(x);
+	if (u > 0) {
+		CELL i;
+		for (i = 0; i < u; i++) {
+			cstore(x, addr + i, c);
+		}
+	}
+}
 void _hold(X* x) { 
 	set(x, HLD, get(x, HLD) - 1);
 	cstore(x, get(x, HLD), pop(x));
 }
-void _move(X* x) { /* TODO */ }
+void _move(X* x) {
+	CELL u = pop(x);
+	CELL addr2 = pop(x);
+	CELL addr1 = pop(x);
+	CELL i;
+	if (addr1 >= addr2) {
+		for (i = 0; i < u; i++) {
+			cstore(x, addr2 + i, cfetch(x, addr1 + i));
+		}
+	} else {
+		for (i = u - 1; i >= 0; i--) {
+			cstore(x, addr2 + i, cfetch(x, addr1 + i));
+		}
+	}
+}
 /* Pre-definition */ void _to_r(X*);
-/* Pre-definition */ void _r_fetch(X*);
 /* Pre-definition */ void _r_from(X*);
+/* Pre-definition */ void _r_fetch(X*);
 /* Pre-definition */ void _rot(X*);
 /* Pre-definition */ void _one_plus(X*);
 /* Pre-definition */ void _one_minus(X*);
@@ -896,8 +920,10 @@ void _sign(X* x) {
 }
 
 void _blank(X* x) { /* TODO */ }
-void _cmove(X* x) { /* TODO */ }
-void _cmove_up(X* x) { /* TODO */ }
+void _cmove(X* x) {
+}
+void _cmove_up(X* x) {
+}
 void _compare(X* x) { /* TODO */ }
 void _search(X* x) { /* TODO */ }
 void _slash_string(X* x) { /* TODO */ }
