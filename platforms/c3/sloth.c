@@ -531,6 +531,18 @@ void _find(X* x) {
 	}
 }
 
+/* Helper to find words from C */
+CELL find_word(X* x, char* name) {
+	CHAR l = strlen(name);
+	CELL a = (CELL)name;
+	CELL w = get(x, LATEST);
+	while (w != 0) {
+		if (!has_flag(x, w, HIDDEN) && compare_without_case(x, w, a, l)) break;
+		w = get_link(x, w);
+	}
+	return w;
+}
+
 /* Outer interpreter */
 
 /* INTERPRET is not an ANS word ??!! */
@@ -718,7 +730,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			printf(">>>> %s", linebuf);
+			/* printf(">>>> %s", linebuf); */
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
@@ -966,14 +978,33 @@ void _write_line(X* x) { /* TODO */ }
 
 void _accept(X* x) { /* TODO */ }
 void _cr(X* x) { printf("\n"); }
-void _dot(X* x) { /* TODO */ }
+void _dot(X* x) { printf("%ld ", pop(x)); }
 void _dot_r(X* x) { /* TODO */ }
-void _dot_quote(X* x) { /* TODO */ }
+/* Pre-definition */ void _type(X*);
+/* Pre-definition */ void _parse(X*);
+/* Pre-definition */ void _literal(X*);
+void _dot_quote(X* x) { 
+	CELL u, addr, i;
+	push(x, '"'); 
+	_parse(x); 
+	u = pop(x);
+	addr = pop(x);
+	compile(x, STRING);
+	comma(x, u);
+	for (i = 0; i < u; i++) {
+		ccomma(x, cfetch(x, addr + i));
+	}
+	align(x);
+	compile(x, get_xt(x, find_word(x, "TYPE")));
+}
 void _emit(X* x) { printf("%c", (CHAR)pop(x)); }
 void _expect(X* x) { /* TODO */ }
 void _key(X* x) { /* TODO */ }
 void _space(X* x) { printf(" "); }
-void _spaces(X* x) { /* TODO */ }
+void _spaces(X* x) { 
+	CELL i, u = pop(x); 
+	for (i = 0; i < u; i++) printf(" ");
+}
 void _type(X* x) { 
 	CELL l = pop(x); 
 	CELL a = pop(x);
@@ -983,9 +1014,8 @@ void _type(X* x) {
 		c = cfetch(x, i);
 		if (c >= 32 && c <= 126) printf("%c", c);
 	}
-	/* printf("%.*s", (int)l, (char*)a); */
 }
-void _u_dot(X* x) { /* TODO */ }
+void _u_dot(X* x) { printf("%lu ", (uCELL)pop(x)); }
 void _u_dot_r(X* x) { /* TODO */ }
 
 void _f_dot(X* x) { /* TODO */ }
@@ -1634,7 +1664,17 @@ void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
 void _bracket_tick(X* x) { _tick(x); literal(x, pop(x)); }
 void _literal(X* x) { literal(x, pop(x)); }
 void _pad(X* x) { /* TODO */ }
-void _parse(X* x) { /* TODO */ }
+void _parse(X* x) {
+	CHAR c = (CHAR)pop(x);
+	CELL ibuf = get(x, IBUF);
+	CELL ilen = get(x, ILEN);
+	CELL ipos = get(x, IPOS);
+	push(x, ibuf + ipos);
+	while (ipos < ilen && cfetch(x, ibuf + ipos) != c) ipos++;
+	push(x, ibuf + ipos - pick(x, 0));
+	if (ipos < ilen) ipos++;
+	set(x, IPOS, ipos);
+}
 void _postpone(X* x) { 
 	CELL i, xt, tok, tlen;
 	push(x, 32); _word(x);
@@ -1839,6 +1879,7 @@ void bootstrap(X* x) {
 	code(x, "CR", primitive(x, &_cr));
 	code(x, ".", primitive(x, &_dot));
 	code(x, ".R", primitive(x, &_dot_r));
+	code(x, ".\"", primitive(x, &_dot_quote)); _immediate(x);
 	code(x, "EMIT", primitive(x, &_emit));
 	code(x, "EXPECT", primitive(x, &_expect));
 	code(x, "KEY", primitive(x, &_key));
