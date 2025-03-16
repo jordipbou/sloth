@@ -773,7 +773,86 @@ void _hold(X* x) {
 	cstore(x, get(x, HLD), pop(x));
 }
 void _move(X* x) { /* TODO */ }
-void _to_number(X* x) { /* TODO */ }
+/* Pre-definition */ void _to_r(X*);
+/* Pre-definition */ void _r_fetch(X*);
+/* Pre-definition */ void _r_from(X*);
+/* Pre-definition */ void _rot(X*);
+/* Pre-definition */ void _one_plus(X*);
+/* Pre-definition */ void _one_minus(X*);
+/* Pre-definition */ void _d_plus(X*);
+/* Pre-definition */ void _u_m_star(X*);
+/* Pre-definition */ void _c_fetch(X*);
+/* Pre-definition */ void _fetch(X*);
+/* Pre-definition */ void _zero_greater_than(X*);
+/* Pre-definition */ void _swap(X*);
+/* Pre-definition */ void _drop(X*);
+/* Pre-definition */ void _dup(X*);
+/* Pre-definition */ void _plus(X*);
+/* Pre-definition */ void _minus(X*);
+/* Pre-definition */ void _nip(X*);
+/* Pre-definition */ void _greater_than(X*);
+/* Pre-definition */ void _less_than(X*);
+/* Pre-definition */ void _zero_less_than(X*);
+/* Pre-definition */ void _false(X*);
+/* Pre-definition */ void _true(X*);
+/* Pre-definition */ void _zero_equals(X*);
+/* Helper function for _to_number */
+void _digit(X* x) {
+	_to_r(x);
+	_dup(x); push(x, 'a'); _less_than(x); _zero_equals(x); /* NOT */
+	if (pop(x)) {
+		push(x, 'a'); _minus(x); push(x, 'A'); _plus(x);
+	}
+	_dup(x); _dup(x); push(x, 'A'); _one_minus(x); _greater_than(x);
+	if (pop(x)) {
+		push(x, 'A'); _minus(x); push(x, '9'); _plus(x); _one_plus(x);
+	} else {
+		_dup(x); push(x, '9'); _greater_than(x);
+		if (pop(x)) {
+			_drop(x); push(x, 0);
+		}
+	}
+	push(x, '0'); _minus(x);
+	_dup(x); _r_from(x); _less_than(x);
+	if (pop(x)) {
+		_dup(x); _one_plus(x); _zero_greater_than(x);
+		if (pop(x)) {
+			_nip(x); _true(x);
+		} else {
+			_drop(x); _false(x);
+		}
+	} else {
+		_drop(x); _false(x);
+	}
+}
+/* Code adapted from pForth Forth code */
+void _to_number(X* x) {
+	_to_r(x);
+	do { /* BEGIN */
+		_r_fetch(x); _zero_greater_than(x);
+		if (pop(x)) {
+			_dup(x); _c_fetch(x); _base(x); _fetch(x);
+			_digit(x);
+			if (pop(x)) {
+				_true(x);
+			} else {
+				_drop(x); _false(x);
+			}
+		} else {
+			_false(x);
+		}
+		if (pop(x) == 0) break; /* WHILE */
+		_swap(x); _to_r(x);
+		_swap(x); _base(x); _fetch(x);
+		_u_m_star(x); _drop(x);
+		_rot(x); _base(x); _fetch(x);
+		_u_m_star(x);
+		_d_plus(x);
+		_r_from(x); _one_plus(x);
+		_r_from(x); _one_minus(x); _to_r(x);
+	} while(1);
+	_r_from(x);
+}
 void _less_number_sign(X* x) {
 	set(x, HLD, to_abs(x, here(x) + NBUF));
 }
@@ -783,9 +862,6 @@ void _number_sign_greater(X* x) {
 	push(x, to_abs(x, here(x) + NBUF) - get(x, HLD));
 }
 /* Pre-definition */ void _u_m_slash_mod(X*);
-/* Pre-definition */ void _to_r(X*);
-/* Pre-definition */ void _r_from(X*);
-/* Pre-definition */ void _rot(X*);
 /* Code adapted from lbForth */
 void _number_sign(X* x) {
 	CELL r;
@@ -1044,7 +1120,20 @@ void _one_plus(X* x) { push(x, pop(x) + 1); }
 void _one_minus(X* x) { push(x, pop(x) - 1); }
 void _or(X* x) { CELL a = pop(x); push(x, pop(x) | a); }
 void _plus(X* x) { CELL a = pop(x); push(x, pop(x) + a); }
-void _d_plus(X* x) { /* TODO */ }
+/* Code adapted from pForth */
+void _d_plus(X* x) { 
+	uCELL ah, al, bl, bh, sh, sl;
+	bh = (uCELL)pop(x);
+	bl = (uCELL)pop(x);
+	ah = (uCELL)pop(x);
+	al = (uCELL)pop(x);
+	sh = 0;
+	sl = al + bl;
+	if (sl < bl) sh = 1;	/* carry */
+	sh += ah + bh;
+	push(x, sl);
+	push(x, sh);
+}
 void _m_plus(X* x) { /* TODO */ }
 void _plus_store(X* x) {
 	CELL a = pop(x);
@@ -1596,7 +1685,7 @@ void _to_rel(X* x) { push(x, pop(x) - x->d); }
 
 void bootstrap(X* x) {
 	comma(x, 0); /* HERE */
-	comma(x, 0); /* BASE */
+	comma(x, 10); /* BASE */
 	comma(x, 0); /* LATEST */
 	comma(x, 0); /* STATE */
 	comma(x, 0); /* IBUF */
