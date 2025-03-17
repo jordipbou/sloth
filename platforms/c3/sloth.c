@@ -13,6 +13,8 @@
 #include <stddef.h>
 #include <limits.h>
 
+#include "getch.h"
+
 /* ---------------------------------------------------- */
 /* ---------------- Virtual machine ------------------- */
 /* ---------------------------------------------------- */
@@ -338,7 +340,9 @@ void unset_flag(X* x, CELL w, CHAR v) {
 
 /* -- Primitives -------------------------------------- */
 
-void _exit(X* x) { x->ip = (x->rp > 0) ? rpop(x) : -1; }
+/* Primitives are defined as p_<name> */
+
+void p_exit(X* x) { x->ip = (x->rp > 0) ? rpop(x) : -1; }
 void _lit(X* x) { push(x, op(x)); }
 void _rip(X* x) { push(x, to_abs(x, x->ip) + op(x) - sCELL); }
 
@@ -387,7 +391,7 @@ void ipop(X* x) {
 	set(x, KX, rpop(x));
 }
 
-void _leave(X* x) { set(x, LX, 1); _exit(x); }
+void _leave(X* x) { set(x, LX, 1); p_exit(x); }
 void _unloop(X* x) { 
 	set(x, LX, get(x, LX) - 1);
 	if (get(x, LX) == -1) {
@@ -443,7 +447,7 @@ void _doloop(X* x) {
 		/* Unloop case */
 		set(x, LX, get(x, LX) + 1);
 		rpop(x);
-		_exit(x);
+		p_exit(x);
 	}
 }
 
@@ -730,7 +734,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			/* printf(">>>> %s", linebuf); */
+			printf(">>>> %s", linebuf);
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
@@ -976,7 +980,23 @@ void _write_line(X* x) { /* TODO */ }
 
 /* More input/output operations */
 
-void _accept(X* x) { /* TODO */ }
+/* Pre-defined */ void _key(X*);
+/* Pre-defined */ void _emit(X*);
+/* TODO: It would be interesting to manage at least backspace */
+void _accept(X* x) {
+	CELL n = pop(x);
+	CELL addr = pop(x);
+	CELL i;
+	CHAR c;
+	for (i = 0; i < n; i++) {
+		_key(x);
+		_dup(x); _emit(x);
+		c = (CHAR)pop(x);
+		if (c < 32) { break; }
+		cstore(x, addr + i, c);
+	}
+	push(x, i);
+}
 void _cr(X* x) { printf("\n"); }
 void _dot(X* x) { printf("%ld ", pop(x)); }
 void _dot_r(X* x) { /* TODO */ }
@@ -999,7 +1019,7 @@ void _dot_quote(X* x) {
 }
 void _emit(X* x) { printf("%c", (CHAR)pop(x)); }
 void _expect(X* x) { /* TODO */ }
-void _key(X* x) { /* TODO */ }
+void _key(X* x) { push(x, getch()); }
 void _space(X* x) { printf(" "); }
 void _spaces(X* x) { 
 	CELL i, u = pop(x); 
@@ -1510,7 +1530,7 @@ void _semicolon(X* x) {
 
 }
 
-/* Basic primitive -- void _exit(X* x) */
+/* Basic primitive -- void p_exit(X* x) */
 void _if(X* x) { compile(x, ZBRANCH); _here(x); comma(x, 0); }
 void _else(X* x) { _ahead(x); _swap(x); _then(x); }
 void _then(X* x) { _here(x); _over(x); _minus(x); _swap(x); _store(x); }
@@ -1768,7 +1788,7 @@ void bootstrap(X* x) {
 
 	/* Required order primitives */
 
-	code(x, "EXIT", primitive(x, &_exit));
+	code(x, "EXIT", primitive(x, &p_exit));
 	code(x, "LIT", primitive(x, &_lit));
 	code(x, "RIP", primitive(x, &_rip));
 	code(x, "COMPILE,", primitive(x, &_compile));
@@ -2042,7 +2062,7 @@ void bootstrap(X* x) {
 	code(x, ":", primitive(x, &_colon));
 	code(x, ":NONAME", primitive(x, &_colon_no_name));
 	code(x, ";", primitive(x, &_semicolon)); _immediate(x);
-	code(x, "EXIT", primitive(x, &_exit));
+	/* Already defined: code(x, "EXIT", primitive(x, &p_exit)); */
 	code(x, "IF", primitive(x, &_if)); _immediate(x);
 	code(x, "ELSE", primitive(x, &_else)); _immediate(x);
 	code(x, "THEN", primitive(x, &_then)); _immediate(x);
