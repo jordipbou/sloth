@@ -725,6 +725,7 @@ void _included(X* x) {
 
 	CELL l = pop(x);
 	CELL a = pop(x);
+
 	strncpy(filename, (char*)a, (size_t)l);
 	filename[l] = 0;
 
@@ -763,6 +764,7 @@ void _bracket_then(X* x) { /* TODO */ }
 
 void _backslash(X* x) { set(x, IPOS, get(x, ILEN)); }
 void _paren(X* x) {
+	/* TODO */
 	/* ( should be able to work multiline if reading from file */
 	while (get(x, IPOS) < get(x, ILEN)
 	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != ')') {
@@ -1543,7 +1545,7 @@ void _s_quote(X* x) {
 	CELL i;
 	/* Parsing */
 	CELL l = 0;
-	CELL a = get(x, IBUF) + get(x, IPOS);;
+	CELL a = get(x, IBUF) + get(x, IPOS);
 	while (get(x, IPOS) < get(x, ILEN)
 	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != '"') {
 		l++;
@@ -1552,9 +1554,9 @@ void _s_quote(X* x) {
 	if (get(x, STATE) == 0) {
 		/* TODO: Should change between SBUF1 and SBUF2 */
 		for (i = 0; i < l; i++) {
-			cset(x, SBUF1 + i, cfetch(x, a + i));
+			cset(x, here(x) + SBUF1 + i, cfetch(x, a + i));
 		}
-		push(x, to_abs(x, SBUF1));
+		push(x, to_abs(x, here(x) + SBUF1));
 		push(x, l);
 	} else {
 		compile(x, STRING);
