@@ -246,6 +246,9 @@ void save_image(X* x, char* filename) {
 /* XTs of primitives that need to be called from C and  */
 /* Forth code. */
 
+/* TODO: If using find_word, there's no need to define this */
+/* as constants in C. */
+
 #define EXIT					-1
 #define LIT						-2
 #define RIP						-3
@@ -1415,6 +1418,9 @@ void _two_variable(X* x) { /* TODO */ }
 void _f_constant(X* x) { /* TODO */ }
 void _f_variable(X* x) { /* TODO */ }
 
+/* Pre-defined */ void _allot(X*);
+void _buffer_colon(X* x) { _create(x); _allot(x); }
+
 /* Memory-stack transfer operations */
 
 void _c_fetch(X* x) { push(x, cfetch(x, pop(x))); }
@@ -1449,7 +1455,11 @@ void _u_less_than(X* x) {
 	uCELL a = (uCELL)pop(x);
 	push(x, a < b ? -1 : 0);
 }
-void _u_greater_than(X* x) { /* TODO */ }
+void _u_greater_than(X* x) { 
+	uCELL b = (uCELL)pop(x);
+	uCELL a = (uCELL)pop(x);
+	push(x, a > b ? -1 : 0);
+}
 void _within(X* x) { /* TODO */ }
 void _zero_equals(X* x) { push(x, pop(x) == 0 ? -1 : 0); }
 void _zero_greater_than(X* x) { push(x, pop(x) > 0 ? -1 : 0); }
@@ -1522,7 +1532,11 @@ void _colon(X* x) {
 	set_flag(x, get(x, LATEST), HIDDEN);
 	set(x, STATE, 1);
 }
-void _colon_no_name(X* x) { /* TODO */ }
+void _colon_no_name(X* x) { 
+	push(x, here(x));
+	set(x, LATESTXT, here(x));
+	set(x, STATE, 1);
+}
 void _semicolon(X* x) {
 	compile(x, EXIT);
 	set(x, STATE, 0);
@@ -1993,6 +2007,8 @@ void bootstrap(X* x) {
 	code(x, "FCONSTANT", primitive(x, &_f_constant));
 	code(x, "FVARIABLE", primitive(x, &_f_variable));
 
+	code(x, "BUFFER:", primitive(x, &_buffer_colon));
+
 	/* Memory-stack transfer operations */
 
 	code(x, "C@", primitive(x, &_c_fetch));
@@ -2009,6 +2025,7 @@ void bootstrap(X* x) {
 	/* LOCAL: code(x, "TO", primitive(x, &_to)); */
 
 	/* Comparison operations */
+
 	code(x, "=", primitive(x, &_equals));
 	code(x, ">", primitive(x, &_greater_than));
 	code(x, "<", primitive(x, &_less_than));
@@ -2176,6 +2193,7 @@ void bootstrap(X* x) {
 	code(x, "CS-ROLL", primitive(x, &_c_s_roll));
 
 	/* Helper */
+
 	code(x, "TO-ABS", primitive(x, &_to_abs));
 	code(x, "TO-REL", primitive(x, &_to_rel));
 }
