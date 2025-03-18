@@ -555,11 +555,12 @@ CELL find_word(X* x, char* name) {
 /* INTERPRET is not an ANS word ??!! */
 void _interpret(X* x) {
 	CELL nt, flag, n;
-	CELL tok, tlen;
+	char* tok;
+	int tlen;
 	char buf[15]; char *endptr;
 	while (get(x, IPOS) < get(x, ILEN)) {
 		push(x, 32); _word(x);
-		tok = pick(x, 0) + sCHAR;
+		tok = (char*)(pick(x, 0) + sCHAR);
 		tlen = cfetch(x, pick(x, 0));
 		if (tlen == 0) { pop(x); return; }
 		_find(x);
@@ -571,16 +572,36 @@ void _interpret(X* x) {
 				compile(x, pop(x));
 			}
 		} else {
+			CELL temp_base = get(x, BASE);
 			pop(x);
-			strncpy(buf, (char*)tok, tlen);
-			buf[tlen] = 0;
-			n = strtol(buf, &endptr, get(x, BASE));	
-			if (*endptr == '\0') {
-				if (get(x, STATE) == 0) push(x, n);
-				else literal(x, n);
+			if (tlen == 3 && *tok == '\'' && (*(tok + 2)) == '\'') {
+				/* Character literal */
+				if (get(x, STATE) == 0)	push(x, *(tok + 1));
+				else literal(x, *(tok + 1));
 			} else {
-				/* TODO Word not found, throw an exception? */
-				printf("%.*s ?\n", (int)tlen, (char*)tok);
+				if (*tok == '#') {
+					temp_base = 10;
+					tlen--;
+					tok++;
+				}	else if (*tok == '$') {
+					temp_base = 16;
+					tlen--;
+					tok++;
+				} else if (*tok == '%') {
+					temp_base = 2;
+					tlen--;
+					tok++;
+				}
+				strncpy(buf, tok, tlen);
+				buf[tlen] = 0;
+				n = strtol(buf, &endptr, temp_base);	
+				if (*endptr == '\0') {
+					if (get(x, STATE) == 0) push(x, n);
+					else literal(x, n);
+				} else {
+					/* TODO Word not found, throw an exception? */
+					printf("%.*s ?\n", tlen, tok);
+				}
 			}
 		}
 	}
