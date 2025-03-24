@@ -1,5 +1,124 @@
 #include "sloth.h"
 
+/* ---------------------------------------------------- */
+/* -- Forth Kernel ------------------------------------ */
+/* ---------------------------------------------------- */
+
+/* -- Constants --------------------------------------- */
+
+/* Displacement of counted string buffer from here */
+#define CBUF					64	/* Counted string buffer */
+#define SBUF1					128	/* First string buffer */
+#define SBUF2					256	/* Second string buffer */
+#define NBUF					384	/* Pictured numeric output buffer */
+
+/* Relative addresses of variables accessed both from C */
+/* and Forth. */
+
+#define HERE					0	
+#define BASE					sCELL
+#define LATEST				2*sCELL
+#define LATESTXT			3*sCELL
+#define STATE					4*sCELL
+#define IBUF					5*sCELL
+#define IPOS					6*sCELL
+#define ILEN					7*sCELL
+#define SOURCE_ID			8*sCELL
+#define HLD						9*sCELL
+#define IX						10*sCELL
+#define JX						11*sCELL
+#define KX						12*sCELL
+#define LX						13*sCELL
+
+/* -- Helpers ----------------------------------------- */
+
+/* Setting and getting variables (cell and char sized) */
+
+void set(X* x, CELL a, CELL v);
+CELL get(X* x, CELL a);
+void cset(X* x, CELL a, CHAR v);
+CHAR cget(X* x, CELL a);
+
+/* Memory management */
+
+CELL here(X* x);
+void allot(X* x, CELL v);
+CELL aligned(CELL a);
+void align(X* x);
+
+/* Compilation */
+
+void comma(X* x, CELL v);
+void ccomma(X* x, CHAR v);
+void compile(X* x, CELL xt);
+void literal(X* x, CELL n);
+
+/* Findind words */
+
+int compare_without_case(X* x, CELL w, CELL t, CELL l);
+CELL find_word(X* x, char* name);
+
+/* Sum of double numbers */
+
+void _d_plus(X* x);
+
+/* Including files */
+
+void _included(X* x);
+
+/* Printing the stack */
+
+void _dot_s(X* x);
+
+/* Headers */
+
+/* Header structure: */
+/* Link CELL					@ NT */
+/* XT CELL						@ NT + sCELL */
+/* Wordlist CELL			@ NT + 2*sCELL */
+/* Flags CHAR					@ NT + 3*sCELL */
+/* Namelen CHAR				@ NT + 3*sCELL + sCHAR */
+/* Name CHAR*namelen	@ NT + 3*sCELL + 2*sCHAR */
+
+CELL header(X* x, CELL n, CELL l);
+CELL get_link(X* x, CELL w);
+CELL get_xt(X* x, CELL w);
+void set_xt(X* x, CELL w, CELL xt);
+CHAR get_flags(X* x, CELL w);
+CELL has_flag(X* x, CELL w, CELL v);
+CHAR get_namelen(X* x, CELL w);
+CELL get_name_addr(X* x, CELL w);
+
+/* Setting flags */
+
+#define HIDDEN				1
+#define IMMEDIATE			2
+
+void set_flag(X* x, CELL w, CHAR v);
+void unset_flag(X* x, CELL w, CHAR v);
+
+/* -- Outer interpreter ------------------------------- */
+
+void _interpret(X*);
+
+/* -- Primitives -------------------------------------- */
+
+void _lit(X* x);
+void _rip(X* x);
+void _compile(X* x);
+void _branch(X* x);
+void _zbranch(X* x);
+void _string(X* x);
+void _quotation(X* x);
+void _do_does(X* x);
+
+/* -- Quotations (not in ANS Forth yet) ---------------- */
+
+void _start_quotation(X* x);
+void _end_quotation(X* x);
+
+/* -- ANS Forth CORE words ----------------------------- */
+
 /* Commands that help you start or end work sessions */
 
 void _environment_query(X*);
@@ -111,6 +230,12 @@ void _bl(X*);
 void _char(X*);
 void _bracket_char(X*);
 
+/* Loop helpers (non ANS) */
+
+void ipush(X* x);
+void ipop(X* x);
+void _doloop(X* x);
+
 /* Forming definite loops */
 
 void _do(X*);
@@ -134,7 +259,7 @@ void _abort(X*);
 void _abort_quote(X*);
 void _colon(X*);
 void _semicolon(X*);
-void _exit(X*);
+void _exit_(X*);
 void _if(X*);
 void _else(X*);
 void _then(X*);
