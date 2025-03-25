@@ -77,7 +77,7 @@ void bootstrap(X* x) {
 
 	/* Comment-introducing operations */
 
-	code(x, "(", primitive(x, &_paren)); _immediate(x);
+	/* Not needed :code(x, "(", primitive(x, &_paren)); _immediate(x); */
 
 	/* Dynamic memory operations */
 
@@ -144,8 +144,8 @@ void bootstrap(X* x) {
 
 	/* Commands to define data structures */
 
-	code(x, "CONSTANT", primitive(x, &_constant));
-	code(x, "VARIABLE", primitive(x, &_variable));
+	/* Not needed: code(x, "CONSTANT", primitive(x, &_constant)); */
+	/* Not needed: code(x, "VARIABLE", primitive(x, &_variable)); */
 
 	/* Memory-stack transfer operations */
 
@@ -183,10 +183,10 @@ void bootstrap(X* x) {
 
 	/* Forming indefinite loops (compiling-mode only) */
 
-	code(x, "BEGIN", primitive(x, &_begin)); _immediate(x);
-	code(x, "UNTIL", primitive(x, &_until)); _immediate(x);
-	code(x, "WHILE", primitive(x, &_while)); _immediate(x);
-	code(x, "REPEAT", primitive(x, &_repeat)); _immediate(x);
+	/* Not needed: code(x, "BEGIN", primitive(x, &_begin)); _immediate(x); */
+	/* Not needed: code(x, "UNTIL", primitive(x, &_until)); _immediate(x); */
+	/* Not needed: code(x, "WHILE", primitive(x, &_while)); _immediate(x); */
+	/* Not needed: code(x, "REPEAT", primitive(x, &_repeat)); _immediate(x); */
 
 	/* More facilities for defining routines (compiling-mode only) */
 
@@ -195,9 +195,9 @@ void bootstrap(X* x) {
 	code(x, ":", primitive(x, &_colon));
 	code(x, ";", primitive(x, &_semicolon)); _immediate(x);
 	code(x, "EXIT", primitive(x, &_exit_));
-	code(x, "IF", primitive(x, &_if)); _immediate(x);
-	code(x, "ELSE", primitive(x, &_else)); _immediate(x);
-	code(x, "THEN", primitive(x, &_then)); _immediate(x);
+	/* Not needed: code(x, "IF", primitive(x, &_if)); _immediate(x); */
+	/* Not needed: code(x, "ELSE", primitive(x, &_else)); _immediate(x); */
+	/* Not needed: code(x, "THEN", primitive(x, &_then)); _immediate(x); */
 	code(x, "[", primitive(x, &_left_bracket)); _immediate(x);
 	code(x, "QUIT", primitive(x, &_quit));
 	code(x, "RECURSE", primitive(x, &_recurse)); _immediate(x);
@@ -225,12 +225,12 @@ void bootstrap(X* x) {
 	code(x, "ALIGNED", primitive(x, &_aligned));
 	code(x, "ALLOT", primitive(x, &_allot));
 	code(x, ">BODY", primitive(x, &_to_body));
-	code(x, "C,", primitive(x, &_c_comma));
+	/* Not needed: code(x, "C,", primitive(x, &_c_comma)); */
 	code(x, "CELL+", primitive(x, &_cell_plus));
 	code(x, "CELLS", primitive(x, &_cells));
 	code(x, "CHAR+", primitive(x, &_char_plus));
 	code(x, "CHARS", primitive(x, &_chars));
-	code(x, ",", primitive(x, &_comma));
+	/* Not needed: code(x, ",", primitive(x, &_comma)); */
 	code(x, "CREATE", primitive(x, &_create));
 	code(x, "DOES>", primitive(x, &_does)); _immediate(x);
 	code(x, "EVALUATE", primitive(x, &_evaluate));
@@ -297,6 +297,8 @@ int main(int argc, char**argv) {
 
 	if (argc == 1) {
 		include(x, "ans.sloth");
+		chdir("../../forth2012-test-suite/src/");
+		include(x, "prelimtest.fth");
 	} else {
 		repl(x);
 	}

@@ -1015,6 +1015,8 @@ void _decimal(X* x) {
 
 /* Comment-introducing operations */
 
+/* Not needed */
+/*
 void _paren(X* x) {
 	while (get(x, IPOS) < get(x, ILEN)
 	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != ')') {
@@ -1023,6 +1025,7 @@ void _paren(X* x) {
 	if (get(x, IPOS) != get(x, ILEN))
 		set(x, IPOS, get(x, IPOS) + 1);
 }
+*/
 
 /* String operations */
 
@@ -1283,6 +1286,11 @@ void _to_body(X* x) {
 	push(x, to_abs(x, pop(x) + 4*sCELL)); 
 }
 
+/* Not needed in Forth, but needed here for:
+VARIABLE
+UNTIL
+REPEAT
+*/
 void _c_comma(X* x) { 
 	ccomma(x, pop(x)); 
 }
@@ -1303,9 +1311,11 @@ void _chars(X* x) {
 	/* Nothing to do */
 }
 
+/* Not needed
 void _comma(X* x) { 
 	comma(x, pop(x)); 
 }
+*/
 
 /* CREATE parses the next word in the input buffer, creates */
 /* a new header for it and then compiles some code. */
@@ -1515,6 +1525,7 @@ void _word(X* x) {
 
 /* Commands to define data structures */
 
+/* Not needed
 void _constant(X* x) { 
 	CELL tok, tlen, v = pop(x);
 	push(x, 32); _word(x);
@@ -1524,12 +1535,15 @@ void _constant(X* x) {
 	literal(x, v); 
 	compile(x, get_xt(x, find_word(x, "EXIT")));
 }
+*/
 
+/* Not needed
 void _variable(X* x) { 
 	_create(x); 
 	push(x, 0); 
 	_comma(x); 
 }
+*/
 
 /* System constants & facilities for generating ASCII values */
 
@@ -1754,26 +1768,34 @@ void _begin(X* x) {
 	_here(x); 
 }
 
+/* Not needed
 void _until(X* x) { 
 	compile(x, get_xt(x, find_word(x, "(ZBRANCH)")));
 	_here(x); 
 	_minus(x); 
 	_comma(x); 
 }
+*/
 
+/* Not needed
 void _while(X* x) { 
 	_if(x); 
 	_swap(x); 
 }
+*/
 
+/* Not needed
 void _repeat(X* x) { 
+*/
 	/* AGAIN (not defined in CORE) */
+/*
 	compile(x, get_xt(x, find_word(x, "(BRANCH)")));
 	_here(x); 
 	_minus(x); 
 	_comma(x);
+*/
 	/* \AGAIN */
+/*
 	_then(x); 
 }
-
-
+*/
