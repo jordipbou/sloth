@@ -55,6 +55,11 @@ void bootstrap(X* x) {
 
 	code(x, "DOLOOP", primitive(x, &_doloop));
 
+	/* Debugging (this functions are not needed) */
+
+	code(x, ".S", primitive(x, &_dot_s));
+	code(x, "SEE", primitive(x, &_see));
+
 	/* Commands that can help you start or end work sessions */
 
 	code(x, "ENVIRONMENT?", primitive(x, &_environment_query));
@@ -236,6 +241,7 @@ void bootstrap(X* x) {
 	code(x, "[']", primitive(x, &_bracket_tick)); _immediate(x);
 	code(x, "LITERAL", primitive(x, &_literal)); _immediate(x);
 	code(x, "POSTPONE", primitive(x, &_postpone)); _immediate(x);
+	/* CORE-EXT */ code(x, "REFILL", primitive(x, &_refill));
 	code(x, "SOURCE", primitive(x, &_source));
 	code(x, "STATE", primitive(x, &_state));
 	code(x, "'", primitive(x, &_tick));
@@ -290,8 +296,7 @@ int main(int argc, char**argv) {
 	bootstrap(x);
 
 	if (argc == 1) {
-		chdir("../../forth2012-test-suite/src/");
-		include(x, "runtests.fth");
+		include(x, "ans.sloth");
 	} else {
 		repl(x);
 	}

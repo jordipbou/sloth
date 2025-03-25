@@ -1,0 +1,42 @@
+REFILL For now, we can use REFILL for comments.
+
+REFILL The basic idea of SLOTH is to use conditional
+REFILL compilation to allow redefining words in the
+REFILL host programming language without needing to
+REFILL rewrite the Forth code all the time, so the
+REFILL first thing we are going to do is write 
+REFILL conditional compilation easier to implement
+REFILL than [IF] [ELSE] [THEN] for now.
+
+CREATE (?DEFFOUND) 0 HERE ! 1 CELLS ALLOT
+
+REFILL ?: checks (without using conditionals) if
+REFILL the word that we want to define is already
+REFILL defined. In that case, it indicates in
+REFILL the (?DEFFOUND) variable that the word is
+REFILL already defined and ignores the rest of the
+REFILL line.
+
+: ?: 
+	32 WORD FIND 
+	SWAP DROP 
+	0 = 
+	DUP
+	1 +
+	SOURCE SWAP DROP 
+	OVER * SWAP 1 SWAP - + 
+	>IN !
+	(?DEFFOUND) !
+;
+
+REFILL This is a conditional end of line comment
+REFILL that depends on the previous use of ?: to
+REFILL know if it must ignore the line or not.
+
+: ?\ (?DEFFOUND) @ INVERT 2 + >IN ! ; IMMEDIATE
+
+?: \ SOURCE >IN ! DROP ; IMMEDIATE
+
+\ End of line comments can be used now.
+
+
