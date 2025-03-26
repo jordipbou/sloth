@@ -217,4 +217,27 @@ DROP DROP
 ?\		OVER OVER INVERT AND >R SWAP INVERT AND R> OR 
 ?\ ;
 
+\ -- Comparisons ------------------------------------------
+
+?: > ( n1 n2 -- flag ) SWAP < ;
+\ Not ANS
+?: <=	( n1 n2 -- flag ) > INVERT ;
+\ Not ANS
+?: >=	( n1 n2 -- flag ) < INVERT ;
+?: 0=	( x -- flag ) IF 0 ELSE 0 INVERT THEN ;
+?: 0> ( x -- flag ) 0 > ;
+?: 0<> ( x -- flag ) 0= 0= ;
+?: 0< ( x -- flag ) 0 < ;
+\ Not ANS
+?: NOT ( x1 -- x2 ) 0= ;
+?: <> ( x1 x2 -- flag ) = INVERT ;
+?: U<	( u1 u2 -- flag ) 2DUP XOR 0< IF SWAP DROP 0< ELSE - 0< THEN ;
+?: U>	( u1 u2 -- flag ) SWAP U< ;
+?: WITHIN ( n1 | u1 n2 | u2 n3 | u3 -- flag ) OVER - >R - R> U< ; 
+
+\ -- More arithmetic operations ---------------------------
+
+?: MIN ( n1 n2 -- n3 ) 2DUP > IF SWAP THEN DROP ;
+?: MAX ( n1 n2 -- n3 ) 2DUP < IF SWAP THEN DROP ;
+
 

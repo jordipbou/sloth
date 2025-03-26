@@ -92,18 +92,6 @@ void init(X* x, CELL d, CELL sz) {
 	x->jmpbuf_idx = -1;
 }
 
-
-
-
-/* Pre definitions */
-void _begin(X*);
-void _again(X*);
-void _until(X*);
-void _while(X*);
-void _repeat(X*);
-
-
-
 /* Data stack */
 
 void push(X* x, CELL v) { x->s[x->sp] = v; x->sp++; }
@@ -1169,9 +1157,7 @@ void _m_star(X* x) {
 	push(x, low);
 	push(x, high);
 }
-void _max(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a > b ? a : b); }
 void _d_max(X* x) { /* TODO */ }
-void _min(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a < b ? a : b); }
 void _d_min(X* x) { /* TODO */ }
 void _minus(X* x) { CELL a = pop(x); push(x, pop(x) - a); }
 void _d_minus(X* x) { /* TODO */ }
@@ -1407,24 +1393,7 @@ void _f_store(X* x) { /* TODO */ }
 /* Comparison operations */
 
 void _equals(X* x) { CELL a = pop(x); push(x, pop(x) == a ? -1 : 0); }
-void _greater_than(X* x) { CELL a = pop(x); push(x, pop(x) > a ? -1 : 0); }
 void _less_than(X* x) { CELL a = pop(x); push(x, pop(x) < a ? -1 : 0); }
-void _not_equals(X* x) { CELL a = pop(x); push(x, pop(x) != a ? -1 : 0); }
-void _u_less_than(X* x) { 
-	uCELL b = (uCELL)pop(x);
-	uCELL a = (uCELL)pop(x);
-	push(x, a < b ? -1 : 0);
-}
-void _u_greater_than(X* x) { 
-	uCELL b = (uCELL)pop(x);
-	uCELL a = (uCELL)pop(x);
-	push(x, a > b ? -1 : 0);
-}
-void _within(X* x) { /* TODO */ }
-void _zero_equals(X* x) { push(x, pop(x) == 0 ? -1 : 0); }
-void _zero_greater_than(X* x) { push(x, pop(x) > 0 ? -1 : 0); }
-void _zero_less_than(X* x) { push(x, pop(x) < 0 ? -1 : 0); }
-void _zero_not_equals(X* x) { push(x, pop(x) != 0 ? -1 : 0); }
 
 void _f_less_than(X* x) { /* TODO */ }
 void _f_zero_equals(X* x) { /* TODO */ }
@@ -1892,9 +1861,9 @@ void bootstrap(X* x) {
 	code(x, "INVERT", primitive(x, &_invert));
 	code(x, "LSHIFT", primitive(x, &_l_shift));
 	code(x, "M*", primitive(x, &_m_star));
-	code(x, "MAX", primitive(x, &_max));
+	/* Not needed: code(x, "MAX", primitive(x, &_max)); */
 	code(x, "DMAX", primitive(x, &_d_max));
-	code(x, "MIN", primitive(x, &_min));
+	/* Not needed: code(x, "MIN", primitive(x, &_min)); */
 	code(x, "DMIN", primitive(x, &_d_min));
 	code(x, "-", primitive(x, &_minus));
 	code(x, "D-", primitive(x, &_d_minus));
@@ -1975,16 +1944,16 @@ void bootstrap(X* x) {
 	/* Comparison operations */
 
 	code(x, "=", primitive(x, &_equals));
-	code(x, ">", primitive(x, &_greater_than));
+	/* Not needed: code(x, ">", primitive(x, &_greater_than)); */
 	code(x, "<", primitive(x, &_less_than));
-	code(x, "<>", primitive(x, &_not_equals));
-	code(x, "U<", primitive(x, &_u_less_than));
-	code(x, "U>", primitive(x, &_u_greater_than));
-	code(x, "WITHIN", primitive(x, &_within));
-	code(x, "0=", primitive(x, &_zero_equals));
-	code(x, "0>", primitive(x, &_zero_greater_than));
-	code(x, "0<", primitive(x, &_zero_less_than));
-	code(x, "0<>", primitive(x, &_zero_not_equals));
+	/* Not needed: code(x, "<>", primitive(x, &_not_equals)); */
+	/* Not needed: code(x, "U<", primitive(x, &_u_less_than)); */
+	/* Not needed: code(x, "U>", primitive(x, &_u_greater_than)); */
+	/* Not needed: code(x, "WITHIN", primitive(x, &_within)); */
+	/* Not needed: code(x, "0=", primitive(x, &_zero_equals)); */
+	/* Not needed: code(x, "0>", primitive(x, &_zero_greater_than)); */
+	/* Not needed: code(x, "0<", primitive(x, &_zero_less_than)); */
+	/* Not needed: code(x, "0<>", primitive(x, &_zero_not_equals)); */
 
 	code(x, "F<", primitive(x, &_f_less_than));
 	code(x, "F0=", primitive(x, &_f_zero_equals));
@@ -2264,6 +2233,31 @@ void _abs(X* x) { CELL v = pop(x); push(x, v < 0 ? (0-v) : v); }
 void _negate(X* x) { push(x, 0 - pop(x)); }
 void _or(X* x) { CELL a = pop(x); push(x, pop(x) | a); }
 void _xor(X* x) { CELL a = pop(x); push(x, pop(x) ^ a); }
+void _min(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a < b ? a : b); }
+void _max(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a > b ? a : b); }
+
+/* Comparison operations */
+
+void _greater_than(X* x) { 
+	CELL a = pop(x); 
+	push(x, pop(x) > a ? -1 : 0); 
+}
+void _not_equals(X* x) { CELL a = pop(x); push(x, pop(x) != a ? -1 : 0); }
+void _zero_equals(X* x) { push(x, pop(x) == 0 ? -1 : 0); }
+void _zero_greater_than(X* x) { push(x, pop(x) > 0 ? -1 : 0); }
+void _zero_not_equals(X* x) { push(x, pop(x) != 0 ? -1 : 0); }
+void _zero_less_than(X* x) { push(x, pop(x) < 0 ? -1 : 0); }
+void _u_less_than(X* x) { 
+	uCELL b = (uCELL)pop(x);
+	uCELL a = (uCELL)pop(x);
+	push(x, a < b ? -1 : 0);
+}
+void _u_greater_than(X* x) { 
+	uCELL b = (uCELL)pop(x);
+	uCELL a = (uCELL)pop(x);
+	push(x, a > b ? -1 : 0);
+}
+void _within(X* x) { /* TODO */ }
 
 /* Comment-introducing operations */
 
