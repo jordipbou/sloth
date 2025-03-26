@@ -189,7 +189,7 @@ DROP DROP
 ?\ ; IMMEDIATE
 
 \ Not ANS
-?: 2RDROP	( x1 x2 -- ) 
+?: 2RDROP ( x1 x2 -- ) 
 ?\		POSTPONE R> POSTPONE R> 
 ?\		POSTPONE DROP POSTPONE DROP 
 ?\ ; IMMEDIATE
@@ -212,7 +212,7 @@ DROP DROP
 
 ?: NEGATE ( n1 -- n2 ) INVERT 1+ ;
 
-?: OR	( x1 x2 -- x3 ) INVERT SWAP INVERT AND INVERT ;
+?: OR ( x1 x2 -- x3 ) INVERT SWAP INVERT AND INVERT ;
 ?: XOR ( x1 x2 -- x3 ) 
 ?\		OVER OVER INVERT AND >R SWAP INVERT AND R> OR 
 ?\ ;
@@ -221,23 +221,64 @@ DROP DROP
 
 ?: > ( n1 n2 -- flag ) SWAP < ;
 \ Not ANS
-?: <=	( n1 n2 -- flag ) > INVERT ;
+?: <= ( n1 n2 -- flag ) > INVERT ;
 \ Not ANS
-?: >=	( n1 n2 -- flag ) < INVERT ;
-?: 0=	( x -- flag ) IF 0 ELSE 0 INVERT THEN ;
+?: >= ( n1 n2 -- flag ) < INVERT ;
+?: 0= ( x -- flag ) IF 0 ELSE 0 INVERT THEN ;
 ?: 0> ( x -- flag ) 0 > ;
 ?: 0<> ( x -- flag ) 0= 0= ;
 ?: 0< ( x -- flag ) 0 < ;
 \ Not ANS
 ?: NOT ( x1 -- x2 ) 0= ;
 ?: <> ( x1 x2 -- flag ) = INVERT ;
-?: U<	( u1 u2 -- flag ) 2DUP XOR 0< IF SWAP DROP 0< ELSE - 0< THEN ;
-?: U>	( u1 u2 -- flag ) SWAP U< ;
-?: WITHIN ( n1 | u1 n2 | u2 n3 | u3 -- flag ) OVER - >R - R> U< ; 
+?: U< ( u1 u2 -- flag ) 
+?\		2DUP XOR 0< IF SWAP DROP 0< ELSE - 0< THEN 
+?\ ;
+?: U> ( u1 u2 -- flag ) SWAP U< ;
+?: WITHIN ( n1 | u1 n2 | u2 n3 | u3 -- flag ) 
+?\		OVER - >R - R> U< 
+?\ ; 
 
 \ -- More arithmetic operations ---------------------------
 
 ?: MIN ( n1 n2 -- n3 ) 2DUP > IF SWAP THEN DROP ;
 ?: MAX ( n1 n2 -- n3 ) 2DUP < IF SWAP THEN DROP ;
 
+\ -- Memory -----------------------------------------------
+
+\ Not ANS
+?: CELL ( -- u ) 1 CELLS ;
+
+?: CELL+ ( a-addr1 -- a-addr2 ) 1 CELLS + ;
+?: CHAR+ ( c-addr1 -- c-addr2 ) 1 CHARS + ;
+\ Not ANS
+?: CELL- ( a-addr1 -- a-addr2 ) 1 CELLS - ;
+\ Not ANS
+?: CHAR- ( c-addr1 -- c-addr2 ) 1 CHARS - ;
+
+?: ALIGNED ( addr -- a-addr ) 
+?\		CELL+ 1- 1 CELLS 1- INVERT AND 
+?\ ;
+?: ALIGN ( -- ) HERE ALIGNED HERE - ALLOT ;
+
+\ PLATFORM DEPENDENT - Not ANS
+?: HERE, ( x -- ) HERE 2 CELLS + POSTPONE LITERAL ;
+\ Not ANS
+?: 0! ( a-addr -- ) 0 SWAP ! ;
+?: +! ( n | u a-addr -- ) SWAP OVER @ + SWAP ! ;
+\ Not ANS
+?: 1+! ( a-addr -- ) DUP @ 1 + SWAP ! ;
+\ Not ANS
+?: 1-! ( a-addr -- ) DUP @ 1 - SWAP ! ;
+
+?: 2! ( x1 x2 a-addr -- ) SWAP OVER ! CELL+ ! ;
+?: 2@ ( a-addr -- x1 x2 ) DUP CELL+ @ SWAP @ ;
+
+?: FILL ( c-addr u char -- ) 
+?\		-ROT BEGIN 
+?\			DUP 0> WHILE 
+?\			>R 2DUP C! CHAR+ R> 1- 
+?\		REPEAT 
+?\		DROP DROP DROP 
+?\ ;
 

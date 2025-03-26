@@ -767,17 +767,6 @@ void _resize(X* x) { /* TODO */ }
 void _convert(X* x) { /* TODO */ }
 void _count(X* x) { CELL a = pop(x); push(x, a + 1); push(x, cfetch(x, a)); }
 void _erase(X* x) { /* TODO */ }
-void _fill(X* x) { 
-	CHAR c = (CHAR)pop(x);
-	CELL u = pop(x);
-	CELL addr = pop(x);
-	if (u > 0) {
-		CELL i;
-		for (i = 0; i < u; i++) {
-			cstore(x, addr + i, c);
-		}
-	}
-}
 void _hold(X* x) { 
 	set(x, HLD, get(x, HLD) - 1);
 	cstore(x, get(x, HLD), pop(x));
@@ -1182,11 +1171,6 @@ void _d_plus(X* x) {
 	push(x, sh);
 }
 void _m_plus(X* x) { /* TODO */ }
-void _plus_store(X* x) {
-	CELL a = pop(x);
-	CELL n = pop(x);
-	store(x, a, fetch(x, a) + n);
-}
 void _d_plus_store(X* x) { /* TODO */ }
 void _r_shift(X* x) { CELL n = pop(x); push(x, ((uCELL)pop(x)) >> n); }
 void _d_slash(X* x) { /* TODO */ }
@@ -1372,17 +1356,7 @@ void _f_variable(X* x) { /* TODO */ }
 void _c_fetch(X* x) { push(x, cfetch(x, pop(x))); }
 void _c_store(X* x) { CELL a = pop(x); cstore(x, a, pop(x)); }
 void _fetch(X* x) { push(x, fetch(x, pop(x))); }
-void _two_fetch(X* x) { 
-	CELL a = pop(x);
-	push(x, fetch(x, a + sCELL));
-	push(x, fetch(x, a));
-}
 void _store(X* x) { CELL a = pop(x); store(x, a, pop(x)); }
-void _two_store(X* x) {
-	CELL a = pop(x);
-	store(x, a, pop(x));
-	store(x, a + sCELL, pop(x));
-}
 void _to(X* x) { /* TODO */ }
 
 void _f_fetch(X* x) { /* TODO */ }
@@ -1530,17 +1504,13 @@ void _f_swap(X* x) { /* TODO */ }
 
 /* Constructing compiler and interpreter system extensions */
 
-void _align(X* x) { /* TODO */ }
 void _f_align(X* x) { /* TODO */ }
-void _aligned(X* x) { /* TODO */ }
 void _f_aligned(X* x) { /* TODO */ }
 void _allot(X* x) { allot(x, pop(x)); }
 void _to_body(X* x) { push(x, to_abs(x, pop(x) + 4*sCELL)); }
-void _cell_plus(X* x) { push(x, pop(x) + sCELL); }
 void _float_plus(X* x) { /* TODO */ }
 void _cells(X* x) { push(x, pop(x) * sCELL); }
 void _floats(X* x) { /* TODO */ }
-void _char_plus(X* x) { push(x, pop(x) + 1); }
 void _chars(X* x) { /* TODO */ }
 void _compile_comma(X* x) { compile(x, pop(x)); }
 void _bracket_compile(X* x) { /* TODO */ }
@@ -1806,7 +1776,7 @@ void bootstrap(X* x) {
 	code(x, "CONVERT", primitive(x, &_convert));
 	code(x, "COUNT", primitive(x, &_count));
 	code(x, "ERASE", primitive(x, &_erase));
-	code(x, "FILL", primitive(x, &_fill));
+	/* Not needed: code(x, "FILL", primitive(x, &_fill)); */
 	code(x, "HOLD", primitive(x, &_hold));
 	code(x, "MOVE", primitive(x, &_move));
 	code(x, ">NUMBER", primitive(x, &_to_number));
@@ -1877,7 +1847,7 @@ void bootstrap(X* x) {
 	code(x, "+", primitive(x, &_plus));
 	code(x, "D+", primitive(x, &_d_plus));
 	code(x, "M+", primitive(x, &_m_plus));
-	code(x, "+!", primitive(x, &_plus_store));
+	/* Not needed: code(x, "+!", primitive(x, &_plus_store)); */
 	code(x, "D+!", primitive(x, &_d_plus_store));
 	code(x, "RSHIFT", primitive(x, &_r_shift));
 	/* Not needed: code(x, "/", primitive(x, &_slash)); */
@@ -1931,9 +1901,9 @@ void bootstrap(X* x) {
 	code(x, "C@", primitive(x, &_c_fetch));
 	code(x, "C!", primitive(x, &_c_store));
 	code(x, "@", primitive(x, &_fetch));
-	code(x, "2@", primitive(x, &_two_fetch));
+	/* Not needed: code(x, "2@", primitive(x, &_two_fetch)); */
 	code(x, "!", primitive(x, &_store));
-	code(x, "2!", primitive(x, &_two_store));
+	/* Not needed: code(x, "2!", primitive(x, &_two_store)); */
 	code(x, "TO", primitive(x, &_to));
 
 	code(x, "F@", primitive(x, &_f_fetch));
@@ -2051,18 +2021,18 @@ void bootstrap(X* x) {
 
 	/* Constructing compiler and interpreter system extensions */
 
-	code(x, "ALIGN", primitive(x, &_align));
+	/* Not needed: code(x, "ALIGN", primitive(x, &_align)); */
 	code(x, "FALIGN", primitive(x, &_f_align));
-	code(x, "ALIGNED", primitive(x, &_aligned));
+	/* Not needed: code(x, "ALIGNED", primitive(x, &_aligned)); */
 	code(x, "FALIGNED", primitive(x, &_f_aligned));
 	code(x, "ALLOT", primitive(x, &_allot));
 	code(x, ">BODY", primitive(x, &_to_body));
 	/* Not needed: code(x, "C,", primitive(x, &_c_comma)); */
-	code(x, "CELL+", primitive(x, &_cell_plus));
+	/* Not needed: code(x, "CELL+", primitive(x, &_cell_plus)); */
 	code(x, "FLOAT+", primitive(x, &_float_plus));
 	code(x, "CELLS", primitive(x, &_cells));
 	code(x, "FLOATS", primitive(x, &_floats));
-	code(x, "CHAR+", primitive(x, &_char_plus));
+	/* Not needed: code(x, "CHAR+", primitive(x, &_char_plus)); */
 	code(x, "CHARS", primitive(x, &_chars));
 	/* Not needed: code(x, ",", primitive(x, &_comma)); */
 	code(x, "COMPILE,", primitive(x, &_compile_comma));
@@ -2153,7 +2123,7 @@ int main(int argc, char**argv) {
 
 	bootstrap(x);
 
-	include(x, "ans.sloth");
+	include(x, "ans.fth");
 
 	if (argc == 1) {
 		chdir("../../forth2012-test-suite/src/");
@@ -2216,6 +2186,19 @@ void _two_over(X* x) {
 	push(x, pick(x, 3)); 
 }
 
+/* Memory-stack transfer operations */
+
+void _two_store(X* x) {
+	CELL a = pop(x);
+	store(x, a, pop(x));
+	store(x, a + sCELL, pop(x));
+}
+void _two_fetch(X* x) { 
+	CELL a = pop(x);
+	push(x, fetch(x, a + sCELL));
+	push(x, fetch(x, a));
+}
+
 /* Arithmetic and logical operations */
 
 void _mod(X* x) { CELL a = pop(x); push(x, pop(x) % a); }
@@ -2235,6 +2218,11 @@ void _or(X* x) { CELL a = pop(x); push(x, pop(x) | a); }
 void _xor(X* x) { CELL a = pop(x); push(x, pop(x) ^ a); }
 void _min(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a < b ? a : b); }
 void _max(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a > b ? a : b); }
+void _plus_store(X* x) {
+	CELL a = pop(x);
+	CELL n = pop(x);
+	store(x, a, fetch(x, a) + n);
+}
 
 /* Comparison operations */
 
@@ -2275,9 +2263,13 @@ void _paren(X* x) {
 
 /* Constructing compiler and interpreter system extensions */
 
+void _cell_plus(X* x) { push(x, pop(x) + sCELL); }
+void _char_plus(X* x) { push(x, pop(x) + 1); }
 void _c_comma(X* x) { ccomma(x, pop(x)); }
 void _comma(X* x) { comma(x, pop(x)); }
 void _literal(X* x) { literal(x, pop(x)); }
+void _aligned(X* x) { /* TODO */ }
+void _align(X* x) { /* TODO */ }
 void _tick(X* x) {
 	CELL tok, tlen;
 	push(x, 32); _word(x);
@@ -2332,3 +2324,18 @@ void _constant(X* x) {
 }
 void _buffer_colon(X* x) { _create(x); _allot(x); }
 void _value(X* x) { /* TODO */ }
+
+/* String operations */
+
+void _fill(X* x) { 
+	CHAR c = (CHAR)pop(x);
+	CELL u = pop(x);
+	CELL addr = pop(x);
+	if (u > 0) {
+		CELL i;
+		for (i = 0; i < u; i++) {
+			cstore(x, addr + i, c);
+		}
+	}
+}
+
