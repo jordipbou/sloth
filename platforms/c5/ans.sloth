@@ -161,7 +161,6 @@ DROP DROP
 ?: -ROT ( x1 x2 x3 -- x3 x1 x2 ) ROT ROT ;
 
 ?: NIP ( x1 x2 -- x2 ) SWAP DROP ;
-
 ?: TUCK ( x1 x2 -- x2 x1 x2 ) >R R@ SWAP R> ;
 
 ?: ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu ) 
@@ -171,11 +170,8 @@ DROP DROP
 ?\ ;
 
 ?: 2DROP ( x1 x2 -- ) DROP DROP ;
-
 ?: 2DUP ( x1 x2 -- x1 x2 x1 x2 ) OVER OVER ;
-
 ?: 2SWAP ( x1 x2 x3 x4 -- x3 x4 x1 x2 ) >R -ROT R> -ROT ;
-
 ?: 2OVER ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 ) 3 PICK 3 PICK ;
 
 ?: 2>R ( x1 x2 -- ) ( R: -- x1 x2 ) 
@@ -197,4 +193,28 @@ DROP DROP
 ?\		POSTPONE R> POSTPONE R> 
 ?\		POSTPONE DROP POSTPONE DROP 
 ?\ ; IMMEDIATE
+
+\ -- Arithmetic -------------------------------------------
+
+?: / ( n1 n2 -- n3 ) 1 SWAP */MOD SWAP DROP ;
+?: */ ( n1 n2 n3 -- n4 ) */MOD SWAP DROP ;
+?: MOD ( n1 n2 -- n3 ) 1 SWAP */MOD DROP ;
+?: /MOD	( n1 n2 -- n3 n4 ) 1 SWAP */MOD ;
+
+?: 1+ ( n1 | u1 -- n2 | u2 ) 1 + ;
+?: 1- ( n1 | u1 -- n2 | u2 ) 1 - ;
+
+?: 2* ( x1 -- x2 ) 2 * ;
+
+?: ABS ( n -- u ) DUP 0 < IF INVERT 1+ THEN ;
+
+\ -- Bit\Logic --------------------------------------------
+
+?: NEGATE ( n1 -- n2 ) INVERT 1+ ;
+
+?: OR	( x1 x2 -- x3 ) INVERT SWAP INVERT AND INVERT ;
+?: XOR ( x1 x2 -- x3 ) 
+?\		OVER OVER INVERT AND >R SWAP INVERT AND R> OR 
+?\ ;
+
 

@@ -1049,7 +1049,6 @@ void _page(X* x) { /* TODO */ }
 
 /* Arithmetic and logical operations */
 
-void _abs(X* x) { CELL v = pop(x); push(x, v < 0 ? (0-v) : v); }
 void _d_abs(X* x) { /* TODO */ }
 void _and(X* x) { CELL v = pop(x); push(x, pop(x) & v); }
 void _f_m_slash_mod(X* x) {
@@ -1176,21 +1175,11 @@ void _min(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a < b ? a : b); }
 void _d_min(X* x) { /* TODO */ }
 void _minus(X* x) { CELL a = pop(x); push(x, pop(x) - a); }
 void _d_minus(X* x) { /* TODO */ }
-void _mod(X* x) { CELL a = pop(x); push(x, pop(x) % a); }
 /* Pre-definition */ void _s_m_slash_rem(X*);
 /* Pre-definition */ void _to_r(X*);
 /* Pre-definition */ void _r_from(X*);
 void _star_slash_mod(X* x) { _to_r(x); _m_star(x); _r_from(x); _s_m_slash_rem(x); }
-void _slash_mod(X* x) { 
-	CELL b = pop(x), a = pop(x);
-	push(x, a%b);
-	push(x, a/b);
-}
-void _negate(X* x) { push(x, 0 - pop(x)); }
 void _d_negate(X* x) { /* TODO */ }
-void _one_plus(X* x) { push(x, pop(x) + 1); }
-void _one_minus(X* x) { push(x, pop(x) - 1); }
-void _or(X* x) { CELL a = pop(x); push(x, pop(x) | a); }
 void _plus(X* x) { CELL a = pop(x); push(x, pop(x) + a); }
 /* Code adapted from pForth */
 void _d_plus(X* x) { 
@@ -1214,7 +1203,6 @@ void _plus_store(X* x) {
 }
 void _d_plus_store(X* x) { /* TODO */ }
 void _r_shift(X* x) { CELL n = pop(x); push(x, ((uCELL)pop(x)) >> n); }
-void _slash(X* x) { CELL a = pop(x); push(x, pop(x) / a); }
 void _d_slash(X* x) { /* TODO */ }
 void _s_m_slash_rem(X* x) {
 	CELL n1 = pop(x), d1_hi = pop(x), d1_lo = pop(x);
@@ -1294,9 +1282,7 @@ void _s_m_slash_rem(X* x) {
 }
 void _star(X* x) { CELL b = pop(x); push(x, pop(x) * b); }
 /* Pre-definition */ void _nip(X*);
-void _star_slash(X* x) { _star_slash_mod(x); _nip(x); }
 void _m_star_slash(X* x) { /* TODO */ }
-void _two_star(X* x) { push(x, 2*pop(x)); }
 void _d_two_star(X* x) { /* TODO */ }
 void _two_slash(X* x) { push(x, pop(x) >> 1); }
 void _d_two_slash(X* x) { /* TODO */ }
@@ -1367,7 +1353,6 @@ void _u_m_slash_mod(X* x) {
 	push(x, al); /* rem */
 	push(x, q);
 }
-void _xor(X* x) { CELL a = pop(x); push(x, pop(x) ^ a); }
 
 void _f_star(X* x) { /* TODO */ }
 void _f_slash(X* x) { /* TODO */ }
@@ -1900,7 +1885,7 @@ void bootstrap(X* x) {
 
 	/* Arithmetic and logical operations */
 
-	code(x, "ABS", primitive(x, &_abs));
+	/* Not needed: code(x, "ABS", primitive(x, &_abs)); */
 	code(x, "DABS", primitive(x, &_d_abs));
 	code(x, "AND", primitive(x, &_and));
 	code(x, "FM/MOD", primitive(x, &_f_m_slash_mod));
@@ -1913,32 +1898,33 @@ void bootstrap(X* x) {
 	code(x, "DMIN", primitive(x, &_d_min));
 	code(x, "-", primitive(x, &_minus));
 	code(x, "D-", primitive(x, &_d_minus));
-	code(x, "MOD", primitive(x, &_mod));
+	/* Not needed: code(x, "MOD", primitive(x, &_mod)); */
 	code(x, "*/MOD", primitive(x, &_star_slash_mod));
-	code(x, "/MOD", primitive(x, &_slash_mod));
-	code(x, "NEGATE", primitive(x, &_negate));
-	code(x, "1+", primitive(x, &_one_plus));
-	code(x, "1-", primitive(x, &_one_minus));
-	code(x, "OR", primitive(x, &_or));
+	/* Not needed: code(x, "/MOD", primitive(x, &_slash_mod)); */
+	/* Not needed: code(x, "NEGATE", primitive(x, &_negate)); */
+	/* Not needed: code(x, "1+", primitive(x, &_one_plus)); */
+	/* Not needed: code(x, "1-", primitive(x, &_one_minus)); */
+	/* Not needed: code(x, "OR", primitive(x, &_or)); */
 	code(x, "+", primitive(x, &_plus));
 	code(x, "D+", primitive(x, &_d_plus));
 	code(x, "M+", primitive(x, &_m_plus));
 	code(x, "+!", primitive(x, &_plus_store));
 	code(x, "D+!", primitive(x, &_d_plus_store));
 	code(x, "RSHIFT", primitive(x, &_r_shift));
-	code(x, "/", primitive(x, &_slash));
+	/* Not needed: code(x, "/", primitive(x, &_slash)); */
 	code(x, "D/", primitive(x, &_d_slash));
 	code(x, "SM/REM", primitive(x, &_s_m_slash_rem));
 	code(x, "*", primitive(x, &_star));
-	code(x, "*/", primitive(x, &_star_slash));
+	/* I needed to put the name as *//* to comment this one */
+	/* Not needed: code(x, "*//*", primitive(x, &_star_slash)); */
 	code(x, "M*/", primitive(x, &_m_star_slash));
-	code(x, "2*", primitive(x, &_two_star));
+	/* Not needed: code(x, "2*", primitive(x, &_two_star)); */
 	code(x, "D2*", primitive(x, &_d_two_star));
 	code(x, "2/", primitive(x, &_two_slash));
 	code(x, "D2/", primitive(x, &_d_two_slash));
 	code(x, "UM*", primitive(x, &_u_m_star));
 	code(x, "UM/MOD", primitive(x, &_u_m_slash_mod));
-	code(x, "XOR", primitive(x, &_xor));
+	/* Not needed: code(x, "XOR", primitive(x, &_xor)); */
 
 	code(x, "F*", primitive(x, &_f_star));
 	code(x, "F/", primitive(x, &_f_slash));
@@ -2260,6 +2246,24 @@ void _two_over(X* x) {
 	push(x, pick(x, 3)); 
 	push(x, pick(x, 3)); 
 }
+
+/* Arithmetic and logical operations */
+
+void _mod(X* x) { CELL a = pop(x); push(x, pop(x) % a); }
+void _slash(X* x) { CELL a = pop(x); push(x, pop(x) / a); }
+void _star_slash(X* x) { _star_slash_mod(x); _nip(x); }
+void _slash_mod(X* x) { 
+	CELL b = pop(x), a = pop(x);
+	push(x, a%b);
+	push(x, a/b);
+}
+void _one_plus(X* x) { push(x, pop(x) + 1); }
+void _one_minus(X* x) { push(x, pop(x) - 1); }
+void _two_star(X* x) { push(x, 2*pop(x)); }
+void _abs(X* x) { CELL v = pop(x); push(x, v < 0 ? (0-v) : v); }
+void _negate(X* x) { push(x, 0 - pop(x)); }
+void _or(X* x) { CELL a = pop(x); push(x, pop(x) | a); }
+void _xor(X* x) { CELL a = pop(x); push(x, pop(x) ^ a); }
 
 /* Comment-introducing operations */
 
