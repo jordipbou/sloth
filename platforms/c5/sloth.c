@@ -1559,25 +1559,11 @@ void _locals(X* x) { /* TODO */ }
 /* Manipulating stack items */
 
 void _drop(X* x) { pop(x); }
-void _two_drop(X* x) { pop(x); pop(x); }
-void _dup(X* x) { push(x, pick(x, 0)); }
-void _two_dup(X* x) { push(x, pick(x, 1)); push(x, pick(x, 1)); }
-void _question_dup(X* x) { if (pick(x, 0) != 0) _dup(x); }
-void _nip(X* x) { CELL v = pop(x); pop(x); push(x, v); }
 void _over(X* x) { push(x, pick(x, 1)); }
-void _two_over(X* x) { push(x, pick(x, 3)); push(x, pick(x, 3)); }
 void _pick(X* x) {  push(x, pick(x, pop(x))); }
-void _two_to_r(X* x) { CELL a = pop(x); rpush(x, pop(x)); rpush(x, a); }
 void _to_r(X* x) { rpush(x, pop(x)); }
-void _two_r_from(X* x) { CELL a = rpop(x); push(x, rpop(x)); push(x, a); }
 void _r_from(X* x) { push(x, rpop(x)); }
-void _r_fetch(X* x) { push(x, rpick(x, 0)); }
-void _two_r_fetch(X* x) { push(x, rpick(x, 1)); push(x, rpick(x, 0)); }
-void _roll(X* x) { /* TODO */ }
-void _rot(X* x) { CELL a = pop(x); CELL b = pop(x); CELL c = pop(x); push(x, b); push(x, a); push(x, c); }
 void _swap(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a); push(x, b); }
-void _two_swap(X* x) { CELL a = pop(x); CELL b = pop(x); CELL c = pop(x); CELL d = pop(x); push(x, b); push(x, a); push(x, d); push(x, c); }
-void _tuck(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a); push(x, b); push(x, a); }
 
 void _two_rot(X* x) { /* TODO */ }
 
@@ -2079,25 +2065,25 @@ void bootstrap(X* x) {
 	/* Manipulating stack items */
 
 	code(x, "DROP", primitive(x, &_drop));
-	code(x, "2DROP", primitive(x, &_two_drop));
-	code(x, "DUP", primitive(x, &_dup));
-	code(x, "2DUP", primitive(x, &_two_dup));
-	code(x, "?DUP", primitive(x, &_question_dup));
-	code(x, "NIP", primitive(x, &_nip));
+	/* Not needed: code(x, "2DROP", primitive(x, &_two_drop)); */
+	/* Not needed: code(x, "DUP", primitive(x, &_dup)); */
+	/* Not needed: code(x, "2DUP", primitive(x, &_two_dup)); */
+	/* Not needed: code(x, "?DUP", primitive(x, &_question_dup)); */
+	/* Not needed: code(x, "NIP", primitive(x, &_nip)); */
 	code(x, "OVER", primitive(x, &_over));
-	code(x, "2OVER", primitive(x, &_two_over));
+	/* Not needed: code(x, "2OVER", primitive(x, &_two_over)); */
 	code(x, "PICK", primitive(x, &_pick));
-	code(x, "2>R", primitive(x, &_two_to_r));
+	/* Not needed: code(x, "2>R", primitive(x, &_two_to_r)); */
 	code(x, ">R", primitive(x, &_to_r));
-	code(x, "2R>", primitive(x, &_two_r_from));
+	/* Not needed: code(x, "2R>", primitive(x, &_two_r_from)); */
 	code(x, "R>", primitive(x, &_r_from));
-	code(x, "R@", primitive(x, &_r_fetch));
-	code(x, "2R@", primitive(x, &_two_r_fetch));
-	code(x, "ROLL", primitive(x, &_roll));
-	code(x, "ROT", primitive(x, &_rot));
+	/* Not needed: code(x, "R@", primitive(x, &_r_fetch)); */
+	/* Not needed: code(x, "2R@", primitive(x, &_two_r_fetch)); */
+	/* Not needed: code(x, "ROLL", primitive(x, &_roll)); */
+	/* Not needed: code(x, "ROT", primitive(x, &_rot)); */
 	code(x, "SWAP", primitive(x, &_swap));
-	code(x, "2SWAP", primitive(x, &_two_swap));
-	code(x, "TUCK", primitive(x, &_tuck));
+	/* Not needed: code(x, "2SWAP", primitive(x, &_two_swap)); */
+	/* Not needed: code(x, "TUCK", primitive(x, &_tuck)); */
 
 	code(x, "2ROT", primitive(x, &_two_rot));
 
@@ -2227,6 +2213,53 @@ int main(int argc, char**argv) {
 }
 
 /* CORE WORDS THAT ARE NOT NEEDED */
+
+/* Manipulating stack items */
+
+void _dup(X* x) { push(x, pick(x, 0)); }
+void _rot(X* x) { 
+	CELL a = pop(x); 
+	CELL b = pop(x); 
+	CELL c = pop(x); 
+	push(x, b); 
+	push(x, a); 
+	push(x, c); 
+}
+void _nip(X* x) { CELL v = pop(x); pop(x); push(x, v); }
+void _tuck(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a); push(x, b); push(x, a); }
+void _roll(X* x) { /* TODO */ }
+void _question_dup(X* x) { if (pick(x, 0) != 0) _dup(x); }
+void _r_fetch(X* x) { push(x, rpick(x, 0)); }
+void _two_drop(X* x) { pop(x); pop(x); }
+void _two_dup(X* x) { push(x, pick(x, 1)); push(x, pick(x, 1)); }
+void _two_swap(X* x) { 
+	CELL a = pop(x); 
+	CELL b = pop(x); 
+	CELL c = pop(x); 
+	CELL d = pop(x); 
+	push(x, b); 
+	push(x, a); 
+	push(x, d); 
+	push(x, c); 
+}
+void _two_to_r(X* x) { 
+	CELL a = pop(x); 
+	rpush(x, pop(x)); 
+	rpush(x, a); 
+}
+void _two_r_fetch(X* x) { 
+	push(x, rpick(x, 1)); 
+	push(x, rpick(x, 0)); 
+}
+void _two_r_from(X* x) { 
+	CELL a = rpop(x); 
+	push(x, rpop(x)); 
+	push(x, a); 
+}
+void _two_over(X* x) { 
+	push(x, pick(x, 3)); 
+	push(x, pick(x, 3)); 
+}
 
 /* Comment-introducing operations */
 

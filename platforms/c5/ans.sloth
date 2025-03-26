@@ -11,7 +11,7 @@ DROP DROP
 	32 WORD FIND 
 	SWAP DROP 
 	0 = 
-	DUP
+	0 PICK	
 	1 +
 	SOURCE SWAP DROP 
 	OVER * SWAP 1 SWAP - + 
@@ -128,3 +128,73 @@ DROP DROP
 ?: REPEAT	( C: orig dest -- ) ( -- ) 
 ?\		POSTPONE AGAIN POSTPONE THEN 
 ?\ ; IMMEDIATE
+
+\ -- Conditional compilation of variables and constants ---
+
+?: ?VARIABLE ( "<spaces>name" -- ) ?: ;
+
+?: ?CONSTANT ( x "<spaces>name" -- ) 
+?\		32 WORD FIND SWAP DROP
+?\		IF DROP SOURCE >IN ! DROP
+?\		ELSE 1 >IN !
+?\		THEN
+?\	;
+
+\ ---------------------------------------------------------
+
+\ Now that we have conditional compilation and basic 
+\ control structures, we can implement a lot of fundamental 
+\ words.
+
+\ -- Stack shuffling --------------------------------------
+
+?: DUP ( x -- x x ) 0 PICK ;
+?: ?DUP	( x -- 0 | x x ) DUP IF DUP THEN ;
+
+?: R@ ( -- x ) ( R: x -- x ) 
+?\		POSTPONE R> POSTPONE DUP POSTPONE >R 
+?\ ; IMMEDIATE
+
+?: ROT ( x1 x2 x3 -- x2 x3 x1 ) >R SWAP R> SWAP ;	
+
+\ Not ANS
+?: -ROT ( x1 x2 x3 -- x3 x1 x2 ) ROT ROT ;
+
+?: NIP ( x1 x2 -- x2 ) SWAP DROP ;
+
+?: TUCK ( x1 x2 -- x2 x1 x2 ) >R R@ SWAP R> ;
+
+?: ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu ) 
+?\		DUP IF 
+?\			SWAP >R 1 - RECURSE R> SWAP EXIT 
+?\		THEN DROP 
+?\ ;
+
+?: 2DROP ( x1 x2 -- ) DROP DROP ;
+
+?: 2DUP ( x1 x2 -- x1 x2 x1 x2 ) OVER OVER ;
+
+?: 2SWAP ( x1 x2 x3 x4 -- x3 x4 x1 x2 ) >R -ROT R> -ROT ;
+
+?: 2OVER ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 ) 3 PICK 3 PICK ;
+
+?: 2>R ( x1 x2 -- ) ( R: -- x1 x2 ) 
+?\		POSTPONE SWAP POSTPONE >R POSTPONE >R 
+?\ ; IMMEDIATE
+
+?: 2R@ ( -- x1 x2 ) ( R: x1 x2 -- x1 x2 ) 
+?\		POSTPONE R> POSTPONE R> 
+?\		POSTPONE SWAP POSTPONE 2DUP POSTPONE SWAP 
+?\		POSTPONE >R POSTPONE >R 
+?\ ; IMMEDIATE
+
+?: 2R> ( -- x1 x2 ) ( R: x1 x2 -- ) 
+?\		POSTPONE R> POSTPONE R> POSTPONE SWAP 
+?\ ; IMMEDIATE
+
+\ Not ANS
+?: 2RDROP	( x1 x2 -- ) 
+?\		POSTPONE R> POSTPONE R> 
+?\		POSTPONE DROP POSTPONE DROP 
+?\ ; IMMEDIATE
+
