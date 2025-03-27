@@ -325,4 +325,32 @@ DROP DROP
 ?\		THEN
 ?\	; IMMEDIATE
 
+\ -- Input/output -----------------------------------------
+
+32
+?CONSTANT BL
+
+?: CR ( -- ) 10 EMIT ;
+
+?: SPACE ( -- ) BL EMIT ;
+
+\ When implementing spaces, I've seen it as this:
+\ begin dup while space 1- repeat drop
+\ but that has the problem of doing infinite spaces
+\ if, for some reason, n is negative.
+?: SPACES ( n -- ) BEGIN DUP 0> WHILE SPACE 1- REPEAT DROP ;
+
+?: TYPE ( c-addr u -- ) 
+?\		>R BEGIN 
+?\			R@ 0> WHILE 
+?\			DUP C@ DUP 32 127 WITHIN IF
+?\				EMIT
+?\			ELSE
+?\				DROP
+?\			THEN
+?\			1+ R> 1- >R 
+?\		REPEAT 
+?\		R> DROP DROP
+?\	;
+
 

@@ -970,7 +970,6 @@ void _accept(X* x) {
 	}
 	push(x, i);
 }
-void _cr(X* x) { printf("\n"); }
 void _dot(X* x) { printf("%ld ", pop(x)); }
 void _dot_r(X* x) { /* TODO */ }
 /* Pre-definition */ void _type(X*);
@@ -993,21 +992,7 @@ void _dot_quote(X* x) {
 void _emit(X* x) { printf("%c", (CHAR)pop(x)); }
 void _expect(X* x) { /* TODO */ }
 void _key(X* x) { push(x, getch()); }
-void _space(X* x) { printf(" "); }
-void _spaces(X* x) { 
-	CELL i, u = pop(x); 
-	for (i = 0; i < u; i++) printf(" ");
-}
-void _type(X* x) { 
-	CELL l = pop(x); 
-	CELL a = pop(x);
-	CELL i;
-	CHAR c;
-	for (i = a; i < a + l; i++) {
-		c = cfetch(x, i);
-		if (c >= 32 && c <= 126) printf("%c", c);
-	}
-}
+
 void _u_dot(X* x) { printf("%lu ", (uCELL)pop(x)); }
 void _u_dot_r(X* x) { /* TODO */ }
 
@@ -1374,7 +1359,6 @@ void _f_zero_less_than(X* x) { /* TODO */ }
 
 /* System constants & facilities for generating ASCII values */
 
-void _bl(X* x) { push(x, 32); }
 void _char(X* x) {
 	push(x, 32); _word(x);
 	push(x, cfetch(x, pop(x) + 1));
@@ -1796,16 +1780,16 @@ void bootstrap(X* x) {
 	/* More input/output operations */
 
 	code(x, "ACCEPT", primitive(x, &_accept));
-	code(x, "CR", primitive(x, &_cr));
+	/* Not needed: code(x, "CR", primitive(x, &_cr)); */
 	code(x, ".", primitive(x, &_dot));
 	code(x, ".R", primitive(x, &_dot_r));
 	code(x, ".\"", primitive(x, &_dot_quote)); _immediate(x);
 	code(x, "EMIT", primitive(x, &_emit));
 	code(x, "EXPECT", primitive(x, &_expect));
 	code(x, "KEY", primitive(x, &_key));
-	code(x, "SPACE", primitive(x, &_space));
-	code(x, "SPACES", primitive(x, &_spaces));
-	code(x, "TYPE", primitive(x, &_type));
+	/* Not needed: code(x, "SPACE", primitive(x, &_space)); */
+	/* Not needed: code(x, "SPACES", primitive(x, &_spaces)); */
+	/* Not needed: code(x, "TYPE", primitive(x, &_type)); */
 	code(x, "U.", primitive(x, &_u_dot));
 	code(x, "U.R", primitive(x, &_u_dot_r));
 	code(x, "F.", primitive(x, &_f_dot));
@@ -1929,7 +1913,7 @@ void bootstrap(X* x) {
 
 	/* System constants & facilities for generating ASCII values */
 
-	code(x, "BL", primitive(x, &_bl));
+	/* Not needed: code(x, "BL", primitive(x, &_bl)); */
 	code(x, "CHAR", primitive(x, &_char));
 	code(x, "[CHAR]", primitive(x, &_bracket_char)); _immediate(x);
 	code(x, "FALSE", primitive(x, &_false));
@@ -2336,6 +2320,29 @@ void _fill(X* x) {
 		for (i = 0; i < u; i++) {
 			cstore(x, addr + i, c);
 		}
+	}
+}
+
+/* System constants & facilities for generating ASCII values */
+
+void _bl(X* x) { push(x, 32); }
+
+/* More input/output operations */
+
+void _cr(X* x) { printf("\n"); }
+void _space(X* x) { printf(" "); }
+void _spaces(X* x) { 
+	CELL i, u = pop(x); 
+	for (i = 0; i < u; i++) printf(" ");
+}
+void _type(X* x) { 
+	CELL l = pop(x); 
+	CELL a = pop(x);
+	CELL i;
+	CHAR c;
+	for (i = a; i < a + l; i++) {
+		c = cfetch(x, i);
+		if (c >= 32 && c <= 126) printf("%c", c);
 	}
 }
 
