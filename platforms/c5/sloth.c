@@ -626,7 +626,6 @@ void _time_and_date(X* x) {
 
 void _depth(X* x) { push(x, x->sp); }
 /* BLOCK EXT */ void _list(X* x) { /* Not implemented */ }
-void _dump(X* x) { /* TODO */ }
 void _question(X* x) { printf("%ld ", fetch(x, pop(x))); }
 void _dot_s(X* x) { 
 	CELL i;
@@ -915,7 +914,6 @@ void _cmove_up(X* x) {
 }
 void _compare(X* x) { /* TODO */ }
 void _search(X* x) { /* TODO */ }
-void _slash_string(X* x) { /* TODO */ }
 void _dash_trailing(X* x) { /* TODO */ }
 
 void _to_float(X* x) { /* TODO */ }
@@ -1702,7 +1700,7 @@ void bootstrap(X* x) {
 
 	code(x, "DEPTH", primitive(x, &_depth));
 	code(x, "LIST", primitive(x, &_list));
-	code(x, "DUMP", primitive(x, &_dump));
+	/* Not needed: code(x, "DUMP", primitive(x, &_dump)); */
 	code(x, "?", primitive(x, &_question));
 	code(x, ".S", primitive(x, &_dot_s));
 	code(x, "SEE", primitive(x, &_see));
@@ -1772,7 +1770,7 @@ void bootstrap(X* x) {
 	code(x, "CMOVE>", primitive(x, &_cmove_up));
 	code(x, "COMPARE", primitive(x, &_compare));
 	code(x, "SEARCH", primitive(x, &_search));
-	code(x, "/STRING", primitive(x, &_slash_string));
+	/* Not needed: code(x, "/STRING", primitive(x, &_slash_string)); */
 	code(x, "-TRAILING", primitive(x, &_dash_trailing));
 	code(x, ">FLOAT", primitive(x, &_to_float));
 	code(x, "REPRESENT", primitive(x, &_represent));
@@ -2322,6 +2320,7 @@ void _fill(X* x) {
 		}
 	}
 }
+void _slash_string(X* x) { /* TODO */ }
 
 /* System constants & facilities for generating ASCII values */
 
@@ -2345,4 +2344,8 @@ void _type(X* x) {
 		if (c >= 32 && c <= 126) printf("%c", c);
 	}
 }
+
+/* Commands to inspect memory, debug & view code */
+
+void _dump(X* x) { /* TODO */ }
 

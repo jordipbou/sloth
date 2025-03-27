@@ -325,6 +325,14 @@ DROP DROP
 ?\		THEN
 ?\	; IMMEDIATE
 
+\ -- Strings ----------------------------------------------
+
+\ Adapted from Minimal Forth to use CHARS instead of memory
+\ units.
+?: /STRING ( c-addr1 u1 n -- c-addr2 u2 )
+?\		SWAP OVER - >R CHARS + R>
+?\ ;
+
 \ -- Input/output -----------------------------------------
 
 32
@@ -348,9 +356,79 @@ DROP DROP
 ?\			ELSE
 ?\				DROP
 ?\			THEN
-?\			1+ R> 1- >R 
+?\			CHAR+ R> 1- >R 
 ?\		REPEAT 
 ?\		R> DROP DROP
 ?\	;
 
+\ -- Dump utility -----------------------------------------
+
+\ Adapted from Minimal Forth
+
+?: .HEXDIGIT ( x -- )
+?\		15 AND DUP 10 < IF 
+?\			'0' + 
+?\		ELSE 
+?\			10 - 'A' + 
+?\		THEN EMIT 
+?\	;
+
+?: .HEX ( x -- )
+?\		DUP  4 RSHIFT .HEXDIGIT .HEXDIGIT
+?\ ;
+
+?: .ADDR ( x -- )
+\ Address 00 is not being printed correctly
+?\		DUP 0= IF 
+?\			DROP '0' EMIT '0' EMIT EXIT 
+?\		THEN
+?\		0 BEGIN ( x i ) 
+?\			OVER WHILE 
+?\			OVER 8 RSHIFT SWAP 1+ 
+?\		REPEAT SWAP DROP
+?\		BEGIN ( x i )
+?\			DUP WHILE 
+?\			SWAP .HEX 1- 
+?\		REPEAT DROP 
+?\ ;
+
+16
+?CONSTANT B/LINE
+
+\ For all systems where char is one byte this definition
+\ is enough. For the systems where char is not one byte,
+\ it should be defined in host.
+?: B@ ( addr -- byte ) C@ ;
+
+?: .H ( addr len -- )
+?\		B/LINE MIN DUP >R
+?\		BEGIN ( addr len )
+?\			DUP	WHILE ( addr len )
+?\			OVER B@ .HEX SPACE
+?\			1- SWAP 1+ SWAP
+?\		REPEAT 2DROP
+?\		B/LINE R> - 3 * SPACES
+?\ ;
+
+?: .A ( addr1 len1 -- )
+?\		B/LINE MIN
+?\		BEGIN ( addr len )
+?\			DUP WHILE
+?\			OVER B@ DUP BL < IF DROP '.' THEN EMIT
+?\			1- SWAP 1+ SWAP
+?\		REPEAT 2DROP 
+?\ ;
+
+?: DUMP-LINE ( addr len1 -- addr len2 )
+?\		OVER .ADDR ':' EMIT SPACE 2DUP .H SPACE SPACE 2DUP .A
+?\		DUP B/LINE MIN /STRING
+?\ ;
+
+?: DUMP ( addr len -- )
+?\		BEGIN
+?\			DUP WHILE ( addr len )
+?\			CR DUMP-LINE
+?\		REPEAT 2DROP 
+?\		CR
+?\ ;
 
