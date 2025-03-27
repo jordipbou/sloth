@@ -282,3 +282,47 @@ DROP DROP
 ?\		DROP DROP DROP 
 ?\ ;
 
+\ -- Deferred words ---------------------------------------
+
+\ PLATFORM DEPENDENT
+?: >BODY ( xt -- a-addr ) 4 CELLS + TO-ABS ;
+
+?: DEFER ( "<spaces>name" -- ) ( EX: i*x -- j*x )
+?\		CREATE 0 , DOES> @ EXECUTE ;
+
+?: TO 
+?\ ( i*x "<spaces>name" -- ) 
+?\ ( C: "<spaces>name" -- )
+?\		STATE @ IF
+?\			POSTPONE ['] POSTPONE >BODY POSTPONE !
+?\		ELSE
+?\			' >BODY !
+?\		THEN 
+?\	; IMMEDIATE
+
+?: IS 
+?\ ( xt "<spaces>name" -- ) 
+?\ ( C: "<spaces>name" -- )
+?\		STATE @ IF
+?\			POSTPONE TO
+?\		ELSE
+?\			['] TO EXECUTE
+?\		THEN
+?\	; IMMEDIATE
+
+?: DEFER@	( xt1 -- xt2 ) >BODY @ ;
+
+?: DEFER!	( xt2 xt1 -- ) >BODY ! ;
+
+?: ACTION-OF 
+?\ ( "<spaces>name" -- xt ) 
+?\ ( C: "<spaces>name -- ) 
+?\ ( RT: -- xt )
+?\		STATE @ IF
+?\			POSTPONE ['] POSTPONE DEFER@
+?\		ELSE
+?\			' DEFER@
+?\		THEN
+?\	; IMMEDIATE
+
+

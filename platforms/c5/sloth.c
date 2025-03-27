@@ -1357,7 +1357,6 @@ void _c_fetch(X* x) { push(x, cfetch(x, pop(x))); }
 void _c_store(X* x) { CELL a = pop(x); cstore(x, a, pop(x)); }
 void _fetch(X* x) { push(x, fetch(x, pop(x))); }
 void _store(X* x) { CELL a = pop(x); store(x, a, pop(x)); }
-void _to(X* x) { /* TODO */ }
 
 void _f_fetch(X* x) { /* TODO */ }
 void _f_store(X* x) { /* TODO */ }
@@ -1507,7 +1506,6 @@ void _f_swap(X* x) { /* TODO */ }
 void _f_align(X* x) { /* TODO */ }
 void _f_aligned(X* x) { /* TODO */ }
 void _allot(X* x) { allot(x, pop(x)); }
-void _to_body(X* x) { push(x, to_abs(x, pop(x) + 4*sCELL)); }
 void _float_plus(X* x) { /* TODO */ }
 void _cells(X* x) { push(x, pop(x) * sCELL); }
 void _floats(X* x) { /* TODO */ }
@@ -1904,7 +1902,7 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "2@", primitive(x, &_two_fetch)); */
 	code(x, "!", primitive(x, &_store));
 	/* Not needed: code(x, "2!", primitive(x, &_two_store)); */
-	code(x, "TO", primitive(x, &_to));
+	/* code(x, "TO", primitive(x, &_to)); */
 
 	code(x, "F@", primitive(x, &_f_fetch));
 	code(x, "F!", primitive(x, &_f_store));
@@ -2026,7 +2024,7 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "ALIGNED", primitive(x, &_aligned)); */
 	code(x, "FALIGNED", primitive(x, &_f_aligned));
 	code(x, "ALLOT", primitive(x, &_allot));
-	code(x, ">BODY", primitive(x, &_to_body));
+	/* Not needed: code(x, ">BODY", primitive(x, &_to_body)); */
 	/* Not needed: code(x, "C,", primitive(x, &_c_comma)); */
 	/* Not needed: code(x, "CELL+", primitive(x, &_cell_plus)); */
 	code(x, "FLOAT+", primitive(x, &_float_plus));
@@ -2286,6 +2284,8 @@ void _ahead(X* x) {
 	_here(x); 
 	comma(x, 0); 
 }
+void _to_body(X* x) { push(x, to_abs(x, pop(x) + 4*sCELL)); }
+void _to(X* x) { /* TODO */ }
 
 /* More facilities for defining routines (compiling-mode only) */
 
