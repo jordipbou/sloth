@@ -244,6 +244,23 @@ DROP DROP
 ?: MIN ( n1 n2 -- n3 ) 2DUP > IF SWAP THEN DROP ;
 ?: MAX ( n1 n2 -- n3 ) 2DUP < IF SWAP THEN DROP ;
 
+?: U+D		DUP ROT + DUP ROT U< NEGATE ;
+
+?: DNEGATE ( d1 -- d2 ) INVERT SWAP INVERT 1 U+D ROT + ;
+?: DABS ( d -- ud ) DUP 0< IF DNEGATE THEN ;
+
+?: SM/REM ( d n1 -- n2 n3 )		\ CORE
+\ Symmetric divide of double by single. Return remainder n2
+\ and quotient n3.
+?\		2DUP XOR >R OVER >R >R DUP 0< IF DNEGATE THEN
+?\		R> ABS UM/MOD
+?\		R> 0< IF SWAP NEGATE SWAP THEN
+?\		R> 0< IF					\ negative quotient
+?\		    NEGATE 0 OVER < 0= IF EXIT THEN
+?\		    -11 THROW THEN          \ result out of range
+?\		DUP 0< IF -11 THROW THEN	\ result out of range
+?\ ;
+
 \ -- Memory -----------------------------------------------
 
 \ Not ANS
@@ -432,3 +449,29 @@ DROP DROP
 ?\		CR
 ?\ ;
 
+\ -- Definitions ------------------------------------------
+
+\ PLATFORM DEPENDENT
+?: LATEST ( -- n ) 2 CELLS TO-ABS ;
+
+\ PLATFORM DEPENDENT
+?: NT>LINK ( nt -- nt ) TO-ABS @ ;
+
+\ -- Markers ----------------------------------------------
+
+\ MARKER creates a word that stores how to delete all
+\ definitions created after it from dictionary,
+\ including itself.
+
+?: DO-MARKER ( -- )
+?\		DUP CELL+ @ HERE - ALLOT
+?\		@ LATEST !
+?\ ;
+
+\ PLATFORM DEPENDENT
+?: MARKER ( "<spaces>name" -- )
+?\		HERE LATEST @
+?\		CREATE
+?\		, ,
+?\		DOES> DO-MARKER
+?\ ;

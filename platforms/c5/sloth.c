@@ -678,7 +678,6 @@ void _base(X* x) { push(x, to_abs(x, BASE)); }
 void _decimal(X* x) { set(x, BASE, 10); }
 void _forget(X* x) { /* Obsolescent, don't implement */ }
 void _hex(X* x) { set(x, BASE, 16); }
-void _marker(X* x) { /* TODO */ }
 
 void _also(X* x) { /* TODO */ }
 void _definitions(X* x) { /* TODO */ }
@@ -730,7 +729,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			printf(">>>> %s", linebuf);
+			/* printf(">>>> %s", linebuf); */
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
@@ -1157,82 +1156,6 @@ void _m_plus(X* x) { /* TODO */ }
 void _d_plus_store(X* x) { /* TODO */ }
 void _r_shift(X* x) { CELL n = pop(x); push(x, ((uCELL)pop(x)) >> n); }
 void _d_slash(X* x) { /* TODO */ }
-void _s_m_slash_rem(X* x) {
-	CELL n1 = pop(x), d1_hi = pop(x), d1_lo = pop(x);
-
-	uCELL q, r;
-	
-	/* Track signs */
-	CELL d_neg = (d1_hi < 0);
-	CELL n_neg = (n1 < 0);
-	
-	/* Use unsigned arithmetic for the algorithm */
-	uCELL abs_n1 = n_neg ? (uCELL)-n1 : (uCELL)n1;
-	uCELL abs_d_hi, abs_d_lo;
-	
-	/* Get absolute value of double-word dividend */
-	if (d_neg) {
-		/* Two's complement negation for double word */
-		abs_d_lo = (uCELL)-d1_lo;
-		abs_d_hi = (uCELL)(~d1_hi + (abs_d_lo == 0));
-	} else {
-		abs_d_hi = (uCELL)d1_hi;
-		abs_d_lo = (uCELL)d1_lo;
-	}
-	
-	/* Initialize quotient and remainder */
-	q = 0;
-	r = 0;
-	
-	/* Process 128 bits of the dividend (64 high bits + 64 low bits) 
-	 * using the standard long division algorithm
-	 */
-	
-	/* First the high bits */
-	{
-		CELL i;
-		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
-			/* Shift remainder left by 1 bit and bring in next bit of dividend */
-			r = (r << 1) | ((abs_d_hi >> i) & 1);
-			
-			/* If remainder >= divisor, subtract and set quotient bit */
-			if (r >= abs_n1) {
-				r -= abs_n1;
-				q |= (1UL << i);
-			}
-		}
-	}
-	
-	/* Then the low bits */
-	{
-		CELL i;
-		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
-			/* Shift remainder left by 1 bit and bring in next bit of dividend */
-			r = (r << 1) | ((abs_d_lo >> i) & 1);
-			
-			/* If remainder >= divisor, subtract and set quotient bit */
-			if (r >= abs_n1) {
-				r -= abs_n1;
-				q |= (1UL << i);
-			}
-		}
-	}
-	
-	/* Apply sign to results */
-	{
-		/* For symmetric division (SM/REM):
-		 * 1. Quotient sign depends on operand signs (like normal division)
-		 * 2. Remainder has the same sign as the dividend
-		 * 3. No adjustment needed - we just truncate toward zero
-		 */
-		CELL quotient = (d_neg != n_neg) ? -(CELL)q : q;
-		CELL remainder = d_neg ? -(CELL)r : r;
-		
-		/* Push results back onto the stack */
-		push(x, remainder);
-		push(x, quotient);
-	}
-}
 void _star(X* x) { CELL b = pop(x); push(x, pop(x) * b); }
 /* Pre-definition */ void _nip(X*);
 void _m_star_slash(X* x) { /* TODO */ }
@@ -1711,7 +1634,7 @@ void bootstrap(X* x) {
 	code(x, "DECIMAL", primitive(x, &_decimal));
 	code(x, "FORGET", primitive(x, &_forget));
 	code(x, "HEX", primitive(x, &_hex));
-	code(x, "MARKER", primitive(x, &_marker));
+	/* Not needed: code(x, "MARKER", primitive(x, &_marker)); */
 
 	code(x, "ALSO", primitive(x, &_also));
 	code(x, "DEFINITIONS", primitive(x, &_definitions));
@@ -1832,7 +1755,7 @@ void bootstrap(X* x) {
 	code(x, "RSHIFT", primitive(x, &_r_shift));
 	/* Not needed: code(x, "/", primitive(x, &_slash)); */
 	code(x, "D/", primitive(x, &_d_slash));
-	code(x, "SM/REM", primitive(x, &_s_m_slash_rem));
+	/* Not needed: code(x, "SM/REM", primitive(x, &_s_m_slash_rem)); */
 	code(x, "*", primitive(x, &_star));
 	/* I needed to put the name as *//* to comment this one */
 	/* Not needed: code(x, "*//*", primitive(x, &_star_slash)); */
@@ -2203,6 +2126,82 @@ void _plus_store(X* x) {
 	CELL n = pop(x);
 	store(x, a, fetch(x, a) + n);
 }
+void _s_m_slash_rem(X* x) {
+	CELL n1 = pop(x), d1_hi = pop(x), d1_lo = pop(x);
+
+	uCELL q, r;
+	
+	/* Track signs */
+	CELL d_neg = (d1_hi < 0);
+	CELL n_neg = (n1 < 0);
+	
+	/* Use unsigned arithmetic for the algorithm */
+	uCELL abs_n1 = n_neg ? (uCELL)-n1 : (uCELL)n1;
+	uCELL abs_d_hi, abs_d_lo;
+	
+	/* Get absolute value of double-word dividend */
+	if (d_neg) {
+		/* Two's complement negation for double word */
+		abs_d_lo = (uCELL)-d1_lo;
+		abs_d_hi = (uCELL)(~d1_hi + (abs_d_lo == 0));
+	} else {
+		abs_d_hi = (uCELL)d1_hi;
+		abs_d_lo = (uCELL)d1_lo;
+	}
+	
+	/* Initialize quotient and remainder */
+	q = 0;
+	r = 0;
+	
+	/* Process 128 bits of the dividend (64 high bits + 64 low bits) 
+	 * using the standard long division algorithm
+	 */
+	
+	/* First the high bits */
+	{
+		CELL i;
+		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
+			/* Shift remainder left by 1 bit and bring in next bit of dividend */
+			r = (r << 1) | ((abs_d_hi >> i) & 1);
+			
+			/* If remainder >= divisor, subtract and set quotient bit */
+			if (r >= abs_n1) {
+				r -= abs_n1;
+				q |= (1UL << i);
+			}
+		}
+	}
+	
+	/* Then the low bits */
+	{
+		CELL i;
+		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
+			/* Shift remainder left by 1 bit and bring in next bit of dividend */
+			r = (r << 1) | ((abs_d_lo >> i) & 1);
+			
+			/* If remainder >= divisor, subtract and set quotient bit */
+			if (r >= abs_n1) {
+				r -= abs_n1;
+				q |= (1UL << i);
+			}
+		}
+	}
+	
+	/* Apply sign to results */
+	{
+		/* For symmetric division (SM/REM):
+		 * 1. Quotient sign depends on operand signs (like normal division)
+		 * 2. Remainder has the same sign as the dividend
+		 * 3. No adjustment needed - we just truncate toward zero
+		 */
+		CELL quotient = (d_neg != n_neg) ? -(CELL)q : q;
+		CELL remainder = d_neg ? -(CELL)r : r;
+		
+		/* Push results back onto the stack */
+		push(x, remainder);
+		push(x, quotient);
+	}
+}
 
 /* Comparison operations */
 
@@ -2348,4 +2347,9 @@ void _type(X* x) {
 /* Commands to inspect memory, debug & view code */
 
 void _dump(X* x) { /* TODO */ }
+
+/* Commands that change compilation & interpretation settings */
+
+void _marker(X* x) { /* TODO */ }
+
 
