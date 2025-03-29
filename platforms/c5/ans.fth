@@ -510,3 +510,38 @@ DROP DROP
 ?: .			DUP 0 <  D. ;
    
 ?: ? ( addr -- ) @ . ;
+
+\ -- CASE/OF/ENDOF ----------------------------------------
+
+\ Copied from SwapForth
+
+( CASE                                       JCB 09:15 07/18/14)
+\ From ANS specification A.3.2.3.2
+
+0 CONSTANT CASE IMMEDIATE  ( init count of ofs )
+
+: OF  ( #of -- orig #of+1 / x -- )
+    1+    ( count ofs )
+    POSTPONE OVER  POSTPONE = ( copy and test case value)
+    POSTPONE IF    ( add orig to control flow stack )
+    POSTPONE DROP  ( discards case value if = )
+    SWAP           ( bring count back now )
+; IMMEDIATE
+
+: ENDOF ( orig1 #of -- orig2 #of )
+    >R   ( move off the stack in case the control-flow )
+         ( stack is the data stack. )
+    POSTPONE ELSE
+    R>   ( we can bring count back now )
+; IMMEDIATE
+
+: ENDCASE  ( orig1..orign #of -- )
+    POSTPONE DROP  ( discard case value )
+    BEGIN
+        DUP
+    WHILE
+        SWAP POSTPONE THEN 1-
+    REPEAT DROP
+; IMMEDIATE
+
+
