@@ -475,3 +475,38 @@ DROP DROP
 ?\		, ,
 ?\		DOES> DO-MARKER
 ?\ ;
+
+\ -- Numeric output ---------------------------------------
+
+\ UD/MOD is needed by #, but I don't know what it does.
+?: UD/MOD	>R 0 R@ UM/MOD R> SWAP >R UM/MOD R> ;
+
+\ This should be used with [UNDEFINED]
+
+?VARIABLE HLD
+?\ CREATE <HOLD 100 CHARS DUP ALLOT <HOLD + CONSTANT HOLD>
+   
+?: <# ( -- ) HOLD> HLD ! ;
+?: HOLD	( c -- ) HLD @ 1- DUP HLD ! C! ;
+?: # ( d1 -- d2 ) 
+?\		BASE @ UD/MOD ROT 9 OVER < IF 7 + THEN 48 + HOLD 
+?\ ;
+?: #S ( d1 -- d2 ) BEGIN # OVER OVER OR 0= UNTIL ;
+?: #> ( d -- c-addr len ) DROP DROP HLD @ HOLD> OVER - ;
+   
+?: SIGN	( n -- ) 0 < IF 45 HOLD THEN ;
+   
+?: UD.R ( d n -- ) >R <# #S #> R> OVER - SPACES TYPE ;
+?: UD.		0 UD.R SPACE ;
+?: U.R		0 SWAP UD.R ;
+?: U.		0 UD. ;
+?: D.R ( d n -- )
+?\		>R SWAP OVER DABS 
+?\		<# #S ROT SIGN #> 
+?\		R> OVER - SPACES TYPE 
+?\ ;
+?: D.		0 D.R SPACE ;
+?: .R		>R DUP 0 < R> D.R ;
+?: .			DUP 0 <  D. ;
+   
+?: ? ( addr -- ) @ . ;

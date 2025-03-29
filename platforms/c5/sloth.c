@@ -729,7 +729,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			/* printf(">>>> %s", linebuf); */
+			printf(">>>> %s", linebuf);
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
@@ -765,10 +765,6 @@ void _resize(X* x) { /* TODO */ }
 void _convert(X* x) { /* TODO */ }
 void _count(X* x) { CELL a = pop(x); push(x, a + 1); push(x, cfetch(x, a)); }
 void _erase(X* x) { /* TODO */ }
-void _hold(X* x) { 
-	set(x, HLD, get(x, HLD) - 1);
-	cstore(x, get(x, HLD), pop(x));
-}
 void _move(X* x) {
 	CELL u = pop(x);
 	CELL addr2 = pop(x);
@@ -864,48 +860,6 @@ void _to_number(X* x) {
 	} while(1);
 	_r_from(x);
 }
-void _less_number_sign(X* x) {
-	set(x, HLD, to_abs(x, here(x) + NBUF));
-}
-void _number_sign_greater(X* x) { 
-	pop(x); pop(x);
-	push(x, get(x, HLD));
-	push(x, to_abs(x, here(x) + NBUF) - get(x, HLD));
-}
-/* Pre-definition */ void _u_m_slash_mod(X*);
-/* Code adapted from lbForth */
-void _number_sign(X* x) {
-	CELL r;
-	push(x, 0);
-	push(x, get(x, BASE));
-	_u_m_slash_mod(x);
-	_to_r(x);
-	push(x, get(x, BASE));
-	_u_m_slash_mod(x);
-	_r_from(x);
-	_rot(x);
-	r = pop(x);
-	if (r > 9) r += 7;
-	r += 48;
-	push(x, r); _hold(x);
-}
-/* Pre-definition */ void _or(X*);
-/* Pre-definition */ void _two_dup(X*);
-/* Pre-definition */ void _zero_equals(X*);
-void _number_sign_s(X* x) {
-	do {
-		_number_sign(x);
-		_two_dup(x);
-		_or(x);
-		_zero_equals(x);
-	} while(pop(x) == 0);
-}
-void _sign(X* x) { 
-	if (pop(x) < 0) {
-		push(x, '-'); _hold(x);
-	} 
-}
-
 void _blank(X* x) { /* TODO */ }
 void _cmove(X* x) {
 }
@@ -1680,14 +1634,14 @@ void bootstrap(X* x) {
 	code(x, "COUNT", primitive(x, &_count));
 	code(x, "ERASE", primitive(x, &_erase));
 	/* Not needed: code(x, "FILL", primitive(x, &_fill)); */
-	code(x, "HOLD", primitive(x, &_hold));
+	/* Not needed: code(x, "HOLD", primitive(x, &_hold)); */
 	code(x, "MOVE", primitive(x, &_move));
 	code(x, ">NUMBER", primitive(x, &_to_number));
-	code(x, "<#", primitive(x, &_less_number_sign));
-	code(x, "#>", primitive(x, &_number_sign_greater));
-	code(x, "#", primitive(x, &_number_sign));
-	code(x, "#S", primitive(x, &_number_sign_s));
-	code(x, "SIGN", primitive(x, &_sign));
+	/* Not needed: code(x, "<#", primitive(x, &_less_number_sign)); */
+	/* Not needed: code(x, "#>", primitive(x, &_number_sign_greater)); */
+	/* Not needed: code(x, "#", primitive(x, &_number_sign)); */
+	/* Not needed: code(x, "#S", primitive(x, &_number_sign_s)); */
+	/* Not needed: code(x, "SIGN", primitive(x, &_sign));
 	code(x, "BLANK", primitive(x, &_blank));
 	code(x, "CMOVE", primitive(x, &_cmove));
 	code(x, "CMOVE>", primitive(x, &_cmove_up));
@@ -2320,6 +2274,47 @@ void _fill(X* x) {
 	}
 }
 void _slash_string(X* x) { /* TODO */ }
+void _hold(X* x) { 
+	set(x, HLD, get(x, HLD) - 1);
+	cstore(x, get(x, HLD), pop(x));
+}
+void _less_number_sign(X* x) {
+	set(x, HLD, to_abs(x, here(x) + NBUF));
+}
+void _number_sign_greater(X* x) { 
+	pop(x); pop(x);
+	push(x, get(x, HLD));
+	push(x, to_abs(x, here(x) + NBUF) - get(x, HLD));
+}
+/* Code adapted from lbForth */
+void _number_sign(X* x) {
+	CELL r;
+	push(x, 0);
+	push(x, get(x, BASE));
+	_u_m_slash_mod(x);
+	_to_r(x);
+	push(x, get(x, BASE));
+	_u_m_slash_mod(x);
+	_r_from(x);
+	_rot(x);
+	r = pop(x);
+	if (r > 9) r += 7;
+	r += 48;
+	push(x, r); _hold(x);
+}
+void _number_sign_s(X* x) {
+	do {
+		_number_sign(x);
+		_two_dup(x);
+		_or(x);
+		_zero_equals(x);
+	} while(pop(x) == 0);
+}
+void _sign(X* x) { 
+	if (pop(x) < 0) {
+		push(x, '-'); _hold(x);
+	} 
+}
 
 /* System constants & facilities for generating ASCII values */
 
