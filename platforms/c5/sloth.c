@@ -1297,32 +1297,6 @@ void _left_bracket(X* x) { set(x, STATE, 0); }
 void _quit(X* x) { /* TODO */ }
 void _recurse(X* x) { compile(x, get(x, LATESTXT)); }
 void _right_bracket(X* x) { set(x, STATE, 1); }
-void _s_quote(X* x) { 
-	CELL i;
-	/* Parsing */
-	CELL l = 0;
-	CELL a = get(x, IBUF) + get(x, IPOS);
-	while (get(x, IPOS) < get(x, ILEN)
-	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != '"') {
-		l++;
-		set(x, IPOS, get(x, IPOS) + 1);
-	}
-	if (get(x, STATE) == 0) {
-		/* TODO: Should change between SBUF1 and SBUF2 */
-		for (i = 0; i < l; i++) {
-			cset(x, here(x) + SBUF1 + i, cfetch(x, a + i));
-		}
-		push(x, to_abs(x, here(x) + SBUF1));
-		push(x, l);
-	} else {
-		compile(x, get_xt(x, find_word(x, "(STRING)")));
-		comma(x, l);
-		for (i = a; i < (a + l); i++) ccomma(x, cfetch(x, i));
-		align(x);
-	}
-	if (get(x, IPOS) < get(x, ILEN))
-		set(x, IPOS, get(x, IPOS) + 1);
-}
 void _catch(X* x) { /* TODO */ }
 void _throw(X* x) { /* TODO */ }
 
@@ -1421,17 +1395,6 @@ void _here(X* x) { push(x, to_abs(x, here(x))); }
 void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
 void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
 void _pad(X* x) { /* TODO */ }
-void _parse(X* x) {
-	CHAR c = (CHAR)pop(x);
-	CELL ibuf = get(x, IBUF);
-	CELL ilen = get(x, ILEN);
-	CELL ipos = get(x, IPOS);
-	push(x, ibuf + ipos);
-	while (ipos < ilen && cfetch(x, ibuf + ipos) != c) ipos++;
-	push(x, ibuf + ipos - pick(x, 0));
-	if (ipos < ilen) ipos++;
-	set(x, IPOS, ipos);
-}
 void _postpone(X* x) { 
 	CELL i, xt, tok, tlen;
 	push(x, 32); _word(x);
@@ -1490,8 +1453,6 @@ void _state(X* x) { push(x, to_abs(x, STATE)); }
 /* Already defined: void _word(X* x) */
 /* Already defined: void _find(X* x) */
 void _search_wordlist(X* x) { /* TODO */ }
-
-void _s_literal(X* x) { /* TODO */ }
 
 void _two_literal(X* x) { /* TODO */ }
 
@@ -1823,7 +1784,7 @@ void bootstrap(X* x) {
 	code(x, "QUIT", primitive(x, &_quit));
 	code(x, "RECURSE", primitive(x, &_recurse)); _immediate(x);
 	code(x, "]", primitive(x, &_right_bracket)); _immediate(x);
-	code(x, "S\"", primitive(x, &_s_quote)); _immediate(x);
+	/* Not needed: code(x, "S\"", primitive(x, &_s_quote)); _immediate(x); */
 
 	code(x, "CATCH", primitive(x, &_catch));
 	code(x, "THROW", primitive(x, &_throw));
@@ -1894,7 +1855,7 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "[']", primitive(x, &_bracket_tick)); _immediate(x); */
 	/* Not needed: code(x, "LITERAL", primitive(x, &_literal)); _immediate(x); */
 	code(x, "PAD", primitive(x, &_pad));
-	code(x, "PARSE", primitive(x, &_parse));
+	/* Not needed: code(x, "PARSE", primitive(x, &_parse)); */
 	code(x, "POSTPONE", primitive(x, &_postpone)); _immediate(x);
 	/* code(x, "QUERY", primitive(x, &_query)); */
 	code(x, "REFILL", primitive(x, &_refill));
@@ -1912,7 +1873,7 @@ void bootstrap(X* x) {
 	code(x, "FIND", primitive(x, &_find));
 	code(x, "SEARCH-WORDLIST", primitive(x, &_search_wordlist));
 
-	code(x, "SLITERAL", primitive(x, &_s_literal));
+	/* Not needed: code(x, "SLITERAL", primitive(x, &_s_literal)); */
 
 	code(x, "2LITERAL", primitive(x, &_two_literal));
 
@@ -2211,6 +2172,18 @@ void _ahead(X* x) {
 }
 void _to_body(X* x) { push(x, to_abs(x, pop(x) + 4*sCELL)); }
 void _to(X* x) { /* TODO */ }
+void _parse(X* x) {
+	CHAR c = (CHAR)pop(x);
+	CELL ibuf = get(x, IBUF);
+	CELL ilen = get(x, ILEN);
+	CELL ipos = get(x, IPOS);
+	push(x, ibuf + ipos);
+	while (ipos < ilen && cfetch(x, ibuf + ipos) != c) ipos++;
+	push(x, ibuf + ipos - pick(x, 0));
+	if (ipos < ilen) ipos++;
+	set(x, IPOS, ipos);
+}
+void _s_literal(X* x) { /* TODO */ }
 
 /* More facilities for defining routines (compiling-mode only) */
 
@@ -2220,6 +2193,32 @@ void _if(X* x) {
 }
 void _then(X* x) { _here(x); _over(x); _minus(x); _swap(x); _store(x); }
 void _else(X* x) { _ahead(x); _swap(x); _then(x); }
+void _s_quote(X* x) { 
+	CELL i;
+	/* Parsing */
+	CELL l = 0;
+	CELL a = get(x, IBUF) + get(x, IPOS);
+	while (get(x, IPOS) < get(x, ILEN)
+	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != '"') {
+		l++;
+		set(x, IPOS, get(x, IPOS) + 1);
+	}
+	if (get(x, STATE) == 0) {
+		/* TODO: Should change between SBUF1 and SBUF2 */
+		for (i = 0; i < l; i++) {
+			cset(x, here(x) + SBUF1 + i, cfetch(x, a + i));
+		}
+		push(x, to_abs(x, here(x) + SBUF1));
+		push(x, l);
+	} else {
+		compile(x, get_xt(x, find_word(x, "(STRING)")));
+		comma(x, l);
+		for (i = a; i < (a + l); i++) ccomma(x, cfetch(x, i));
+		align(x);
+	}
+	if (get(x, IPOS) < get(x, ILEN))
+		set(x, IPOS, get(x, IPOS) + 1);
+}
 
 /* Forming indefinite loops (compiling-mode only) */
 

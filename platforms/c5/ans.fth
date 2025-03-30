@@ -301,6 +301,9 @@ DROP DROP
 ?\		DROP DROP DROP 
 ?\ ;
 
+?: CMOVE> ( c-addr1 c-addr2 u -- ) CHARS MOVE ;
+?: CMOVE ( c-addr1 c-addr2 u -- ) CHARS MOVE ;
+
 \ -- Deferred words ---------------------------------------
 
 \ PLATFORM DEPENDENT
@@ -577,4 +580,56 @@ DROP DROP
 ?: +LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
 ?\		POSTPONE ;] POSTPONE (DOLOOP)
 ?\ ; IMMEDIATE
+
+\ -- Parsing ----------------------------------------------
+
+?: /SOURCE ( -- c-addr n )
+?\		SOURCE >IN @ /STRING DUP 0< IF DROP 0 THEN 
+?\ ; 
+
+\ Here three words for parsing are implemented, resembling
+\ numeric output.
+
+?: <P ( -- c-addr n ) /SOURCE ;
+?: *P ( -?- )
+?\		>R BEGIN 
+?\			/SOURCE NIP WHILE 
+?\			/SOURCE DROP C@ R@ EXECUTE WHILE 
+?\			>IN 1+! 
+?\		REPEAT THEN 
+?\		R> DROP 
+?\ ;
+?: P> ( -?- ) 
+?\		/SOURCE NIP DUP >R - R> IF 
+?\			>IN 1+! 
+?\		THEN 
+?\ ;
+
+?: PARSE ( char "ccc<char>" -- c-addr u )
+?\		<P ROT [: OVER <> ;] *P DROP P> 
+?\ ;
+
+?: CHAR ( "<spaces>name" -- char ) BL PARSE DROP C@ ; 
+?: [CHAR] ( "<spaces>name" -- char ) ( -- char )
+?\		CHAR POSTPONE LITERAL 
+?\ ; IMMEDIATE 
+
+?: PARSE-NAME ( "<spaces>name<space>" -- c-addr u )
+?\		[: BL <= ;] *P <P [: BL > ;] *P P> 
+?\ ;
+
+\ -- String literals --------------------------------------
+
+?: SLITERAL ( c-addr1 u -- ) ( -- c-addr2 u )
+?\		POSTPONE (STRING) DUP ,
+?\		HERE OVER CHARS ALLOT
+?\		SWAP CMOVE
+?\		ALIGN
+?\ ; IMMEDIATE
+
+?: S" ( "ccc<quote" -- ) ( -- c-addr u )
+?\		34 PARSE STATE @ IF 
+?\			POSTPONE SLITERAL 
+?\		THEN 
+?\ ; IMMEDIATE 
 
