@@ -627,9 +627,21 @@ DROP DROP
 ?\		ALIGN
 ?\ ; IMMEDIATE
 
-?: S" ( "ccc<quote" -- ) ( -- c-addr u )
+?: S" ( "ccc<quote>" -- ) ( -- c-addr u )
 ?\		34 PARSE STATE @ IF 
 ?\			POSTPONE SLITERAL 
 ?\		THEN 
 ?\ ; IMMEDIATE 
+
+?: CLITERAL ( c-addr1 u -- ) ( -- c-addr2 )
+?\		POSTPONE (CSTRING) DUP C,
+?\		HERE OVER CHARS ALLOT
+?\		SWAP CMOVE
+?\		ALIGN
+?\ ; IMMEDIATE
+
+\ TODO: C" only works when compiling
+?: C" ( "ccc<quote>" -- ) ( -- c-addr )
+?\		34 PARSE POSTPONE CLITERAL
+?\ ; IMMEDIATE
 

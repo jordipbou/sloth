@@ -331,8 +331,18 @@ void _compile(X* x) { compile(x, pop(x)); }
 void _branch(X* x) { x->ip += op(x) - sCELL; }
 void _zbranch(X* x) { x->ip += pop(x) == 0 ? (op(x) - sCELL) : sCELL; }
 
-/* TODO: Shouldn't be aligned? */
-void _string(X* x) { CELL l = op(x); push(x, to_abs(x, x->ip)); push(x, l); x->ip = aligned(x->ip + l); }
+void _string(X* x) { 
+	CELL l = op(x); 
+	push(x, to_abs(x, x->ip)); 
+	push(x, l); 
+	x->ip = aligned(x->ip + l); 
+}
+
+void _c_string(X* x) { 
+	CHAR l = cfetch(x, to_abs(x, x->ip)); 
+	push(x, to_abs(x, x->ip)); 
+	x->ip = aligned(x->ip + l + 1);
+}
 
 /* Quotations (not in ANS Forth yet) */
 
@@ -1263,7 +1273,6 @@ void _swap(X* x); /* Predefined for swap */
 
 void _abort(X* x) { /* TODO */ }
 void _abort_quote(X* x) { /* TODO */ }
-void _c_quote(X* x) { /* TODO */ }
 void _case(X* x) { /* TODO */ }
 void _of(X* x) { /* TODO */ }
 void _endof(X* x) { /* TODO */ }
@@ -1507,6 +1516,7 @@ void bootstrap(X* x) {
 	code(x, "(BRANCH)", primitive(x, &_branch));
 	code(x, "(?BRANCH)", primitive(x, &_zbranch));
 	code(x, "(STRING)", primitive(x, &_string));
+	code(x, "(CSTRING)", primitive(x, &_c_string));
 	code(x, "(QUOTATION)", primitive(x, &_quotation));
 	code(x, "(DOES)", primitive(x, &_do_does));
 	code(x, "(DOLOOP)", primitive(x, &_doloop));
@@ -1768,7 +1778,7 @@ void bootstrap(X* x) {
 
 	code(x, "ABORT", primitive(x, &_abort));
 	code(x, "ABORT\"", primitive(x, &_abort_quote));
-	code(x, "C\"", primitive(x, &_c_quote));
+	/* Not needed: code(x, "C\"", primitive(x, &_c_quote)); */
 	code(x, "CASE", primitive(x, &_case));
 	code(x, "OF", primitive(x, &_of));
 	code(x, "ENDOF", primitive(x, &_endof));
@@ -2219,6 +2229,7 @@ void _s_quote(X* x) {
 	if (get(x, IPOS) < get(x, ILEN))
 		set(x, IPOS, get(x, IPOS) + 1);
 }
+void _c_quote(X* x) { /* TODO */ }
 
 /* Forming indefinite loops (compiling-mode only) */
 
