@@ -282,6 +282,8 @@ DROP DROP
 ?: HERE, ( x -- ) HERE 2 CELLS + POSTPONE LITERAL ;
 \ Not ANS
 ?: 0! ( a-addr -- ) 0 SWAP ! ;
+\ Not ANS
+?: 1! ( a-addr -- ) 1 SWAP ! ;
 ?: +! ( n | u a-addr -- ) SWAP OVER @ + SWAP ! ;
 \ Not ANS
 ?: 1+! ( a-addr -- ) DUP @ 1 + SWAP ! ;
@@ -544,4 +546,35 @@ DROP DROP
     REPEAT DROP
 ; IMMEDIATE
 
+\ -- Forming definite loops -----------------------------
+
+?: IX ( -- addr ) 11 CELLS TO-ABS ;
+?: JX ( -- addr ) 12 CELLS TO-ABS ;
+?: KX ( -- addr ) 13 CELLS TO-ABS ;
+?: LX ( -- addr ) 14 CELLS TO-ABS ;
+
+?: DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
+?\		1 POSTPONE LITERAL POSTPONE [:
+?\ ; IMMEDIATE
+
+?: ?DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
+?\		0 POSTPONE LITERAL POSTPONE [:
+?\ ; IMMEDIATE
+
+?: I ( -- n ) IX @ ;
+?: J ( -- n ) JX @ ;
+\ Not ANS Forth
+?: K ( -- n ) KX @ ;
+
+?: LEAVE ( -- ) ( R: loop-sys -- )
+?\		POSTPONE LX POSTPONE 1! POSTPONE EXIT
+?\ ; IMMEDIATE
+
+?: LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
+?\		1 POSTPONE LITERAL POSTPONE ;] POSTPONE (DOLOOP)
+?\ ; IMMEDIATE
+
+?: +LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
+?\		POSTPONE ;] POSTPONE (DOLOOP)
+?\ ; IMMEDIATE
 

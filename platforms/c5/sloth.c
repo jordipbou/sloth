@@ -82,6 +82,15 @@ typedef struct VM {
 	P *p;
 } X;
 
+
+void _do(X*);
+void _question_do(X*);
+void _i(X*);
+void _j(X*);
+void _loop(X*);
+void _plus_loop(X*);
+
+
 void init(X* x, CELL d, CELL sz) { 
 	x->sp = 0; 
 	x->rp = 0; 
@@ -362,7 +371,6 @@ void ipop(X* x) {
 	set(x, KX, rpop(x));
 }
 
-void _leave(X* x) { set(x, LX, 1); p_exit(x); }
 void _unloop(X* x) { 
 	set(x, LX, get(x, LX) - 1);
 	if (get(x, LX) == -1) {
@@ -1245,24 +1253,6 @@ void _bracket_char(X* x) {
 void _false(X* x) { push(x, 0); }
 void _true(X* x) { push(x, -1); }
 
-/* Forming definite loops */
-
-void _do(X* x) { literal(x, 1); _start_quotation(x); }
-void _question_do(X* x) { literal(x, 0); _start_quotation(x); }
-void _i(X* x) { push(x, get(x, IX)); }
-void _j(X* x) { push(x, get(x, JX)); }
-/* Already defined: void _leave(X* x); */
-/* Already defined: void _unloop(X* x); */
-void _loop(X* x) { 
-	literal(x, 1); 
-	_end_quotation(x); 
-	compile(x, get_xt(x, find_word(x, "(DOLOOP)"))); 
-}
-void _plus_loop(X* x) { 
-	_end_quotation(x); 
-	compile(x, get_xt(x, find_word(x, "(DOLOOP)"))); 
-}
-
 /* More facilities for defining routines (compiling-mode only) */
 
 void _here(X* x); /* Predefined for if */
@@ -1796,14 +1786,14 @@ void bootstrap(X* x) {
 
 	/* Forming definite loops */
 
-	code(x, "DO", primitive(x, &_do)); _immediate(x);
-	code(x, "?DO", primitive(x, &_question_do)); _immediate(x);
-	code(x, "I", primitive(x, &_i));
-	code(x, "J", primitive(x, &_j));
-	code(x, "LEAVE", primitive(x, &_leave));
+	/* Not needed: code(x, "DO", primitive(x, &_do)); _immediate(x); */
+	/* Not needed: code(x, "?DO", primitive(x, &_question_do)); _immediate(x); */
+	/* Not needed: code(x, "I", primitive(x, &_i)); */
+	/* Not needed: code(x, "J", primitive(x, &_j)); */
+	/* Not needed: code(x, "LEAVE", primitive(x, &_leave)); */
 	code(x, "UNLOOP", primitive(x, &_unloop));
-	code(x, "LOOP", primitive(x, &_loop)); _immediate(x);
-	code(x, "+LOOP", primitive(x, &_plus_loop)); _immediate(x);
+	/* Not needed: code(x, "LOOP", primitive(x, &_loop)); _immediate(x); */
+	/* Not needed: code(x, "+LOOP", primitive(x, &_plus_loop)); _immediate(x); */
 
 	/* Forming indefinite loops (compiling-mode only) */
 
@@ -2346,5 +2336,23 @@ void _dump(X* x) { /* TODO */ }
 /* Commands that change compilation & interpretation settings */
 
 void _marker(X* x) { /* TODO */ }
+
+/* Forming definite loops */
+
+void _do(X* x) { literal(x, 1); _start_quotation(x); }
+void _question_do(X* x) { literal(x, 0); _start_quotation(x); }
+void _i(X* x) { push(x, get(x, IX)); }
+void _j(X* x) { push(x, get(x, JX)); }
+void _leave(X* x) { set(x, LX, 1); p_exit(x); }
+/* Already defined: void _unloop(X* x); */
+void _loop(X* x) { 
+	literal(x, 1); 
+	_end_quotation(x); 
+	compile(x, get_xt(x, find_word(x, "(DOLOOP)"))); 
+}
+void _plus_loop(X* x) { 
+	_end_quotation(x); 
+	compile(x, get_xt(x, find_word(x, "(DOLOOP)"))); 
+}
 
 
