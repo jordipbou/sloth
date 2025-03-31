@@ -62,6 +62,22 @@ DROP DROP
 
 ?: ( 41 WORD DROP ; IMMEDIATE
 
+\ -- Variables shared with the host -----------------------
+
+?: (BASE) ( -- addr ) 1 CELLS TO-ABS ;
+?: (LATEST) ( -- addr ) 2 CELLS TO-ABS ;
+?: (STATE) ( -- addr ) 3 CELLS TO-ABS ;
+?: (IBUF) ( -- addr ) 4 CELLS TO-ABS ;
+?: (IPOS) ( -- addr ) 5 CELLS TO-ABS ;
+?: (ILEN) ( -- addr ) 6 CELLS TO-ABS ;
+?: (SOURCE-ID) ( -- addr ) 7 CELLS TO-ABS ;
+?: (HLD) ( -- addr ) 8 CELLS TO-ABS ;
+?: (LATESTXT) ( -- addr ) 9 CELLS TO-ABS ;
+?: (IX) ( -- addr ) 10 CELLS TO-ABS ;
+?: (JX) ( -- addr ) 11 CELLS TO-ABS ;
+?: (KX) ( -- addr ) 12 CELLS TO-ABS ;
+?: (LX) ( -- addr ) 13 CELLS TO-ABS ;
+
 \ -- Compilation ------------------------------------------
 
 ?: , ( x -- ) HERE ! 1 CELLS ALLOT ;
@@ -552,10 +568,10 @@ DROP DROP
 
 \ -- Forming definite loops -----------------------------
 
-?: IX ( -- addr ) 11 CELLS TO-ABS ;
-?: JX ( -- addr ) 12 CELLS TO-ABS ;
-?: KX ( -- addr ) 13 CELLS TO-ABS ;
-?: LX ( -- addr ) 14 CELLS TO-ABS ;
+\ ?: IX ( -- addr ) 11 CELLS TO-ABS ;
+\ ?: JX ( -- addr ) 12 CELLS TO-ABS ;
+\ ?: KX ( -- addr ) 13 CELLS TO-ABS ;
+\ ?: LX ( -- addr ) 14 CELLS TO-ABS ;
 
 ?: DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
 ?\		1 POSTPONE LITERAL POSTPONE [:
@@ -565,13 +581,13 @@ DROP DROP
 ?\		0 POSTPONE LITERAL POSTPONE [:
 ?\ ; IMMEDIATE
 
-?: I ( -- n ) IX @ ;
-?: J ( -- n ) JX @ ;
+?: I ( -- n ) (IX) @ ;
+?: J ( -- n ) (JX) @ ;
 \ Not ANS Forth
-?: K ( -- n ) KX @ ;
+?: K ( -- n ) (KX) @ ;
 
 ?: LEAVE ( -- ) ( R: loop-sys -- )
-?\		POSTPONE LX POSTPONE 1! POSTPONE EXIT
+?\		POSTPONE (LX) POSTPONE 1! POSTPONE EXIT
 ?\ ; IMMEDIATE
 
 ?: LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )

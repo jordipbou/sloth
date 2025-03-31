@@ -217,13 +217,13 @@ void throw(X* x, CELL e) {
 #define IPOS					5*sCELL
 #define ILEN					6*sCELL
 #define SOURCE_ID			7*sCELL
-#define DOES					8*sCELL
-#define HLD						9*sCELL
-#define LATESTXT			10*sCELL
-#define IX						11*sCELL
-#define JX						12*sCELL
-#define KX						13*sCELL
-#define LX						14*sCELL
+/* #define DOES					8*sCELL */
+#define HLD						8*sCELL
+#define LATESTXT			9*sCELL
+#define IX						10*sCELL
+#define JX						11*sCELL
+#define KX						12*sCELL
+#define LX						13*sCELL
 
 /* Word statuses */
 
@@ -1490,7 +1490,7 @@ void bootstrap(X* x) {
 	comma(x, 0); /* IPOS */
 	comma(x, 0); /* ILEN */
 	comma(x, 0); /* SOURCE_ID */
-	comma(x, 0); /* DOES */
+	/* Not needed: comma(x, 0); // DOES */
 	comma(x, 0); /* HLD */
 	comma(x, 0); /* LATESTXT */
 	comma(x, 0); /* IX */
