@@ -498,6 +498,7 @@ DROP DROP
 ?\ ;
 ?: #S ( d1 -- d2 ) BEGIN # OVER OVER OR 0= UNTIL ;
 ?: #> ( d -- c-addr len ) DROP DROP HLD @ HOLD> OVER - ;
+
    
 ?: SIGN	( n -- ) 0 < IF 45 HOLD THEN ;
    
@@ -581,6 +582,17 @@ DROP DROP
 ?\		POSTPONE ;] POSTPONE (DOLOOP)
 ?\ ; IMMEDIATE
 
+\ -- Stack visualization ----------------------------------
+
+?: .S ( -- ) 
+?\		'<' EMIT DEPTH 0 0 D.R '>' EMIT SPACE
+?\		DEPTH 0 > IF
+?\			1 DEPTH 1- DO
+?\				I 1- PICK .
+?\			-1 +LOOP
+?\		THEN
+?\ ;
+
 \ -- Parsing ----------------------------------------------
 
 ?: /SOURCE ( -- c-addr n )
@@ -627,12 +639,6 @@ DROP DROP
 ?\		ALIGN
 ?\ ; IMMEDIATE
 
-?: S" ( "ccc<quote>" -- ) ( -- c-addr u )
-?\		34 PARSE STATE @ IF 
-?\			POSTPONE SLITERAL 
-?\		THEN 
-?\ ; IMMEDIATE 
-
 ?: CLITERAL ( c-addr1 u -- ) ( -- c-addr2 )
 ?\		POSTPONE (CSTRING) DUP C,
 ?\		HERE OVER CHARS ALLOT
@@ -640,8 +646,16 @@ DROP DROP
 ?\		ALIGN
 ?\ ; IMMEDIATE
 
+\ The following definitions will have an end-of-line
+\ comment with a quote to not break syntax highlighting.
+
+?: S" ( "ccc<quote>" -- ) ( -- c-addr u )	\ "
+?\		34 PARSE STATE @ IF 
+?\			POSTPONE SLITERAL 
+?\		THEN 
+?\ ; IMMEDIATE 
+
 \ TODO: C" only works when compiling
-?: C" ( "ccc<quote>" -- ) ( -- c-addr )
+?: C" ( "ccc<quote>" -- ) ( -- c-addr )		\ "
 ?\		34 PARSE POSTPONE CLITERAL
 ?\ ; IMMEDIATE
-

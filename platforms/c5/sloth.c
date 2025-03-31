@@ -636,22 +636,13 @@ void _time_and_date(X* x) {
 	push(x, tm->tm_min);
 	push(x, tm->tm_hour);
 	push(x, tm->tm_mday);
-	push(x, tm->tm_mon);
-	push(x, tm->tm_year);
+	push(x, tm->tm_mon + 1);
+	push(x, tm->tm_year + 1900);
 }
 
 /* Commands to inspect memory, debug & view code */
 
 void _depth(X* x) { push(x, x->sp); }
-/* BLOCK EXT */ void _list(X* x) { /* Not implemented */ }
-void _question(X* x) { printf("%ld ", fetch(x, pop(x))); }
-void _dot_s(X* x) { 
-	CELL i;
-	printf("<%ld> ", x->sp);
-	for (i = 0; i < x->sp; i++) {
-		printf("%ld ", x->s[i]);
-	}
-}
 void _see(X* x) { 
 	CELL tok, tlen, i, xt, op = 0;
 	CELL q = 0;
@@ -747,7 +738,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			printf(">>>> %s", linebuf);
+			/* printf(">>>> %s", linebuf); */
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
@@ -1529,18 +1520,18 @@ void bootstrap(X* x) {
 	/* Commands that can help you start or end work sessions */
 
 	code(x, "ENVIRONMENT?", primitive(x, &_environment_q));
-	code(x, "UNUSED", primitive(x, &_unused));
+	/* NEEDED */ code(x, "UNUSED", primitive(x, &_unused));
 	code(x, "WORDS", primitive(x, &_words));
-	code(x, "BYE", primitive(x, &_bye));
-	code(x, "TIME&DATE", primitive(x, &_time_and_date));
+	/* NEEDED */ code(x, "BYE", primitive(x, &_bye));
+	/* NEEDED */ code(x, "TIME&DATE", primitive(x, &_time_and_date));
 
 	/* Commands to inspect memory, debug & view code */
 
-	code(x, "DEPTH", primitive(x, &_depth));
-	code(x, "LIST", primitive(x, &_list));
+	/* NEEDED */ code(x, "DEPTH", primitive(x, &_depth));
+	/* BLOCK: Not needed code(x, "LIST", primitive(x, &_list)); */
 	/* Not needed: code(x, "DUMP", primitive(x, &_dump)); */
-	code(x, "?", primitive(x, &_question));
-	code(x, ".S", primitive(x, &_dot_s));
+	/* Not needed: code(x, "?", primitive(x, &_question)); */
+	/* Not needed: code(x, ".S", primitive(x, &_dot_s)); */
 	code(x, "SEE", primitive(x, &_see));
 
 	/* Commands that change compilation & interpretation settings */
@@ -1919,7 +1910,7 @@ void repl(X* x) {
 			push(x, (CELL)buf);
 			push(x, strlen(buf));
 			_evaluate(x);
-			printf("Data stack: ");	_dot_s(x); printf("\n");
+			/* printf("Data stack: ");	_dot_s(x); printf("\n"); */
 		} else {
 			/* TODO: Error */
 		}
@@ -2341,7 +2332,16 @@ void _type(X* x) {
 
 /* Commands to inspect memory, debug & view code */
 
+void _dot_s(X* x) { 
+	CELL i;
+	printf("<%ld> ", x->sp);
+	for (i = 0; i < x->sp; i++) {
+		printf("%ld ", x->s[i]);
+	}
+}
 void _dump(X* x) { /* TODO */ }
+/* BLOCK EXT */ void _list(X* x) { /* Not implemented */ }
+void _question(X* x) { printf("%ld ", fetch(x, pop(x))); }
 
 /* Commands that change compilation & interpretation settings */
 
@@ -2364,5 +2364,4 @@ void _plus_loop(X* x) {
 	_end_quotation(x); 
 	compile(x, get_xt(x, find_word(x, "(DOLOOP)"))); 
 }
-
 
