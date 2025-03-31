@@ -78,6 +78,11 @@ DROP DROP
 ?: (KX) ( -- addr ) 12 CELLS TO-ABS ;
 ?: (LX) ( -- addr ) 13 CELLS TO-ABS ;
 
+\ -- Adjusting BASE ---------------------------------------
+
+?: DECIMAL ( -- ) 10 BASE ! ;
+?: HEX ( -- ) 16 BASE ! ;
+
 \ -- Compilation ------------------------------------------
 
 ?: , ( x -- ) HERE ! 1 CELLS ALLOT ;
@@ -155,6 +160,13 @@ DROP DROP
 ?\		ELSE 1 >IN !
 ?\		THEN
 ?\	;
+
+\ -- Controlling state ------------------------------------
+
+?VARIABLE (PREV-STATE)
+
+?: [ ( -- ) STATE @ (PREV-STATE) ! 0 STATE ! ; IMMEDIATE
+?: ] ( -- ) (PREV-STATE) @ STATE ! ; IMMEDIATE
 
 \ ---------------------------------------------------------
 
@@ -675,3 +687,13 @@ DROP DROP
 ?: C" ( "ccc<quote>" -- ) ( -- c-addr )		\ "
 ?\		34 PARSE POSTPONE CLITERAL
 ?\ ; IMMEDIATE
+
+?: ." ( "ccc<quote>" -- ) ( -- ) \ "
+?\		34 PARSE STATE @ IF 
+?\			POSTPONE SLITERAL POSTPONE TYPE 
+?\		ELSE 
+?\			TYPE 
+?\		THEN 
+?\ ; IMMEDIATE 
+
+

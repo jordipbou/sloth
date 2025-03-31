@@ -932,23 +932,6 @@ void _accept(X* x) {
 }
 void _dot(X* x) { printf("%ld ", pop(x)); }
 void _dot_r(X* x) { /* TODO */ }
-/* Pre-definition */ void _type(X*);
-/* Pre-definition */ void _parse(X*);
-/* Pre-definition */ void _literal(X*);
-void _dot_quote(X* x) { 
-	CELL u, addr, i;
-	push(x, '"'); 
-	_parse(x); 
-	u = pop(x);
-	addr = pop(x);
-	compile(x, get_xt(x, find_word(x, "(STRING)")));
-	comma(x, u);
-	for (i = 0; i < u; i++) {
-		ccomma(x, cfetch(x, addr + i));
-	}
-	align(x);
-	compile(x, get_xt(x, find_word(x, "TYPE")));
-}
 void _emit(X* x) { printf("%c", (CHAR)pop(x)); }
 void _expect(X* x) { /* TODO */ }
 void _key(X* x) { push(x, getch()); }
@@ -1292,11 +1275,8 @@ void _semicolon(X* x) {
 
 }
 
-/* TODO: left_bracket and right_bracket will break quotations */
-void _left_bracket(X* x) { set(x, STATE, 0); }
 void _quit(X* x) { /* TODO */ }
 void _recurse(X* x) { compile(x, get(x, LATESTXT)); }
-void _right_bracket(X* x) { set(x, STATE, 1); }
 void _catch(X* x) { /* TODO */ }
 void _throw(X* x) { /* TODO */ }
 
@@ -1609,7 +1589,7 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "CR", primitive(x, &_cr)); */
 	code(x, ".", primitive(x, &_dot));
 	code(x, ".R", primitive(x, &_dot_r));
-	code(x, ".\"", primitive(x, &_dot_quote)); _immediate(x);
+	/* Not needed: code(x, ".\"", primitive(x, &_dot_quote)); _immediate(x); */
 	code(x, "EMIT", primitive(x, &_emit));
 	code(x, "EXPECT", primitive(x, &_expect));
 	code(x, "KEY", primitive(x, &_key));
@@ -1780,10 +1760,10 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "IF", primitive(x, &_if)); _immediate(x); */
 	/* Not needed: code(x, "ELSE", primitive(x, &_else)); _immediate(x); */
 	/* Not needed: code(x, "THEN", primitive(x, &_then)); _immediate(x); */
-	code(x, "[", primitive(x, &_left_bracket)); _immediate(x);
+	/* Not needed: code(x, "[", primitive(x, &_left_bracket)); _immediate(x); */
 	code(x, "QUIT", primitive(x, &_quit));
 	code(x, "RECURSE", primitive(x, &_recurse)); _immediate(x);
-	code(x, "]", primitive(x, &_right_bracket)); _immediate(x);
+	/* Not needed: code(x, "]", primitive(x, &_right_bracket)); _immediate(x); */
 	/* Not needed: code(x, "S\"", primitive(x, &_s_quote)); _immediate(x); */
 
 	code(x, "CATCH", primitive(x, &_catch));
@@ -2221,6 +2201,8 @@ void _s_quote(X* x) {
 		set(x, IPOS, get(x, IPOS) + 1);
 }
 void _c_quote(X* x) { /* TODO */ }
+void _left_bracket(X* x) { set(x, STATE, 0); }
+void _right_bracket(X* x) { set(x, STATE, 1); }
 
 /* Forming indefinite loops (compiling-mode only) */
 
@@ -2364,5 +2346,22 @@ void _loop(X* x) {
 void _plus_loop(X* x) { 
 	_end_quotation(x); 
 	compile(x, get_xt(x, find_word(x, "(DOLOOP)"))); 
+}
+
+/* More input/output operations */
+
+void _dot_quote(X* x) { 
+	CELL u, addr, i;
+	push(x, '"'); 
+	_parse(x); 
+	u = pop(x);
+	addr = pop(x);
+	compile(x, get_xt(x, find_word(x, "(STRING)")));
+	comma(x, u);
+	for (i = 0; i < u; i++) {
+		ccomma(x, cfetch(x, addr + i));
+	}
+	align(x);
+	compile(x, get_xt(x, find_word(x, "TYPE")));
 }
 
