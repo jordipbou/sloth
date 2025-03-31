@@ -178,7 +178,7 @@ void catch(X* x, CELL q) {
 	int tip = x->ip;
 	int e;
 
-	if (!(e = setjmp(x->jmpbuf[x->jmpbuf_idx++]))) {
+	if (!(e = setjmp(x->jmpbuf[++x->jmpbuf_idx]))) {
 		eval(x, q);
 		push(x, 0);
 	} else {
@@ -1198,8 +1198,8 @@ void _semicolon(X* x) {
 
 void _quit(X* x) { /* TODO */ }
 void _recurse(X* x) { compile(x, get(x, LATESTXT)); }
-void _catch(X* x) { /* TODO */ }
-void _throw(X* x) { /* TODO */ }
+void _catch(X* x) { catch(x, pop(x)); }
+void _throw(X* x) { CELL e = pop(x); if (e != 0) throw(x, e); }
 
 void _code(X* x) { /* TODO */ }
 void _semicolon_code(X* x) { /* TODO */ }
@@ -1790,6 +1790,7 @@ void bootstrap(X* x) {
 
 	code(x, "TO-ABS", primitive(x, &_to_abs));
 	code(x, "TO-REL", primitive(x, &_to_rel));
+	code(x, "INTERPRET", primitive(x, &_interpret));
 }
 
 /* Helpers to work with files from C */
