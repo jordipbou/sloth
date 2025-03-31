@@ -789,86 +789,6 @@ void _move(X* x) {
 		}
 	}
 }
-/* Pre-definition */ void _to_r(X*);
-/* Pre-definition */ void _r_from(X*);
-/* Pre-definition */ void _r_fetch(X*);
-/* Pre-definition */ void _rot(X*);
-/* Pre-definition */ void _one_plus(X*);
-/* Pre-definition */ void _one_minus(X*);
-/* Pre-definition */ void _d_plus(X*);
-/* Pre-definition */ void _u_m_star(X*);
-/* Pre-definition */ void _c_fetch(X*);
-/* Pre-definition */ void _fetch(X*);
-/* Pre-definition */ void _zero_greater_than(X*);
-/* Pre-definition */ void _swap(X*);
-/* Pre-definition */ void _drop(X*);
-/* Pre-definition */ void _dup(X*);
-/* Pre-definition */ void _plus(X*);
-/* Pre-definition */ void _minus(X*);
-/* Pre-definition */ void _nip(X*);
-/* Pre-definition */ void _greater_than(X*);
-/* Pre-definition */ void _less_than(X*);
-/* Pre-definition */ void _zero_less_than(X*);
-/* Pre-definition */ void _false(X*);
-/* Pre-definition */ void _true(X*);
-/* Pre-definition */ void _zero_equals(X*);
-/* Helper function for _to_number */
-void _digit(X* x) {
-	_to_r(x);
-	_dup(x); push(x, 'a'); _less_than(x); _zero_equals(x); /* NOT */
-	if (pop(x)) {
-		push(x, 'a'); _minus(x); push(x, 'A'); _plus(x);
-	}
-	_dup(x); _dup(x); push(x, 'A'); _one_minus(x); _greater_than(x);
-	if (pop(x)) {
-		push(x, 'A'); _minus(x); push(x, '9'); _plus(x); _one_plus(x);
-	} else {
-		_dup(x); push(x, '9'); _greater_than(x);
-		if (pop(x)) {
-			_drop(x); push(x, 0);
-		}
-	}
-	push(x, '0'); _minus(x);
-	_dup(x); _r_from(x); _less_than(x);
-	if (pop(x)) {
-		_dup(x); _one_plus(x); _zero_greater_than(x);
-		if (pop(x)) {
-			_nip(x); _true(x);
-		} else {
-			_drop(x); _false(x);
-		}
-	} else {
-		_drop(x); _false(x);
-	}
-}
-/* Code adapted from pForth Forth code */
-void _to_number(X* x) {
-	_to_r(x);
-	do { /* BEGIN */
-		_r_fetch(x); _zero_greater_than(x);
-		if (pop(x)) {
-			_dup(x); _c_fetch(x); _base(x); _fetch(x);
-			_digit(x);
-			if (pop(x)) {
-				_true(x);
-			} else {
-				_drop(x); _false(x);
-			}
-		} else {
-			_false(x);
-		}
-		if (pop(x) == 0) break; /* WHILE */
-		_swap(x); _to_r(x);
-		_swap(x); _base(x); _fetch(x);
-		_u_m_star(x); _drop(x);
-		_rot(x); _base(x); _fetch(x);
-		_u_m_star(x);
-		_d_plus(x);
-		_r_from(x); _one_plus(x);
-		_r_from(x); _one_minus(x); _to_r(x);
-	} while(1);
-	_r_from(x);
-}
 void _blank(X* x) { /* TODO */ }
 void _cmove(X* x) {
 }
@@ -913,6 +833,7 @@ void _write_line(X* x) { /* TODO */ }
 
 /* More input/output operations */
 
+/* Pre-defined */ void _dup(X*);
 /* Pre-defined */ void _key(X*);
 /* Pre-defined */ void _emit(X*);
 /* TODO: It would be interesting to manage at least backspace */
@@ -1567,7 +1488,7 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "FILL", primitive(x, &_fill)); */
 	/* Not needed: code(x, "HOLD", primitive(x, &_hold)); */
 	code(x, "MOVE", primitive(x, &_move));
-	code(x, ">NUMBER", primitive(x, &_to_number));
+	/* Not needed: code(x, ">NUMBER", primitive(x, &_to_number)); */
 	/* Not needed: code(x, "<#", primitive(x, &_less_number_sign)); */
 	/* Not needed: code(x, "#>", primitive(x, &_number_sign_greater)); */
 	/* Not needed: code(x, "#", primitive(x, &_number_sign)); */
@@ -2287,6 +2208,63 @@ void _sign(X* x) {
 	if (pop(x) < 0) {
 		push(x, '-'); _hold(x);
 	} 
+}
+/* Helper function for _to_number */
+void _digit(X* x) {
+	_to_r(x);
+	_dup(x); push(x, 'a'); _less_than(x); _zero_equals(x); /* NOT */
+	if (pop(x)) {
+		push(x, 'a'); _minus(x); push(x, 'A'); _plus(x);
+	}
+	_dup(x); _dup(x); push(x, 'A'); _one_minus(x); _greater_than(x);
+	if (pop(x)) {
+		push(x, 'A'); _minus(x); push(x, '9'); _plus(x); _one_plus(x);
+	} else {
+		_dup(x); push(x, '9'); _greater_than(x);
+		if (pop(x)) {
+			_drop(x); push(x, 0);
+		}
+	}
+	push(x, '0'); _minus(x);
+	_dup(x); _r_from(x); _less_than(x);
+	if (pop(x)) {
+		_dup(x); _one_plus(x); _zero_greater_than(x);
+		if (pop(x)) {
+			_nip(x); _true(x);
+		} else {
+			_drop(x); _false(x);
+		}
+	} else {
+		_drop(x); _false(x);
+	}
+}
+/* Code adapted from pForth Forth code */
+void _to_number(X* x) {
+	_to_r(x);
+	do { /* BEGIN */
+		_r_fetch(x); _zero_greater_than(x);
+		if (pop(x)) {
+			_dup(x); _c_fetch(x); _base(x); _fetch(x);
+			_digit(x);
+			if (pop(x)) {
+				_true(x);
+			} else {
+				_drop(x); _false(x);
+			}
+		} else {
+			_false(x);
+		}
+		if (pop(x) == 0) break; /* WHILE */
+		_swap(x); _to_r(x);
+		_swap(x); _base(x); _fetch(x);
+		_u_m_star(x); _drop(x);
+		_rot(x); _base(x); _fetch(x);
+		_u_m_star(x);
+		_d_plus(x);
+		_r_from(x); _one_plus(x);
+		_r_from(x); _one_minus(x); _to_r(x);
+	} while(1);
+	_r_from(x);
 }
 
 /* System constants & facilities for generating ASCII values */

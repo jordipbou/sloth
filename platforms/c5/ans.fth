@@ -696,4 +696,66 @@ DROP DROP
 ?\		THEN 
 ?\ ; IMMEDIATE 
 
+\ -- Number conversion ------------------------------------
+
+\ TODO: This number conversion seems to be pretty basic.
+
+\ DIGIT Taken from pFORTH
+\ Convert a single character to a number in the given base.
+?: DIGIT   ( char base -- n true | char false )
+?\		>R
+\ convert lower to upper
+?\		DUP [CHAR] A < NOT
+?\		IF
+?\			[CHAR] A - [CHAR] A +
+?\		THEN
+?\		
+?\		DUP DUP [CHAR] A 1- >
+?\		IF [CHAR] A - [CHAR] 9 + 1+
+?\		ELSE ( CHAR CHAR )
+?\			DUP [CHAR] 9 >
+?\			IF
+?\				( BETWEEN 9 AND A IS BAD )
+?\				DROP 0 ( TRIGGER ERROR BELOW )
+?\			THEN
+?\		THEN
+?\		[CHAR] 0 -
+?\		DUP R> <
+?\		IF DUP 1+ 0>
+?\			IF NIP TRUE
+?\			ELSE DROP FALSE
+?\			THEN
+?\		ELSE DROP FALSE
+?\		THEN
+?\ ;
+
+\ >NUMBER taken from pForth
+?: >NUMBER ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 , convert till bad char , CORE )
+?\		>R
+?\		BEGIN
+?\			R@ 0>    \ ANY CHARACTERS LEFT?
+?\			IF
+?\				DUP C@ BASE @
+?\				DIGIT ( UD1 C-ADDR , N TRUE | CHAR FALSE )
+?\				IF
+?\					TRUE
+?\				ELSE
+?\					DROP FALSE
+?\				THEN
+?\			ELSE
+?\				FALSE
+?\			THEN
+?\		WHILE ( -- UD1 C-ADDR N  )
+?\			SWAP >R  ( -- UD1LO UD1HI N  )
+?\			SWAP  BASE @ ( -- UD1LO N UD1HI BASE  )
+?\			UM* DROP ( -- UD1LO N UD1HI*BASELO  )
+?\			ROT  BASE @ ( -- N UD1HI*BASELO UD1LO BASE )
+?\			UM* ( -- N UD1HI*BASELO UD1LO*BASELLO UD1LO*BASELHI )
+?\			D+  ( -- UD2 )
+?\			R> CHAR+     \ INCREMENT CHAR*
+?\			R> 1- >R  \ DECREMENT COUNT
+?\		REPEAT
+?\		R>
+?\ ;
+
 
