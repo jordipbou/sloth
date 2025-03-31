@@ -83,13 +83,14 @@ typedef struct VM {
 } X;
 
 
+/* Pre-definitions */
 void _do(X*);
 void _question_do(X*);
 void _i(X*);
 void _j(X*);
 void _loop(X*);
 void _plus_loop(X*);
-
+void _base(X*);
 
 void init(X* x, CELL d, CELL sz) { 
 	x->sp = 0; 
@@ -683,7 +684,6 @@ void _see(X* x) {
 
 /* Commands that change compilation & interpretation settings */
 
-void _base(X* x) { push(x, to_abs(x, BASE)); }
 void _decimal(X* x) { set(x, BASE, 10); }
 void _forget(X* x) { /* Obsolescent, don't implement */ }
 void _hex(X* x) { set(x, BASE, 16); }
@@ -1447,7 +1447,6 @@ void _save_input(X* x) { /* TODO */ }
 void _source(X* x) { push(x, get(x, IBUF)); push(x, get(x, ILEN)); }
 void _source_id(X* x) { /* TODO */ }
 void _span(X* x) { /* TODO */ }
-void _state(X* x) { push(x, to_abs(x, STATE)); }
 /* void _tib(X* x) */
 /* void _number_tib(X* x) */
 /* Already defined: void _word(X* x) */
@@ -1536,7 +1535,7 @@ void bootstrap(X* x) {
 
 	/* Commands that change compilation & interpretation settings */
 
-	code(x, "BASE", primitive(x, &_base));
+	/* Not needed: code(x, "BASE", primitive(x, &_base)); */
 	code(x, "DECIMAL", primitive(x, &_decimal));
 	code(x, "FORGET", primitive(x, &_forget));
 	code(x, "HEX", primitive(x, &_hex));
@@ -1865,7 +1864,7 @@ void bootstrap(X* x) {
 	code(x, "SOURCE", primitive(x, &_source));
 	code(x, "SOURCE-ID", primitive(x, &_source_id));
 	code(x, "SPAN", primitive(x, &_span));
-	code(x, "STATE", primitive(x, &_state));
+	/* Not needed: code(x, "STATE", primitive(x, &_state)); */
 	/* code(x, "TIB", primitive(x, &_tib)); */
 	/* code(x, "#TIB", primitive(x, &_number_tib)); */
 	/* Not needed: code(x, "'", primitive(x, &_tick)); */
@@ -2185,6 +2184,7 @@ void _parse(X* x) {
 	set(x, IPOS, ipos);
 }
 void _s_literal(X* x) { /* TODO */ }
+void _state(X* x) { push(x, to_abs(x, STATE)); }
 
 /* More facilities for defining routines (compiling-mode only) */
 
@@ -2346,6 +2346,7 @@ void _question(X* x) { printf("%ld ", fetch(x, pop(x))); }
 /* Commands that change compilation & interpretation settings */
 
 void _marker(X* x) { /* TODO */ }
+void _base(X* x) { push(x, to_abs(x, BASE)); }
 
 /* Forming definite loops */
 

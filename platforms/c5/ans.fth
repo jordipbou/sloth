@@ -64,9 +64,9 @@ DROP DROP
 
 \ -- Variables shared with the host -----------------------
 
-?: (BASE) ( -- addr ) 1 CELLS TO-ABS ;
+?: BASE ( -- addr ) 1 CELLS TO-ABS ;
 ?: (LATEST) ( -- addr ) 2 CELLS TO-ABS ;
-?: (STATE) ( -- addr ) 3 CELLS TO-ABS ;
+?: STATE ( -- addr ) 3 CELLS TO-ABS ;
 ?: (IBUF) ( -- addr ) 4 CELLS TO-ABS ;
 ?: (IPOS) ( -- addr ) 5 CELLS TO-ABS ;
 ?: (ILEN) ( -- addr ) 6 CELLS TO-ABS ;
