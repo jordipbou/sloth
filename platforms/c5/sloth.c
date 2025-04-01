@@ -206,6 +206,7 @@ void throw(X* x, CELL e) {
 #define SBUF1					128	/* First string buffer */
 #define SBUF2					256	/* Second string buffer */
 #define NBUF					384	/* Pictured numeric output buffer */
+#define PAD						416 /* PAD */
 
 /* Relative addresses of variables accessed both from C */
 /* and Forth. */
@@ -1197,7 +1198,6 @@ void _semicolon(X* x) {
 
 }
 
-void _quit(X* x) { /* TODO */ }
 void _recurse(X* x) { compile(x, get(x, LATESTXT)); }
 void _catch(X* x) { catch(x, pop(x)); }
 void _throw(X* x) { CELL e = pop(x); if (e != 0) throw(x, e); }
@@ -1296,7 +1296,6 @@ void _execute(X* x) { eval(x, pop(x)); }
 void _here(X* x) { push(x, to_abs(x, here(x))); }
 void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
 void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
-void _pad(X* x) { /* TODO */ }
 void _postpone(X* x) { 
 	CELL i, xt, tok, tlen;
 	push(x, 32); _word(x);
@@ -1683,7 +1682,7 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "ELSE", primitive(x, &_else)); _immediate(x); */
 	/* Not needed: code(x, "THEN", primitive(x, &_then)); _immediate(x); */
 	/* Not needed: code(x, "[", primitive(x, &_left_bracket)); _immediate(x); */
-	code(x, "QUIT", primitive(x, &_quit));
+	/* Not needed: code(x, "QUIT", primitive(x, &_quit)); */
 	code(x, "RECURSE", primitive(x, &_recurse)); _immediate(x);
 	/* Not needed: code(x, "]", primitive(x, &_right_bracket)); _immediate(x); */
 	/* Not needed: code(x, "S\"", primitive(x, &_s_quote)); _immediate(x); */
@@ -1756,7 +1755,7 @@ void bootstrap(X* x) {
 	code(x, ">IN", primitive(x, &_to_in));
 	/* Not needed: code(x, "[']", primitive(x, &_bracket_tick)); _immediate(x); */
 	/* Not needed: code(x, "LITERAL", primitive(x, &_literal)); _immediate(x); */
-	code(x, "PAD", primitive(x, &_pad));
+	/* Not needed: code(x, "PAD", primitive(x, &_pad)); */
 	/* Not needed: code(x, "PARSE", primitive(x, &_parse)); */
 	code(x, "POSTPONE", primitive(x, &_postpone)); _immediate(x);
 	/* code(x, "QUERY", primitive(x, &_query)); */
@@ -2082,6 +2081,7 @@ void _parse(X* x) {
 void _s_literal(X* x) { /* TODO */ }
 void _state(X* x) { push(x, to_abs(x, STATE)); }
 void _source_id(X* x) { /* TODO */ }
+void _pad(X* x) { _here(x); push(x, PAD); _plus(x); }
 
 /* More facilities for defining routines (compiling-mode only) */
 
@@ -2120,6 +2120,7 @@ void _s_quote(X* x) {
 void _c_quote(X* x) { /* TODO */ }
 void _left_bracket(X* x) { set(x, STATE, 0); }
 void _right_bracket(X* x) { set(x, STATE, 1); }
+void _quit(X* x) { /* TODO */ }
 
 /* Forming indefinite loops (compiling-mode only) */
 

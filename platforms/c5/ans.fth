@@ -163,6 +163,23 @@ DROP DROP
 ?\		THEN
 ?\	;
 
+\ -- Some constants ---------------------------------------
+
+64
+?CONSTANT (CBUF-DISPLACEMENT)	\ Counted string buffer
+
+128
+?CONSTANT (SBUF1-DISPLACEMENT)	\ String buffer 1
+
+256
+?CONSTANT (SBUF2-DISPLACEMENT)	\ String buffer 2
+
+384
+?CONSTANT (NBUF-DISPLACEMENT)	\ Numeric output buffer
+
+416
+?CONSTANT (PAD-DISPLACEMENT)	\ PAD
+
 \ -- Controlling state ------------------------------------
 
 ?VARIABLE (PREV-STATE)
@@ -378,6 +395,8 @@ DROP DROP
 ?\	; IMMEDIATE
 
 \ -- Strings ----------------------------------------------
+
+?: PAD ( -- c-addr ) HERE (PAD-DISPLACEMENT) + ;
 
 \ Adapted from Minimal Forth to use CHARS instead of memory
 \ units.
@@ -762,24 +781,20 @@ DROP DROP
 
 \ -- QUIT -------------------------------------------------
 
-\ TODO This can not work because repl (in C) calls evaluate
-\ and evaluate sets SOURCE-ID to -1 so REFILL returns 0 and
-\ the loop just ends, calling BYE.
-
-: QUIT
-   ( empty the return stack and set the input source to the user input device )
-   0 (SOURCE-ID) !
-   POSTPONE [
-   BEGIN
-     REFILL
-   WHILE
-     ['] INTERPRET CATCH
-     CASE
-     0 OF STATE @ 0= IF ." OK" THEN CR ENDOF
-     POSTPONE [
-     -1 OF ( Aborted )  ENDOF
-     -2 OF ( display message from ABORT" ) ENDOF
-     ( default ) DUP ." Exception # " .
-     ENDCASE
-   REPEAT BYE
-;
+?: QUIT
+?\		( TODO empty the return stack )
+?\		0 (SOURCE-ID) !		\ Set source to user input device
+?\		POSTPONE [
+?\		BEGIN
+?\			REFILL
+?\		WHILE
+?\			['] INTERPRET CATCH
+?\			CASE
+?\			0 OF STATE @ 0= IF ." OK" THEN CR ENDOF
+?\			POSTPONE [
+?\			-1 OF ( TODO Aborted )  ENDOF
+?\			-2 OF ( TODO display message from ABORT" ) ENDOF
+?\			( default ) DUP ." Exception # " .
+?\			ENDCASE
+?\		REPEAT BYE
+?\ ;
