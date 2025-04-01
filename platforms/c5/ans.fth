@@ -78,6 +78,8 @@ DROP DROP
 ?: (KX) ( -- addr ) 12 CELLS TO-ABS ;
 ?: (LX) ( -- addr ) 13 CELLS TO-ABS ;
 
+?: SOURCE-ID ( -- 0 | -1 | fileid ) (SOURCE-ID) @ ;
+
 \ -- Adjusting BASE ---------------------------------------
 
 ?: DECIMAL ( -- ) 10 BASE ! ;
@@ -757,3 +759,27 @@ DROP DROP
 ?\		REPEAT
 ?\		R>
 ?\ ;
+
+\ -- QUIT -------------------------------------------------
+
+\ TODO This can not work because repl (in C) calls evaluate
+\ and evaluate sets SOURCE-ID to -1 so REFILL returns 0 and
+\ the loop just ends, calling BYE.
+
+: QUIT
+   ( empty the return stack and set the input source to the user input device )
+   0 (SOURCE-ID) !
+   POSTPONE [
+   BEGIN
+     REFILL
+   WHILE
+     ['] INTERPRET CATCH
+     CASE
+     0 OF STATE @ 0= IF ." OK" THEN CR ENDOF
+     POSTPONE [
+     -1 OF ( Aborted )  ENDOF
+     -2 OF ( display message from ABORT" ) ENDOF
+     ( default ) DUP ." Exception # " .
+     ENDCASE
+   REPEAT BYE
+;

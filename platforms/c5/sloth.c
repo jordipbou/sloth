@@ -587,7 +587,8 @@ void _interpret(X* x) {
 					else literal(x, n);
 				} else {
 					/* TODO Word not found, throw an exception? */
-					printf("%.*s ?\n", tlen, tok);
+					/* printf("%.*s ?\n", tlen, tok); */
+					throw(x, -13);
 				}
 			}
 		}
@@ -1313,6 +1314,7 @@ void _postpone(X* x) {
 		compile(x, get_xt(x, find_word(x, "(COMPILE)")));
 	} else if (i == 1) {
 		/* Compile the immediate word */
+
 		compile(x, xt);
 	}
 }
@@ -1346,7 +1348,6 @@ void _refill(X* x) {
 void _restore_input(X* x) { /* TODO */ }
 void _save_input(X* x) { /* TODO */ }
 void _source(X* x) { push(x, get(x, IBUF)); push(x, get(x, ILEN)); }
-void _source_id(X* x) { /* TODO */ }
 void _span(X* x) { /* TODO */ }
 /* void _tib(X* x) */
 /* void _number_tib(X* x) */
@@ -1763,7 +1764,7 @@ void bootstrap(X* x) {
 	code(x, "RESTORE-INPUT", primitive(x, &_restore_input));
 	code(x, "SAVE-INPUT", primitive(x, &_save_input));
 	code(x, "SOURCE", primitive(x, &_source));
-	code(x, "SOURCE-ID", primitive(x, &_source_id));
+	/* Not needed: code(x, "SOURCE-ID", primitive(x, &_source_id)); */
 	code(x, "SPAN", primitive(x, &_span));
 	/* Not needed: code(x, "STATE", primitive(x, &_state)); */
 	/* code(x, "TIB", primitive(x, &_tib)); */
@@ -1805,17 +1806,10 @@ void include(X* x, char* f) {
 
 void repl(X* x) {
 	char buf[80];
-	while (1) {
-		printf("[IN] >> ");
-		if (fgets(buf, 80, stdin) != 0) {
-			push(x, (CELL)buf);
-			push(x, strlen(buf));
-			_evaluate(x);
-			/* printf("Data stack: ");	_dot_s(x); printf("\n"); */
-		} else {
-			/* TODO: Error */
-		}
-	}
+	set(x, IBUF, (CELL)buf);
+	set(x, IPOS, 0);
+	set(x, ILEN, 80);
+	eval(x, get_xt(x, find_word(x, "QUIT")));
 }
 
 /* ---------------------------------------------------- */
@@ -2087,6 +2081,7 @@ void _parse(X* x) {
 }
 void _s_literal(X* x) { /* TODO */ }
 void _state(X* x) { push(x, to_abs(x, STATE)); }
+void _source_id(X* x) { /* TODO */ }
 
 /* More facilities for defining routines (compiling-mode only) */
 
