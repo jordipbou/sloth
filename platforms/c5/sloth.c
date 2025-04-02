@@ -646,43 +646,6 @@ void _time_and_date(X* x) {
 /* Commands to inspect memory, debug & view code */
 
 void _depth(X* x) { push(x, x->sp); }
-void _see(X* x) { 
-	CELL tok, tlen, i, xt, op = 0;
-	CELL q = 0;
-	CELL EXIT, QUOTATION, LIT;
-	push(x, 32); _word(x);
-	tok = pick(x, 0) + sCHAR;
-	tlen = cfetch(x, pick(x, 0));
-	if (tlen == 0) { pop(x); return; }
-	printf("NAME: %.*s\n", (int)tlen, (char*)tok);
-	_find(x); 
-	i = pop(x);
-	printf("IMMEDIATE (1 = YES, -1 = NO): %ld\n", i);
-	xt = pop(x);
-	printf("XT: %ld\n", xt);
-	if (xt > 0) {
-		EXIT = get_xt(x, find_word(x, "EXIT"));
-		QUOTATION = get_xt(x, find_word(x, "(QUOTATION)"));
-		LIT = get_xt(x, find_word(x, "(LIT)"));
-		do {
-			op = fetch(x, to_abs(x, xt));
-			xt += sCELL;
-			printf("%ld ", op);
-			if (op == EXIT && q == 0) {
-				break;
-			} else if (op == EXIT && q > 0) {
-				q--;
-			} else if (op == QUOTATION) {
-				q++;
-			} else if (op == LIT) {
-				op = fetch(x, to_abs(x, xt));
-				xt += sCELL;
-				printf("%ld ", op);
-			} 
-		} while (1);
-		printf("\n");
-	} 
-}
 
 /* Commands that change compilation & interpretation settings */
 
@@ -1432,7 +1395,7 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "DUMP", primitive(x, &_dump)); */
 	/* Not needed: code(x, "?", primitive(x, &_question)); */
 	/* Not needed: code(x, ".S", primitive(x, &_dot_s)); */
-	code(x, "SEE", primitive(x, &_see));
+	/* Not needed: code(x, "SEE", primitive(x, &_see)); */
 
 	/* Commands that change compilation & interpretation settings */
 
@@ -2299,6 +2262,43 @@ void _dot_s(X* x) {
 void _dump(X* x) { /* TODO */ }
 /* BLOCK EXT */ void _list(X* x) { /* Not implemented */ }
 void _question(X* x) { printf("%ld ", fetch(x, pop(x))); }
+void _see(X* x) { 
+	CELL tok, tlen, i, xt, op = 0;
+	CELL q = 0;
+	CELL EXIT, QUOTATION, LIT;
+	push(x, 32); _word(x);
+	tok = pick(x, 0) + sCHAR;
+	tlen = cfetch(x, pick(x, 0));
+	if (tlen == 0) { pop(x); return; }
+	printf("NAME: %.*s\n", (int)tlen, (char*)tok);
+	_find(x); 
+	i = pop(x);
+	printf("IMMEDIATE (1 = YES, -1 = NO): %ld\n", i);
+	xt = pop(x);
+	printf("XT: %ld\n", xt);
+	if (xt > 0) {
+		EXIT = get_xt(x, find_word(x, "EXIT"));
+		QUOTATION = get_xt(x, find_word(x, "(QUOTATION)"));
+		LIT = get_xt(x, find_word(x, "(LIT)"));
+		do {
+			op = fetch(x, to_abs(x, xt));
+			xt += sCELL;
+			printf("%ld ", op);
+			if (op == EXIT && q == 0) {
+				break;
+			} else if (op == EXIT && q > 0) {
+				q--;
+			} else if (op == QUOTATION) {
+				q++;
+			} else if (op == LIT) {
+				op = fetch(x, to_abs(x, xt));
+				xt += sCELL;
+				printf("%ld ", op);
+			} 
+		} while (1);
+		printf("\n");
+	} 
+}
 
 /* Commands that change compilation & interpretation settings */
 

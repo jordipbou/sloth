@@ -432,77 +432,6 @@ DROP DROP
 ?\		R> DROP DROP
 ?\	;
 
-\ -- Dump utility -----------------------------------------
-
-\ Adapted from Minimal Forth
-
-?: .HEXDIGIT ( x -- )
-?\		15 AND DUP 10 < IF 
-?\			'0' + 
-?\		ELSE 
-?\			10 - 'A' + 
-?\		THEN EMIT 
-?\	;
-
-?: .HEX ( x -- )
-?\		DUP  4 RSHIFT .HEXDIGIT .HEXDIGIT
-?\ ;
-
-?: .ADDR ( x -- )
-\ Address 00 is not being printed correctly
-?\		DUP 0= IF 
-?\			DROP '0' EMIT '0' EMIT EXIT 
-?\		THEN
-?\		0 BEGIN ( x i ) 
-?\			OVER WHILE 
-?\			OVER 8 RSHIFT SWAP 1+ 
-?\		REPEAT SWAP DROP
-?\		BEGIN ( x i )
-?\			DUP WHILE 
-?\			SWAP .HEX 1- 
-?\		REPEAT DROP 
-?\ ;
-
-16
-?CONSTANT B/LINE
-
-\ For all systems where char is one byte this definition
-\ is enough. For the systems where char is not one byte,
-\ it should be defined in host.
-?: B@ ( addr -- byte ) C@ ;
-
-?: .H ( addr len -- )
-?\		B/LINE MIN DUP >R
-?\		BEGIN ( addr len )
-?\			DUP	WHILE ( addr len )
-?\			OVER B@ .HEX SPACE
-?\			1- SWAP 1+ SWAP
-?\		REPEAT 2DROP
-?\		B/LINE R> - 3 * SPACES
-?\ ;
-
-?: .A ( addr1 len1 -- )
-?\		B/LINE MIN
-?\		BEGIN ( addr len )
-?\			DUP WHILE
-?\			OVER B@ DUP BL < IF DROP '.' THEN EMIT
-?\			1- SWAP 1+ SWAP
-?\		REPEAT 2DROP 
-?\ ;
-
-?: DUMP-LINE ( addr len1 -- addr len2 )
-?\		OVER .ADDR ':' EMIT SPACE 2DUP .H SPACE SPACE 2DUP .A
-?\		DUP B/LINE MIN /STRING
-?\ ;
-
-?: DUMP ( addr len -- )
-?\		BEGIN
-?\			DUP WHILE ( addr len )
-?\			CR DUMP-LINE
-?\		REPEAT 2DROP 
-?\		CR
-?\ ;
-
 \ -- Definitions ------------------------------------------
 
 \ PLATFORM DEPENDENT
@@ -797,4 +726,107 @@ DROP DROP
 ?\			( default ) DUP ." Exception # " .
 ?\			ENDCASE
 ?\		REPEAT BYE
+?\ ;
+
+\ -- Commands to inspect memory, debug & view code --------
+
+\ -- Dump (inspecting memory)
+
+\ Adapted from Minimal Forth
+
+?: .HEXDIGIT ( x -- )
+?\		15 AND DUP 10 < IF 
+?\			'0' + 
+?\		ELSE 
+?\			10 - 'A' + 
+?\		THEN EMIT 
+?\	;
+
+?: .HEX ( x -- )
+?\		DUP  4 RSHIFT .HEXDIGIT .HEXDIGIT
+?\ ;
+
+?: .ADDR ( x -- )
+\ Address 00 is not being printed correctly
+?\		DUP 0= IF 
+?\			DROP '0' EMIT '0' EMIT EXIT 
+?\		THEN
+?\		0 BEGIN ( x i ) 
+?\			OVER WHILE 
+?\			OVER 8 RSHIFT SWAP 1+ 
+?\		REPEAT SWAP DROP
+?\		BEGIN ( x i )
+?\			DUP WHILE 
+?\			SWAP .HEX 1- 
+?\		REPEAT DROP 
+?\ ;
+
+16
+?CONSTANT B/LINE
+
+\ For all systems where char is one byte this definition
+\ is enough. For the systems where char is not one byte,
+\ it should be defined in host.
+?: B@ ( addr -- byte ) C@ ;
+
+?: .H ( addr len -- )
+?\		B/LINE MIN DUP >R
+?\		BEGIN ( addr len )
+?\			DUP	WHILE ( addr len )
+?\			OVER B@ .HEX SPACE
+?\			1- SWAP 1+ SWAP
+?\		REPEAT 2DROP
+?\		B/LINE R> - 3 * SPACES
+?\ ;
+
+?: .A ( addr1 len1 -- )
+?\		B/LINE MIN
+?\		BEGIN ( addr len )
+?\			DUP WHILE
+?\			OVER B@ DUP BL < IF DROP '.' THEN EMIT
+?\			1- SWAP 1+ SWAP
+?\		REPEAT 2DROP 
+?\ ;
+
+?: DUMP-LINE ( addr len1 -- addr len2 )
+?\		OVER .ADDR ':' EMIT SPACE 2DUP .H SPACE SPACE 2DUP .A
+?\		DUP B/LINE MIN /STRING
+?\ ;
+
+?: DUMP ( addr len -- )
+?\		BEGIN
+?\			DUP WHILE ( addr len )
+?\			CR DUMP-LINE
+?\		REPEAT 2DROP 
+?\		CR
+?\ ;
+
+\ -- See (inspecting words)
+
+\ TODO This should be modified to use wordlists and the
+\ search order.
+
+\ TODO Make it better to take into account literals, rips,
+\ quotations and strings.
+
+\ PLATFORM DEPENDENT
+?: SEE ( "<spaces>name" -- )
+?\		BL WORD DUP FIND
+?\		DUP IF
+?\			ROT ." NAME: " COUNT TYPE CR
+?\			0< IF ." NON " THEN ." IMMEDIATE" CR
+?\			DUP ." XT: " . CR
+?\			DUP 0> IF
+?\				TO-ABS BEGIN
+?\					DUP @ ['] EXIT <> WHILE
+?\					DUP @ . 
+?\					CELL+
+?\				REPEAT
+?\				." ;" CR
+?\			ELSE
+?\				DROP
+?\			THEN
+?\		ELSE
+?\			." WORD NOT FOUND" CR DROP DROP DROP
+?\		THEN
 ?\ ;
