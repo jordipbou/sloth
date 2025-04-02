@@ -649,9 +649,7 @@ void _depth(X* x) { push(x, x->sp); }
 
 /* Commands that change compilation & interpretation settings */
 
-void _decimal(X* x) { set(x, BASE, 10); }
 void _forget(X* x) { /* Obsolescent, don't implement */ }
-void _hex(X* x) { set(x, BASE, 16); }
 
 void _also(X* x) { /* TODO */ }
 void _definitions(X* x) { /* TODO */ }
@@ -671,14 +669,6 @@ void _editor(X* x) { /* TODO */ }
 
 /* Source code preprocessing, interpreting & auditing commands */
 
-void _dot_paren(X* x) { 
-	while (get(x, IPOS) < get(x, ILEN)
-	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != ')') {
-		set(x, IPOS, get(x, IPOS) + 1);
-	}
-	if (get(x, IPOS) != get(x, ILEN)) 
-		set(x, IPOS, get(x, IPOS) + 1);
-}
 void _include_file(X* x) { /* TODO */ }
 void _included(X* x) {
 	FILE *f;
@@ -736,8 +726,6 @@ void _resize(X* x) { /* TODO */ }
 
 /* String operations */
 
-void _convert(X* x) { /* TODO */ }
-void _count(X* x) { CELL a = pop(x); push(x, a + 1); push(x, cfetch(x, a)); }
 void _erase(X* x) { /* TODO */ }
 void _move(X* x) {
 	CELL u = pop(x);
@@ -1400,9 +1388,9 @@ void bootstrap(X* x) {
 	/* Commands that change compilation & interpretation settings */
 
 	/* Not needed: code(x, "BASE", primitive(x, &_base)); */
-	code(x, "DECIMAL", primitive(x, &_decimal));
+	/* Not needed: code(x, "DECIMAL", primitive(x, &_decimal)); */
 	code(x, "FORGET", primitive(x, &_forget));
-	code(x, "HEX", primitive(x, &_hex));
+	/* Not needed: code(x, "HEX", primitive(x, &_hex)); */
 	/* Not needed: code(x, "MARKER", primitive(x, &_marker)); */
 
 	code(x, "ALSO", primitive(x, &_also));
@@ -1423,7 +1411,7 @@ void bootstrap(X* x) {
 
 	/* Source code preprocessing, interpreting & auditing commands */
 
-	code(x, ".(", primitive(x, &_dot_paren)); _immediate(x);
+	/* Not needed: code(x, ".(", primitive(x, &_dot_paren)); _immediate(x); */
 	code(x, "INCLUDE-FILE", primitive(x, &_include_file));
 	code(x, "INCLUDED", primitive(x, &_included));
 	code(x, "LOAD", primitive(x, &_load));
@@ -1445,8 +1433,7 @@ void bootstrap(X* x) {
 
 	/* String operations */
 
-	code(x, "CONVERT", primitive(x, &_convert));
-	code(x, "COUNT", primitive(x, &_count));
+	/* Not needed: code(x, "COUNT", primitive(x, &_count)); */
 	code(x, "ERASE", primitive(x, &_erase));
 	/* Not needed: code(x, "FILL", primitive(x, &_fill)); */
 	/* Not needed: code(x, "HOLD", primitive(x, &_hold)); */
@@ -2116,6 +2103,7 @@ void _value(X* x) { /* TODO */ }
 
 /* String operations */
 
+void _count(X* x) { CELL a = pop(x); push(x, a + 1); push(x, cfetch(x, a)); }
 void _fill(X* x) { 
 	CHAR c = (CHAR)pop(x);
 	CELL u = pop(x);
@@ -2302,6 +2290,8 @@ void _see(X* x) {
 
 /* Commands that change compilation & interpretation settings */
 
+void _decimal(X* x) { set(x, BASE, 10); }
+void _hex(X* x) { set(x, BASE, 16); }
 void _marker(X* x) { /* TODO */ }
 void _base(X* x) { push(x, to_abs(x, BASE)); }
 
@@ -2340,3 +2330,13 @@ void _dot_quote(X* x) {
 	compile(x, get_xt(x, find_word(x, "TYPE")));
 }
 
+/* Source code preprocessing, interpreting & auditing commands */
+
+void _dot_paren(X* x) { 
+	while (get(x, IPOS) < get(x, ILEN)
+	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != ')') {
+		set(x, IPOS, get(x, IPOS) + 1);
+	}
+	if (get(x, IPOS) != get(x, ILEN)) 
+		set(x, IPOS, get(x, IPOS) + 1);
+}

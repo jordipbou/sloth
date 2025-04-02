@@ -404,6 +404,10 @@ DROP DROP
 ?\		SWAP OVER - >R CHARS + R>
 ?\ ;
 
+?: COUNT ( c-addr1 -- c-addr2 u )
+?\		DUP CHAR+ SWAP C@ 
+?\ ;
+
 \ -- Input/output -----------------------------------------
 
 32
@@ -645,6 +649,10 @@ DROP DROP
 ?\			TYPE 
 ?\		THEN 
 ?\ ; IMMEDIATE 
+
+?: .( ( "ccc<paren>" -- )
+?\		')' PARSE TYPE
+?\ ; IMMEDIATE
 
 \ -- Number conversion ------------------------------------
 
