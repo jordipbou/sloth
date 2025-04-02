@@ -91,6 +91,7 @@ void _j(X*);
 void _loop(X*);
 void _plus_loop(X*);
 void _base(X*);
+void _dot_s(X*);
 
 void init(X* x, CELL d, CELL sz) { 
 	x->sp = 0; 
@@ -674,6 +675,7 @@ void _included(X* x) {
 	FILE *f;
 	char filename[1024];
 	char linebuf[1024];
+	CELL INTERPRET, e;
 
 	CELL previbuf = get(x, IBUF);
 	CELL previpos = get(x, IPOS);
@@ -690,15 +692,21 @@ void _included(X* x) {
 	f = fopen(filename, "r");
 
 	if (f) {
+		INTERPRET = get_xt(x, find_word(x, "INTERPRET"));
+
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
-			/* printf(">>>> %s", linebuf); */
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
 
-			_interpret(x);
+			catch(x, INTERPRET);
+			if ((e = pop(x)) != 0) {
+				printf("Exception %ld on line:\n", e);
+				printf("%s", linebuf);
+				break;
+			}
 		}
 
 		set(x, SOURCE_ID, prevsourceid);
@@ -1303,7 +1311,6 @@ void _span(X* x) { /* TODO */ }
 /* void _number_tib(X* x) */
 /* Already defined: void _word(X* x) */
 /* Already defined: void _find(X* x) */
-void _search_wordlist(X* x) { /* TODO */ }
 
 void _two_literal(X* x) { /* TODO */ }
 
@@ -1722,7 +1729,7 @@ void bootstrap(X* x) {
 	code(x, "WORD", primitive(x, &_word));
 
 	code(x, "FIND", primitive(x, &_find));
-	code(x, "SEARCH-WORDLIST", primitive(x, &_search_wordlist));
+	/* Not needed: code(x, "SEARCH-WORDLIST", primitive(x, &_search_wordlist)); */
 
 	/* Not needed: code(x, "SLITERAL", primitive(x, &_s_literal)); */
 
@@ -2032,6 +2039,7 @@ void _s_literal(X* x) { /* TODO */ }
 void _state(X* x) { push(x, to_abs(x, STATE)); }
 void _source_id(X* x) { /* TODO */ }
 void _pad(X* x) { _here(x); push(x, PAD); _plus(x); }
+void _search_wordlist(X* x) { /* TODO */ }
 
 /* More facilities for defining routines (compiling-mode only) */
 

@@ -396,6 +396,8 @@ DROP DROP
 
 \ -- Strings ----------------------------------------------
 
+?: BOUNDS ( addr u -- u u ) CHARS OVER + SWAP ;
+
 ?: PAD ( -- c-addr ) HERE (PAD-DISPLACEMENT) + ;
 
 \ Adapted from Minimal Forth to use CHARS instead of memory
@@ -438,11 +440,26 @@ DROP DROP
 
 \ -- Definitions ------------------------------------------
 
+1
+?CONSTANT HIDDEN-FLAG
+
+2
+?CONSTANT IMMEDIATE-FLAG
+
 \ PLATFORM DEPENDENT
 ?: LATEST ( -- n ) 2 CELLS TO-ABS ;
 
 \ PLATFORM DEPENDENT
-?: NT>LINK ( nt -- nt ) TO-ABS @ ;
+?: NAME>LINK ( nt -- nt ) TO-ABS @ ;
+?: NAME>XT ( nt -- xt ) CELL+ TO-ABS @ ;
+?: NAME>STRING ( nt -- c-addr u )
+?\		2 CELLS + CHAR+ TO-ABS COUNT
+?\ ;
+
+?: NAME>FLAGS ( nt -- n ) 2 CELLs + TO-ABS C@ ;
+
+?: HIDDEN? ( nt -- flag ) NAME>FLAGS HIDDEN-FLAG AND ;
+?: IMMEDIATE? ( nt -- flag ) NAME>FLAGS IMMEDIATE-FLAG AND ;
 
 \ -- Markers ----------------------------------------------
 
@@ -727,7 +744,7 @@ DROP DROP
 ?\		WHILE
 ?\			['] INTERPRET CATCH
 ?\			CASE
-?\			0 OF STATE @ 0= IF ." OK" THEN CR ENDOF
+?\			0 OF STATE @ 0= IF ."  OK" THEN CR ENDOF
 ?\			POSTPONE [
 ?\			-1 OF ( TODO Aborted )  ENDOF
 ?\			-2 OF ( TODO display message from ABORT" ) ENDOF
@@ -838,3 +855,63 @@ DROP DROP
 ?\			." WORD NOT FOUND" CR DROP DROP DROP
 ?\		THEN
 ?\ ;
+
+\ -- Combinators ------------------------------------------
+
+\ Removes n from the data stack, executes xt and restores n
+?: DIP ( n xt -- n ) SWAP >R EXECUTE R> ;
+
+\ Applies xt1 to n1, then applies xt2 to n2
+?: BI* ( n1 n2 xt1 xt2 -- ) ['] DIP DIP EXECUTE ;
+
+\ Applies xt to n1 and then applies xt to n2
+?: BI@ ( n1 n2 xt -- ) DUP BI* ;
+
+
+\ -- Finding words ----------------------------------------
+
+?: LETTER>UPPER ( char -- char )
+?\		DUP 97 123 WITHIN IF
+?\			32 -
+?\		THEN
+?\ ;
+
+?: CASE-INSENSITIVE-= ( char char -- ) 
+?\		['] LETTER>UPPER BI@ = 
+?\ ;
+
+?: CASE-INSENSITIVE-COMPARE ( c-addr1 u1 c-addr2 u2 -- flag )
+?\		ROT OVER = IF
+?\			BOUNDS ( c-addr1 c-addr2 c-addr2+u ) DO
+?\				I C@ OVER C@ CASE-INSENSITIVE-= 0= IF
+?\					DROP FALSE UNLOOP EXIT
+?\				THEN
+?\				CHAR+
+?\			1 CHARS +LOOP
+?\			DROP TRUE
+?\		ELSE
+?\			DROP DROP DROP FALSE
+?\		THEN
+?\ ;
+
+?: WORDLIST-LATEST ( wid -- nt ) @ ;
+
+?: FIND-NAME-IN ( c-addr u wid -- nt | 0 )
+?\		WORDLIST-LATEST >R BEGIN
+?\			R@ WHILE
+?\			R@ NAME>STRING
+?\			2OVER CASE-INSENSITIVE-COMPARE IF
+?\				DROP DROP R> EXIT
+?\			THEN
+?\			R> NAME>LINK >R
+?\		REPEAT
+?\		2DROP R>
+?\ ;
+
+?: SEARCH-WORDLIST ( c-addr u wid -- 0 | xt 1 | xt -1 )
+?\		FIND-NAME-IN DUP IF
+?\			DUP NAME>XT SWAP
+?\			IMMEDIATE? IF 1 ELSE -1 THEN
+?\		THEN
+?\ ;
+
