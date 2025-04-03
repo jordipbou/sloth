@@ -751,13 +751,6 @@ void _move(X* x) {
 	}
 }
 void _blank(X* x) { /* TODO */ }
-void _cmove(X* x) {
-}
-void _cmove_up(X* x) {
-}
-void _compare(X* x) { /* TODO */ }
-void _search(X* x) { /* TODO */ }
-void _dash_trailing(X* x) { /* TODO */ }
 
 void _to_float(X* x) { /* TODO */ }
 void _represent(X* x) { /* TODO */ }
@@ -1450,14 +1443,14 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "#>", primitive(x, &_number_sign_greater)); */
 	/* Not needed: code(x, "#", primitive(x, &_number_sign)); */
 	/* Not needed: code(x, "#S", primitive(x, &_number_sign_s)); */
-	/* Not needed: code(x, "SIGN", primitive(x, &_sign));
+	/* Not needed: code(x, "SIGN", primitive(x, &_sign)); */
 	code(x, "BLANK", primitive(x, &_blank));
-	code(x, "CMOVE", primitive(x, &_cmove));
-	code(x, "CMOVE>", primitive(x, &_cmove_up));
-	code(x, "COMPARE", primitive(x, &_compare));
-	code(x, "SEARCH", primitive(x, &_search));
+	/* Not needed: code(x, "CMOVE", primitive(x, &_cmove)); */
+	/* Not needed: code(x, "CMOVE>", primitive(x, &_cmove_up)); */
+	/* Not needed: code(x, "COMPARE", primitive(x, &_compare)); */
+	/* Not needed: code(x, "SEARCH", primitive(x, &_search)); */
 	/* Not needed: code(x, "/STRING", primitive(x, &_slash_string)); */
-	code(x, "-TRAILING", primitive(x, &_dash_trailing));
+	/* Not needed: code(x, "-TRAILING", primitive(x, &_dash_trailing)); */
 	code(x, ">FLOAT", primitive(x, &_to_float));
 	code(x, "REPRESENT", primitive(x, &_represent));
 
@@ -2222,6 +2215,11 @@ void _to_number(X* x) {
 	} while(1);
 	_r_from(x);
 }
+void _cmove(X* x) { /* TODO */ }
+void _cmove_up(X* x) { /* TODO */ }
+void _dash_trailing(X* x) { /* TODO */ }
+void _search(X* x) { /* TODO */ }
+void _compare(X* x) { /* TODO */ }
 
 /* System constants & facilities for generating ASCII values */
 

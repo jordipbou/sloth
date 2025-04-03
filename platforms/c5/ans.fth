@@ -220,6 +220,8 @@ DROP DROP
 ?: 2DUP ( x1 x2 -- x1 x2 x1 x2 ) OVER OVER ;
 ?: 2SWAP ( x1 x2 x3 x4 -- x3 x4 x1 x2 ) >R -ROT R> -ROT ;
 ?: 2OVER ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 ) 3 PICK 3 PICK ;
+\ Not ANS
+?: 2NIP ( x1 x2 x3 x4 -- x3 x4 ) ROT DROP ROT DROP ;
 
 ?: 2>R ( x1 x2 -- ) ( R: -- x1 x2 ) 
 ?\		POSTPONE SWAP POSTPONE >R POSTPONE >R 
@@ -394,23 +396,39 @@ DROP DROP
 ?\		THEN
 ?\	; IMMEDIATE
 
+\ -- Forming definite loops -----------------------------
+
+\ ?: IX ( -- addr ) 11 CELLS TO-ABS ;
+\ ?: JX ( -- addr ) 12 CELLS TO-ABS ;
+\ ?: KX ( -- addr ) 13 CELLS TO-ABS ;
+\ ?: LX ( -- addr ) 14 CELLS TO-ABS ;
+
+?: DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
+?\		1 POSTPONE LITERAL POSTPONE [:
+?\ ; IMMEDIATE
+
+?: ?DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
+?\		0 POSTPONE LITERAL POSTPONE [:
+?\ ; IMMEDIATE
+
+?: I ( -- n ) (IX) @ ;
+?: J ( -- n ) (JX) @ ;
+\ Not ANS Forth
+?: K ( -- n ) (KX) @ ;
+
+?: LEAVE ( -- ) ( R: loop-sys -- )
+?\		POSTPONE (LX) POSTPONE 1! POSTPONE EXIT
+?\ ; IMMEDIATE
+
+?: LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
+?\		1 POSTPONE LITERAL POSTPONE ;] POSTPONE (DOLOOP)
+?\ ; IMMEDIATE
+
+?: +LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
+?\		POSTPONE ;] POSTPONE (DOLOOP)
+?\ ; IMMEDIATE
+
 \ -- Strings ----------------------------------------------
-
-?: BOUNDS ( addr u -- u u ) CHARS OVER + SWAP ;
-
-?: PAD ( -- c-addr ) HERE (PAD-DISPLACEMENT) + ;
-
-\ Adapted from Minimal Forth to use CHARS instead of memory
-\ units.
-?: /STRING ( c-addr1 u1 n -- c-addr2 u2 )
-?\		SWAP OVER - >R CHARS + R>
-?\ ;
-
-?: COUNT ( c-addr1 -- c-addr2 u )
-?\		DUP CHAR+ SWAP C@ 
-?\ ;
-
-\ -- Input/output -----------------------------------------
 
 32
 ?CONSTANT BL
@@ -425,6 +443,29 @@ DROP DROP
 \ if, for some reason, n is negative.
 ?: SPACES ( n -- ) BEGIN DUP 0> WHILE SPACE 1- REPEAT DROP ;
 
+?: COUNT ( c-addr1 -- c-addr2 u )
+?\		DUP CHAR+ SWAP C@ 
+?\ ;
+
+?: BOUNDS ( addr u -- u u ) CHARS OVER + SWAP ;
+
+?: PAD ( -- c-addr ) HERE (PAD-DISPLACEMENT) + ;
+
+\ Adapted from Minimal Forth to use CHARS instead of memory
+\ units.
+?: /STRING ( c-addr1 u1 n -- c-addr2 u2 )
+?\		SWAP OVER - >R CHARS + R>
+?\ ;
+
+?: -TRAILING ( c-addr u1 -- c-addr u2 )
+?\		BEGIN   
+?\		    2DUP + CHAR- C@ BL =
+?\		    OVER AND
+?\		WHILE   
+?\		    CHAR-  
+?\		REPEAT  
+?\ ;
+
 ?: TYPE ( c-addr u -- ) 
 ?\		>R BEGIN 
 ?\			R@ 0> WHILE 
@@ -437,6 +478,41 @@ DROP DROP
 ?\		REPEAT 
 ?\		R> DROP DROP
 ?\	;
+
+\ COMPARE implementation taken from SwapForth
+
+?: COMPARE-SAME? ( c-addr1 c-addr2 u -- -1|0|1 )
+?\		BOUNDS ?DO
+?\			I C@ OVER C@ - ?DUP IF
+?\				0> 2* 1+
+?\				NIP UNLOOP EXIT
+?\			THEN
+?\			1+
+?\		LOOP
+?\		DROP 0
+?\ ;
+
+?: COMPARE ( c-addr1 u1 c-addr2 u2 -- n )
+?\		ROT 2DUP SWAP - >R          \ ca1 ca2 u2 u1  r: u1-u2
+?\		MIN COMPARE-SAME? ?DUP
+?\		IF R> DROP EXIT THEN
+?\		R> DUP IF 0< 2* 1+ THEN 
+?\ ;
+
+\ Implementation taken from lbForth
+
+\ TODO Does not return u3 == u1 when does not find anything
+
+?: SEARCH ( c-addr1 u1 c-addr2 u2 -- c-addr3 u3 flag )   
+?\		2>R BEGIN 
+?\			2DUP R@ MIN 2R@ COMPARE WHILE 
+?\			DUP WHILE
+?\			1 /STRING 
+?\		REPEAT 
+?\		0 ELSE -1 
+?\		THEN 
+?\		2R> 2DROP 
+?\ ;
 
 \ -- Definitions ------------------------------------------
 
@@ -548,38 +624,6 @@ DROP DROP
         SWAP POSTPONE THEN 1-
     REPEAT DROP
 ; IMMEDIATE
-
-\ -- Forming definite loops -----------------------------
-
-\ ?: IX ( -- addr ) 11 CELLS TO-ABS ;
-\ ?: JX ( -- addr ) 12 CELLS TO-ABS ;
-\ ?: KX ( -- addr ) 13 CELLS TO-ABS ;
-\ ?: LX ( -- addr ) 14 CELLS TO-ABS ;
-
-?: DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
-?\		1 POSTPONE LITERAL POSTPONE [:
-?\ ; IMMEDIATE
-
-?: ?DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
-?\		0 POSTPONE LITERAL POSTPONE [:
-?\ ; IMMEDIATE
-
-?: I ( -- n ) (IX) @ ;
-?: J ( -- n ) (JX) @ ;
-\ Not ANS Forth
-?: K ( -- n ) (KX) @ ;
-
-?: LEAVE ( -- ) ( R: loop-sys -- )
-?\		POSTPONE (LX) POSTPONE 1! POSTPONE EXIT
-?\ ; IMMEDIATE
-
-?: LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
-?\		1 POSTPONE LITERAL POSTPONE ;] POSTPONE (DOLOOP)
-?\ ; IMMEDIATE
-
-?: +LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
-?\		POSTPONE ;] POSTPONE (DOLOOP)
-?\ ; IMMEDIATE
 
 \ -- Stack visualization ----------------------------------
 
@@ -915,3 +959,8 @@ DROP DROP
 ?\		THEN
 ?\ ;
 
+\ TODO I need to implement wordlists and search order to
+\ be able to implement FIND-NAME.
+\ It would be interesting to implement it in C also, as
+\ find_word is used from C and it needs to work even when
+\ the search order is implemented in Forth.
