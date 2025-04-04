@@ -15,6 +15,32 @@
 
 #include "getch.h"
 
+/* -- Milliseconds multiplatform implementation -------- */
+/* Taken from: https://stackoverflow.com/a/28827188 */
+
+#ifdef WIN32
+#include <windows.h>
+#elif _POSIX_C_SOURCE >= 199309L
+#include <time.h>   /* for nanosleep */
+#else
+#include <unistd.h> /* for usleep */
+#endif
+
+void sleep_ms(int milliseconds){ /* cross-platform sleep */
+#ifdef WIN32
+    Sleep(milliseconds);
+#elif _POSIX_C_SOURCE >= 199309L
+    struct timespec ts;
+    ts.tv_sec = milliseconds / 1000;
+    ts.tv_nsec = (milliseconds % 1000) * 1000000;
+    nanosleep(&ts, NULL);
+#else
+    if (milliseconds >= 1000)
+      sleep(milliseconds / 1000);
+    usleep((milliseconds % 1000) * 1000);
+#endif
+}
+
 /* ---------------------------------------------------- */
 /* ---------------- Virtual machine ------------------- */
 /* ---------------------------------------------------- */
@@ -91,6 +117,7 @@ void _j(X*);
 void _loop(X*);
 void _plus_loop(X*);
 void _base(X*);
+void _dot(X*);
 void _dot_s(X*);
 
 void init(X* x, CELL d, CELL sz) { 
@@ -728,8 +755,8 @@ void _bracket_then(X* x) { /* TODO */ }
 
 /* Dynamic memory operations */
 
-void _allocate(X* x) { /* TODO */ }
-void _free(X* x) { /* TODO */ }
+void _allocate(X* x) { push(x, (CELL)malloc(pop(x))); }
+void _free(X* x) { free((void*)pop(x)); }
 void _resize(X* x) { /* TODO */ }
 
 /* String operations */
@@ -787,26 +814,19 @@ void _write_line(X* x) { /* TODO */ }
 
 /* More input/output operations */
 
-void _dot(X* x) { printf("%ld ", pop(x)); }
-void _dot_r(X* x) { /* TODO */ }
 void _emit(X* x) { printf("%c", (CHAR)pop(x)); }
-void _expect(X* x) { /* TODO */ }
 void _key(X* x) { push(x, getch()); }
-
-void _u_dot(X* x) { printf("%lu ", (uCELL)pop(x)); }
-void _u_dot_r(X* x) { /* TODO */ }
 
 void _f_dot(X* x) { /* TODO */ }
 void _f_e_dot(X* x) { /* TODO */ }
 void _f_s_dot(X* x) { /* TODO */ }
 
-void _at_x_y(X* x) { /* TODO */ }
 void _e_key(X* x) { /* TODO */ }
 void _e_key_to_char(X* x) { /* TODO */ }
 void _e_key_question(X* x) { /* TODO */ }
 void _emit_question(X* x) { /* TODO */ }
 void _key_question(X* x) { /* TODO */ }
-void _ms(X* x) { /* TODO */ }
+void _ms(X* x) { sleep_ms(pop(x)); }
 void _page(X* x) { /* TODO */ }
 
 /* Arithmetic and logical operations */
@@ -1440,21 +1460,20 @@ void bootstrap(X* x) {
 
 	/* Not needed: code(x, "ACCEPT", primitive(x, &_accept)); */
 	/* Not needed: code(x, "CR", primitive(x, &_cr)); */
-	code(x, ".", primitive(x, &_dot));
-	code(x, ".R", primitive(x, &_dot_r));
+	/* Not needed: code(x, ".", primitive(x, &_dot)); */
+	/* Not needed: code(x, ".R", primitive(x, &_dot_r)); */
 	/* Not needed: code(x, ".\"", primitive(x, &_dot_quote)); _immediate(x); */
 	code(x, "EMIT", primitive(x, &_emit));
-	code(x, "EXPECT", primitive(x, &_expect));
 	code(x, "KEY", primitive(x, &_key));
 	/* Not needed: code(x, "SPACE", primitive(x, &_space)); */
 	/* Not needed: code(x, "SPACES", primitive(x, &_spaces)); */
 	/* Not needed: code(x, "TYPE", primitive(x, &_type)); */
-	code(x, "U.", primitive(x, &_u_dot));
-	code(x, "U.R", primitive(x, &_u_dot_r));
+	/* Not needed: code(x, "U.", primitive(x, &_u_dot)); */
+	/* Not needed: code(x, "U.R", primitive(x, &_u_dot_r)); */
 	code(x, "F.", primitive(x, &_f_dot));
 	code(x, "FE.", primitive(x, &_f_e_dot));
 	code(x, "FS.", primitive(x, &_f_s_dot));
-	code(x, "AT-XY", primitive(x, &_at_x_y));
+	/* Not needed: code(x, "AT-XY", primitive(x, &_at_x_y)); */
 	code(x, "EKEY", primitive(x, &_e_key));
 	code(x, "EKEY>CHAR", primitive(x, &_e_key_to_char));
 	code(x, "EKEY?", primitive(x, &_e_key_question));
@@ -2331,6 +2350,12 @@ void _accept(X* x) {
 	}
 	push(x, i);
 }
+void _dot(X* x) { printf("%ld ", pop(x)); }
+void _dot_r(X* x) { /* TODO */ }
+void _u_dot(X* x) { printf("%lu ", (uCELL)pop(x)); }
+void _u_dot_r(X* x) { /* TODO */ }
+
+void _at_x_y(X* x) { /* TODO */ }
 
 /* Source code preprocessing, interpreting & auditing commands */
 

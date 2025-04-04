@@ -1,3 +1,10 @@
+REFILL Problems:
+REFILL - DUP (or 0 PICK) causes QUIT to enter an
+REFILL		infinite loop.
+REFILL - . is not correctly printing negative
+REFILL		numbers !!
+DROP DROP DROP DROP DROP
+
 REFILL For now, we can only use REFILL for comments.
 DROP
 
@@ -538,21 +545,49 @@ DROP DROP
 ?\					CHAR+
 ?\				THEN
 ?\			THEN
-?\		REPEAT DROP ( drop key value ) THEN
+?\		REPEAT 
+?\			DROP ( drop key value ) 
+?\			SPACE ( add one space for clarity )
+?\		THEN
 ?\		- R> SWAP -
 ?\ ;
 
-\ ?\		\ TODO Check if n > 0
-\ ?\		BOUNDS ( c-addr1 c-addr2 )
-\ ?\		0 -ROT ( 0 c-addr1 c-addr2 )
-\ ?\		DO
-\ ?\			KEY 
-\ ?\			DUP 32 < IF DROP UNLOOP EXIT THEN
-\ ?\			DUP EMIT 
-\ ?\			I C!
-\ ?\			1+
-\ ?\		1 CHARS +LOOP
-\ ?\ ;
+\ -- Numeric output ---------------------------------------
+
+\ UD/MOD is needed by #, but I don't know what it does.
+?: UD/MOD	>R 0 R@ UM/MOD R> SWAP >R UM/MOD R> ;
+
+\ This should be used with [UNDEFINED]
+
+?VARIABLE HLD
+?\ CREATE <HOLD 100 CHARS DUP ALLOT <HOLD + CONSTANT HOLD>
+   
+?: <# ( -- ) HOLD> HLD ! ;
+?: HOLD	( c -- ) HLD @ 1- DUP HLD ! C! ;
+?: # ( d1 -- d2 ) 
+?\		BASE @ UD/MOD ROT 9 OVER < IF 7 + THEN 48 + HOLD 
+?\ ;
+?: #S ( d1 -- d2 ) BEGIN # OVER OVER OR 0= UNTIL ;
+?: #> ( d -- c-addr len ) DROP DROP HLD @ HOLD> OVER - ;
+
+   
+?: SIGN	( n -- ) 0 < IF 45 HOLD THEN ;
+   
+?: UD.R ( d n -- ) >R <# #S #> R> OVER - SPACES TYPE ;
+?: UD.		0 UD.R SPACE ;
+?: U.R ( u n -- ) 0 SWAP UD.R ;
+?: U. ( u -- ) 0 UD. ;
+?: D.R ( d n -- )
+?\		>R SWAP OVER DABS 
+?\		<# #S ROT SIGN #> 
+?\		R> OVER - SPACES TYPE 
+?\ ;
+?: D.		0 D.R SPACE ;
+?: .R ( n1 n2 -- ) >R DUP 0 < R> D.R ;
+\ TODO This is not working for negative numbers !!!!
+?: . ( n -- ) DUP 0 < D. ;
+   
+?: ? ( addr -- ) @ . ;
 
 \ -- Definitions ------------------------------------------
 
@@ -595,42 +630,6 @@ DROP DROP
 ?\		, ,
 ?\		DOES> DO-MARKER
 ?\ ;
-
-\ -- Numeric output ---------------------------------------
-
-\ UD/MOD is needed by #, but I don't know what it does.
-?: UD/MOD	>R 0 R@ UM/MOD R> SWAP >R UM/MOD R> ;
-
-\ This should be used with [UNDEFINED]
-
-?VARIABLE HLD
-?\ CREATE <HOLD 100 CHARS DUP ALLOT <HOLD + CONSTANT HOLD>
-   
-?: <# ( -- ) HOLD> HLD ! ;
-?: HOLD	( c -- ) HLD @ 1- DUP HLD ! C! ;
-?: # ( d1 -- d2 ) 
-?\		BASE @ UD/MOD ROT 9 OVER < IF 7 + THEN 48 + HOLD 
-?\ ;
-?: #S ( d1 -- d2 ) BEGIN # OVER OVER OR 0= UNTIL ;
-?: #> ( d -- c-addr len ) DROP DROP HLD @ HOLD> OVER - ;
-
-   
-?: SIGN	( n -- ) 0 < IF 45 HOLD THEN ;
-   
-?: UD.R ( d n -- ) >R <# #S #> R> OVER - SPACES TYPE ;
-?: UD.		0 UD.R SPACE ;
-?: U.R		0 SWAP UD.R ;
-?: U.		0 UD. ;
-?: D.R ( d n -- )
-?\		>R SWAP OVER DABS 
-?\		<# #S ROT SIGN #> 
-?\		R> OVER - SPACES TYPE 
-?\ ;
-?: D.		0 D.R SPACE ;
-?: .R		>R DUP 0 < R> D.R ;
-?: .			DUP 0 <  D. ;
-   
-?: ? ( addr -- ) @ . ;
 
 \ -- CASE/OF/ENDOF ----------------------------------------
 
@@ -1004,3 +1003,49 @@ DROP DROP
 \ It would be interesting to implement it in C also, as
 \ find_word is used from C and it needs to work even when
 \ the search order is implemented in Forth.
+
+\ -- Facility -----------------------------------------------
+
+\ Adapted from SwapForth
+
+?: AT-XY ( u1 u2 ) \ cursor to column u1, row u2
+?\		27 EMIT '[' EMIT	\ Control sequence introducer
+?\		1+ 0 U.R
+?\		';' EMIT
+?\		1+ 0 U.R
+?\		'H' EMIT
+?\ ;
+
+\ Structure implementation taken from ANS Forth standard
+
+?: BEGIN-STRUCTURE  ( -- addr 0 ; -- size )
+?\		CREATE
+?\			HERE 0 0 ,      \ mark stack, lay dummy
+?\		DOES> @             \ -- rec-len
+;
+
+?: +FIELD  ( n <"name"> -- ; Exec: addr -- 'addr )
+?\		CREATE OVER , +
+?\		DOES> @ +
+?\ ;
+
+?: FIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+?\		ALIGNED 1 CELLS +FIELD 
+?\ ;
+?: CFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+\ TODO Shouldn't CHARS be also aligned?
+?\		1 CHARS +FIELD 
+?\ ;
+\ ?: FFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+\ ?\		FALIGNED 1 FLOATS +FIELD 
+\ ?\ ;
+\ ?: SFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+\ ?\		SFALIGNED 1 SFLOATS +FIELD 
+\ ?\ ;
+\ ?: DFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+\ ?\		DFALIGNED 1 DFLOATS +FIELD 
+\ ?\ ;
+
+?: END-STRUCTURE ( addr n -- )
+?\		SWAP !           \ set len 
+?\ ;
