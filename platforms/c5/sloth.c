@@ -632,7 +632,7 @@ void _environment_q(X* x) {
 }
 void _unused(X* x) { push(x, x->sz - get(x, HERE)); }
 void _words(X* x) { /* TODO */ }
-void _bye(X* x) { exit(0); }
+void _bye(X* x) { printf("\n"); exit(0); }
 void _time_and_date(X* x) {
 	time_t t = time(NULL);
 	struct tm *tm = localtime(&t);
@@ -787,24 +787,6 @@ void _write_line(X* x) { /* TODO */ }
 
 /* More input/output operations */
 
-/* Pre-defined */ void _dup(X*);
-/* Pre-defined */ void _key(X*);
-/* Pre-defined */ void _emit(X*);
-/* TODO: It would be interesting to manage at least backspace */
-void _accept(X* x) {
-	CELL n = pop(x);
-	CELL addr = pop(x);
-	CELL i;
-	CHAR c;
-	for (i = 0; i < n; i++) {
-		_key(x);
-		_dup(x); _emit(x);
-		c = (CHAR)pop(x);
-		if (c < 32) { break; }
-		cstore(x, addr + i, c);
-	}
-	push(x, i);
-}
 void _dot(X* x) { printf("%ld ", pop(x)); }
 void _dot_r(X* x) { /* TODO */ }
 void _emit(X* x) { printf("%c", (CHAR)pop(x)); }
@@ -1278,7 +1260,7 @@ void _refill(X* x) {
 		break;
 	case 0:
 		push(x, get(x, IBUF)); push(x, 80);
-		_accept(x);
+		eval(x, get_xt(x, find_word(x, "ACCEPT")));
 		set(x, ILEN, pop(x));
 		set(x, IPOS, 0);
 		push(x, -1); 
@@ -1451,12 +1433,12 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "SEARCH", primitive(x, &_search)); */
 	/* Not needed: code(x, "/STRING", primitive(x, &_slash_string)); */
 	/* Not needed: code(x, "-TRAILING", primitive(x, &_dash_trailing)); */
-	code(x, ">FLOAT", primitive(x, &_to_float));
-	code(x, "REPRESENT", primitive(x, &_represent));
+	/* FLOATING */ code(x, ">FLOAT", primitive(x, &_to_float));
+	/* FLOATING */ code(x, "REPRESENT", primitive(x, &_represent));
 
 	/* More input/output operations */
 
-	code(x, "ACCEPT", primitive(x, &_accept));
+	/* Not needed: code(x, "ACCEPT", primitive(x, &_accept)); */
 	/* Not needed: code(x, "CR", primitive(x, &_cr)); */
 	code(x, ".", primitive(x, &_dot));
 	code(x, ".R", primitive(x, &_dot_r));
@@ -2334,6 +2316,20 @@ void _dot_quote(X* x) {
 	}
 	align(x);
 	compile(x, get_xt(x, find_word(x, "TYPE")));
+}
+void _accept(X* x) {
+	CELL n = pop(x);
+	CELL addr = pop(x);
+	CELL i;
+	CHAR c;
+	for (i = 0; i < n; i++) {
+		_key(x);
+		_dup(x); _emit(x);
+		c = (CHAR)pop(x);
+		if (c < 32) { break; }
+		cstore(x, addr + i, c);
+	}
+	push(x, i);
 }
 
 /* Source code preprocessing, interpreting & auditing commands */

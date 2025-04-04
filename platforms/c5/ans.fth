@@ -202,6 +202,10 @@ DROP DROP
 ?\		POSTPONE R> POSTPONE DUP POSTPONE >R 
 ?\ ; IMMEDIATE
 
+?: RDROP ( -- ) ( R: x -- ) 
+?\		POSTPONE R> POSTPONE DROP 
+?\ ; IMMEDIATE
+
 ?: ROT ( x1 x2 x3 -- x2 x3 x1 ) >R SWAP R> SWAP ;	
 
 \ Not ANS
@@ -447,7 +451,7 @@ DROP DROP
 ?\		DUP CHAR+ SWAP C@ 
 ?\ ;
 
-?: BOUNDS ( addr u -- u u ) CHARS OVER + SWAP ;
+?: BOUNDS ( c-addr1 u -- c-addr1 c-addr2 ) CHARS OVER + SWAP ;
 
 ?: PAD ( -- c-addr ) HERE (PAD-DISPLACEMENT) + ;
 
@@ -465,19 +469,6 @@ DROP DROP
 ?\		    CHAR-  
 ?\		REPEAT  
 ?\ ;
-
-?: TYPE ( c-addr u -- ) 
-?\		>R BEGIN 
-?\			R@ 0> WHILE 
-?\			DUP C@ DUP 32 127 WITHIN IF
-?\				EMIT
-?\			ELSE
-?\				DROP
-?\			THEN
-?\			CHAR+ R> 1- >R 
-?\		REPEAT 
-?\		R> DROP DROP
-?\	;
 
 \ COMPARE implementation taken from SwapForth
 
@@ -513,6 +504,55 @@ DROP DROP
 ?\		THEN 
 ?\		2R> 2DROP 
 ?\ ;
+
+?: TYPE ( c-addr u -- ) 
+?\		>R BEGIN 
+?\			R@ 0> WHILE 
+?\			DUP C@ DUP 32 127 WITHIN IF
+?\				EMIT
+?\			ELSE
+?\				DROP
+?\			THEN
+?\			CHAR+ R> 1- >R 
+?\		REPEAT 
+?\		R> DROP DROP
+?\	;
+
+?: ACCEPT ( c-addr +n1 -- +n2 )
+?\		BOUNDS ( c-addr2 c-addr1 )
+?\		2DUP - >R
+?\		BEGIN ( c-addr2 c-addr1 )
+?\			2OVER <> WHILE
+\ TODO Check if 10 will work on Windows too
+?\			KEY DUP 10 <> WHILE
+?\			DUP 127 = IF
+?\				2DUP - R@ <> IF
+?\					DROP
+?\					8 EMIT 32 EMIT 8 EMIT
+?\					CHAR-	
+?\				THEN
+?\			ELSE
+?\				DUP 31 > IF
+?\					DUP EMIT
+?\					OVER C!
+?\					CHAR+
+?\				THEN
+?\			THEN
+?\		REPEAT DROP ( drop key value ) THEN
+?\		- R> SWAP -
+?\ ;
+
+\ ?\		\ TODO Check if n > 0
+\ ?\		BOUNDS ( c-addr1 c-addr2 )
+\ ?\		0 -ROT ( 0 c-addr1 c-addr2 )
+\ ?\		DO
+\ ?\			KEY 
+\ ?\			DUP 32 < IF DROP UNLOOP EXIT THEN
+\ ?\			DUP EMIT 
+\ ?\			I C!
+\ ?\			1+
+\ ?\		1 CHARS +LOOP
+\ ?\ ;
 
 \ -- Definitions ------------------------------------------
 
