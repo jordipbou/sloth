@@ -319,6 +319,20 @@ DROP DROP
 ?\		DUP 0< IF -11 THROW THEN	\ result out of range
 ?\ ;
 
+\ Taken from ANS Forth Standard reference implementation
+
+?: FM/MOD ( d n -- rem quot )
+?\		DUP >R
+?\		SM/REM
+\ if the remainder is not zero and has a different sign 
+\ than the divisor
+?\		OVER DUP 0<> SWAP 0< R@ 0< XOR AND IF
+?\			1- SWAP R> + SWAP
+?\		ELSE
+?\			RDROP
+?\		THEN
+?\ ;
+
 \ -- Memory -----------------------------------------------
 
 \ Not ANS
