@@ -360,17 +360,6 @@ DROP DROP
 ?: 2! ( x1 x2 a-addr -- ) SWAP OVER ! CELL+ ! ;
 ?: 2@ ( a-addr -- x1 x2 ) DUP CELL+ @ SWAP @ ;
 
-?: FILL ( c-addr u char -- ) 
-?\		-ROT BEGIN 
-?\			DUP 0> WHILE 
-?\			>R 2DUP C! CHAR+ R> 1- 
-?\		REPEAT 
-?\		DROP DROP DROP 
-?\ ;
-
-?: CMOVE> ( c-addr1 c-addr2 u -- ) CHARS MOVE ;
-?: CMOVE ( c-addr1 c-addr2 u -- ) CHARS MOVE ;
-
 \ -- Deferred words ---------------------------------------
 
 \ PLATFORM DEPENDENT
@@ -483,6 +472,19 @@ DROP DROP
 ?\		    CHAR-  
 ?\		REPEAT  
 ?\ ;
+
+?: FILL ( c-addr u char -- ) 
+?\		-ROT BEGIN 
+?\			DUP 0> WHILE 
+?\			>R 2DUP C! CHAR+ R> 1- 
+?\		REPEAT 
+?\		DROP DROP DROP 
+?\ ;
+
+?: BLANK ( c-addr u -- ) BL FILL ;
+
+?: CMOVE> ( c-addr1 c-addr2 u -- ) CHARS MOVE ;
+?: CMOVE ( c-addr1 c-addr2 u -- ) CHARS MOVE ;
 
 \ COMPARE implementation taken from SwapForth
 
@@ -822,26 +824,6 @@ DROP DROP
 ?\		R>
 ?\ ;
 
-\ -- QUIT -------------------------------------------------
-
-?: QUIT
-?\		( TODO empty the return stack )
-?\		0 (SOURCE-ID) !		\ Set source to user input device
-?\		POSTPONE [
-?\		BEGIN
-?\			REFILL
-?\		WHILE
-?\			['] INTERPRET CATCH
-?\			CASE
-?\			0 OF STATE @ 0= IF ."  OK" THEN CR ENDOF
-?\			POSTPONE [
-?\			-1 OF ( TODO Aborted )  ENDOF
-?\			-2 OF ( TODO display message from ABORT" ) ENDOF
-?\			( default ) DUP ." Exception # " . CR
-?\			ENDCASE
-?\		REPEAT BYE
-?\ ;
-
 \ -- Commands to inspect memory, debug & view code --------
 
 \ -- Dump (inspecting memory)
@@ -1022,6 +1004,8 @@ DROP DROP
 ?\		'H' EMIT
 ?\ ;
 
+\ -- Structures -------------------------------------------
+
 \ Structure implementation taken from ANS Forth standard
 
 ?: BEGIN-STRUCTURE  ( -- addr 0 ; -- size )
@@ -1055,3 +1039,27 @@ DROP DROP
 ?: END-STRUCTURE ( addr n -- )
 ?\		SWAP !           \ set len 
 ?\ ;
+
+\ -- QUIT -------------------------------------------------
+
+?: QUIT
+?\		( TODO empty the return stack )
+?\		0 (SOURCE-ID) !		\ Set source to user input device
+?\		POSTPONE [
+?\		BEGIN
+?\			REFILL
+?\		WHILE
+?\			['] INTERPRET CATCH
+?\			CASE
+?\			0 OF STATE @ 0= IF 
+?\				."  OK" DEPTH 0 > IF SPACE DEPTH . THEN
+?\			THEN CR ENDOF
+?\			POSTPONE [
+?\			-1 OF ( TODO Aborted )  ENDOF
+?\			-2 OF ( TODO display message from ABORT" ) ENDOF
+?\			( default ) DUP ." Exception # " . CR
+?\			ENDCASE
+?\		REPEAT BYE
+?\ ;
+
+

@@ -777,7 +777,6 @@ void _move(X* x) {
 		}
 	}
 }
-void _blank(X* x) { /* TODO */ }
 
 void _to_float(X* x) { /* TODO */ }
 void _represent(X* x) { /* TODO */ }
@@ -1306,14 +1305,14 @@ void bootstrap(X* x) {
 	/* BLOCK: Not needed code(x, "LIST", primitive(x, &_list)); */
 	/* Not needed: code(x, "DUMP", primitive(x, &_dump)); */
 	/* Not needed: code(x, "?", primitive(x, &_question)); */
-	code(x, ".S", primitive(x, &_dot_s));
+	/* Not needed: code(x, ".S", primitive(x, &_dot_s)); */
 	/* Not needed: code(x, "SEE", primitive(x, &_see)); */
 
 	/* Commands that change compilation & interpretation settings */
 
 	/* Not needed: code(x, "BASE", primitive(x, &_base)); */
 	/* Not needed: code(x, "DECIMAL", primitive(x, &_decimal)); */
-	code(x, "FORGET", primitive(x, &_forget));
+	/* Obsolescent: code(x, "FORGET", primitive(x, &_forget)); */
 	/* Not needed: code(x, "HEX", primitive(x, &_hex)); */
 	/* Not needed: code(x, "MARKER", primitive(x, &_marker)); */
 
@@ -1368,7 +1367,7 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "#", primitive(x, &_number_sign)); */
 	/* Not needed: code(x, "#S", primitive(x, &_number_sign_s)); */
 	/* Not needed: code(x, "SIGN", primitive(x, &_sign)); */
-	code(x, "BLANK", primitive(x, &_blank));
+	/* Not needed: code(x, "BLANK", primitive(x, &_blank)); */
 	/* Not needed: code(x, "CMOVE", primitive(x, &_cmove)); */
 	/* Not needed: code(x, "CMOVE>", primitive(x, &_cmove_up)); */
 	/* Not needed: code(x, "COMPARE", primitive(x, &_compare)); */
@@ -2222,6 +2221,7 @@ void _cmove_up(X* x) { /* TODO */ }
 void _dash_trailing(X* x) { /* TODO */ }
 void _search(X* x) { /* TODO */ }
 void _compare(X* x) { /* TODO */ }
+void _blank(X* x) { /* TODO */ }
 
 /* System constants & facilities for generating ASCII values */
 
