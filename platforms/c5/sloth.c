@@ -831,7 +831,6 @@ void _page(X* x) { /* TODO */ }
 
 /* Arithmetic and logical operations */
 
-void _d_abs(X* x) { /* TODO */ }
 void _and(X* x) { CELL v = pop(x); push(x, pop(x) & v); }
 
 void _invert(X* x) { push(x, ~pop(x)); }
@@ -1408,7 +1407,7 @@ void bootstrap(X* x) {
 	/* Arithmetic and logical operations */
 
 	/* Not needed: code(x, "ABS", primitive(x, &_abs)); */
-	code(x, "DABS", primitive(x, &_d_abs));
+	/* Not needed: code(x, "DABS", primitive(x, &_d_abs)); */
 	code(x, "AND", primitive(x, &_and));
 	/* Not needed: code(x, "FM/MOD", primitive(x, &_f_m_slash_mod)); */
 	code(x, "INVERT", primitive(x, &_invert));
@@ -1778,6 +1777,7 @@ void _two_fetch(X* x) {
 
 /* Arithmetic and logical operations */
 
+void _d_abs(X* x) { /* TODO */ }
 void _mod(X* x) { CELL a = pop(x); push(x, pop(x) % a); }
 void _slash(X* x) { CELL a = pop(x); push(x, pop(x) / a); }
 void _star_slash(X* x) { _star_slash_mod(x); _nip(x); }

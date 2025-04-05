@@ -1,8 +1,3 @@
-REFILL Problems:
-REFILL - . is not correctly printing negative
-REFILL		numbers !!
-DROP DROP DROP
-
 REFILL For now, we can only use REFILL for comments.
 DROP
 
@@ -596,7 +591,6 @@ DROP DROP
 ?\ ;
 ?: D.		0 D.R SPACE ;
 ?: .R ( n1 n2 -- ) >R DUP 0 < R> D.R ;
-\ TODO This is not working for negative numbers !!!!
 ?: . ( n -- ) DUP 0 < D. ;
    
 ?: ? ( addr -- ) @ . ;
