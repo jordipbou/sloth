@@ -1164,7 +1164,7 @@ void _locals(X* x) { /* TODO */ }
 
 /* Manipulating stack items */
 
-void _drop(X* x) { pop(x); }
+void _drop(X* x) { if (x->sp <= 0) throw(x, -4); else pop(x); }
 void _over(X* x) { push(x, pick(x, 1)); }
 void _pick(X* x) {  push(x, pick(x, pop(x))); }
 void _to_r(X* x) { rpush(x, pop(x)); }

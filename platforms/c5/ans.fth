@@ -1,9 +1,7 @@
 REFILL Problems:
-REFILL - DUP (or 0 PICK) causes QUIT to enter an
-REFILL		infinite loop.
 REFILL - . is not correctly printing negative
 REFILL		numbers !!
-DROP DROP DROP DROP DROP
+DROP DROP DROP
 
 REFILL For now, we can only use REFILL for comments.
 DROP
@@ -831,7 +829,7 @@ DROP DROP
 ?\			POSTPONE [
 ?\			-1 OF ( TODO Aborted )  ENDOF
 ?\			-2 OF ( TODO display message from ABORT" ) ENDOF
-?\			( default ) DUP ." Exception # " .
+?\			( default ) DUP ." Exception # " . CR
 ?\			ENDCASE
 ?\		REPEAT BYE
 ?\ ;
