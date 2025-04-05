@@ -1274,6 +1274,7 @@ void _postpone(X* x) {
 /* void _query(X* x) */
 void _refill(X* x) {
 	char linebuf[1024];
+	int i;
 	switch (get(x, SOURCE_ID)) {
 	case -1: 
 		push(x, 0);
@@ -1384,7 +1385,7 @@ void bootstrap(X* x) {
 	/* BLOCK: Not needed code(x, "LIST", primitive(x, &_list)); */
 	/* Not needed: code(x, "DUMP", primitive(x, &_dump)); */
 	/* Not needed: code(x, "?", primitive(x, &_question)); */
-	/* Not needed: code(x, ".S", primitive(x, &_dot_s)); */
+	code(x, ".S", primitive(x, &_dot_s));
 	/* Not needed: code(x, "SEE", primitive(x, &_see)); */
 
 	/* Commands that change compilation & interpretation settings */

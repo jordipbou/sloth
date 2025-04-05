@@ -529,7 +529,7 @@ DROP DROP
 ?\		BOUNDS ( c-addr2 c-addr1 )
 ?\		2DUP - >R
 ?\		BEGIN ( c-addr2 c-addr1 )
-?\			2OVER <> WHILE
+?\			2DUP <> WHILE
 \ TODO Check if 10 will work on Windows too
 ?\			KEY DUP 10 <> WHILE
 ?\			DUP 127 = IF
