@@ -247,13 +247,14 @@ void throw(X* x, CELL e) {
 #define IPOS					5*sCELL
 #define ILEN					6*sCELL
 #define SOURCE_ID			7*sCELL
-/* #define DOES					8*sCELL */
 #define HLD						8*sCELL
 #define LATESTXT			9*sCELL
 #define IX						10*sCELL
 #define JX						11*sCELL
 #define KX						12*sCELL
 #define LX						13*sCELL
+#define ORDER					14*sCELL
+#define CONTEXT				15*sCELL
 
 /* Word statuses */
 
@@ -530,18 +531,22 @@ int compare_without_case(X* x, CELL w, CELL t, CELL l) {
 	return 1;
 }
 
-void _find(X* x) {
-	/* Let's get the address and length from the counted */
-	/* string on the stack. */
-	CELL cstring = pop(x);
-	CHAR l = cfetch(x, cstring);
-	CELL a = cstring + sCHAR;
-	/* Let's find the word, starting from LATEST */
-	CELL w = get(x, LATEST);
-	while (w != 0) {
-		if (!has_flag(x, w, HIDDEN) && compare_without_case(x, w, a, l)) break;
-		w = get_link(x, w);
+CELL search_word(X* x, CELL n, int l) {
+	CELL wl, w, i;
+	for (i = 0; i < get(x, ORDER); i++) {
+		wl = get(x, CONTEXT + i*sCELL);
+		w = fetch(x, wl);
+		while (w != 0) {
+			if (!has_flag(x, w, HIDDEN) && compare_without_case(x, w, n, l)) return w;
+			w = get_link(x, w);
+		}
 	}
+	return 0;
+}
+
+void _find(X* x) {
+	CELL cstring = pop(x);
+	CELL w = search_word(x, cstring + sCHAR, cfetch(x, cstring));
 	if (w == 0) {
 		push(x, cstring);
 		push(x, 0);
@@ -556,14 +561,7 @@ void _find(X* x) {
 
 /* Helper to find words from C */
 CELL find_word(X* x, char* name) {
-	CHAR l = strlen(name);
-	CELL a = (CELL)name;
-	CELL w = get(x, LATEST);
-	while (w != 0) {
-		if (!has_flag(x, w, HIDDEN) && compare_without_case(x, w, a, l)) break;
-		w = get_link(x, w);
-	}
-	return w;
+	return search_word(x, (CELL)name, strlen(name));
 }
 
 /* Outer interpreter */
@@ -684,13 +682,10 @@ void _definitions(X* x) { /* TODO */ }
 void _forth(X* x) { /* TODO */ }
 void _forth_wordlist(X* x) { /* TODO */ }
 void _get_current(X* x) { /* TODO */ }
-void _get_order(X* x) { /* TODO */ }
 void _only(X* x) { /* TODO */ }
 void _order(X* x) { /* TODO */ }
 void _previous(X* x) { /* TODO */ }
 void _set_current(X* x) { /* TODO */ }
-void _set_order(X* x) { /* TODO */ }
-void _wordlist(X* x) { /* TODO */ }
 
 void _assembler(X* x) { /* TODO */ }
 void _editor(X* x) { /* TODO */ }
@@ -1256,6 +1251,9 @@ void _to_abs(X* x) { push(x, pop(x) + x->d); }
 void _to_rel(X* x) { push(x, pop(x) - x->d); }
 
 void bootstrap(X* x) {
+
+	/* Variables commonly shared from C and Forth */
+
 	comma(x, 0); /* HERE */
 	comma(x, 10); /* BASE */
 	comma(x, 0); /* LATEST */
@@ -1264,13 +1262,15 @@ void bootstrap(X* x) {
 	comma(x, 0); /* IPOS */
 	comma(x, 0); /* ILEN */
 	comma(x, 0); /* SOURCE_ID */
-	/* Not needed: comma(x, 0); // DOES */
 	comma(x, 0); /* HLD */
 	comma(x, 0); /* LATESTXT */
 	comma(x, 0); /* IX */
 	comma(x, 0); /* JX */
 	comma(x, 0); /* KX */
 	comma(x, 0); /* LX */
+	comma(x, 1); /* #ORDER */
+	comma(x, to_abs(x, LATEST)); /* CONTEXT 0 */
+	allot(x, 15*sCELL);
 
 	/* Basic primitives */
 
@@ -1321,13 +1321,13 @@ void bootstrap(X* x) {
 	code(x, "FORTH", primitive(x, &_forth));
 	code(x, "FORTH-WORDLIST", primitive(x, &_forth_wordlist));
 	code(x, "GET-CURRENT", primitive(x, &_get_current));
-	code(x, "GET-ORDER", primitive(x, &_get_order));
+	/* Not needed: code(x, "GET-ORDER", primitive(x, &_get_order)); */
 	code(x, "ONLY", primitive(x, &_only));
 	code(x, "ORDER", primitive(x, &_order));
 	code(x, "PREVIOUS", primitive(x, &_previous));
 	code(x, "SET-CURRENT", primitive(x, &_set_current));
-	code(x, "SET-ORDER", primitive(x, &_set_order));
-	code(x, "WORDLIST", primitive(x, &_wordlist));
+	/* Not needed: code(x, "SET-ORDER", primitive(x, &_set_order)); */
+	/* Not needed: code(x, "WORDLIST", primitive(x, &_wordlist)); */
 	
 	code(x, "ASSEMBLER", primitive(x, &_assembler));
 	code(x, "EDITOR", primitive(x, &_editor));
@@ -2302,6 +2302,10 @@ void _decimal(X* x) { set(x, BASE, 10); }
 void _hex(X* x) { set(x, BASE, 16); }
 void _marker(X* x) { /* TODO */ }
 void _base(X* x) { push(x, to_abs(x, BASE)); }
+
+void _get_order(X* x) { /* TODO */ }
+void _set_order(X* x) { /* TODO */ }
+void _wordlist(X* x) { /* TODO */ }
 
 /* Forming definite loops */
 

@@ -78,6 +78,10 @@ DROP DROP
 ?: (KX) ( -- addr ) 12 CELLS TO-ABS ;
 ?: (LX) ( -- addr ) 13 CELLS TO-ABS ;
 
+?: #ORDER ( -- addr ) 14 CELLS TO-ABS ;
+
+?: CONTEXT ( -- addr ) 15 CELLS TO-ABS ;
+
 ?: SOURCE-ID ( -- 0 | -1 | fileid ) (SOURCE-ID) @ ;
 
 \ -- Adjusting BASE ---------------------------------------
@@ -1062,4 +1066,25 @@ DROP DROP
 ?\		REPEAT BYE
 ?\ ;
 
+\ -- Search order -----------------------------------------
+
+\ Implementation taken from reference implementation in
+\ ANS Forth Standard
+
+?: GET-ORDER ( -- wid1 ... widn n )
+?\		#ORDER @ 0 ?DO
+?\			#ORDER @ I - 1- CELLS CONTEXT + @
+?\		LOOP
+?\		#ORDER @
+?\ ; 
+
+?: SET-ORDER ( wid1 ... widn n -0 )
+?\		DUP -1 = IF
+?\			DROP LATEST 1
+?\		THEN
+?\		DUP #order !
+?\		0 ?DO I CELLS context + ! LOOP
+?\ ;
+
+?: WORDLIST ( -- wid ) HERE 0 , ;
 
