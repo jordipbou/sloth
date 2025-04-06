@@ -65,7 +65,7 @@ DROP DROP
 \ -- Variables shared with the host -----------------------
 
 ?: BASE ( -- addr ) 1 CELLS TO-ABS ;
-?: (LATEST) ( -- addr ) 2 CELLS TO-ABS ;
+?: FORTH-WORDLIST ( -- addr ) 2 CELLS TO-ABS ;
 ?: STATE ( -- addr ) 3 CELLS TO-ABS ;
 ?: (IBUF) ( -- addr ) 4 CELLS TO-ABS ;
 ?: (IPOS) ( -- addr ) 5 CELLS TO-ABS ;
@@ -78,7 +78,7 @@ DROP DROP
 ?: (KX) ( -- addr ) 12 CELLS TO-ABS ;
 ?: (LX) ( -- addr ) 13 CELLS TO-ABS ;
 
-?: CURRENT ( -- addr ) 14 CELLS TO-ABS ;
+?: (CURRENT) ( -- addr ) 14 CELLS TO-ABS ;
 ?: #ORDER ( -- addr ) 15 CELLS TO-ABS ;
 ?: CONTEXT ( -- addr ) 16 CELLS TO-ABS ;
 
@@ -217,6 +217,23 @@ DROP DROP
 
 ?: NIP ( x1 x2 -- x2 ) SWAP DROP ;
 ?: TUCK ( x1 x2 -- x2 x1 x2 ) >R R@ SWAP R> ;
+
+\ Not ANS
+\ TODO Should this take into account the number of
+\ items on the stack, or just do as told without
+\ checking anything?
+?: DISCARD ( x1 ... xn u -- )
+?\		0 OVER < IF
+?\			BEGIN
+?\				DUP WHILE
+?\				NIP
+?\				1 -
+?\			REPEAT
+?\			DROP
+?\		ELSE
+?\			DROP
+?\		THEN
+?\ ;
 
 ?: ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu ) 
 ?\		DUP IF 
@@ -610,9 +627,6 @@ DROP DROP
 ?CONSTANT IMMEDIATE-FLAG
 
 \ PLATFORM DEPENDENT
-?: LATEST ( -- n ) 2 CELLS TO-ABS ;
-
-\ PLATFORM DEPENDENT
 ?: NAME>LINK ( nt -- nt ) TO-ABS @ ;
 ?: NAME>XT ( nt -- xt ) CELL+ TO-ABS @ ;
 ?: NAME>STRING ( nt -- c-addr u )
@@ -624,6 +638,42 @@ DROP DROP
 ?: HIDDEN? ( nt -- flag ) NAME>FLAGS HIDDEN-FLAG AND ;
 ?: IMMEDIATE? ( nt -- flag ) NAME>FLAGS IMMEDIATE-FLAG AND ;
 
+\ -- Search order -----------------------------------------
+
+\ Implementation taken from reference implementation in
+\ ANS Forth Standard
+
+?: GET-ORDER ( -- wid1 ... widn n )
+?\		#ORDER @ 0 ?DO
+?\			#ORDER @ I - 1- CELLS CONTEXT + @
+?\		LOOP
+?\		#ORDER @
+?\ ; 
+
+?: SET-ORDER ( wid1 ... widn n -0 )
+?\		DUP -1 = IF
+?\			DROP FORTH-WORDLIST 1
+?\		THEN
+?\		DUP #order !
+?\		0 ?DO I CELLS context + ! LOOP
+?\ ;
+
+?: WORDLIST ( -- wid ) HERE 0 , ;
+
+?: GET-CURRENT ( -- wid ) (CURRENT) @ ;
+?: SET-CURRENT ( wid -- ) (CURRENT) ! ;
+
+?: ALSO ( -- ) GET-ORDER OVER SWAP 1+ SET-ORDER ;
+?: DEFINITIONS ( -- ) GET-ORDER SWAP SET-CURRENT DISCARD ;
+?: FORTH ( -- ) GET-ORDER NIP FORTH-WORDLIST SWAP SET-ORDER ;
+?: ONLY ( -- ) -1 SET-ORDER ;
+?: PREVIOUS ( -- ) GET-ORDER NIP 1- SET-ORDER ;
+
+?: ORDER ( -- )
+?\		CR GET-ORDER DUP . 0 ?DO . LOOP CR
+?\		GET-CURRENT . CR
+?\ ;
+
 \ -- Markers ----------------------------------------------
 
 \ MARKER creates a word that stores how to delete all
@@ -632,12 +682,12 @@ DROP DROP
 
 ?: DO-MARKER ( -- )
 ?\		DUP CELL+ @ HERE - ALLOT
-?\		@ LATEST !
+?\		@ GET-CURRENT !
 ?\ ;
 
 \ PLATFORM DEPENDENT
 ?: MARKER ( "<spaces>name" -- )
-?\		HERE LATEST @
+?\		HERE GET-CURRENT @
 ?\		CREATE
 ?\		, ,
 ?\		DOES> DO-MARKER
@@ -1066,27 +1116,4 @@ DROP DROP
 ?\		REPEAT BYE
 ?\ ;
 
-\ -- Search order -----------------------------------------
 
-\ Implementation taken from reference implementation in
-\ ANS Forth Standard
-
-?: GET-ORDER ( -- wid1 ... widn n )
-?\		#ORDER @ 0 ?DO
-?\			#ORDER @ I - 1- CELLS CONTEXT + @
-?\		LOOP
-?\		#ORDER @
-?\ ; 
-
-?: SET-ORDER ( wid1 ... widn n -0 )
-?\		DUP -1 = IF
-?\			DROP LATEST 1
-?\		THEN
-?\		DUP #order !
-?\		0 ?DO I CELLS context + ! LOOP
-?\ ;
-
-?: WORDLIST ( -- wid ) HERE 0 , ;
-
-?: GET-CURRENT ( -- wid ) CURRENT @ ;
-?: SET-CURRENT ( wid -- ) CURRENT ! ;

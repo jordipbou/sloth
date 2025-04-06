@@ -239,23 +239,23 @@ void throw(X* x, CELL e) {
 /* Relative addresses of variables accessed both from C */
 /* and Forth. */
 
-#define HERE					0	
-#define BASE					sCELL
-#define LATEST				2*sCELL
-#define STATE					3*sCELL
-#define IBUF					4*sCELL
-#define IPOS					5*sCELL
-#define ILEN					6*sCELL
-#define SOURCE_ID			7*sCELL
-#define HLD						8*sCELL
-#define LATESTXT			9*sCELL
-#define IX						10*sCELL
-#define JX						11*sCELL
-#define KX						12*sCELL
-#define LX						13*sCELL
-#define CURRENT				14*sCELL
-#define ORDER					15*sCELL
-#define CONTEXT				16*sCELL
+#define HERE									0	
+#define BASE									sCELL
+#define FORTH_WORDLIST				2*sCELL
+#define STATE									3*sCELL
+#define IBUF									4*sCELL
+#define IPOS									5*sCELL
+#define ILEN									6*sCELL
+#define SOURCE_ID							7*sCELL
+#define HLD										8*sCELL
+#define LATESTXT							9*sCELL
+#define IX										10*sCELL
+#define JX										11*sCELL
+#define KX										12*sCELL
+#define LX										13*sCELL
+#define CURRENT								14*sCELL
+#define ORDER									15*sCELL
+#define CONTEXT								16*sCELL
 
 /* Word statuses */
 
@@ -681,13 +681,6 @@ void _depth(X* x) { push(x, x->sp); }
 
 void _forget(X* x) { /* Obsolescent, don't implement */ }
 
-void _also(X* x) { /* TODO */ }
-void _definitions(X* x) { /* TODO */ }
-void _forth(X* x) { /* TODO */ }
-void _forth_wordlist(X* x) { /* TODO */ }
-void _only(X* x) { /* TODO */ }
-void _order(X* x) { /* TODO */ }
-void _previous(X* x) { /* TODO */ }
 
 void _assembler(X* x) { /* TODO */ }
 void _editor(X* x) { /* TODO */ }
@@ -721,6 +714,7 @@ void _included(X* x) {
 		set(x, SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
+			/* printf(">>>> %s\n", linebuf); */
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
 			set(x, ILEN, strlen(linebuf));
@@ -1257,7 +1251,7 @@ void bootstrap(X* x) {
 
 	comma(x, 0); /* HERE */
 	comma(x, 10); /* BASE */
-	comma(x, 0); /* LATEST */
+	comma(x, 0); /* FORTH-WORDLIST */
 	comma(x, 0); /* STATE */
 	comma(x, 0); /* IBUF */
 	comma(x, 0); /* IPOS */
@@ -1269,9 +1263,9 @@ void bootstrap(X* x) {
 	comma(x, 0); /* JX */
 	comma(x, 0); /* KX */
 	comma(x, 0); /* LX */
-	comma(x, to_abs(x, LATEST)); /* CURRENT */
+	comma(x, to_abs(x, FORTH_WORDLIST)); /* CURRENT */
 	comma(x, 1); /* #ORDER */
-	comma(x, to_abs(x, LATEST)); /* CONTEXT 0 */
+	comma(x, to_abs(x, FORTH_WORDLIST)); /* CONTEXT 0 */
 	allot(x, 15*sCELL);
 
 	/* Basic primitives */
@@ -1318,15 +1312,15 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "HEX", primitive(x, &_hex)); */
 	/* Not needed: code(x, "MARKER", primitive(x, &_marker)); */
 
-	code(x, "ALSO", primitive(x, &_also));
-	code(x, "DEFINITIONS", primitive(x, &_definitions));
-	code(x, "FORTH", primitive(x, &_forth));
-	code(x, "FORTH-WORDLIST", primitive(x, &_forth_wordlist));
+	/* Not needed: code(x, "ALSO", primitive(x, &_also)); */
+	/* Not needed: code(x, "DEFINITIONS", primitive(x, &_definitions)); */
+	/* Not needed: code(x, "FORTH", primitive(x, &_forth)); */
+	/* Not needed: code(x, "FORTH-WORDLIST", primitive(x, &_forth_wordlist)); */
 	/* Not needed: code(x, "GET-CURRENT", primitive(x, &_get_current)); */
 	/* Not needed: code(x, "GET-ORDER", primitive(x, &_get_order)); */
-	code(x, "ONLY", primitive(x, &_only));
-	code(x, "ORDER", primitive(x, &_order));
-	code(x, "PREVIOUS", primitive(x, &_previous));
+	/* Not needed: code(x, "ONLY", primitive(x, &_only)); */
+	/* Not needed: code(x, "ORDER", primitive(x, &_order)); */
+	/* Not needed: code(x, "PREVIOUS", primitive(x, &_previous)); */
 	/* Not needed: code(x, "SET-CURRENT", primitive(x, &_set_current)); */
 	/* Not needed: code(x, "SET-ORDER", primitive(x, &_set_order)); */
 	/* Not needed: code(x, "WORDLIST", primitive(x, &_wordlist)); */
@@ -2305,6 +2299,13 @@ void _hex(X* x) { set(x, BASE, 16); }
 void _marker(X* x) { /* TODO */ }
 void _base(X* x) { push(x, to_abs(x, BASE)); }
 
+void _also(X* x) { /* TODO */ }
+void _definitions(X* x) { /* TODO */ }
+void _forth_wordlist(X* x) { /* TODO */ }
+void _forth(X* x) { /* TODO */ }
+void _only(X* x) { /* TODO */ }
+void _order(X* x) { /* TODO */ }
+void _previous(X* x) { /* TODO */ }
 void _get_current(X* x) { /* TODO */ }
 void _set_current(X* x) { /* TODO */ }
 void _get_order(X* x) { /* TODO */ }
