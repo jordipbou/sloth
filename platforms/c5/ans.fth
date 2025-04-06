@@ -774,6 +774,129 @@ DROP DROP
 ?\		[: BL <= ;] *P <P [: BL > ;] *P P> 
 ?\ ;
 
+\ -- Combinators ------------------------------------------
+
+\ Removes n from the data stack, executes xt and restores n
+?: DIP ( n xt -- n ) SWAP >R EXECUTE R> ;
+
+\ Applies xt1 to n1, then applies xt2 to n2
+?: BI* ( n1 n2 xt1 xt2 -- ) ['] DIP DIP EXECUTE ;
+
+\ Applies xt to n1 and then applies xt to n2
+?: BI@ ( n1 n2 xt -- ) DUP BI* ;
+
+
+\ -- Finding words ----------------------------------------
+
+?: LETTER>UPPER ( char -- char )
+?\		DUP 97 123 WITHIN IF
+?\			32 -
+?\		THEN
+?\ ;
+
+?: CASE-INSENSITIVE-= ( char char -- ) 
+?\		['] LETTER>UPPER BI@ = 
+?\ ;
+
+?: CASE-INSENSITIVE-COMPARE ( c-addr1 u1 c-addr2 u2 -- flag )
+?\		ROT OVER = IF
+?\			BOUNDS ( c-addr1 c-addr2 c-addr2+u ) DO
+?\				I C@ OVER C@ CASE-INSENSITIVE-= 0= IF
+?\					DROP FALSE UNLOOP EXIT
+?\				THEN
+?\				CHAR+
+?\			1 CHARS +LOOP
+?\			DROP TRUE
+?\		ELSE
+?\			DROP DROP DROP FALSE
+?\		THEN
+?\ ;
+
+?: WORDLIST-LATEST ( wid -- nt ) @ ;
+
+?: FIND-NAME-IN ( c-addr u wid -- nt | 0 )
+?\		WORDLIST-LATEST >R BEGIN
+?\			R@ WHILE
+?\			R@ NAME>STRING
+?\			2OVER CASE-INSENSITIVE-COMPARE IF
+?\				DROP DROP R> EXIT
+?\			THEN
+?\			R> NAME>LINK >R
+?\		REPEAT
+?\		2DROP R>
+?\ ;
+
+?: SEARCH-WORDLIST ( c-addr u wid -- 0 | xt 1 | xt -1 )
+?\		FIND-NAME-IN DUP IF
+?\			DUP NAME>XT SWAP
+?\			IMMEDIATE? IF 1 ELSE -1 THEN
+?\		THEN
+
+?\ ;
+
+?: TRAVERSE-WORDLIST ( i*x xt wid -- j*x )
+?\		@ 2>R BEGIN ( R: xt latest )
+?\			R@ WHILE
+?\			2R@ SWAP EXECUTE IF
+?\				R> NAME>LINK >R
+?\			ELSE
+?\				2R> EXIT
+?\			THEN
+?\		REPEAT
+?\		2R> 2DROP
+?\ ;
+
+\ Not ANS yet
+\ ?: FIND-NAME ( c-addr u -- nt | 0 )
+
+\ TODO I need to implement wordlists and search order to
+\ be able to implement FIND-NAME.
+\ It would be interesting to implement it in C also, as
+\ find_word is used from C and it needs to work even when
+\ the search order is implemented in Forth.
+
+\ -- ANS Forth conditional compilation --------------------
+
+\ Implementation taken from ANS reference implementation
+
+?: [DEFINED] ( "<spaces>name ..." -- flag ) 
+?\		BL WORD FIND NIP 0<>
+?\ ; IMMEDIATE
+
+?: [UNDEFINED] ( "<sapces>name ..." -- flag )
+?\		BL WORD FIND NIP 0=
+?\ ; IMMEDIATE
+
+\ Implementation of [IF] [ELSE] [THEN] by ruv, as seen in:
+\ https://forth-standard.org/standard/tools/BracketELSE
+
+WORDLIST DUP 
+CONSTANT BRACKET-FLOW-WL 
+GET-CURRENT SWAP SET-CURRENT
+
+?: [IF]		1+ ; \ ( level1 -- level2 )
+?: [ELSE]	DUP 1 = IF 1- THEN ; \ ( level1 -- level2 )
+?: [THEN]	1- ; \ ( level1 -- level2 )
+
+SET-CURRENT
+
+?: [ELSE] \ ( -- )
+?\		1 BEGIN 
+?\			BEGIN 
+?\				PARSE-NAME DUP WHILE
+?\				BRACKET-FLOW-WL SEARCH-WORDLIST IF 
+?\					EXECUTE DUP 0= IF DROP EXIT THEN
+?\				THEN
+?\			REPEAT 
+?\			2DROP REFILL 0= 
+?\		UNTIL 
+?\		DROP
+?\ ; IMMEDIATE
+
+?: [THEN]	; IMMEDIATE \ ( -- )
+
+?: [IF]		0= IF POSTPONE [ELSE] THEN ; IMMEDIATE \ ( flag -- )
+   
 \ -- String literals --------------------------------------
 
 ?: SLITERAL ( c-addr1 u -- ) ( -- c-addr2 u )
@@ -981,71 +1104,6 @@ DROP DROP
 ?\		THEN
 ?\ ;
 
-\ -- Combinators ------------------------------------------
-
-\ Removes n from the data stack, executes xt and restores n
-?: DIP ( n xt -- n ) SWAP >R EXECUTE R> ;
-
-\ Applies xt1 to n1, then applies xt2 to n2
-?: BI* ( n1 n2 xt1 xt2 -- ) ['] DIP DIP EXECUTE ;
-
-\ Applies xt to n1 and then applies xt to n2
-?: BI@ ( n1 n2 xt -- ) DUP BI* ;
-
-
-\ -- Finding words ----------------------------------------
-
-?: LETTER>UPPER ( char -- char )
-?\		DUP 97 123 WITHIN IF
-?\			32 -
-?\		THEN
-?\ ;
-
-?: CASE-INSENSITIVE-= ( char char -- ) 
-?\		['] LETTER>UPPER BI@ = 
-?\ ;
-
-?: CASE-INSENSITIVE-COMPARE ( c-addr1 u1 c-addr2 u2 -- flag )
-?\		ROT OVER = IF
-?\			BOUNDS ( c-addr1 c-addr2 c-addr2+u ) DO
-?\				I C@ OVER C@ CASE-INSENSITIVE-= 0= IF
-?\					DROP FALSE UNLOOP EXIT
-?\				THEN
-?\				CHAR+
-?\			1 CHARS +LOOP
-?\			DROP TRUE
-?\		ELSE
-?\			DROP DROP DROP FALSE
-?\		THEN
-?\ ;
-
-?: WORDLIST-LATEST ( wid -- nt ) @ ;
-
-?: FIND-NAME-IN ( c-addr u wid -- nt | 0 )
-?\		WORDLIST-LATEST >R BEGIN
-?\			R@ WHILE
-?\			R@ NAME>STRING
-?\			2OVER CASE-INSENSITIVE-COMPARE IF
-?\				DROP DROP R> EXIT
-?\			THEN
-?\			R> NAME>LINK >R
-?\		REPEAT
-?\		2DROP R>
-?\ ;
-
-?: SEARCH-WORDLIST ( c-addr u wid -- 0 | xt 1 | xt -1 )
-?\		FIND-NAME-IN DUP IF
-?\			DUP NAME>XT SWAP
-?\			IMMEDIATE? IF 1 ELSE -1 THEN
-?\		THEN
-?\ ;
-
-\ TODO I need to implement wordlists and search order to
-\ be able to implement FIND-NAME.
-\ It would be interesting to implement it in C also, as
-\ find_word is used from C and it needs to work even when
-\ the search order is implemented in Forth.
-
 \ -- Facility -----------------------------------------------
 
 \ Adapted from SwapForth
@@ -1115,5 +1173,4 @@ DROP DROP
 ?\			ENDCASE
 ?\		REPEAT BYE
 ?\ ;
-
 
