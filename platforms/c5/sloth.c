@@ -253,8 +253,9 @@ void throw(X* x, CELL e) {
 #define JX						11*sCELL
 #define KX						12*sCELL
 #define LX						13*sCELL
-#define ORDER					14*sCELL
-#define CONTEXT				15*sCELL
+#define CURRENT				14*sCELL
+#define ORDER					15*sCELL
+#define CONTEXT				16*sCELL
 
 /* Word statuses */
 
@@ -298,6 +299,9 @@ void literal(X* x, CELL n) {
 
 /* Headers */
 
+CELL get_latest(X* x) { return fetch(x, get(x, CURRENT)); }
+void set_latest(X* x, CELL w) { store(x, get(x, CURRENT), w); }
+
 /* Header structure: */
 /* Link CELL					@ NT */
 /* XT CELL						@ NT + sCELL */
@@ -310,8 +314,8 @@ CELL header(X* x, CELL n, CELL l) {
 	CELL w, i;
 	align(x);
 	w = here(x); /* NT address */
-	comma(x, get(x, LATEST)); /* Store link to latest */
-	set(x, LATEST, w); /* Set NT as latest */
+	comma(x, get_latest(x));
+	set_latest(x, w);
 	comma(x, 0); /* Reserve space for XT */
 	ccomma(x, 0); /* Flags (default flags: 0) */
 	ccomma(x, l); /* Name length */
@@ -681,11 +685,9 @@ void _also(X* x) { /* TODO */ }
 void _definitions(X* x) { /* TODO */ }
 void _forth(X* x) { /* TODO */ }
 void _forth_wordlist(X* x) { /* TODO */ }
-void _get_current(X* x) { /* TODO */ }
 void _only(X* x) { /* TODO */ }
 void _order(X* x) { /* TODO */ }
 void _previous(X* x) { /* TODO */ }
-void _set_current(X* x) { /* TODO */ }
 
 void _assembler(X* x) { /* TODO */ }
 void _editor(X* x) { /* TODO */ }
@@ -1049,8 +1051,8 @@ void _colon(X* x) {
 	tok = pick(x, 0) + sCHAR;
 	tlen = cfetch(x, pop(x));
 	header(x, tok, tlen);
-	set(x, LATESTXT, get_xt(x, get(x, LATEST)));
-	set_flag(x, get(x, LATEST), HIDDEN);
+	set(x, LATESTXT, get_xt(x, get_latest(x)));
+	set_flag(x, get_latest(x), HIDDEN);
 	set(x, STATE, 1);
 }
 void _colon_no_name(X* x) { 
@@ -1062,9 +1064,8 @@ void _semicolon(X* x) {
 	compile(x, get_xt(x, find_word(x, "EXIT")));
 	set(x, STATE, 0);
 	/* Don't change flags for nonames */
-	if (get_xt(x, get(x, LATEST)) == get(x, LATESTXT))
-		unset_flag(x, get(x, LATEST), HIDDEN);
-
+	if (get_xt(x, get_latest(x)) == get(x, LATESTXT))
+		unset_flag(x, get_latest(x), HIDDEN);
 }
 
 void _recurse(X* x) { compile(x, get(x, LATESTXT)); }
@@ -1131,7 +1132,7 @@ void _create(X* x) {
 /* compiled by CREATE on the new created word with a call */
 /* to the code after the DOES> in the CREATE DOES> word */
 void _do_does(X* x) {
-	set(x, get_xt(x, get(x, LATEST)) + 2*sCELL, pop(x));
+	set(x, get_xt(x, get_latest(x)) + 2*sCELL, pop(x));
 }
 void _does(X* x) {
 	literal(x, here(x) + 4*sCELL);
@@ -1163,7 +1164,7 @@ void _evaluate(X* x) {
 }
 void _execute(X* x) { eval(x, pop(x)); }
 void _here(X* x) { push(x, to_abs(x, here(x))); }
-void _immediate(X* x) { set_flag(x, get(x, LATEST), IMMEDIATE); }
+void _immediate(X* x) { set_flag(x, get_latest(x), IMMEDIATE); }
 void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
 void _postpone(X* x) { 
 	CELL i, xt, tok, tlen;
@@ -1268,6 +1269,7 @@ void bootstrap(X* x) {
 	comma(x, 0); /* JX */
 	comma(x, 0); /* KX */
 	comma(x, 0); /* LX */
+	comma(x, to_abs(x, LATEST)); /* CURRENT */
 	comma(x, 1); /* #ORDER */
 	comma(x, to_abs(x, LATEST)); /* CONTEXT 0 */
 	allot(x, 15*sCELL);
@@ -1320,12 +1322,12 @@ void bootstrap(X* x) {
 	code(x, "DEFINITIONS", primitive(x, &_definitions));
 	code(x, "FORTH", primitive(x, &_forth));
 	code(x, "FORTH-WORDLIST", primitive(x, &_forth_wordlist));
-	code(x, "GET-CURRENT", primitive(x, &_get_current));
+	/* Not needed: code(x, "GET-CURRENT", primitive(x, &_get_current)); */
 	/* Not needed: code(x, "GET-ORDER", primitive(x, &_get_order)); */
 	code(x, "ONLY", primitive(x, &_only));
 	code(x, "ORDER", primitive(x, &_order));
 	code(x, "PREVIOUS", primitive(x, &_previous));
-	code(x, "SET-CURRENT", primitive(x, &_set_current));
+	/* Not needed: code(x, "SET-CURRENT", primitive(x, &_set_current)); */
 	/* Not needed: code(x, "SET-ORDER", primitive(x, &_set_order)); */
 	/* Not needed: code(x, "WORDLIST", primitive(x, &_wordlist)); */
 	
@@ -2303,6 +2305,8 @@ void _hex(X* x) { set(x, BASE, 16); }
 void _marker(X* x) { /* TODO */ }
 void _base(X* x) { push(x, to_abs(x, BASE)); }
 
+void _get_current(X* x) { /* TODO */ }
+void _set_current(X* x) { /* TODO */ }
 void _get_order(X* x) { /* TODO */ }
 void _set_order(X* x) { /* TODO */ }
 void _wordlist(X* x) { /* TODO */ }

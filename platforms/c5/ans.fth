@@ -78,9 +78,9 @@ DROP DROP
 ?: (KX) ( -- addr ) 12 CELLS TO-ABS ;
 ?: (LX) ( -- addr ) 13 CELLS TO-ABS ;
 
-?: #ORDER ( -- addr ) 14 CELLS TO-ABS ;
-
-?: CONTEXT ( -- addr ) 15 CELLS TO-ABS ;
+?: CURRENT ( -- addr ) 14 CELLS TO-ABS ;
+?: #ORDER ( -- addr ) 15 CELLS TO-ABS ;
+?: CONTEXT ( -- addr ) 16 CELLS TO-ABS ;
 
 ?: SOURCE-ID ( -- 0 | -1 | fileid ) (SOURCE-ID) @ ;
 
@@ -1088,3 +1088,5 @@ DROP DROP
 
 ?: WORDLIST ( -- wid ) HERE 0 , ;
 
+?: GET-CURRENT ( -- wid ) CURRENT @ ;
+?: SET-CURRENT ( wid -- ) CURRENT ! ;
