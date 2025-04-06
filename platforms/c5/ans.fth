@@ -846,8 +846,9 @@ DROP DROP
 ?\		2R> 2DROP
 ?\ ;
 
-\ Not ANS yet
+\ \ Not ANS yet
 \ ?: FIND-NAME ( c-addr u -- nt | 0 )
+\ ?\ ;
 
 \ TODO I need to implement wordlists and search order to
 \ be able to implement FIND-NAME.
@@ -1102,6 +1103,14 @@ SET-CURRENT
 ?\		ELSE
 ?\			." WORD NOT FOUND" CR DROP DROP DROP
 ?\		THEN
+?\ ;
+
+\ -- Words 
+
+?: WORDS ( -- )
+?\		GET-ORDER SWAP >R 1- DISCARD R>
+?\		[: NAME>STRING TYPE SPACE TRUE ;] SWAP 
+?\		CR TRAVERSE-WORDLIST
 ?\ ;
 
 \ -- Facility -----------------------------------------------

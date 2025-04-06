@@ -660,7 +660,6 @@ void _environment_q(X* x) {
 	*/
 }
 void _unused(X* x) { push(x, x->sz - get(x, HERE)); }
-void _words(X* x) { /* TODO */ }
 void _bye(X* x) { printf("\n"); exit(0); }
 void _time_and_date(X* x) {
 	time_t t = time(NULL);
@@ -1291,7 +1290,7 @@ void bootstrap(X* x) {
 
 	code(x, "ENVIRONMENT?", primitive(x, &_environment_q));
 	/* NEEDED */ code(x, "UNUSED", primitive(x, &_unused));
-	code(x, "WORDS", primitive(x, &_words));
+	/* Not needed: code(x, "WORDS", primitive(x, &_words)); */
 	/* NEEDED */ code(x, "BYE", primitive(x, &_bye));
 	/* NEEDED */ code(x, "TIME&DATE", primitive(x, &_time_and_date));
 
@@ -2377,3 +2376,8 @@ void _dot_paren(X* x) {
 	if (get(x, IPOS) != get(x, ILEN)) 
 		set(x, IPOS, get(x, IPOS) + 1);
 }
+
+/* Commands that can help you start or end work sessions */
+
+void _words(X* x) { /* TODO */ }
+
