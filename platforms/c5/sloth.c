@@ -768,7 +768,6 @@ void _resize(X* x) { /* TODO */ }
 
 /* String operations */
 
-void _erase(X* x) { /* TODO */ }
 void _move(X* x) {
 	CELL u = pop(x);
 	CELL addr2 = pop(x);
@@ -1369,7 +1368,7 @@ void bootstrap(X* x) {
 	/* String operations */
 
 	/* Not needed: code(x, "COUNT", primitive(x, &_count)); */
-	code(x, "ERASE", primitive(x, &_erase));
+	/* Not needed: code(x, "ERASE", primitive(x, &_erase)); */
 	/* Not needed: code(x, "FILL", primitive(x, &_fill)); */
 	/* Not needed: code(x, "HOLD", primitive(x, &_hold)); */
 	code(x, "MOVE", primitive(x, &_move));
@@ -2129,6 +2128,7 @@ void _fill(X* x) {
 		}
 	}
 }
+void _erase(X* x) { /* TODO */ }
 void _slash_string(X* x) { /* TODO */ }
 void _hold(X* x) { 
 	set(x, HLD, get(x, HLD) - 1);

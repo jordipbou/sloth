@@ -502,6 +502,8 @@ DROP DROP
 ?\		DROP DROP DROP 
 ?\ ;
 
+?: ERASE ( c-addr n -- ) 0 FILL ;
+
 ?: BLANK ( c-addr u -- ) BL FILL ;
 
 ?: CMOVE> ( c-addr1 c-addr2 u -- ) CHARS MOVE ;
