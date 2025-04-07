@@ -1027,19 +1027,6 @@ void _f_less_than(X* x) { /* TODO */ }
 void _f_zero_equals(X* x) { /* TODO */ }
 void _f_zero_less_than(X* x) { /* TODO */ }
 
-/* System constants & facilities for generating ASCII values */
-
-void _char(X* x) {
-	push(x, 32); _word(x);
-	push(x, cfetch(x, pop(x) + 1));
-}
-void _bracket_char(X* x) { 
-	push(x, 32); _word(x);
-	literal(x, cfetch(x, pop(x) + 1));
-}
-void _false(X* x) { push(x, 0); }
-void _true(X* x) { push(x, -1); }
-
 /* More facilities for defining routines (compiling-mode only) */
 
 void _here(X* x); /* Predefined for if */
@@ -1524,10 +1511,10 @@ void bootstrap(X* x) {
 	/* System constants & facilities for generating ASCII values */
 
 	/* Not needed: code(x, "BL", primitive(x, &_bl)); */
-	code(x, "CHAR", primitive(x, &_char));
-	code(x, "[CHAR]", primitive(x, &_bracket_char)); _immediate(x);
-	code(x, "FALSE", primitive(x, &_false));
-	code(x, "TRUE", primitive(x, &_true));
+	/* Not needed: code(x, "CHAR", primitive(x, &_char)); */
+	/* Not needed: code(x, "[CHAR]", primitive(x, &_bracket_char)); _immediate(x); */
+	/* Not needed: code(x, "FALSE", primitive(x, &_false)); */
+	/* Not needed: code(x, "TRUE", primitive(x, &_true)); */
 
 	/* Forming definite loops */
 
@@ -2114,6 +2101,20 @@ void _constant(X* x) {
 void _buffer_colon(X* x) { _create(x); _allot(x); }
 void _value(X* x) { /* TODO */ }
 
+/* System constants & facilities for generating ASCII values */
+
+void _bl(X* x) { push(x, 32); }
+void _char(X* x) {
+	push(x, 32); _word(x);
+	push(x, cfetch(x, pop(x) + 1));
+}
+void _bracket_char(X* x) { 
+	push(x, 32); _word(x);
+	literal(x, cfetch(x, pop(x) + 1));
+}
+void _false(X* x) { push(x, 0); }
+void _true(X* x) { push(x, -1); }
+
 /* String operations */
 
 void _count(X* x) { CELL a = pop(x); push(x, a + 1); push(x, cfetch(x, a)); }
@@ -2235,9 +2236,6 @@ void _search(X* x) { /* TODO */ }
 void _compare(X* x) { /* TODO */ }
 void _blank(X* x) { /* TODO */ }
 
-/* System constants & facilities for generating ASCII values */
-
-void _bl(X* x) { push(x, 32); }
 
 /* More input/output operations */
 

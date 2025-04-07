@@ -184,6 +184,12 @@ DROP DROP
 416
 ?CONSTANT (PAD-DISPLACEMENT)	\ PAD
 
+-1
+?CONSTANT TRUE
+
+0
+?CONSTANT FALSE
+
 \ -- Controlling state ------------------------------------
 
 ?VARIABLE (PREV-STATE)
