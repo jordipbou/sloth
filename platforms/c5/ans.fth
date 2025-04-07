@@ -626,6 +626,11 @@ DROP DROP
    
 ?: ? ( addr -- ) @ . ;
 
+\ Taken from SwapForth that indicates taken from standard
+?: HOLDS ( addr u -- )
+?\		BEGIN DUP WHILE 1- 2DUP + C@ HOLD REPEAT 2DROP
+?\ ;
+
 \ -- Definitions ------------------------------------------
 
 1
@@ -933,7 +938,7 @@ SET-CURRENT
 ?\		THEN 
 ?\ ; IMMEDIATE 
 
-\ TODO: C" only works when compiling
+\ TODO: C" only works when compiling, is that correct?
 ?: C" ( "ccc<quote>" -- ) ( -- c-addr )		\ "
 ?\		34 PARSE POSTPONE CLITERAL
 ?\ ; IMMEDIATE
@@ -1193,3 +1198,26 @@ SET-CURRENT
 ?\		REPEAT BYE
 ?\ ;
 
+\ -- Exceptions -------------------------------------------
+
+?: ABORT ( i*x -- ) ( R: j*x -- ) -1 THROW ;
+
+[UNDEFINED] ABORT" [IF] \ " for correct syntax highlighting
+\ TODO INTERNAL-WORDLIST should be defined and used before
+WORDLIST CONSTANT INTERNAL-WORDLIST
+
+INTERNAL-WORDLIST SET-CURRENT
+: (ABORT")  ( X1 CADDR -- )
+    SWAP IF
+        COUNT TYPE -2 THROW
+    ELSE
+        DROP
+    THEN
+;
+FORTH-WORDLIST SET-CURRENT
+
+: ABORT"
+    POSTPONE C"
+    POSTPONE (ABORT")
+; IMMEDIATE
+[THEN]

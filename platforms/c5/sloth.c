@@ -1035,8 +1035,6 @@ void _ahead(X* x); /* Predefined for else */
 void _then(X* x); /* Predefined for else */
 void _swap(X* x); /* Predefined for swap */
 
-void _abort(X* x) { /* TODO */ }
-void _abort_quote(X* x) { /* TODO */ }
 void _case(X* x) { /* TODO */ }
 void _of(X* x) { /* TODO */ }
 void _endof(X* x) { /* TODO */ }
@@ -1537,8 +1535,8 @@ void bootstrap(X* x) {
 
 	/* More facilities for defining routines (compiling-mode only) */
 
-	code(x, "ABORT", primitive(x, &_abort));
-	code(x, "ABORT\"", primitive(x, &_abort_quote));
+	/* Not needed: code(x, "ABORT", primitive(x, &_abort)); */
+	/* Not needed: code(x, "ABORT\"", primitive(x, &_abort_quote)); */
 	/* Not needed: code(x, "C\"", primitive(x, &_c_quote)); */
 	code(x, "CASE", primitive(x, &_case));
 	code(x, "OF", primitive(x, &_of));
@@ -2071,6 +2069,8 @@ void _c_quote(X* x) { /* TODO */ }
 void _left_bracket(X* x) { set(x, STATE, 0); }
 void _right_bracket(X* x) { set(x, STATE, 1); }
 void _quit(X* x) { /* TODO */ }
+void _abort(X* x) { /* TODO */ }
+void _abort_quote(X* x) { /* TODO */ }
 
 /* Forming indefinite loops (compiling-mode only) */
 
