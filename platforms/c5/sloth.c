@@ -759,9 +759,6 @@ void _included(X* x) {
 }
 void _load(X* x) { /* TODO */ }
 void _thru(X* x) { /* TODO */ }
-void _bracket_if(X* x) { /* TODO */ }
-void _bracket_else(X* x) { /* TODO */ }
-void _bracket_then(X* x) { /* TODO */ }
 
 /* Dynamic memory operations */
 
@@ -1354,9 +1351,9 @@ void bootstrap(X* x) {
 	code(x, "INCLUDED", primitive(x, &_included));
 	code(x, "LOAD", primitive(x, &_load));
 	code(x, "THRU", primitive(x, &_thru));
-	code(x, "[IF]", primitive(x, &_bracket_if));
-	code(x, "[ELSE]", primitive(x, &_bracket_else));
-	code(x, "[THEN]", primitive(x, &_bracket_then));
+	/* Not needed: code(x, "[IF]", primitive(x, &_bracket_if)); */
+	/* Not needed: code(x, "[ELSE]", primitive(x, &_bracket_else)); */
+	/* Not needed: code(x, "[THEN]", primitive(x, &_bracket_then)); */
 
 	/* Comment-introducing operations */
 
@@ -2396,6 +2393,9 @@ void _dot_paren(X* x) {
 	if (get(x, IPOS) != get(x, ILEN)) 
 		set(x, IPOS, get(x, IPOS) + 1);
 }
+void _bracket_if(X* x) { /* TODO */ }
+void _bracket_else(X* x) { /* TODO */ }
+void _bracket_then(X* x) { /* TODO */ }
 
 /* Commands that can help you start or end work sessions */
 
