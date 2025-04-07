@@ -1,6 +1,6 @@
-/* ---------------------------------------------------- */
-/* ------------------ SLOTH Forth --------------------- */
-/* ---------------------------------------------------- */
+/* ----------------------------------------------------- */
+/* ------------------ SLOTH Forth ---------------------- */
+/* ----------------------------------------------------- */
 
 #include<stdint.h>
 #include<setjmp.h>
@@ -13,12 +13,12 @@
 #include <stddef.h>
 #include <limits.h>
 
-#include "getch.h"
+/* #include "getch.h" */
 
 /* -- Milliseconds multiplatform implementation -------- */
 /* Taken from: https://stackoverflow.com/a/28827188 */
 
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #elif _POSIX_C_SOURCE >= 199309L
 #include <time.h>   /* for nanosleep */
@@ -27,7 +27,7 @@
 #endif
 
 void sleep_ms(int milliseconds){ /* cross-platform sleep */
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
     Sleep(milliseconds);
 #elif _POSIX_C_SOURCE >= 199309L
     struct timespec ts;
@@ -41,20 +41,40 @@ void sleep_ms(int milliseconds){ /* cross-platform sleep */
 #endif
 }
 
-/* ---------------------------------------------------- */
-/* ---------------- Virtual machine ------------------- */
-/* ---------------------------------------------------- */
-/* This is the reference implementation of the SLOTH    */
-/* Virtual Machine.                                     */
-/* ---------------------------------------------------- */
-/* This API defines how the virtual machine works and   */
-/* allow access to its internals from the host.         */
-/* ---------------------------------------------------- */
-/* It uses a table of primitives (C functions that can  */
-/* be called from Forth) that the bootstrapped          */
-/* programming language can use to interact with the    */
-/* virtual machine.                                     */
-/* ---------------------------------------------------- */
+/* -- getch multiplatform implementation --------------- */
+
+#if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
+#include <conio.h>
+#else
+#include <termios.h>
+#include <unistd.h>
+int getch() {
+	struct termios oldt, newt;
+	int ch;
+	tcgetattr(STDIN_FILENO, &oldt);
+	newt = oldt;
+	newt.c_lflag &= ~(ICANON|ECHO);
+	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+	ch = getchar();
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+	return ch;
+}
+#endif 
+
+/* ----------------------------------------------------- */
+/* ---------------- Virtual machine -------------------- */
+/* ----------------------------------------------------- */
+/* This is the reference implementation of the SLOTH     */
+/* Virtual Machine.                                      */
+/* ----------------------------------------------------- */
+/* This API defines how the virtual machine works and    */
+/* allow access to its internals from the host.          */
+/* ----------------------------------------------------- */
+/* It uses a table of primitives (C functions that can   */
+/* be called from Forth) that the bootstrapped           */
+/* programming language can use to interact with the     */
+/* virtual machine.                                      */
+/* ----------------------------------------------------- */
 
 typedef int8_t CHAR;
 typedef intptr_t CELL;
@@ -719,7 +739,7 @@ void _included(X* x) {
 			set(x, ILEN, strlen(linebuf));
 
 			catch(x, INTERPRET);
-			if ((e = pop(x)) != 0) {
+			if ((e = pop(x)) != 0) {	
 				printf("Exception %ld on line:\n", e);
 				printf("%s", linebuf);
 				break;
@@ -1519,7 +1539,7 @@ void bootstrap(X* x) {
 	/* Not needed: code(x, "?DO", primitive(x, &_question_do)); _immediate(x); */
 	/* Not needed: code(x, "I", primitive(x, &_i)); */
 	/* Not needed: code(x, "J", primitive(x, &_j)); */
-	/* Not needed: code(x, "LEAVE", primitive(x, &_leave)); */
+	/* Not needed: code(x, "LEAVE", primitive(x, &__leave)); */
 	code(x, "UNLOOP", primitive(x, &_unloop));
 	/* Not needed: code(x, "LOOP", primitive(x, &_loop)); _immediate(x); */
 	/* Not needed: code(x, "+LOOP", primitive(x, &_plus_loop)); _immediate(x); */

@@ -848,6 +848,8 @@ DROP DROP
 
 \ \ Not ANS yet
 \ ?: FIND-NAME ( c-addr u -- nt | 0 )
+\ TODO I need some way to traverse the search order
+\ TODO and execute FIND-NAME-IN until the word is found
 \ ?\ ;
 
 \ TODO I need to implement wordlists and search order to
