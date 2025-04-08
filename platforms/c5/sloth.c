@@ -102,7 +102,7 @@ typedef uintptr_t uCELL;
 /* or before including this file */
 #define STACK_SIZE 64
 #define RETURN_STACK_SIZE 64
-#define DSIZE 65536
+#define DSIZE 131072
 #define PSIZE 512
 
 struct VM;
@@ -648,37 +648,6 @@ void _interpret(X* x) {
 
 /* Commands that can help you start or end work sessions */
 
-void _environment_q(X* x) { 
-	CELL u = pop(x);
-	CHAR *s = (CHAR *)pop(x);
-	/*
-	if (compare_no_case(x, s, u, "/COUNTED-STRING")) {
-		push(x, COUNTED_STRING_MAX_SIZE);
-	} else if (compare_no_case(x, s, u, "/HOLD")) {
-		push(x, NUMERIC_OUTPUT_STRING_BUFFER_SIZE);
-	} else if (compare_no_case(x, s, u, "/PAD")) {
-		push(x, SCRATCH_AREA_SIZE);
-	} else if (compare_no_case(x, s, u, "ADDRESS-UNIT-BITS")) {
-		push(x, BITS_PER_ADDRESS_UNIT);
-	} else if (compare_no_case(x, s, u, "FLOORED")) {
-		push(x, FLOORED_DIVISION_AS_DEFAULT);
-	} else if (compare_no_case(x, s, u, "MAX-CHAR")) {
-		push(x, MAX_VALUE_FOR_CHAR);
-	} else if (compare_no_case(x, s, u, "MAX-D")) {
-		push(x, LARGEST_USABLE_DOUBLE_NUMBER);
-	} else if (compare_no_case(x, s, u, "MAX-N")) {
-		push(x, LARGEST_USABLE_SIGNED_INTEGER);
-	} else if (compare_no_case(x, s, u, "MAX-U")) {
-		push(x, LARGEST_USABLE_UNSIGNED_INTEGER);
-	} else if (compare_no_case(x, s, u, "MAX-UD")) {
-		push(x, LARGEST_USABLE_UNSIGNED_DOUBLE_NUMBER);
-	} else if (compare_no_case(x, s, u, "RETURN-STACK-CELLS")) {
-		push(x, RETURN_STACK_SIZE);
-	} else if (compare_no_case(x, s, u, "STACK-CELLS")) {
-		push(x, STACK_SIZE);
-	}
-	*/
-}
 void _unused(X* x) { push(x, x->sz - get(x, HERE)); }
 void _bye(X* x) { printf("\n"); exit(0); }
 void _time_and_date(X* x) {
@@ -1209,8 +1178,6 @@ void _refill(X* x) {
 	}	
 }
 
-void _restore_input(X* x) { /* TODO */ }
-void _save_input(X* x) { /* TODO */ }
 void _source(X* x) { push(x, get(x, IBUF)); push(x, get(x, ILEN)); }
 void _span(X* x) { /* TODO */ }
 /* void _tib(X* x) */
@@ -1289,7 +1256,7 @@ void bootstrap(X* x) {
 
 	/* Commands that can help you start or end work sessions */
 
-	code(x, "ENVIRONMENT?", primitive(x, &_environment_q));
+	/* Not needed: code(x, "ENVIRONMENT?", primitive(x, &_environment_q)); */
 	/* NEEDED */ code(x, "UNUSED", primitive(x, &_unused));
 	/* Not needed: code(x, "WORDS", primitive(x, &_words)); */
 	/* NEEDED */ code(x, "BYE", primitive(x, &_bye));
@@ -1628,8 +1595,8 @@ void bootstrap(X* x) {
 	code(x, "POSTPONE", primitive(x, &_postpone)); _immediate(x);
 	/* code(x, "QUERY", primitive(x, &_query)); */
 	code(x, "REFILL", primitive(x, &_refill));
-	code(x, "RESTORE-INPUT", primitive(x, &_restore_input));
-	code(x, "SAVE-INPUT", primitive(x, &_save_input));
+	/* Not needed: code(x, "RESTORE-INPUT", primitive(x, &_restore_input)); */
+	/* Not needed: code(x, "SAVE-INPUT", primitive(x, &_save_input)); */
 	code(x, "SOURCE", primitive(x, &_source));
 	/* Not needed: code(x, "SOURCE-ID", primitive(x, &_source_id)); */
 	code(x, "SPAN", primitive(x, &_span));
@@ -2030,6 +1997,8 @@ void _state(X* x) { push(x, to_abs(x, STATE)); }
 void _source_id(X* x) { /* TODO */ }
 void _pad(X* x) { _here(x); push(x, PAD); _plus(x); }
 void _search_wordlist(X* x) { /* TODO */ }
+void _restore_input(X* x) { /* TODO */ }
+void _save_input(X* x) { /* TODO */ }
 
 /* More facilities for defining routines (compiling-mode only) */
 
@@ -2398,4 +2367,35 @@ void _bracket_then(X* x) { /* TODO */ }
 /* Commands that can help you start or end work sessions */
 
 void _words(X* x) { /* TODO */ }
+void _environment_q(X* x) { 
+	CELL u = pop(x);
+	CHAR *s = (CHAR *)pop(x);
+	/*
+	if (compare_no_case(x, s, u, "/COUNTED-STRING")) {
+		push(x, COUNTED_STRING_MAX_SIZE);
+	} else if (compare_no_case(x, s, u, "/HOLD")) {
+		push(x, NUMERIC_OUTPUT_STRING_BUFFER_SIZE);
+	} else if (compare_no_case(x, s, u, "/PAD")) {
+		push(x, SCRATCH_AREA_SIZE);
+	} else if (compare_no_case(x, s, u, "ADDRESS-UNIT-BITS")) {
+		push(x, BITS_PER_ADDRESS_UNIT);
+	} else if (compare_no_case(x, s, u, "FLOORED")) {
+		push(x, FLOORED_DIVISION_AS_DEFAULT);
+	} else if (compare_no_case(x, s, u, "MAX-CHAR")) {
+		push(x, MAX_VALUE_FOR_CHAR);
+	} else if (compare_no_case(x, s, u, "MAX-D")) {
+		push(x, LARGEST_USABLE_DOUBLE_NUMBER);
+	} else if (compare_no_case(x, s, u, "MAX-N")) {
+		push(x, LARGEST_USABLE_SIGNED_INTEGER);
+	} else if (compare_no_case(x, s, u, "MAX-U")) {
+		push(x, LARGEST_USABLE_UNSIGNED_INTEGER);
+	} else if (compare_no_case(x, s, u, "MAX-UD")) {
+		push(x, LARGEST_USABLE_UNSIGNED_DOUBLE_NUMBER);
+	} else if (compare_no_case(x, s, u, "RETURN-STACK-CELLS")) {
+		push(x, RETURN_STACK_SIZE);
+	} else if (compare_no_case(x, s, u, "STACK-CELLS")) {
+		push(x, STACK_SIZE);
+	}
+	*/
+}
 
