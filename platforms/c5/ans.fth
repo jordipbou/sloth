@@ -1169,7 +1169,7 @@ SET-CURRENT
 \ -- QUIT -------------------------------------------------
 
 ?: QUIT
-?\		( TODO empty the return stack )
+?\		(EMPTY-RS)			\ Empty return stack
 ?\		0 (SOURCE-ID) !		\ Set source to user input device
 ?\		POSTPONE [
 ?\		BEGIN
@@ -1199,17 +1199,26 @@ WORDLIST CONSTANT INTERNAL-WORDLIST
 INTERNAL-WORDLIST SET-CURRENT
 : (ABORT")  ( X1 CADDR -- )
     SWAP IF
-        COUNT TYPE -2 THROW
+		(EXC-FRAMES?) 0= IF \ (EXC-FRAMES?) is platform dep.
+			COUNT TYPE 
+		ELSE
+			DROP
+		THEN
+		-2 THROW
     ELSE
         DROP
     THEN
 ;
 FORTH-WORDLIST SET-CURRENT
 
+GET-ORDER INTERNAL-WORDLIST SWAP 1+ SET-ORDER
+
 : ABORT"
     POSTPONE C"
     POSTPONE (ABORT")
 ; IMMEDIATE
+
+PREVIOUS
 [THEN]
 
 \ -- Environment queries ----------------------------------
@@ -1391,5 +1400,3 @@ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 	DROP (IPOS) ! (ILEN) ! (IBUF) ! (SOURCE-ID) ! FALSE
 ;
 [THEN]
-
-

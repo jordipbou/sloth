@@ -240,7 +240,14 @@ void catch(X* x, CELL q) {
 }
 
 void throw(X* x, CELL e) {
-	longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
+	if (x->jmpbuf_idx >= 0) {
+		longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
+	} else {
+		/* If no exception frame has been nested with CATCH */
+		/* the system should just go back to the OS. */
+		printf(" Exception %ld, ending.\n", e);
+		exit(e);
+	}
 }
 
 /* ---------------------------------------------------- */
@@ -718,12 +725,7 @@ void _included(X* x) {
 				set(x, ILEN, strlen(linebuf));
 			}
 
-			catch(x, INTERPRET);
-			if ((e = pop(x)) != 0) {	
-				printf("Exception %ld on line:\n", e);
-				printf("%s", linebuf);
-				break;
-			}
+			eval(x, INTERPRET);
 		}
 
 		set(x, SOURCE_ID, prevsourceid);
@@ -1234,6 +1236,14 @@ CELL code(X* x, char* name, CELL xt) {
 void _to_abs(X* x) { push(x, pop(x) + x->d); }
 void _to_rel(X* x) { push(x, pop(x) - x->d); }
 
+/* Helper to know if exception frames have been nested */
+
+void _exc_frames(X* x) { push(x, x->jmpbuf_idx < 0 ? 0 : -1); }
+
+/* Helper to empty the return stack */
+
+void _empty_rs(X* x) { x->rp = 0; }
+
 void bootstrap(X* x) {
 
 	/* Variables commonly shared from C and Forth */
@@ -1648,6 +1658,8 @@ void bootstrap(X* x) {
 	code(x, "TO-ABS", primitive(x, &_to_abs));
 	code(x, "TO-REL", primitive(x, &_to_rel));
 	code(x, "INTERPRET", primitive(x, &_interpret));
+	code(x, "(EXC-FRAMES?)", primitive(x, &_exc_frames));
+	code(x, "(EMPTY-RS)", primitive(x, &_empty_rs));
 }
 
 /* Helpers to work with files from C */
