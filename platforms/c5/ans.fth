@@ -550,18 +550,8 @@ DROP DROP
 ?\		2R> 2DROP 
 ?\ ;
 
-?: TYPE ( c-addr u -- ) 
-?\		>R BEGIN 
-?\			R@ 0> WHILE 
-?\			DUP C@ DUP 32 127 WITHIN IF
-?\				EMIT
-?\			ELSE
-?\				DROP
-?\			THEN
-?\			CHAR+ R> 1- >R 
-?\		REPEAT 
-?\		R> DROP DROP
-?\	;
+\ Implementation from ANS Forth standard comment
+?: TYPE ( c-addr u -- ) 0 ?DO COUNT EMIT LOOP DROP ;
 
 ?: ACCEPT ( c-addr +n1 -- +n2 )
 ?\		BOUNDS ( c-addr2 c-addr1 )
@@ -964,9 +954,9 @@ SET-CURRENT
 ?: DIGIT   ( char base -- n true | char false )
 ?\		>R
 \ convert lower to upper
-?\		DUP [CHAR] A < NOT
+?\		DUP [CHAR] a < NOT
 ?\		IF
-?\			[CHAR] A - [CHAR] A +
+?\			[CHAR] a - [CHAR] A +
 ?\		THEN
 ?\		
 ?\		DUP DUP [CHAR] A 1- >
@@ -1302,7 +1292,7 @@ create EscapeTable      \ -- addr
         0 c,	\ \z NUL (no character)
 
 create CRLF$    \ -- addr ; CR/LF as counted string
-  2 c,  13 c,  10 c,
+	2 c,  13 c,  10 c,
 
 : addEscape	\ c-addr len dest -- c-addr' len'
 \ *G Add an escape sequence to the counted string at dest,
@@ -1401,4 +1391,5 @@ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 	DROP (IPOS) ! (ILEN) ! (IBUF) ! (SOURCE-ID) ! FALSE
 ;
 [THEN]
+
 

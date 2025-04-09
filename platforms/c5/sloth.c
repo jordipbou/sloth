@@ -76,7 +76,7 @@ int getch() {
 /* virtual machine.                                      */
 /* ----------------------------------------------------- */
 
-typedef int8_t CHAR;
+typedef uint8_t CHAR; /* CHARs are always unsigned */
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
 
@@ -676,6 +676,7 @@ void _editor(X* x) { /* TODO */ }
 /* Source code preprocessing, interpreting & auditing commands */
 
 void _include_file(X* x) { /* TODO */ }
+/* Pre-definition */ void _refill(X*);
 void _included(X* x) {
 	FILE *f;
 	char filename[1024];
@@ -703,9 +704,19 @@ void _included(X* x) {
 
 		while (fgets(linebuf, 1024, f)) {
 			/* printf(">>>> %s\n", linebuf); */
+			/* I tried to use _refill from here as the next */
+			/* lines of code do exactly the same but, the */
+			/* input buffer of the included file is overwritten */
+			/* when doing some REFILL from Forth (for an [IF] */
+			/* for example). So I left this here to be able to */
+			/* use linebuf here. */
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
-			set(x, ILEN, strlen(linebuf));
+			if (linebuf[strlen(linebuf) - 1] < ' ') {
+				set(x, ILEN, strlen(linebuf) - 1);
+			} else {
+				set(x, ILEN, strlen(linebuf));
+			}
 
 			catch(x, INTERPRET);
 			if ((e = pop(x)) != 0) {	
@@ -1169,7 +1180,18 @@ void _refill(X* x) {
 		if (fgets(linebuf, 1024, (FILE *)get(x, SOURCE_ID))) {
 			set(x, IBUF, (CELL)linebuf);
 			set(x, IPOS, 0);
-			set(x, ILEN, strlen(linebuf));
+			/* Although I haven't found anywhere that \n should */
+			/* not be part of the input buffer when reading from */
+			/* a file, the results from preliminary tests when */
+			/* using SOURCE ... TYPE add newlines (because they */
+			/* are present) and on some other Forths they do not. */
+			/* So I just added a check to remove the \n at then */
+			/* end. */
+			if (linebuf[strlen(linebuf) - 1] < ' ') {
+				set(x, ILEN, strlen(linebuf) - 1);
+			} else {
+				set(x, ILEN, strlen(linebuf));
+			}
 			push(x, -1);
 		} else {
 			push(x, 0);
