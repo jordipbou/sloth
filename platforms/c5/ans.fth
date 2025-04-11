@@ -276,6 +276,8 @@ DROP DROP
 
 \ -- Arithmetic -------------------------------------------
 
+?: */MOD ( n1 n2 n3 -- n4 n5 ) >R M* R> SM/REM ;
+
 ?: / ( n1 n2 -- n3 ) 1 SWAP */MOD SWAP DROP ;
 ?: */ ( n1 n2 n3 -- n4 ) */MOD SWAP DROP ;
 ?: MOD ( n1 n2 -- n3 ) 1 SWAP */MOD DROP ;
@@ -1169,7 +1171,7 @@ SET-CURRENT
 \ -- QUIT -------------------------------------------------
 
 ?: QUIT
-?\		(EMPTY-RS)			\ Empty return stack
+?\		(EMPTY-RETURN-STACK)
 ?\		0 (SOURCE-ID) !		\ Set source to user input device
 ?\		POSTPONE [
 ?\		BEGIN
@@ -1197,25 +1199,20 @@ SET-CURRENT
 WORDLIST CONSTANT INTERNAL-WORDLIST
 
 INTERNAL-WORDLIST SET-CURRENT
-: (ABORT")  ( X1 CADDR -- )
-    SWAP IF
-		(EXC-FRAMES?) 0= IF \ (EXC-FRAMES?) is platform dep.
-			COUNT TYPE 
-		ELSE
-			DROP
-		THEN
+: (ABORT") ( n c-addr u -- )
+	ROT 0= IF
+		2DROP
+	ELSE
 		-2 THROW
-    ELSE
-        DROP
-    THEN
+	THEN
 ;
 FORTH-WORDLIST SET-CURRENT
 
 GET-ORDER INTERNAL-WORDLIST SWAP 1+ SET-ORDER
 
 : ABORT"
-    POSTPONE C"
-    POSTPONE (ABORT")
+	POSTPONE S"
+	POSTPONE (ABORT")
 ; IMMEDIATE
 
 PREVIOUS

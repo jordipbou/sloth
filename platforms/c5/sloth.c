@@ -7,13 +7,10 @@
 #include<stdlib.h>
 #include<stdio.h>
 #include<string.h>
-#include<time.h>
 
-/* This were used by Claude's FM/MOD implementation */
+/* This are used by Claude's SM/REM implementation */
 #include <stddef.h>
-#include <limits.h>
-
-/* #include "getch.h" */
+#include <limits.h> /* for CHAR_BIT */
 
 /* -- Milliseconds multiplatform implementation -------- */
 /* Taken from: https://stackoverflow.com/a/28827188 */
@@ -59,7 +56,7 @@ int getch() {
 	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 	return ch;
 }
-#endif 
+#endif
 
 /* ----------------------------------------------------- */
 /* ---------------- Virtual machine -------------------- */
@@ -97,13 +94,21 @@ typedef uintptr_t uCELL;
 #define sCHAR sizeof(CHAR)
 #define CELL_BITS sCELL*8
 
-/* Predefined sizes */
-/* TODO: they should be modifiable before context creation */
-/* or before including this file */
+#ifndef STACK_SIZE
 #define STACK_SIZE 64
+#endif
+
+#ifndef RETURN_STACK_SIZE
 #define RETURN_STACK_SIZE 64
+#endif
+
+#ifndef DSIZE
 #define DSIZE 131072
+#endif
+
+#ifndef PSIZE
 #define PSIZE 512
+#endif
 
 struct VM;
 typedef void (*F)(struct VM*);
@@ -128,18 +133,6 @@ typedef struct VM {
 	P *p;
 } X;
 
-
-/* Pre-definitions */
-void _do(X*);
-void _question_do(X*);
-void _i(X*);
-void _j(X*);
-void _loop(X*);
-void _plus_loop(X*);
-void _base(X*);
-void _dot(X*);
-void _dot_s(X*);
-
 void init(X* x, CELL d, CELL sz) { 
 	x->sp = 0; 
 	x->rp = 0; 
@@ -152,13 +145,11 @@ void init(X* x, CELL d, CELL sz) {
 
 /* Data stack */
 
+/* TODO: Add checks for stack underflow/overflow */
+
 void push(X* x, CELL v) { x->s[x->sp] = v; x->sp++; }
 CELL pop(X* x) { x->sp--; return x->s[x->sp]; }
 CELL pick(X* x, CELL a) { return x->s[x->sp - a - 1]; }
-
-/* Helpers for double numbers */
-
-CELL lower_half(CELL v) { return ((v) & (((uCELL)1 << (sCELL*4)) - 1)); }
 
 /* Return stack */
 
@@ -246,6 +237,8 @@ void throw(X* x, CELL e) {
 		/* If no exception frame has been nested with CATCH */
 		/* the system should just go back to the OS. */
 		printf(" Exception %ld, ending.\n", e);
+		/* DEBUG Temporal printing of input buffer before throw */
+		printf("%.*s\n", (int)fetch(x, to_abs(x, 6*sCELL)), (char*)fetch(x, to_abs(x, 4*sCELL)));
 		exit(e);
 	}
 }
@@ -653,37 +646,19 @@ void _interpret(X* x) {
 	}
 }
 
+/* -- Required words to bootstrap ---------------------- */
+
 /* Commands that can help you start or end work sessions */
 
-void _unused(X* x) { push(x, x->sz - get(x, HERE)); }
 void _bye(X* x) { printf("\n"); exit(0); }
-void _time_and_date(X* x) {
-	time_t t = time(NULL);
-	struct tm *tm = localtime(&t);
-	push(x, tm->tm_sec);
-	push(x, tm->tm_min);
-	push(x, tm->tm_hour);
-	push(x, tm->tm_mday);
-	push(x, tm->tm_mon + 1);
-	push(x, tm->tm_year + 1900);
-}
 
 /* Commands to inspect memory, debug & view code */
 
 void _depth(X* x) { push(x, x->sp); }
-
-/* Commands that change compilation & interpretation settings */
-
-void _forget(X* x) { /* Obsolescent, don't implement */ }
-
-
-void _assembler(X* x) { /* TODO */ }
-void _editor(X* x) { /* TODO */ }
+void _unused(X* x) { push(x, x->sz - get(x, HERE)); }
 
 /* Source code preprocessing, interpreting & auditing commands */
 
-void _include_file(X* x) { /* TODO */ }
-/* Pre-definition */ void _refill(X*);
 void _included(X* x) {
 	FILE *f;
 	char filename[1024];
@@ -739,14 +714,6 @@ void _included(X* x) {
 	set(x, IPOS, previpos);
 	set(x, ILEN, previlen);
 }
-void _load(X* x) { /* TODO */ }
-void _thru(X* x) { /* TODO */ }
-
-/* Dynamic memory operations */
-
-void _allocate(X* x) { push(x, (CELL)malloc(pop(x))); }
-void _free(X* x) { free((void*)pop(x)); }
-void _resize(X* x) { /* TODO */ }
 
 /* String operations */
 
@@ -766,55 +733,12 @@ void _move(X* x) {
 	}
 }
 
-void _to_float(X* x) { /* TODO */ }
-void _represent(X* x) { /* TODO */ }
-
-/* Disk input/output operations using files or block buffers */
-
-void _block(X* x) { /* TODO */ }
-void _buffer(X* x) { /* TODO */ }
-void _empty_buffers(X* x) { /* TODO */ }
-void _flush(X* x) { /* TODO */ }
-void _save_buffers(X* x) { /* TODO */ }
-void _scr(X* x) { /* TODO */ }
-void _update(X* x) { /* TODO */ }
-
-void _bin(X* x) { /* TODO */ }
-void _close_file(X* x) { /* TODO */ }
-void _create_file(X* x) { /* TODO */ }
-void _delete_file(X* x) { /* TODO */ }
-void _file_position(X* x) { /* TODO */ }
-void _file_size(X* x) { /* TODO */ }
-void _file_status(X* x) { /* TODO */ }
-void _flush_file(X* x) { /* TODO */ }
-void _open_file(X* x) { /* TODO */ }
-void _r_o(X* x) { /* TODO */ }
-void _r_w(X* x) { /* TODO */ }
-void _read_file(X* x) { /* TODO */ }
-void _read_line(X* x) { /* TODO */ }
-void _rename_file(X* x) { /* TODO */ }
-void _reposition_file(X* x) { /* TODO */ }
-void _resize_file(X* x) { /* TODO */ }
-void _w_o(X* x) { /* TODO */ }
-void _write_file(X* x) { /* TODO */ }
-void _write_line(X* x) { /* TODO */ }
-
 /* More input/output operations */
+
+/* TODO EMIT/KEY should be implementable by user */
 
 void _emit(X* x) { printf("%c", (CHAR)pop(x)); }
 void _key(X* x) { push(x, getch()); }
-
-void _f_dot(X* x) { /* TODO */ }
-void _f_e_dot(X* x) { /* TODO */ }
-void _f_s_dot(X* x) { /* TODO */ }
-
-void _e_key(X* x) { /* TODO */ }
-void _e_key_to_char(X* x) { /* TODO */ }
-void _e_key_question(X* x) { /* TODO */ }
-void _emit_question(X* x) { /* TODO */ }
-void _key_question(X* x) { /* TODO */ }
-void _ms(X* x) { sleep_ms(pop(x)); }
-void _page(X* x) { /* TODO */ }
 
 /* Arithmetic and logical operations */
 
@@ -822,6 +746,7 @@ void _and(X* x) { CELL v = pop(x); push(x, pop(x) & v); }
 
 void _invert(X* x) { push(x, ~pop(x)); }
 void _l_shift(X* x) { CELL n = pop(x); push(x, pop(x) << n); }
+
 /* Code for _m_star has been created by claude.ai */
 void _m_star(X* x) {
 	CELL b = pop(x), a = pop(x), high, low;
@@ -859,16 +784,90 @@ void _m_star(X* x) {
 	push(x, low);
 	push(x, high);
 }
-void _d_max(X* x) { /* TODO */ }
-void _d_min(X* x) { /* TODO */ }
+
 void _minus(X* x) { CELL a = pop(x); push(x, pop(x) - a); }
-void _d_minus(X* x) { /* TODO */ }
-/* Pre-definition */ void _s_m_slash_rem(X*);
+
 /* Pre-definition */ void _to_r(X*);
 /* Pre-definition */ void _r_from(X*);
-void _star_slash_mod(X* x) { _to_r(x); _m_star(x); _r_from(x); _s_m_slash_rem(x); }
-void _d_negate(X* x) { /* TODO */ }
+void _s_m_slash_rem(X* x) {
+	CELL n1 = pop(x), d1_hi = pop(x), d1_lo = pop(x);
+
+	uCELL q, r;
+	
+	/* Track signs */
+	CELL d_neg = (d1_hi < 0);
+	CELL n_neg = (n1 < 0);
+	
+	/* Use unsigned arithmetic for the algorithm */
+	uCELL abs_n1 = n_neg ? (uCELL)-n1 : (uCELL)n1;
+	uCELL abs_d_hi, abs_d_lo;
+	
+	/* Get absolute value of double-word dividend */
+	if (d_neg) {
+		/* Two's complement negation for double word */
+		abs_d_lo = (uCELL)-d1_lo;
+		abs_d_hi = (uCELL)(~d1_hi + (abs_d_lo == 0));
+	} else {
+		abs_d_hi = (uCELL)d1_hi;
+		abs_d_lo = (uCELL)d1_lo;
+	}
+	
+	/* Initialize quotient and remainder */
+	q = 0;
+	r = 0;
+	
+	/* Process 128 bits of the dividend (64 high bits + 64 low bits) 
+	 * using the standard long division algorithm
+	 */
+	
+	/* First the high bits */
+	{
+		CELL i;
+		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
+			/* Shift remainder left by 1 bit and bring in next bit of dividend */
+			r = (r << 1) | ((abs_d_hi >> i) & 1);
+			
+			/* If remainder >= divisor, subtract and set quotient bit */
+			if (r >= abs_n1) {
+				r -= abs_n1;
+				q |= (1UL << i);
+			}
+		}
+	}
+	
+	/* Then the low bits */
+	{
+		CELL i;
+		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
+			/* Shift remainder left by 1 bit and bring in next bit of dividend */
+			r = (r << 1) | ((abs_d_lo >> i) & 1);
+			
+			/* If remainder >= divisor, subtract and set quotient bit */
+			if (r >= abs_n1) {
+				r -= abs_n1;
+				q |= (1UL << i);
+			}
+		}
+	}
+	
+	/* Apply sign to results */
+	{
+		/* For symmetric division (SM/REM):
+		 * 1. Quotient sign depends on operand signs (like normal division)
+		 * 2. Remainder has the same sign as the dividend
+		 * 3. No adjustment needed - we just truncate toward zero
+		 */
+		CELL quotient = (d_neg != n_neg) ? -(CELL)q : q;
+		CELL remainder = d_neg ? -(CELL)r : r;
+		
+		/* Push results back onto the stack */
+		push(x, remainder);
+		push(x, quotient);
+	}
+}
+
 void _plus(X* x) { CELL a = pop(x); push(x, pop(x) + a); }
+
 /* Code adapted from pForth */
 void _d_plus(X* x) { 
 	uCELL ah, al, bl, bh, sh, sl;
@@ -883,16 +882,15 @@ void _d_plus(X* x) {
 	push(x, sl);
 	push(x, sh);
 }
-void _m_plus(X* x) { /* TODO */ }
-void _d_plus_store(X* x) { /* TODO */ }
-void _r_shift(X* x) { CELL n = pop(x); push(x, ((uCELL)pop(x)) >> n); }
-void _d_slash(X* x) { /* TODO */ }
+
+void _r_shift(X* x) { 
+	CELL n = pop(x); 
+	push(x, ((uCELL)pop(x)) >> n); 
+}
+
 void _star(X* x) { CELL b = pop(x); push(x, pop(x) * b); }
-/* Pre-definition */ void _nip(X*);
-void _m_star_slash(X* x) { /* TODO */ }
-void _d_two_star(X* x) { /* TODO */ }
+
 void _two_slash(X* x) { push(x, pop(x) >> 1); }
-void _d_two_slash(X* x) { /* TODO */ }
 void _u_m_star(X* x) {
 	uCELL b = (uCELL)pop(x), a = (uCELL)pop(x), high, low;
 
@@ -1046,7 +1044,19 @@ void _semicolon(X* x) {
 
 void _recurse(X* x) { compile(x, get(x, LATESTXT)); }
 void _catch(X* x) { catch(x, pop(x)); }
-void _throw(X* x) { CELL e = pop(x); if (e != 0) throw(x, e); }
+void _throw(X* x) { 
+	CELL e = pop(x); 
+	if (e != 0) {
+		if (e == -2) {
+			int l = (int)pop(x);
+			char *a = (char*)pop(x);
+			if (x->jmpbuf_idx < 0) {
+				printf("Error: %.*s\n", l, a);
+			}
+		}
+		throw(x, e);
+	}
+}
 
 void _code(X* x) { /* TODO */ }
 void _semicolon_code(X* x) { /* TODO */ }
@@ -1062,8 +1072,6 @@ void _pick(X* x) {  push(x, pick(x, pop(x))); }
 void _to_r(X* x) { rpush(x, pop(x)); }
 void _r_from(X* x) { push(x, rpop(x)); }
 void _swap(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a); push(x, b); }
-
-void _two_rot(X* x) { /* TODO */ }
 
 void _f_depth(X* x) { /* TODO */ }
 void _f_drop(X* x) { /* TODO */ }
@@ -1236,10 +1244,6 @@ CELL code(X* x, char* name, CELL xt) {
 void _to_abs(X* x) { push(x, pop(x) + x->d); }
 void _to_rel(X* x) { push(x, pop(x) - x->d); }
 
-/* Helper to know if exception frames have been nested */
-
-void _exc_frames(X* x) { push(x, x->jmpbuf_idx < 0 ? 0 : -1); }
-
 /* Helper to empty the return stack */
 
 void _empty_rs(X* x) { x->rp = 0; }
@@ -1288,158 +1292,42 @@ void bootstrap(X* x) {
 
 	/* Commands that can help you start or end work sessions */
 
-	/* Not needed: code(x, "ENVIRONMENT?", primitive(x, &_environment_q)); */
 	/* NEEDED */ code(x, "UNUSED", primitive(x, &_unused));
-	/* Not needed: code(x, "WORDS", primitive(x, &_words)); */
 	/* NEEDED */ code(x, "BYE", primitive(x, &_bye));
-	/* NEEDED */ code(x, "TIME&DATE", primitive(x, &_time_and_date));
 
 	/* Commands to inspect memory, debug & view code */
 
 	/* NEEDED */ code(x, "DEPTH", primitive(x, &_depth));
 	/* BLOCK: Not needed code(x, "LIST", primitive(x, &_list)); */
-	/* Not needed: code(x, "DUMP", primitive(x, &_dump)); */
-	/* Not needed: code(x, "?", primitive(x, &_question)); */
-	/* Not needed: code(x, ".S", primitive(x, &_dot_s)); */
-	/* Not needed: code(x, "SEE", primitive(x, &_see)); */
-
-	/* Commands that change compilation & interpretation settings */
-
-	/* Not needed: code(x, "BASE", primitive(x, &_base)); */
-	/* Not needed: code(x, "DECIMAL", primitive(x, &_decimal)); */
-	/* Obsolescent: code(x, "FORGET", primitive(x, &_forget)); */
-	/* Not needed: code(x, "HEX", primitive(x, &_hex)); */
-	/* Not needed: code(x, "MARKER", primitive(x, &_marker)); */
-
-	/* Not needed: code(x, "ALSO", primitive(x, &_also)); */
-	/* Not needed: code(x, "DEFINITIONS", primitive(x, &_definitions)); */
-	/* Not needed: code(x, "FORTH", primitive(x, &_forth)); */
-	/* Not needed: code(x, "FORTH-WORDLIST", primitive(x, &_forth_wordlist)); */
-	/* Not needed: code(x, "GET-CURRENT", primitive(x, &_get_current)); */
-	/* Not needed: code(x, "GET-ORDER", primitive(x, &_get_order)); */
-	/* Not needed: code(x, "ONLY", primitive(x, &_only)); */
-	/* Not needed: code(x, "ORDER", primitive(x, &_order)); */
-	/* Not needed: code(x, "PREVIOUS", primitive(x, &_previous)); */
-	/* Not needed: code(x, "SET-CURRENT", primitive(x, &_set_current)); */
-	/* Not needed: code(x, "SET-ORDER", primitive(x, &_set_order)); */
-	/* Not needed: code(x, "WORDLIST", primitive(x, &_wordlist)); */
-	
-	code(x, "ASSEMBLER", primitive(x, &_assembler));
-	code(x, "EDITOR", primitive(x, &_editor));
 
 	/* Source code preprocessing, interpreting & auditing commands */
 
-	/* Not needed: code(x, ".(", primitive(x, &_dot_paren)); _immediate(x); */
-	code(x, "INCLUDE-FILE", primitive(x, &_include_file));
 	code(x, "INCLUDED", primitive(x, &_included));
-	code(x, "LOAD", primitive(x, &_load));
-	code(x, "THRU", primitive(x, &_thru));
-	/* Not needed: code(x, "[IF]", primitive(x, &_bracket_if)); */
-	/* Not needed: code(x, "[ELSE]", primitive(x, &_bracket_else)); */
-	/* Not needed: code(x, "[THEN]", primitive(x, &_bracket_then)); */
-
-	/* Comment-introducing operations */
-
-	/* Not needed: code(x, "\\", primitive(x, &_backslash)); _immediate(x); */
-	/* Not needed: code(x, "(", primitive(x, &_paren)); _immediate(x); */
-
-	/* Dynamic memory operations */
-
-	code(x, "ALLOCATE", primitive(x, &_allocate));
-	code(x, "FREE", primitive(x, &_free));
-	code(x, "RESIZE", primitive(x, &_resize));
 
 	/* String operations */
 
-	/* Not needed: code(x, "COUNT", primitive(x, &_count)); */
-	/* Not needed: code(x, "ERASE", primitive(x, &_erase)); */
-	/* Not needed: code(x, "FILL", primitive(x, &_fill)); */
-	/* Not needed: code(x, "HOLD", primitive(x, &_hold)); */
 	code(x, "MOVE", primitive(x, &_move));
-	/* Not needed: code(x, ">NUMBER", primitive(x, &_to_number)); */
-	/* Not needed: code(x, "<#", primitive(x, &_less_number_sign)); */
-	/* Not needed: code(x, "#>", primitive(x, &_number_sign_greater)); */
-	/* Not needed: code(x, "#", primitive(x, &_number_sign)); */
-	/* Not needed: code(x, "#S", primitive(x, &_number_sign_s)); */
-	/* Not needed: code(x, "SIGN", primitive(x, &_sign)); */
-	/* Not needed: code(x, "BLANK", primitive(x, &_blank)); */
-	/* Not needed: code(x, "CMOVE", primitive(x, &_cmove)); */
-	/* Not needed: code(x, "CMOVE>", primitive(x, &_cmove_up)); */
-	/* Not needed: code(x, "COMPARE", primitive(x, &_compare)); */
-	/* Not needed: code(x, "SEARCH", primitive(x, &_search)); */
-	/* Not needed: code(x, "/STRING", primitive(x, &_slash_string)); */
-	/* Not needed: code(x, "-TRAILING", primitive(x, &_dash_trailing)); */
-	/* FLOATING */ code(x, ">FLOAT", primitive(x, &_to_float));
-	/* FLOATING */ code(x, "REPRESENT", primitive(x, &_represent));
-
+	
 	/* More input/output operations */
 
-	/* Not needed: code(x, "ACCEPT", primitive(x, &_accept)); */
-	/* Not needed: code(x, "CR", primitive(x, &_cr)); */
-	/* Not needed: code(x, ".", primitive(x, &_dot)); */
-	/* Not needed: code(x, ".R", primitive(x, &_dot_r)); */
-	/* Not needed: code(x, ".\"", primitive(x, &_dot_quote)); _immediate(x); */
 	code(x, "EMIT", primitive(x, &_emit));
 	code(x, "KEY", primitive(x, &_key));
-	/* Not needed: code(x, "SPACE", primitive(x, &_space)); */
-	/* Not needed: code(x, "SPACES", primitive(x, &_spaces)); */
-	/* Not needed: code(x, "TYPE", primitive(x, &_type)); */
-	/* Not needed: code(x, "U.", primitive(x, &_u_dot)); */
-	/* Not needed: code(x, "U.R", primitive(x, &_u_dot_r)); */
-	code(x, "F.", primitive(x, &_f_dot));
-	code(x, "FE.", primitive(x, &_f_e_dot));
-	code(x, "FS.", primitive(x, &_f_s_dot));
-	/* Not needed: code(x, "AT-XY", primitive(x, &_at_x_y)); */
-	code(x, "EKEY", primitive(x, &_e_key));
-	code(x, "EKEY>CHAR", primitive(x, &_e_key_to_char));
-	code(x, "EKEY?", primitive(x, &_e_key_question));
-	code(x, "EMIT?", primitive(x, &_emit_question));
-	code(x, "KEY?", primitive(x, &_key_question));
-	code(x, "MS", primitive(x, &_ms));
-	code(x, "PAGE", primitive(x, &_page));
 
 	/* Arithmetic and logical operations */
 
-	/* Not needed: code(x, "ABS", primitive(x, &_abs)); */
-	/* Not needed: code(x, "DABS", primitive(x, &_d_abs)); */
 	code(x, "AND", primitive(x, &_and));
-	/* Not needed: code(x, "FM/MOD", primitive(x, &_f_m_slash_mod)); */
 	code(x, "INVERT", primitive(x, &_invert));
 	code(x, "LSHIFT", primitive(x, &_l_shift));
 	code(x, "M*", primitive(x, &_m_star));
-	/* Not needed: code(x, "MAX", primitive(x, &_max)); */
-	code(x, "DMAX", primitive(x, &_d_max));
-	/* Not needed: code(x, "MIN", primitive(x, &_min)); */
-	code(x, "DMIN", primitive(x, &_d_min));
 	code(x, "-", primitive(x, &_minus));
-	code(x, "D-", primitive(x, &_d_minus));
-	/* Not needed: code(x, "MOD", primitive(x, &_mod)); */
-	code(x, "*/MOD", primitive(x, &_star_slash_mod));
-	/* Not needed: code(x, "/MOD", primitive(x, &_slash_mod)); */
-	/* Not needed: code(x, "NEGATE", primitive(x, &_negate)); */
-	/* Not needed: code(x, "1+", primitive(x, &_one_plus)); */
-	/* Not needed: code(x, "1-", primitive(x, &_one_minus)); */
-	/* Not needed: code(x, "OR", primitive(x, &_or)); */
+	code(x, "SM/REM", primitive(x, &_s_m_slash_rem));
 	code(x, "+", primitive(x, &_plus));
 	code(x, "D+", primitive(x, &_d_plus));
-	code(x, "M+", primitive(x, &_m_plus));
-	/* Not needed: code(x, "+!", primitive(x, &_plus_store)); */
-	code(x, "D+!", primitive(x, &_d_plus_store));
 	code(x, "RSHIFT", primitive(x, &_r_shift));
-	/* Not needed: code(x, "/", primitive(x, &_slash)); */
-	code(x, "D/", primitive(x, &_d_slash));
-	/* Not needed: code(x, "SM/REM", primitive(x, &_s_m_slash_rem)); */
 	code(x, "*", primitive(x, &_star));
-	/* I needed to put the name as *//* to comment this one */
-	/* Not needed: code(x, "*//*", primitive(x, &_star_slash)); */
-	code(x, "M*/", primitive(x, &_m_star_slash));
-	/* Not needed: code(x, "2*", primitive(x, &_two_star)); */
-	code(x, "D2*", primitive(x, &_d_two_star));
 	code(x, "2/", primitive(x, &_two_slash));
-	code(x, "D2/", primitive(x, &_d_two_slash));
 	code(x, "UM*", primitive(x, &_u_m_star));
 	code(x, "UM/MOD", primitive(x, &_u_m_slash_mod));
-	/* Not needed: code(x, "XOR", primitive(x, &_xor)); */
 
 	code(x, "F*", primitive(x, &_f_star));
 	code(x, "F/", primitive(x, &_f_slash));
@@ -1460,83 +1348,37 @@ void bootstrap(X* x) {
 
 	/* Commands to define data structures */
 
-	/* Not needed: code(x, "CONSTANT", primitive(x, &_constant)); */
-	/* Not needed: code(x, "VALUE", primitive(x, &_value)); */
-	/* Not needed: code(x, "VARIABLE", primitive(x, &_variable)); */
-
 	code(x, "2CONSTANT", primitive(x, &_two_constant));
 	code(x, "2VARIABLE", primitive(x, &_two_variable));
 
 	code(x, "FCONSTANT", primitive(x, &_f_constant));
 	code(x, "FVARIABLE", primitive(x, &_f_variable));
 
-	/* Not needed: code(x, "BUFFER:", primitive(x, &_buffer_colon)); */
-
 	/* Memory-stack transfer operations */
 
 	code(x, "C@", primitive(x, &_c_fetch));
 	code(x, "C!", primitive(x, &_c_store));
 	code(x, "@", primitive(x, &_fetch));
-	/* Not needed: code(x, "2@", primitive(x, &_two_fetch)); */
 	code(x, "!", primitive(x, &_store));
-	/* Not needed: code(x, "2!", primitive(x, &_two_store)); */
-	/* code(x, "TO", primitive(x, &_to)); */
 
 	code(x, "F@", primitive(x, &_f_fetch));
 	code(x, "F!", primitive(x, &_f_store));
 
-	/* LOCAL: code(x, "TO", primitive(x, &_to)); */
-
 	/* Comparison operations */
 
 	code(x, "=", primitive(x, &_equals));
-	/* Not needed: code(x, ">", primitive(x, &_greater_than)); */
 	code(x, "<", primitive(x, &_less_than));
-	/* Not needed: code(x, "<>", primitive(x, &_not_equals)); */
-	/* Not needed: code(x, "U<", primitive(x, &_u_less_than)); */
-	/* Not needed: code(x, "U>", primitive(x, &_u_greater_than)); */
-	/* Not needed: code(x, "WITHIN", primitive(x, &_within)); */
-	/* Not needed: code(x, "0=", primitive(x, &_zero_equals)); */
-	/* Not needed: code(x, "0>", primitive(x, &_zero_greater_than)); */
-	/* Not needed: code(x, "0<", primitive(x, &_zero_less_than)); */
-	/* Not needed: code(x, "0<>", primitive(x, &_zero_not_equals)); */
 
 	code(x, "F<", primitive(x, &_f_less_than));
 	code(x, "F0=", primitive(x, &_f_zero_equals));
 	code(x, "F0<", primitive(x, &_f_zero_less_than));
 
-	/* System constants & facilities for generating ASCII values */
-
-	/* Not needed: code(x, "BL", primitive(x, &_bl)); */
-	/* Not needed: code(x, "CHAR", primitive(x, &_char)); */
-	/* Not needed: code(x, "[CHAR]", primitive(x, &_bracket_char)); _immediate(x); */
-	/* Not needed: code(x, "FALSE", primitive(x, &_false)); */
-	/* Not needed: code(x, "TRUE", primitive(x, &_true)); */
-
 	/* Forming definite loops */
 
-	/* Not needed: code(x, "DO", primitive(x, &_do)); _immediate(x); */
-	/* Not needed: code(x, "?DO", primitive(x, &_question_do)); _immediate(x); */
-	/* Not needed: code(x, "I", primitive(x, &_i)); */
-	/* Not needed: code(x, "J", primitive(x, &_j)); */
-	/* Not needed: code(x, "LEAVE", primitive(x, &__leave)); */
 	code(x, "UNLOOP", primitive(x, &_unloop));
-	/* Not needed: code(x, "LOOP", primitive(x, &_loop)); _immediate(x); */
-	/* Not needed: code(x, "+LOOP", primitive(x, &_plus_loop)); _immediate(x); */
-
-	/* Forming indefinite loops (compiling-mode only) */
-
-	/* Not needed: code(x, "BEGIN", primitive(x, &_begin)); _immediate(x); */
-	/* Not needed: code(x, "AGAIN", primitive(x, &_again)); _immediate(x); */
-	/* Not needed: code(x, "UNTIL", primitive(x, &_until)); _immediate(x); */
-	/* Not needed: code(x, "WHILE", primitive(x, &_while)); _immediate(x); */
-	/* Not needed: code(x, "REPEAT", primitive(x, &_repeat)); _immediate(x); */
 
 	/* More facilities for defining routines (compiling-mode only) */
 
-	/* Not needed: code(x, "ABORT", primitive(x, &_abort)); */
-	/* Not needed: code(x, "ABORT\"", primitive(x, &_abort_quote)); */
-	/* Not needed: code(x, "C\"", primitive(x, &_c_quote)); */
 	code(x, "CASE", primitive(x, &_case));
 	code(x, "OF", primitive(x, &_of));
 	code(x, "ENDOF", primitive(x, &_endof));
@@ -1545,14 +1387,6 @@ void bootstrap(X* x) {
 	code(x, ":NONAME", primitive(x, &_colon_no_name));
 	code(x, ";", primitive(x, &_semicolon)); _immediate(x);
 	/* Already defined: code(x, "EXIT", primitive(x, &p_exit)); */
-	/* Not needed: code(x, "IF", primitive(x, &_if)); _immediate(x); */
-	/* Not needed: code(x, "ELSE", primitive(x, &_else)); _immediate(x); */
-	/* Not needed: code(x, "THEN", primitive(x, &_then)); _immediate(x); */
-	/* Not needed: code(x, "[", primitive(x, &_left_bracket)); _immediate(x); */
-	/* Not needed: code(x, "QUIT", primitive(x, &_quit)); */
-	code(x, "RECURSE", primitive(x, &_recurse)); _immediate(x);
-	/* Not needed: code(x, "]", primitive(x, &_right_bracket)); _immediate(x); */
-	/* Not needed: code(x, "S\"", primitive(x, &_s_quote)); _immediate(x); */
 
 	code(x, "CATCH", primitive(x, &_catch));
 	code(x, "THROW", primitive(x, &_throw));
@@ -1566,27 +1400,13 @@ void bootstrap(X* x) {
 	/* Manipulating stack items */
 
 	code(x, "DROP", primitive(x, &_drop));
-	/* Not needed: code(x, "2DROP", primitive(x, &_two_drop)); */
-	/* Not needed: code(x, "DUP", primitive(x, &_dup)); */
-	/* Not needed: code(x, "2DUP", primitive(x, &_two_dup)); */
-	/* Not needed: code(x, "?DUP", primitive(x, &_question_dup)); */
-	/* Not needed: code(x, "NIP", primitive(x, &_nip)); */
 	code(x, "OVER", primitive(x, &_over));
-	/* Not needed: code(x, "2OVER", primitive(x, &_two_over)); */
 	code(x, "PICK", primitive(x, &_pick));
-	/* Not needed: code(x, "2>R", primitive(x, &_two_to_r)); */
 	code(x, ">R", primitive(x, &_to_r));
-	/* Not needed: code(x, "2R>", primitive(x, &_two_r_from)); */
 	code(x, "R>", primitive(x, &_r_from));
-	/* Not needed: code(x, "R@", primitive(x, &_r_fetch)); */
-	/* Not needed: code(x, "2R@", primitive(x, &_two_r_fetch)); */
-	/* Not needed: code(x, "ROLL", primitive(x, &_roll)); */
-	/* Not needed: code(x, "ROT", primitive(x, &_rot)); */
 	code(x, "SWAP", primitive(x, &_swap));
-	/* Not needed: code(x, "2SWAP", primitive(x, &_two_swap)); */
-	/* Not needed: code(x, "TUCK", primitive(x, &_tuck)); */
 
-	code(x, "2ROT", primitive(x, &_two_rot));
+	code(x, "RECURSE", primitive(x, &_recurse)); _immediate(x);
 
 	code(x, "FDEPTH", primitive(x, &_f_depth));
 	code(x, "FDROP", primitive(x, &_f_drop));
@@ -1597,20 +1417,13 @@ void bootstrap(X* x) {
 
 	/* Constructing compiler and interpreter system extensions */
 
-	/* Not needed: code(x, "ALIGN", primitive(x, &_align)); */
 	code(x, "FALIGN", primitive(x, &_f_align));
-	/* Not needed: code(x, "ALIGNED", primitive(x, &_aligned)); */
 	code(x, "FALIGNED", primitive(x, &_f_aligned));
 	code(x, "ALLOT", primitive(x, &_allot));
-	/* Not needed: code(x, ">BODY", primitive(x, &_to_body)); */
-	/* Not needed: code(x, "C,", primitive(x, &_c_comma)); */
-	/* Not needed: code(x, "CELL+", primitive(x, &_cell_plus)); */
 	code(x, "FLOAT+", primitive(x, &_float_plus));
 	code(x, "CELLS", primitive(x, &_cells));
 	code(x, "FLOATS", primitive(x, &_floats));
-	/* Not needed: code(x, "CHAR+", primitive(x, &_char_plus)); */
 	code(x, "CHARS", primitive(x, &_chars));
-	/* Not needed: code(x, ",", primitive(x, &_comma)); */
 	code(x, "COMPILE,", primitive(x, &_compile_comma));
 	code(x, "[COMPILE]", primitive(x, &_bracket_compile));
 	code(x, "CREATE", primitive(x, &_create));
@@ -1620,28 +1433,17 @@ void bootstrap(X* x) {
 	code(x, "HERE", primitive(x, &_here));
 	code(x, "IMMEDIATE", primitive(x, &_immediate));
 	code(x, ">IN", primitive(x, &_to_in));
-	/* Not needed: code(x, "[']", primitive(x, &_bracket_tick)); _immediate(x); */
-	/* Not needed: code(x, "LITERAL", primitive(x, &_literal)); _immediate(x); */
-	/* Not needed: code(x, "PAD", primitive(x, &_pad)); */
-	/* Not needed: code(x, "PARSE", primitive(x, &_parse)); */
 	code(x, "POSTPONE", primitive(x, &_postpone)); _immediate(x);
 	/* code(x, "QUERY", primitive(x, &_query)); */
 	code(x, "REFILL", primitive(x, &_refill));
-	/* Not needed: code(x, "RESTORE-INPUT", primitive(x, &_restore_input)); */
-	/* Not needed: code(x, "SAVE-INPUT", primitive(x, &_save_input)); */
 	code(x, "SOURCE", primitive(x, &_source));
-	/* Not needed: code(x, "SOURCE-ID", primitive(x, &_source_id)); */
 	code(x, "SPAN", primitive(x, &_span));
-	/* Not needed: code(x, "STATE", primitive(x, &_state)); */
 	/* code(x, "TIB", primitive(x, &_tib)); */
 	/* code(x, "#TIB", primitive(x, &_number_tib)); */
 	/* Not needed: code(x, "'", primitive(x, &_tick)); */
 	code(x, "WORD", primitive(x, &_word));
 
 	code(x, "FIND", primitive(x, &_find));
-	/* Not needed: code(x, "SEARCH-WORDLIST", primitive(x, &_search_wordlist)); */
-
-	/* Not needed: code(x, "SLITERAL", primitive(x, &_s_literal)); */
 
 	code(x, "2LITERAL", primitive(x, &_two_literal));
 
@@ -1649,7 +1451,6 @@ void bootstrap(X* x) {
 
 	code(x, "BLK", primitive(x, &_blk));
 
-	/* Not needed: code(x, "AHEAD", primitive(x, &_ahead)); */
 	code(x, "CS-PICK", primitive(x, &_c_s_pick));
 	code(x, "CS-ROLL", primitive(x, &_c_s_roll));
 
@@ -1657,9 +1458,11 @@ void bootstrap(X* x) {
 
 	code(x, "TO-ABS", primitive(x, &_to_abs));
 	code(x, "TO-REL", primitive(x, &_to_rel));
+	/* TODO Maybe INTERPRET should be deferred or as a */
+	/* variable to be able to create an INTERPRET for */
+	/* debugging in Forth itself. */
 	code(x, "INTERPRET", primitive(x, &_interpret));
-	code(x, "(EXC-FRAMES?)", primitive(x, &_exc_frames));
-	code(x, "(EMPTY-RS)", primitive(x, &_empty_rs));
+	code(x, "(EMPTY-RETURN-STACK)", primitive(x, &_empty_rs));
 }
 
 /* Helpers to work with files from C */
@@ -1708,728 +1511,3 @@ int main(int argc, char**argv) {
 	free(x->p);
 	free(x);
 }
-
-/* CORE WORDS THAT ARE NOT NEEDED */
-
-/* Manipulating stack items */
-
-void _dup(X* x) { push(x, pick(x, 0)); }
-void _rot(X* x) { 
-	CELL a = pop(x); 
-	CELL b = pop(x); 
-	CELL c = pop(x); 
-	push(x, b); 
-	push(x, a); 
-	push(x, c); 
-}
-void _nip(X* x) { CELL v = pop(x); pop(x); push(x, v); }
-void _tuck(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a); push(x, b); push(x, a); }
-void _roll(X* x) { /* TODO */ }
-void _question_dup(X* x) { if (pick(x, 0) != 0) _dup(x); }
-void _r_fetch(X* x) { push(x, rpick(x, 0)); }
-void _two_drop(X* x) { pop(x); pop(x); }
-void _two_dup(X* x) { push(x, pick(x, 1)); push(x, pick(x, 1)); }
-void _two_swap(X* x) { 
-	CELL a = pop(x); 
-	CELL b = pop(x); 
-	CELL c = pop(x); 
-	CELL d = pop(x); 
-	push(x, b); 
-	push(x, a); 
-	push(x, d); 
-	push(x, c); 
-}
-void _two_to_r(X* x) { 
-	CELL a = pop(x); 
-	rpush(x, pop(x)); 
-	rpush(x, a); 
-}
-void _two_r_fetch(X* x) { 
-	push(x, rpick(x, 1)); 
-	push(x, rpick(x, 0)); 
-}
-void _two_r_from(X* x) { 
-	CELL a = rpop(x); 
-	push(x, rpop(x)); 
-	push(x, a); 
-}
-void _two_over(X* x) { 
-	push(x, pick(x, 3)); 
-	push(x, pick(x, 3)); 
-}
-
-/* Memory-stack transfer operations */
-
-void _two_store(X* x) {
-	CELL a = pop(x);
-	store(x, a, pop(x));
-	store(x, a + sCELL, pop(x));
-}
-void _two_fetch(X* x) { 
-	CELL a = pop(x);
-	push(x, fetch(x, a + sCELL));
-	push(x, fetch(x, a));
-}
-
-/* Arithmetic and logical operations */
-
-void _d_abs(X* x) { /* TODO */ }
-void _mod(X* x) { CELL a = pop(x); push(x, pop(x) % a); }
-void _slash(X* x) { CELL a = pop(x); push(x, pop(x) / a); }
-void _star_slash(X* x) { _star_slash_mod(x); _nip(x); }
-void _slash_mod(X* x) { 
-	CELL b = pop(x), a = pop(x);
-	push(x, a%b);
-	push(x, a/b);
-}
-void _one_plus(X* x) { push(x, pop(x) + 1); }
-void _one_minus(X* x) { push(x, pop(x) - 1); }
-void _two_star(X* x) { push(x, 2*pop(x)); }
-void _abs(X* x) { CELL v = pop(x); push(x, v < 0 ? (0-v) : v); }
-void _negate(X* x) { push(x, 0 - pop(x)); }
-void _or(X* x) { CELL a = pop(x); push(x, pop(x) | a); }
-void _xor(X* x) { CELL a = pop(x); push(x, pop(x) ^ a); }
-void _min(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a < b ? a : b); }
-void _max(X* x) { CELL a = pop(x); CELL b = pop(x); push(x, a > b ? a : b); }
-void _plus_store(X* x) {
-	CELL a = pop(x);
-	CELL n = pop(x);
-	store(x, a, fetch(x, a) + n);
-}
-void _s_m_slash_rem(X* x) {
-	CELL n1 = pop(x), d1_hi = pop(x), d1_lo = pop(x);
-
-	uCELL q, r;
-	
-	/* Track signs */
-	CELL d_neg = (d1_hi < 0);
-	CELL n_neg = (n1 < 0);
-	
-	/* Use unsigned arithmetic for the algorithm */
-	uCELL abs_n1 = n_neg ? (uCELL)-n1 : (uCELL)n1;
-	uCELL abs_d_hi, abs_d_lo;
-	
-	/* Get absolute value of double-word dividend */
-	if (d_neg) {
-		/* Two's complement negation for double word */
-		abs_d_lo = (uCELL)-d1_lo;
-		abs_d_hi = (uCELL)(~d1_hi + (abs_d_lo == 0));
-	} else {
-		abs_d_hi = (uCELL)d1_hi;
-		abs_d_lo = (uCELL)d1_lo;
-	}
-	
-	/* Initialize quotient and remainder */
-	q = 0;
-	r = 0;
-	
-	/* Process 128 bits of the dividend (64 high bits + 64 low bits) 
-	 * using the standard long division algorithm
-	 */
-	
-	/* First the high bits */
-	{
-		CELL i;
-		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
-			/* Shift remainder left by 1 bit and bring in next bit of dividend */
-			r = (r << 1) | ((abs_d_hi >> i) & 1);
-			
-			/* If remainder >= divisor, subtract and set quotient bit */
-			if (r >= abs_n1) {
-				r -= abs_n1;
-				q |= (1UL << i);
-			}
-		}
-	}
-	
-	/* Then the low bits */
-	{
-		CELL i;
-		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
-			/* Shift remainder left by 1 bit and bring in next bit of dividend */
-			r = (r << 1) | ((abs_d_lo >> i) & 1);
-			
-			/* If remainder >= divisor, subtract and set quotient bit */
-			if (r >= abs_n1) {
-				r -= abs_n1;
-				q |= (1UL << i);
-			}
-		}
-	}
-	
-	/* Apply sign to results */
-	{
-		/* For symmetric division (SM/REM):
-		 * 1. Quotient sign depends on operand signs (like normal division)
-		 * 2. Remainder has the same sign as the dividend
-		 * 3. No adjustment needed - we just truncate toward zero
-		 */
-		CELL quotient = (d_neg != n_neg) ? -(CELL)q : q;
-		CELL remainder = d_neg ? -(CELL)r : r;
-		
-		/* Push results back onto the stack */
-		push(x, remainder);
-		push(x, quotient);
-	}
-}
-void _f_m_slash_mod(X* x) {
-	CELL n1 = pop(x), d1_hi = pop(x), d1_lo = pop(x);
-
-	uCELL q, r;
-    
-  /* Track signs */
-  CELL d_neg = (d1_hi < 0);
-  CELL n_neg = (n1 < 0);
-    
-  /* Use unsigned arithmetic for the algorithm */
-  uCELL abs_n1 = n_neg ? (uCELL)-n1 : (uCELL)n1;
-  uCELL abs_d_hi, abs_d_lo;
-    
-  /* Get absolute value of double-word dividend */
-  if (d_neg) {
-    /* Two's complement negation for double word */
-    abs_d_lo = (uCELL)-d1_lo;
-    abs_d_hi = (uCELL)(~d1_hi + (abs_d_lo == 0));
-  } else {
-    abs_d_hi = (uCELL)d1_hi;
-    abs_d_lo = (uCELL)d1_lo;
-  }
-    
-  /* Initialize quotient and remainder */
-  q = 0;
-  r = 0;
-    
-  /* Process 128 bits of the dividend (64 high bits + 64 low bits) 
-  * using the standard long division algorithm
-  */
-    
-  /* First the high bits */
-  {
-    CELL i;
-    for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
-      /* Shift remainder left by 1 bit and bring in next bit of dividend */
-      r = (r << 1) | ((abs_d_hi >> i) & 1);
-            
-      /* If remainder >= divisor, subtract and set quotient bit */
-      if (r >= abs_n1) {
-        r -= abs_n1;
-        q |= (1UL << i);
-      }
-    }
-  }
-    
-  /* Then the low bits */
-  {
-    CELL i;
-    for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
-      /* Shift remainder left by 1 bit and bring in next bit of dividend */
-      r = (r << 1) | ((abs_d_lo >> i) & 1);
-            
-      /* If remainder >= divisor, subtract and set quotient bit */
-      if (r >= abs_n1) {
-        r -= abs_n1;
-        q |= (1UL << i);
-      }
-    }
-  }
-    
-  /* Apply sign to results */
-  {
-    CELL quotient = (d_neg != n_neg) ? -(CELL)q : q;
-    CELL remainder = d_neg ? -(CELL)r : r;
-    
-    /* Adjust for floored division semantics */
-    if ((d_neg != n_neg) && remainder != 0) {
-        quotient--;
-        remainder += n1;
-    }
-    
-    /* Push results back onto the stack */
-		push(x, remainder);
-		push(x, quotient);
-  }
-}
-
-
-/* Comparison operations */
-
-void _greater_than(X* x) { 
-	CELL a = pop(x); 
-	push(x, pop(x) > a ? -1 : 0); 
-}
-void _not_equals(X* x) { CELL a = pop(x); push(x, pop(x) != a ? -1 : 0); }
-void _zero_equals(X* x) { push(x, pop(x) == 0 ? -1 : 0); }
-void _zero_greater_than(X* x) { push(x, pop(x) > 0 ? -1 : 0); }
-void _zero_not_equals(X* x) { push(x, pop(x) != 0 ? -1 : 0); }
-void _zero_less_than(X* x) { push(x, pop(x) < 0 ? -1 : 0); }
-void _u_less_than(X* x) { 
-	uCELL b = (uCELL)pop(x);
-	uCELL a = (uCELL)pop(x);
-	push(x, a < b ? -1 : 0);
-}
-void _u_greater_than(X* x) { 
-	uCELL b = (uCELL)pop(x);
-	uCELL a = (uCELL)pop(x);
-	push(x, a > b ? -1 : 0);
-}
-void _within(X* x) { /* TODO */ }
-
-/* Comment-introducing operations */
-
-void _backslash(X* x) { set(x, IPOS, get(x, ILEN)); }
-void _paren(X* x) {
-	/* TODO */
-	/* ( should be able to work multiline if reading from file */
-	while (get(x, IPOS) < get(x, ILEN)
-	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != ')') {
-		set(x, IPOS, get(x, IPOS) + 1);
-	}
-	if (get(x, IPOS) != get(x, ILEN))
-		set(x, IPOS, get(x, IPOS) + 1);
-}
-
-/* Constructing compiler and interpreter system extensions */
-
-void _cell_plus(X* x) { push(x, pop(x) + sCELL); }
-void _char_plus(X* x) { push(x, pop(x) + 1); }
-void _c_comma(X* x) { ccomma(x, pop(x)); }
-void _comma(X* x) { comma(x, pop(x)); }
-void _literal(X* x) { literal(x, pop(x)); }
-void _aligned(X* x) { /* TODO */ }
-void _align(X* x) { /* TODO */ }
-void _tick(X* x) {
-	CELL tok, tlen;
-	push(x, 32); _word(x);
-	tok = pick(x, 0) + sCHAR;
-	tlen = cfetch(x, pick(x, 0));
-	if (tlen == 0) { pop(x); return; }
-	_find(x);
-	pop(x);
-	push(x, pop(x));
-}
-void _bracket_tick(X* x) { _tick(x); literal(x, pop(x)); }
-void _ahead(X* x) { 
-	compile(x, get_xt(x, find_word(x, "(BRANCH)"))); 
-	_here(x); 
-	comma(x, 0); 
-}
-void _to_body(X* x) { push(x, to_abs(x, pop(x) + 4*sCELL)); }
-void _to(X* x) { /* TODO */ }
-void _parse(X* x) {
-	CHAR c = (CHAR)pop(x);
-	CELL ibuf = get(x, IBUF);
-	CELL ilen = get(x, ILEN);
-	CELL ipos = get(x, IPOS);
-	push(x, ibuf + ipos);
-	while (ipos < ilen && cfetch(x, ibuf + ipos) != c) ipos++;
-	push(x, ibuf + ipos - pick(x, 0));
-	if (ipos < ilen) ipos++;
-	set(x, IPOS, ipos);
-}
-void _s_literal(X* x) { /* TODO */ }
-void _state(X* x) { push(x, to_abs(x, STATE)); }
-void _source_id(X* x) { /* TODO */ }
-void _pad(X* x) { _here(x); push(x, PAD); _plus(x); }
-void _search_wordlist(X* x) { /* TODO */ }
-void _restore_input(X* x) { /* TODO */ }
-void _save_input(X* x) { /* TODO */ }
-
-/* More facilities for defining routines (compiling-mode only) */
-
-void _if(X* x) { 
-	compile(x, get_xt(x, find_word(x, "(?BRANCH)"))); 
-	_here(x); comma(x, 0); 
-}
-void _then(X* x) { _here(x); _over(x); _minus(x); _swap(x); _store(x); }
-void _else(X* x) { _ahead(x); _swap(x); _then(x); }
-void _s_quote(X* x) { 
-	CELL i;
-	/* Parsing */
-	CELL l = 0;
-	CELL a = get(x, IBUF) + get(x, IPOS);
-	while (get(x, IPOS) < get(x, ILEN)
-	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != '"') {
-		l++;
-		set(x, IPOS, get(x, IPOS) + 1);
-	}
-	if (get(x, STATE) == 0) {
-		/* TODO: Should change between SBUF1 and SBUF2 */
-		for (i = 0; i < l; i++) {
-			cset(x, here(x) + SBUF1 + i, cfetch(x, a + i));
-		}
-		push(x, to_abs(x, here(x) + SBUF1));
-		push(x, l);
-	} else {
-		compile(x, get_xt(x, find_word(x, "(STRING)")));
-		comma(x, l);
-		for (i = a; i < (a + l); i++) ccomma(x, cfetch(x, i));
-		align(x);
-	}
-	if (get(x, IPOS) < get(x, ILEN))
-		set(x, IPOS, get(x, IPOS) + 1);
-}
-void _c_quote(X* x) { /* TODO */ }
-void _left_bracket(X* x) { set(x, STATE, 0); }
-void _right_bracket(X* x) { set(x, STATE, 1); }
-void _quit(X* x) { /* TODO */ }
-void _abort(X* x) { /* TODO */ }
-void _abort_quote(X* x) { /* TODO */ }
-
-/* Forming indefinite loops (compiling-mode only) */
-
-void _begin(X* x) { _here(x); }
-void _again(X* x) { 
-	compile(x, get_xt(x, find_word(x, "(BRANCH)"))); 
-	_here(x); _minus(x); _comma(x); 
-}
-void _until(X* x) { 
-	compile(x, get_xt(x, find_word(x, "(?BRANCH)"))); 
-	_here(x); _minus(x); _comma(x); 
-}
-void _while(X* x) { _if(x); _swap(x); }
-void _repeat(X* x) { _again(x); _then(x); }
-
-/* Commands to define data structures */
-
-void _variable(X* x) { _create(x); push(x, 0); _comma(x); }
-void _constant(X* x) { 
-	CELL tok, tlen, v = pop(x);
-	push(x, 32); _word(x);
-	tok = pick(x, 0) + sCHAR;
-	tlen = cfetch(x, pop(x));
-	header(x, tok, tlen);
-	literal(x, v); 
-	compile(x, get_xt(x, find_word(x, "EXIT")));
-}
-void _buffer_colon(X* x) { _create(x); _allot(x); }
-void _value(X* x) { /* TODO */ }
-
-/* System constants & facilities for generating ASCII values */
-
-void _bl(X* x) { push(x, 32); }
-void _char(X* x) {
-	push(x, 32); _word(x);
-	push(x, cfetch(x, pop(x) + 1));
-}
-void _bracket_char(X* x) { 
-	push(x, 32); _word(x);
-	literal(x, cfetch(x, pop(x) + 1));
-}
-void _false(X* x) { push(x, 0); }
-void _true(X* x) { push(x, -1); }
-
-/* String operations */
-
-void _count(X* x) { CELL a = pop(x); push(x, a + 1); push(x, cfetch(x, a)); }
-void _fill(X* x) { 
-	CHAR c = (CHAR)pop(x);
-	CELL u = pop(x);
-	CELL addr = pop(x);
-	if (u > 0) {
-		CELL i;
-		for (i = 0; i < u; i++) {
-			cstore(x, addr + i, c);
-		}
-	}
-}
-void _erase(X* x) { /* TODO */ }
-void _slash_string(X* x) { /* TODO */ }
-void _hold(X* x) { 
-	set(x, HLD, get(x, HLD) - 1);
-	cstore(x, get(x, HLD), pop(x));
-}
-void _less_number_sign(X* x) {
-	set(x, HLD, to_abs(x, here(x) + NBUF));
-}
-void _number_sign_greater(X* x) { 
-	pop(x); pop(x);
-	push(x, get(x, HLD));
-	push(x, to_abs(x, here(x) + NBUF) - get(x, HLD));
-}
-/* Code adapted from lbForth */
-void _number_sign(X* x) {
-	CELL r;
-	push(x, 0);
-	push(x, get(x, BASE));
-	_u_m_slash_mod(x);
-	_to_r(x);
-	push(x, get(x, BASE));
-	_u_m_slash_mod(x);
-	_r_from(x);
-	_rot(x);
-	r = pop(x);
-	if (r > 9) r += 7;
-	r += 48;
-	push(x, r); _hold(x);
-}
-void _number_sign_s(X* x) {
-	do {
-		_number_sign(x);
-		_two_dup(x);
-		_or(x);
-		_zero_equals(x);
-	} while(pop(x) == 0);
-}
-void _sign(X* x) { 
-	if (pop(x) < 0) {
-		push(x, '-'); _hold(x);
-	} 
-}
-/* Helper function for _to_number */
-void _digit(X* x) {
-	_to_r(x);
-	_dup(x); push(x, 'a'); _less_than(x); _zero_equals(x); /* NOT */
-	if (pop(x)) {
-		push(x, 'a'); _minus(x); push(x, 'A'); _plus(x);
-	}
-	_dup(x); _dup(x); push(x, 'A'); _one_minus(x); _greater_than(x);
-	if (pop(x)) {
-		push(x, 'A'); _minus(x); push(x, '9'); _plus(x); _one_plus(x);
-	} else {
-		_dup(x); push(x, '9'); _greater_than(x);
-		if (pop(x)) {
-			_drop(x); push(x, 0);
-		}
-	}
-	push(x, '0'); _minus(x);
-	_dup(x); _r_from(x); _less_than(x);
-	if (pop(x)) {
-		_dup(x); _one_plus(x); _zero_greater_than(x);
-		if (pop(x)) {
-			_nip(x); _true(x);
-		} else {
-			_drop(x); _false(x);
-		}
-	} else {
-		_drop(x); _false(x);
-	}
-}
-/* Code adapted from pForth Forth code */
-void _to_number(X* x) {
-	_to_r(x);
-	do { /* BEGIN */
-		_r_fetch(x); _zero_greater_than(x);
-		if (pop(x)) {
-			_dup(x); _c_fetch(x); _base(x); _fetch(x);
-			_digit(x);
-			if (pop(x)) {
-				_true(x);
-			} else {
-				_drop(x); _false(x);
-			}
-		} else {
-			_false(x);
-		}
-		if (pop(x) == 0) break; /* WHILE */
-		_swap(x); _to_r(x);
-		_swap(x); _base(x); _fetch(x);
-		_u_m_star(x); _drop(x);
-		_rot(x); _base(x); _fetch(x);
-		_u_m_star(x);
-		_d_plus(x);
-		_r_from(x); _one_plus(x);
-		_r_from(x); _one_minus(x); _to_r(x);
-	} while(1);
-	_r_from(x);
-}
-void _cmove(X* x) { /* TODO */ }
-void _cmove_up(X* x) { /* TODO */ }
-void _dash_trailing(X* x) { /* TODO */ }
-void _search(X* x) { /* TODO */ }
-void _compare(X* x) { /* TODO */ }
-void _blank(X* x) { /* TODO */ }
-
-
-/* More input/output operations */
-
-void _cr(X* x) { printf("\n"); }
-void _space(X* x) { printf(" "); }
-void _spaces(X* x) { 
-	CELL i, u = pop(x); 
-	for (i = 0; i < u; i++) printf(" ");
-}
-void _type(X* x) { 
-	CELL l = pop(x); 
-	CELL a = pop(x);
-	CELL i;
-	CHAR c;
-	for (i = a; i < a + l; i++) {
-		c = cfetch(x, i);
-		if (c >= 32 && c <= 126) printf("%c", c);
-	}
-}
-
-/* Commands to inspect memory, debug & view code */
-
-void _dot_s(X* x) { 
-	CELL i;
-	printf("<%ld> ", x->sp);
-	for (i = 0; i < x->sp; i++) {
-		printf("%ld ", x->s[i]);
-	}
-}
-void _dump(X* x) { /* TODO */ }
-/* BLOCK EXT */ void _list(X* x) { /* Not implemented */ }
-void _question(X* x) { printf("%ld ", fetch(x, pop(x))); }
-void _see(X* x) { 
-	CELL tok, tlen, i, xt, op = 0;
-	CELL q = 0;
-	CELL EXIT, QUOTATION, LIT;
-	push(x, 32); _word(x);
-	tok = pick(x, 0) + sCHAR;
-	tlen = cfetch(x, pick(x, 0));
-	if (tlen == 0) { pop(x); return; }
-	printf("NAME: %.*s\n", (int)tlen, (char*)tok);
-	_find(x); 
-	i = pop(x);
-	printf("IMMEDIATE (1 = YES, -1 = NO): %ld\n", i);
-	xt = pop(x);
-	printf("XT: %ld\n", xt);
-	if (xt > 0) {
-		EXIT = get_xt(x, find_word(x, "EXIT"));
-		QUOTATION = get_xt(x, find_word(x, "(QUOTATION)"));
-		LIT = get_xt(x, find_word(x, "(LIT)"));
-		do {
-			op = fetch(x, to_abs(x, xt));
-			xt += sCELL;
-			printf("%ld ", op);
-			if (op == EXIT && q == 0) {
-				break;
-			} else if (op == EXIT && q > 0) {
-				q--;
-			} else if (op == QUOTATION) {
-				q++;
-			} else if (op == LIT) {
-				op = fetch(x, to_abs(x, xt));
-				xt += sCELL;
-				printf("%ld ", op);
-			} 
-		} while (1);
-		printf("\n");
-	} 
-}
-
-/* Commands that change compilation & interpretation settings */
-
-void _decimal(X* x) { set(x, BASE, 10); }
-void _hex(X* x) { set(x, BASE, 16); }
-void _marker(X* x) { /* TODO */ }
-void _base(X* x) { push(x, to_abs(x, BASE)); }
-
-void _also(X* x) { /* TODO */ }
-void _definitions(X* x) { /* TODO */ }
-void _forth_wordlist(X* x) { /* TODO */ }
-void _forth(X* x) { /* TODO */ }
-void _only(X* x) { /* TODO */ }
-void _order(X* x) { /* TODO */ }
-void _previous(X* x) { /* TODO */ }
-void _get_current(X* x) { /* TODO */ }
-void _set_current(X* x) { /* TODO */ }
-void _get_order(X* x) { /* TODO */ }
-void _set_order(X* x) { /* TODO */ }
-void _wordlist(X* x) { /* TODO */ }
-
-/* Forming definite loops */
-
-void _do(X* x) { literal(x, 1); _start_quotation(x); }
-void _question_do(X* x) { literal(x, 0); _start_quotation(x); }
-void _i(X* x) { push(x, get(x, IX)); }
-void _j(X* x) { push(x, get(x, JX)); }
-void _leave(X* x) { set(x, LX, 1); p_exit(x); }
-/* Already defined: void _unloop(X* x); */
-void _loop(X* x) { 
-	literal(x, 1); 
-	_end_quotation(x); 
-	compile(x, get_xt(x, find_word(x, "(DOLOOP)"))); 
-}
-void _plus_loop(X* x) { 
-	_end_quotation(x); 
-	compile(x, get_xt(x, find_word(x, "(DOLOOP)"))); 
-}
-
-/* More input/output operations */
-
-void _dot_quote(X* x) { 
-	CELL u, addr, i;
-	push(x, '"'); 
-	_parse(x); 
-	u = pop(x);
-	addr = pop(x);
-	compile(x, get_xt(x, find_word(x, "(STRING)")));
-	comma(x, u);
-	for (i = 0; i < u; i++) {
-		ccomma(x, cfetch(x, addr + i));
-	}
-	align(x);
-	compile(x, get_xt(x, find_word(x, "TYPE")));
-}
-void _accept(X* x) {
-	CELL n = pop(x);
-	CELL addr = pop(x);
-	CELL i;
-	CHAR c;
-	for (i = 0; i < n; i++) {
-		_key(x);
-		_dup(x); _emit(x);
-		c = (CHAR)pop(x);
-		if (c < 32) { break; }
-		cstore(x, addr + i, c);
-	}
-	push(x, i);
-}
-void _dot(X* x) { printf("%ld ", pop(x)); }
-void _dot_r(X* x) { /* TODO */ }
-void _u_dot(X* x) { printf("%lu ", (uCELL)pop(x)); }
-void _u_dot_r(X* x) { /* TODO */ }
-
-void _at_x_y(X* x) { /* TODO */ }
-
-/* Source code preprocessing, interpreting & auditing commands */
-
-void _dot_paren(X* x) { 
-	while (get(x, IPOS) < get(x, ILEN)
-	&& cfetch(x, get(x, IBUF) + get(x, IPOS)) != ')') {
-		set(x, IPOS, get(x, IPOS) + 1);
-	}
-	if (get(x, IPOS) != get(x, ILEN)) 
-		set(x, IPOS, get(x, IPOS) + 1);
-}
-void _bracket_if(X* x) { /* TODO */ }
-void _bracket_else(X* x) { /* TODO */ }
-void _bracket_then(X* x) { /* TODO */ }
-
-/* Commands that can help you start or end work sessions */
-
-void _words(X* x) { /* TODO */ }
-void _environment_q(X* x) { 
-	CELL u = pop(x);
-	CHAR *s = (CHAR *)pop(x);
-	/*
-	if (compare_no_case(x, s, u, "/COUNTED-STRING")) {
-		push(x, COUNTED_STRING_MAX_SIZE);
-	} else if (compare_no_case(x, s, u, "/HOLD")) {
-		push(x, NUMERIC_OUTPUT_STRING_BUFFER_SIZE);
-	} else if (compare_no_case(x, s, u, "/PAD")) {
-		push(x, SCRATCH_AREA_SIZE);
-	} else if (compare_no_case(x, s, u, "ADDRESS-UNIT-BITS")) {
-		push(x, BITS_PER_ADDRESS_UNIT);
-	} else if (compare_no_case(x, s, u, "FLOORED")) {
-		push(x, FLOORED_DIVISION_AS_DEFAULT);
-	} else if (compare_no_case(x, s, u, "MAX-CHAR")) {
-		push(x, MAX_VALUE_FOR_CHAR);
-	} else if (compare_no_case(x, s, u, "MAX-D")) {
-		push(x, LARGEST_USABLE_DOUBLE_NUMBER);
-	} else if (compare_no_case(x, s, u, "MAX-N")) {
-		push(x, LARGEST_USABLE_SIGNED_INTEGER);
-	} else if (compare_no_case(x, s, u, "MAX-U")) {
-		push(x, LARGEST_USABLE_UNSIGNED_INTEGER);
-	} else if (compare_no_case(x, s, u, "MAX-UD")) {
-		push(x, LARGEST_USABLE_UNSIGNED_DOUBLE_NUMBER);
-	} else if (compare_no_case(x, s, u, "RETURN-STACK-CELLS")) {
-		push(x, RETURN_STACK_SIZE);
-	} else if (compare_no_case(x, s, u, "STACK-CELLS")) {
-		push(x, STACK_SIZE);
-	}
-	*/
-}
-
