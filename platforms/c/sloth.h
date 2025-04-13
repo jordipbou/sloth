@@ -124,17 +124,17 @@ CELL sloth_to_rel(X* x, CELL a);
 
 /* -- Inner interpreter -------------------------------- */
 
-CELL op(X* x);
-void do_prim(X* x, CELL p);
-void call(X* x, CELL q);
-void execute(X* x, CELL q);
-void inner(X* x);
-void eval(X* x, CELL q);
+CELL sloth_op(X* x);
+void sloth__do_prim(X* x, CELL p);
+void sloth__call(X* x, CELL q);
+void sloth__execute(X* x, CELL q);
+void sloth__inner(X* x);
+void sloth_eval(X* x, CELL q);
 
 /* -- Exceptions --------------------------------------- */
 
-void catch(X* x, CELL q);
-void throw(X* x, CELL e);
+void sloth_catch(X* x, CELL q);
+void sloth_throw(X* x, CELL e);
 
 /* ---------------------------------------------------- */
 /* -- Forth Kernel ------------------------------------ */
@@ -143,7 +143,7 @@ void throw(X* x, CELL e);
 /* -- Constants --------------------------------------- */
 
 /* Displacement of counted string buffer from here */
-#define CBUF					64	/* Counted string buffer */
+#define SLOTH_CBUF						64	/* Counted string buffer */
 
 /* Relative addresses of variables accessed both from C */
 /* and Forth. */
@@ -466,48 +466,48 @@ CELL sloth_to_rel(X* x, CELL a) { return a - x->d; }
 
 /* -- Inner interpreter -------------------------------- */
 
-CELL op(X* x) { 
+CELL sloth_op(X* x) { 
 	CELL o = sloth_fetch(x, sloth_to_abs(x, x->ip));
 	x->ip += sCELL;
 	return o; 
 }
 
-void do_prim(X* x, CELL p) { 
+void sloth__do_prim(X* x, CELL p) { 
 	(x->p->p[-1 - p])(x); 
 }
 
-void call(X* x, CELL q) { 
+void sloth__call(X* x, CELL q) { 
 	if (x->ip >= 0) sloth_rpush(x, x->ip); 
 	x->ip = q; 
 }
 
-void execute(X* x, CELL q) { 
-	if (q < 0) do_prim(x, q); 
-	else call(x, q); 
+void sloth__execute(X* x, CELL q) { 
+	if (q < 0) sloth__do_prim(x, q); 
+	else sloth__call(x, q); 
 }
 
-void inner(X* x) { 
+void sloth__inner(X* x) { 
 	CELL t = x->rp;
 	while (t <= x->rp && x->ip >= 0) { 
-		execute(x, op(x));
+		sloth__execute(x, sloth_op(x));
 	} 
 }
 
-void eval(X* x, CELL q) { 
-	execute(x, q); 
-	if (q > 0) inner(x); 
+void sloth_eval(X* x, CELL q) { 
+	sloth__execute(x, q); 
+	if (q > 0) sloth__inner(x); 
 }
 
 /* -- Exceptions --------------------------------------- */
 
-void catch(X* x, CELL q) {
+void sloth_catch(X* x, CELL q) {
 	int tsp = x->sp;
 	int trp = x->rp;
 	int tip = x->ip;
 	int e;
 
 	if (!(e = setjmp(x->jmpbuf[++x->jmpbuf_idx]))) {
-		eval(x, q);
+		sloth_eval(x, q);
 		sloth_push(x, 0);
 	} else {
 		x->sp = tsp;
@@ -519,7 +519,7 @@ void catch(X* x, CELL q) {
 	x->jmpbuf_idx--;
 }
 
-void throw(X* x, CELL e) {
+void sloth_throw(X* x, CELL e) {
 	if (x->jmpbuf_idx >= 0) {
 		longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
 	} else {
@@ -618,17 +618,27 @@ void unset_flag(X* x, CELL w, uCHAR v) {
 
 /* _exit does exist, so p_exit is used (from primitive) */
 
-void p_exit(X* x) { x->ip = (x->rp > 0) ? sloth_rpop(x) : -1; }
-void _lit(X* x) { sloth_push(x, op(x)); }
-void _rip(X* x) { sloth_push(x, sloth_to_abs(x, x->ip) + op(x) - sCELL); }
+void p_exit(X* x) { 
+	x->ip = (x->rp > 0) ? sloth_rpop(x) : -1; 
+}
+void _lit(X* x) { sloth_push(x, sloth_op(x)); }
+void _rip(X* x) { 
+	sloth_push(
+		x, 
+		sloth_to_abs(x, x->ip) + sloth_op(x) - sCELL); 
+}
 
 void _compile(X* x) { compile(x, sloth_pop(x)); }
 
-void _branch(X* x) { x->ip += op(x) - sCELL; }
-void _zbranch(X* x) { x->ip += sloth_pop(x) == 0 ? (op(x) - sCELL) : sCELL; }
+void _branch(X* x) { x->ip += sloth_op(x) - sCELL; }
+void _zbranch(X* x) { 
+	x->ip += sloth_pop(x) == 0 ? 
+		(sloth_op(x) - sCELL) 
+		: sCELL; 
+}
 
 void _string(X* x) { 
-	CELL l = op(x); 
+	CELL l = sloth_op(x); 
 	sloth_push(x, sloth_to_abs(x, x->ip)); 
 	sloth_push(x, l); 
 	x->ip = aligned(x->ip + l); 
@@ -642,7 +652,11 @@ void _c_string(X* x) {
 
 /* Quotations (not in ANS Forth yet) */
 
-void _quotation(X* x) { CELL d = op(x); sloth_push(x, x->ip); x->ip += d; }
+void _quotation(X* x) { 
+	CELL d = sloth_op(x); 
+	sloth_push(x, x->ip); 
+	x->ip += d; 
+}
 void _start_quotation(X* x) {
 	CELL s = get(x, STATE);
 	set(x, STATE, s <= 0 ? s - 1 : s + 1);
@@ -705,7 +719,7 @@ void _doloop(X* x) {
 
 	/* First iteration is executed always on a DO */
 	if (do_first_loop == 1) {
-		eval(x, q);
+		sloth_eval(x, q);
 		if (get(x, LX) == 0) {
 			d = sloth_pop(x);
 			o = get(x, IX) - l;
@@ -716,7 +730,7 @@ void _doloop(X* x) {
 
 	if (!(do_first_loop == 0 && o == 0)) {
 		while (((o ^ (o + d)) & (o ^ d)) >= 0 && get(x, LX) == 0) {
-			eval(x, q);
+			sloth_eval(x, q);
 			if (get(x, LX) == 0) { /* Avoid pop if we're leaving */
 				d = sloth_pop(x);
 				o = get(x, IX) - l;
@@ -767,11 +781,11 @@ void _word(X* x) {
 	}
 	end = ibuf + ipos;	
 	/* Now, copy it to the counted string buffer */
-	sloth_cstore(x, sloth_to_abs(x, here(x) + CBUF), end - start);
+	sloth_cstore(x, sloth_to_abs(x, here(x) + SLOTH_CBUF), end - start);
 	for (i = 0; i < (end - start); i++) {
-		sloth_cstore(x, sloth_to_abs(x, here(x) + CBUF + suCHAR + i*suCHAR), sloth_cfetch(x, start + i*suCHAR));
+		sloth_cstore(x, sloth_to_abs(x, here(x) + SLOTH_CBUF + suCHAR + i*suCHAR), sloth_cfetch(x, start + i*suCHAR));
 	}
-	sloth_push(x, sloth_to_abs(x, here(x) + CBUF));
+	sloth_push(x, sloth_to_abs(x, here(x) + SLOTH_CBUF));
 	/* If we are not at the end of the input buffer, */
 	/* skip c after the word, but its not part of the counted */
 	/* string */
@@ -846,7 +860,7 @@ void _interpret(X* x) {
 		if ((flag = sloth_pop(x)) != 0) {
 			if (get(x, STATE) == 0
 			|| (get(x, STATE) != 0 && flag == 1)) {
-				eval(x, sloth_pop(x));	
+				sloth_eval(x, sloth_pop(x));	
 			} else {
 				compile(x, sloth_pop(x));
 			}
@@ -880,7 +894,7 @@ void _interpret(X* x) {
 				} else {
 					/* TODO Word not found, throw an exception? */
 					/* printf("%.*s ?\n", tlen, tok); */
-					throw(x, -13);
+					sloth_throw(x, -13);
 				}
 			}
 		}
@@ -941,7 +955,7 @@ void _included(X* x) {
 				set(x, ILEN, strlen(linebuf));
 			}
 
-			eval(x, INTERPRET);
+			sloth_eval(x, INTERPRET);
 		}
 
 		set(x, SOURCE_ID, prevsourceid);
@@ -1238,7 +1252,7 @@ void _semicolon(X* x) {
 }
 
 void _recurse(X* x) { compile(x, get(x, LATESTXT)); }
-void _catch(X* x) { catch(x, sloth_pop(x)); }
+void _catch(X* x) { sloth_catch(x, sloth_pop(x)); }
 void _throw(X* x) { 
 	CELL e = sloth_pop(x); 
 	if (e != 0) {
@@ -1249,13 +1263,18 @@ void _throw(X* x) {
 				printf("Error: %.*s\n", l, a);
 			}
 		}
-		throw(x, e);
+		sloth_throw(x, e);
 	}
 }
 
 /* Manipulating stack items */
 
-void _drop(X* x) { if (x->sp <= 0) throw(x, -4); else sloth_pop(x); }
+void _drop(X* x) { 
+	if (x->sp <= 0) 
+		sloth_throw(x, -4); 
+	else 
+		sloth_pop(x); 
+}
 void _over(X* x) { sloth_push(x, sloth_pick(x, 1)); }
 void _pick(X* x) {  sloth_push(x, sloth_pick(x, sloth_pop(x))); }
 void _to_r(X* x) { sloth_rpush(x, sloth_pop(x)); }
@@ -1323,7 +1342,7 @@ void _evaluate(X* x) {
 	set(x, IPOS, previpos);
 	set(x, ILEN, previlen);
 }
-void _execute(X* x) { eval(x, sloth_pop(x)); }
+void _execute(X* x) { sloth_eval(x, sloth_pop(x)); }
 void _here(X* x) { sloth_push(x, sloth_to_abs(x, here(x))); }
 void _immediate(X* x) { set_flag(x, get_latest(x), IMMEDIATE); }
 void _to_in(X* x) { sloth_push(x, sloth_to_abs(x, IPOS)); }
@@ -1357,7 +1376,7 @@ void _refill(X* x) {
 		break;
 	case 0:
 		sloth_push(x, get(x, IBUF)); sloth_push(x, 80);
-		eval(x, get_xt(x, find_word(x, "ACCEPT")));
+		sloth_eval(x, get_xt(x, find_word(x, "ACCEPT")));
 		set(x, ILEN, sloth_pop(x));
 		set(x, IPOS, 0);
 		sloth_push(x, -1); 
@@ -1586,7 +1605,7 @@ void repl(X* x) {
 	set(x, IBUF, (CELL)buf);
 	set(x, IPOS, 0);
 	set(x, ILEN, 80);
-	eval(x, get_xt(x, find_word(x, "QUIT")));
+	sloth_eval(x, get_xt(x, find_word(x, "QUIT")));
 }
 
 #endif
