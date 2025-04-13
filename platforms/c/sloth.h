@@ -1,3 +1,6 @@
+#ifndef SLOTH_HEADER
+#define SLOTH_HEADER
+
 /* ----------------------------------------------------- */
 /* ------------------ SLOTH Forth ---------------------- */
 /* ----------------------------------------------------- */
@@ -13,24 +16,14 @@
 #include <stddef.h>
 #include <limits.h> /* for CHAR_BIT */
 
-/* -- getch multiplatform implementation --------------- */
+/* -- getch multiplatform definition ------------------- */
 
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 #include <conio.h>
 #else
 #include <termios.h>
 #include <unistd.h>
-int getch() {
-	struct termios oldt, newt;
-	int ch;
-	tcgetattr(STDIN_FILENO, &oldt);
-	newt = oldt;
-	newt.c_lflag &= ~(ICANON|ECHO);
-	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-	ch = getchar();
-	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-	return ch;
-}
+int getch();
 #endif
 
 /* ----------------------------------------------------- */
@@ -100,7 +93,311 @@ typedef struct VM {
 	P *p;
 } X;
 
-/* -- Context de/initialization ------------------------ */
+/* -- Context initialization/destruction --------------- */
+
+void init(X* x, CELL d, CELL sz);
+X* sloth(int psize, int dsize);
+X* sloth_new();
+void sloth_free(X* x);
+
+/* -- Data stack --------------------------------------- */
+
+void push(X* x, CELL v);
+CELL pop(X* x);
+CELL pick(X* x, CELL a);
+
+/* -- Return stack ------------------------------------- */
+
+void rpush(X* x, CELL v);
+CELL rpop(X* x);
+CELL rpick(X* x, CELL a);
+
+/* -- Memory ------------------------------------------- */
+
+void store(X* x, CELL a, CELL v);
+CELL fetch(X* x, CELL a);
+void cstore(X* x, CELL a, uCHAR v);
+uCHAR cfetch(X* x, CELL a);
+
+CELL to_abs(X* x, CELL a);
+CELL to_rel(X* x, CELL a);
+
+/* -- Inner interpreter -------------------------------- */
+
+CELL op(X* x);
+void do_prim(X* x, CELL p);
+void call(X* x, CELL q);
+void execute(X* x, CELL q);
+void inner(X* x);
+void eval(X* x, CELL q);
+
+/* -- Exceptions --------------------------------------- */
+
+void catch(X* x, CELL q);
+void throw(X* x, CELL e);
+
+/* ---------------------------------------------------- */
+/* -- Forth Kernel ------------------------------------ */
+/* ---------------------------------------------------- */
+
+/* -- Constants --------------------------------------- */
+
+/* Displacement of counted string buffer from here */
+#define CBUF					64	/* Counted string buffer */
+
+/* Relative addresses of variables accessed both from C */
+/* and Forth. */
+
+#define HERE									0	
+#define BASE									sCELL
+#define FORTH_WORDLIST				2*sCELL	/* Not used in C */
+#define STATE									3*sCELL
+#define IBUF									4*sCELL
+#define IPOS									5*sCELL
+#define ILEN									6*sCELL
+#define SOURCE_ID							7*sCELL
+#define HLD										8*sCELL /* Not used in C */
+#define LATESTXT							9*sCELL
+#define IX										10*sCELL
+#define JX										11*sCELL
+#define KX										12*sCELL
+#define LX										13*sCELL
+#define CURRENT								14*sCELL
+#define ORDER									15*sCELL
+#define CONTEXT								16*sCELL
+
+/* Word statuses */
+
+#define HIDDEN				1
+#define IMMEDIATE			2
+
+/* -- Helpers ----------------------------------------- */
+
+/* Setting and getting variables (cell and char sized) */
+
+void set(X* x, CELL a, CELL v);
+CELL get(X* x, CELL a);
+
+void cset(X* x, CELL a, uCHAR v);
+uCHAR cget(X* x, CELL a);
+
+/* Memory management */
+
+CELL here(X* x);
+void allot(X* x, CELL v);
+CELL aligned(CELL a);
+void align(X* x);
+
+/* Compilation */
+
+void comma(X* x, CELL v);
+void ccomma(X* x, uCHAR v);
+
+void compile(X* x, CELL xt);
+void literal(X* x, CELL n);
+
+/* Headers */
+
+CELL get_latest(X* x);
+void set_latest(X* x, CELL w);
+
+/* Header structure: */
+/* Link CELL					@ NT */
+/* XT CELL						@ NT + sCELL */
+/* Wordlist CELL			@ NT + 2*sCELL */
+/* Flags uCHAR					@ NT + 3*sCELL */
+/* Namelen uCHAR				@ NT + 3*sCELL + suCHAR */
+/* Name uCHAR*namelen	@ NT + 3*sCELL + 2*suCHAR */
+
+CELL header(X* x, CELL n, CELL l);
+CELL get_link(X* x, CELL w);
+CELL get_xt(X* x, CELL w);
+void set_xt(X* x, CELL w, CELL xt);
+uCHAR get_flags(X* x, CELL w);
+CELL has_flag(X* x, CELL w, CELL v);
+uCHAR get_namelen(X* x, CELL w);
+CELL get_name_addr(X* x, CELL w);
+
+/* Setting flags */
+
+void set_flag(X* x, CELL w, uCHAR v);
+void unset_flag(X* x, CELL w, uCHAR v);
+
+/* -- Primitives -------------------------------------- */
+
+void p_exit(X* x);
+void _lit(X* x);
+void _rip(X* x);
+
+void _compile(X* x);
+
+void _branch(X* x);
+void _zbranch(X* x);
+
+void _string(X* x);
+void _c_string(X* x);
+
+/* Quotations (not in ANS Forth yet) */
+
+void _quotation(X* x);
+void _start_quotation(X* x);
+void _end_quotation(X* x);
+
+/* Loop helpers */
+
+void ipush(X* x);
+void ipop(X* x);
+void _unloop(X* x);
+void _doloop(X* x);
+
+/* Parsing input */
+
+void _word(X* x);
+
+/* Finding words */
+
+int compare_without_case(X* x, CELL w, CELL t, CELL l);
+CELL search_word(X* x, CELL n, int l);
+void _find(X* x);
+CELL find_word(X* x, char* name);
+
+/* Outer interpreter */
+
+void _interpret(X* x);
+
+/* -- Required words to bootstrap ---------------------- */
+
+/* Commands that can help you start or end work sessions */
+
+void _bye(X* x);
+
+/* Commands to inspect memory, debug & view code */
+
+void _depth(X* x);
+void _unused(X* x);
+
+/* Source code preprocessing, interpreting & auditing commands */
+
+void _included(X* x);
+
+/* String operations */
+
+void _move(X* x);
+
+/* More input/output operations */
+
+void _emit(X* x);
+void _key(X* x);
+
+/* Arithmetic and logical operations */
+
+void _and(X* x);
+void _invert(X* x);
+void _l_shift(X* x);
+void _m_star(X* x);
+void _minus(X* x);
+void _s_m_slash_rem(X* x);
+void _plus(X* x);
+void _d_plus(X* x);
+void _r_shift(X* x);
+void _star(X* x);
+void _two_slash(X* x);
+void _u_m_star(X* x);
+void _u_m_slash_mod(X* x);
+
+/* Memory-stack transfer operations */
+
+void _c_fetch(X* x);
+void _c_store(X* x);
+void _fetch(X* x);
+void _store(X* x);
+
+/* Comparison operations */
+
+void _equals(X* x);
+void _less_than(X* x);
+
+/* More facilities for defining routines (compiling-mode only) */
+
+void _colon(X* x);
+void _colon_no_name(X* x);
+void _semicolon(X* x);
+void _recurse(X* x);
+void _catch(X* x);
+void _throw(X* x);
+
+/* Manipulating stack items */
+
+void _drop(X* x);
+void _over(X* x);
+void _pick(X* x);
+void _to_r(X* x);
+void _r_from(X* x);
+void _swap(X* x);
+
+/* Constructing compiler and interpreter system extensions */
+
+void _allot(X* x);
+void _cells(X* x);
+void _chars(X* x);
+void _compile_comma(X* x);
+void _create(X* x);
+void _do_does(X* x);
+void _does(X* x);
+void _evaluate(X* x);
+void _execute(X* x);
+void _here(X* x);
+void _immediate(X* x);
+void _to_in(X* x);
+void _postpone(X* x);
+void _refill(X* x);
+void _source(X* x);
+
+/* -- Helpers to add primitives to the dictionary ------ */
+
+CELL primitive(X* x, F f);
+CELL code(X* x, char* name, CELL xt);
+
+/* Helper to work with absolute/relative memory addresses */
+
+void _to_abs(X* x);
+void _to_rel(X* x);
+
+/* Helper to empty the return stack */
+
+void _empty_rs(X* x);
+
+/* -- Bootstrapping ------------------------------------ */
+
+void bootstrap(X* x);
+
+/* Helpers to work with files from C */
+
+void include(X* x, char* f);
+
+/* Helper REPL */
+
+void repl(X* x);
+
+#ifdef SLOTH_IMPLEMENTATION
+
+/* -- getch multiplatform implementation --------------- */
+
+#if !defined(WIN32) && !defined(_WIN32) && !defined(_WIN64)
+int getch() {
+	struct termios oldt, newt;
+	int ch;
+	tcgetattr(STDIN_FILENO, &oldt);
+	newt = oldt;
+	newt.c_lflag &= ~(ICANON|ECHO);
+	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+	ch = getchar();
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+	return ch;
+}
+#endif
+
+/* -- Context initialization/destruction --------------- */
 
 void init(X* x, CELL d, CELL sz) { 
 	x->sp = 0; 
@@ -112,6 +409,8 @@ void init(X* x, CELL d, CELL sz) {
 	x->jmpbuf_idx = -1;
 }
 
+/* TODO Allot the ability to not use malloc at all in */
+/* this file. */
 X* sloth(int psize, int dsize) {
 	X* x;
 
@@ -232,37 +531,6 @@ void throw(X* x, CELL e) {
 /* -- Forth Kernel ------------------------------------ */
 /* ---------------------------------------------------- */
 
-/* -- Constants --------------------------------------- */
-
-/* Displacement of counted string buffer from here */
-#define CBUF					64	/* Counted string buffer */
-
-/* Relative addresses of variables accessed both from C */
-/* and Forth. */
-
-#define HERE									0	
-#define BASE									sCELL
-#define FORTH_WORDLIST				2*sCELL	/* Not used in C */
-#define STATE									3*sCELL
-#define IBUF									4*sCELL
-#define IPOS									5*sCELL
-#define ILEN									6*sCELL
-#define SOURCE_ID							7*sCELL
-#define HLD										8*sCELL /* Not used in C */
-#define LATESTXT							9*sCELL
-#define IX										10*sCELL
-#define JX										11*sCELL
-#define KX										12*sCELL
-#define LX										13*sCELL
-#define CURRENT								14*sCELL
-#define ORDER									15*sCELL
-#define CONTEXT								16*sCELL
-
-/* Word statuses */
-
-#define HIDDEN				1
-#define IMMEDIATE			2
-
 /* -- Helpers ----------------------------------------- */
 
 /* Setting and getting variables (cell and char sized) */
@@ -288,9 +556,6 @@ void comma(X* x, CELL v) { set(x, here(x), v); allot(x, sCELL); }
 void ccomma(X* x, uCHAR v) { set(x, here(x), v); allot(x, suCHAR); }
 
 void compile(X* x, CELL xt) { comma(x, xt); }
-
-/* Pre-definition */ CELL find_word(X*, char*);
-/* Pre-definition */ CELL get_xt(X*, CELL);
 
 void literal(X* x, CELL n) { 
 	comma(x, get_xt(x, find_word(x, "(LIT)")));
@@ -711,10 +976,12 @@ void _move(X* x) {
 
 /* More input/output operations */
 
-/* TODO EMIT/KEY should be implementable by user */
-
+#ifndef SLOTH_CUSTOM_EMIT
 void _emit(X* x) { printf("%c", (uCHAR)pop(x)); }
+#endif
+#ifndef SLOTH_CUSTOM_KEY
 void _key(X* x) { push(x, getch()); }
+#endif
 
 /* Arithmetic and logical operations */
 
@@ -1144,6 +1411,8 @@ void _to_rel(X* x) { push(x, pop(x) - x->d); }
 
 void _empty_rs(X* x) { x->rp = 0; }
 
+/* -- Bootstrapping ------------------------------------ */
+
 void bootstrap(X* x) {
 
 	/* Variables commonly shared from C and Forth */
@@ -1320,26 +1589,5 @@ void repl(X* x) {
 	eval(x, get_xt(x, find_word(x, "QUIT")));
 }
 
-/* ---------------------------------------------------- */
-/* -- main -------------------------------------------- */
-/* ---------------------------------------------------- */
-
-int main(int argc, char**argv) {
-	X* x = sloth_new();
-
-	bootstrap(x);
-
-	include(x, "../../4th/ans.4th");
-
-	if (argc == 1) {
-		repl(x);
-	} else if (strcmp(argv[1], "--test") == 0 
-					|| strcmp(argv[1], "-t") == 0) {
-		chdir("../../forth2012-test-suite/src/");
-		include(x, "runtests.fth");
-	} else {
-		include(x, argv[1]);
-	}
-
-	sloth_free(x);
-}
+#endif
+#endif
