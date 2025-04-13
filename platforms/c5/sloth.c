@@ -1197,6 +1197,12 @@ void bootstrap(X* x) {
 	comma(x, 1); /* #ORDER */
 	comma(x, to_abs(x, FORTH_WORDLIST)); /* CONTEXT 0 */
 	allot(x, 15*sCELL);
+	/* Variable indicating if we are on Linux or Windows */
+#if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
+	comma(x, 1);
+#else
+	comma(x, 0);
+#endif
 
 	/* Basic primitives */
 
