@@ -1349,7 +1349,7 @@ int main(int argc, char**argv) {
 
 	bootstrap(x);
 
-	include(x, "ans.fth");
+	include(x, "../../4th/ans.4th");
 
 	if (argc == 1) {
 		repl(x);
