@@ -22,7 +22,7 @@ void _see(X* x) {
 	CELL q = 0;
 	CELL EXIT, QUOTATION, LIT;
 	push(x, 32); _word(x);
-	tok = pick(x, 0) + sCHAR;
+	tok = pick(x, 0) + suCHAR;
 	tlen = cfetch(x, pick(x, 0));
 	if (tlen == 0) { pop(x); return; }
 	printf("NAME: %.*s\n", (int)tlen, (char*)tok);

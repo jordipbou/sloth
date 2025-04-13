@@ -157,7 +157,7 @@ void _type(X* x) {
 	CELL l = pop(x); 
 	CELL a = pop(x);
 	CELL i;
-	CHAR c;
+	uCHAR c;
 	for (i = a; i < a + l; i++) {
 		c = cfetch(x, i);
 		if (c >= 32 && c <= 126) printf("%c", c);
@@ -181,11 +181,11 @@ void _accept(X* x) {
 	CELL n = pop(x);
 	CELL addr = pop(x);
 	CELL i;
-	CHAR c;
+	uCHAR c;
 	for (i = 0; i < n; i++) {
 		_key(x);
 		_dup(x); _emit(x);
-		c = (CHAR)pop(x);
+		c = (uCHAR)pop(x);
 		if (c < 32) { break; }
 		cstore(x, addr + i, c);
 	}
@@ -237,7 +237,7 @@ void _base(X* x) { push(x, to_abs(x, BASE)); }
 
 void _count(X* x) { CELL a = pop(x); push(x, a + 1); push(x, cfetch(x, a)); }
 void _fill(X* x) { 
-	CHAR c = (CHAR)pop(x);
+	uCHAR c = (uCHAR)pop(x);
 	CELL u = pop(x);
 	CELL addr = pop(x);
 	if (u > 0) {
@@ -314,7 +314,7 @@ void _variable(X* x) { _create(x); push(x, 0); _comma(x); }
 void _constant(X* x) { 
 	CELL tok, tlen, v = pop(x);
 	push(x, 32); _word(x);
-	tok = pick(x, 0) + sCHAR;
+	tok = pick(x, 0) + suCHAR;
 	tlen = cfetch(x, pop(x));
 	header(x, tok, tlen);
 	literal(x, v); 
@@ -381,7 +381,7 @@ void _align(X* x) { /* TODO */ }
 void _tick(X* x) {
 	CELL tok, tlen;
 	push(x, 32); _word(x);
-	tok = pick(x, 0) + sCHAR;
+	tok = pick(x, 0) + suCHAR;
 	tlen = cfetch(x, pick(x, 0));
 	if (tlen == 0) { pop(x); return; }
 	_find(x);
@@ -392,7 +392,7 @@ void _bracket_tick(X* x) { _tick(x); literal(x, pop(x)); }
 void _to_body(X* x) { push(x, to_abs(x, pop(x) + 4*sCELL)); }
 void _to(X* x) { /* TODO */ }
 void _parse(X* x) {
-	CHAR c = (CHAR)pop(x);
+	uCHAR c = (uCHAR)pop(x);
 	CELL ibuf = get(x, IBUF);
 	CELL ilen = get(x, ILEN);
 	CELL ipos = get(x, IPOS);

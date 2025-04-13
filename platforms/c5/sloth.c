@@ -73,7 +73,7 @@ int getch() {
 /* virtual machine.                                      */
 /* ----------------------------------------------------- */
 
-typedef uint8_t CHAR; /* CHARs are always unsigned */
+typedef uint8_t uCHAR; /* CHARs are always unsigned */
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
 
@@ -91,7 +91,7 @@ typedef uintptr_t uCELL;
 #endif
 
 #define sCELL sizeof(CELL)
-#define sCHAR sizeof(CHAR)
+#define suCHAR sizeof(uCHAR)
 #define CELL_BITS sCELL*8
 
 #ifndef STACK_SIZE
@@ -165,8 +165,8 @@ not just inside SLOTH dictionary (memory block).
 */
 void store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
 CELL fetch(X* x, CELL a) { return *((CELL*)a); }
-void cstore(X* x, CELL a, CHAR v) { *((CHAR*)a) = v; }
-CHAR cfetch(X* x, CELL a) { return *((CHAR*)a); }
+void cstore(X* x, CELL a, uCHAR v) { *((uCHAR*)a) = v; }
+uCHAR cfetch(X* x, CELL a) { return *((uCHAR*)a); }
 
 /*
 The next two macros allow transforming from relative to
@@ -234,11 +234,6 @@ void throw(X* x, CELL e) {
 	if (x->jmpbuf_idx >= 0) {
 		longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
 	} else {
-		/* If no exception frame has been nested with CATCH */
-		/* the system should just go back to the OS. */
-		printf(" Exception %ld, ending.\n", e);
-		/* DEBUG Temporal printing of input buffer before throw */
-		printf("%.*s\n", (int)fetch(x, to_abs(x, 6*sCELL)), (char*)fetch(x, to_abs(x, 4*sCELL)));
 		exit(e);
 	}
 }
@@ -289,8 +284,8 @@ void throw(X* x, CELL e) {
 void set(X* x, CELL a, CELL v) { store(x, to_abs(x, a), v); }
 CELL get(X* x, CELL a) { return fetch(x, to_abs(x, a)); }
 
-void cset(X* x, CELL a, CHAR v) { cstore(x, to_abs(x, a), v); }
-CHAR cget(X* x, CELL a) { return cfetch(x, to_abs(x, a)); }
+void cset(X* x, CELL a, uCHAR v) { cstore(x, to_abs(x, a), v); }
+uCHAR cget(X* x, CELL a) { return cfetch(x, to_abs(x, a)); }
 
 /* Memory management */
 
@@ -304,7 +299,7 @@ void align(X* x) {
 /* Compilation */
 
 void comma(X* x, CELL v) { set(x, here(x), v); allot(x, sCELL); }
-void ccomma(X* x, CHAR v) { set(x, here(x), v); allot(x, sCHAR); }
+void ccomma(X* x, uCHAR v) { set(x, here(x), v); allot(x, suCHAR); }
 
 void compile(X* x, CELL xt) { comma(x, xt); }
 
@@ -325,9 +320,9 @@ void set_latest(X* x, CELL w) { store(x, get(x, CURRENT), w); }
 /* Link CELL					@ NT */
 /* XT CELL						@ NT + sCELL */
 /* Wordlist CELL			@ NT + 2*sCELL */
-/* Flags CHAR					@ NT + 3*sCELL */
-/* Namelen CHAR				@ NT + 3*sCELL + sCHAR */
-/* Name CHAR*namelen	@ NT + 3*sCELL + 2*sCHAR */
+/* Flags uCHAR					@ NT + 3*sCELL */
+/* Namelen uCHAR				@ NT + 3*sCELL + suCHAR */
+/* Name uCHAR*namelen	@ NT + 3*sCELL + 2*suCHAR */
 
 CELL header(X* x, CELL n, CELL l) {
 	CELL w, i;
@@ -349,22 +344,22 @@ CELL get_link(X* x, CELL w) { return get(x, w); }
 CELL get_xt(X* x, CELL w) { return get(x, w + sCELL); }
 void set_xt(X* x, CELL w, CELL xt) { set(x, w + sCELL, xt); }
 
-CHAR get_flags(X* x, CELL w) { return cget(x, w + 2*sCELL); }
+uCHAR get_flags(X* x, CELL w) { return cget(x, w + 2*sCELL); }
 CELL has_flag(X* x, CELL w, CELL v) { return get_flags(x, w) & v; }
 
-CHAR get_namelen(X* x, CELL w) { 
-	return cget(x, w + 2*sCELL + sCHAR); 
+uCHAR get_namelen(X* x, CELL w) { 
+	return cget(x, w + 2*sCELL + suCHAR); 
 }
 CELL get_name_addr(X* x, CELL w) { 
-	return to_abs(x, w + 2*sCELL + 2*sCHAR); 
+	return to_abs(x, w + 2*sCELL + 2*suCHAR); 
 }
 
 /* Setting flags */
 
-void set_flag(X* x, CELL w, CHAR v) { 
+void set_flag(X* x, CELL w, uCHAR v) { 
 	cset(x, w + 2*sCELL, get_flags(x, w) | v); 
 }
-void unset_flag(X* x, CELL w, CHAR v) { 
+void unset_flag(X* x, CELL w, uCHAR v) { 
 	cset(x, w + 2*sCELL, get_flags(x, w) & ~v); 
 }
 
@@ -389,7 +384,7 @@ void _string(X* x) {
 }
 
 void _c_string(X* x) { 
-	CHAR l = cfetch(x, to_abs(x, x->ip)); 
+	uCHAR l = cfetch(x, to_abs(x, x->ip)); 
 	push(x, to_abs(x, x->ip)); 
 	x->ip = aligned(x->ip + l + 1);
 }
@@ -498,7 +493,7 @@ void _doloop(X* x) {
 void _word(X* x) {
 	/* The region to store WORD counted strings starts */
 	/* at here + CBUF. */
-	CHAR c = (CHAR)pop(x);
+	uCHAR c = (uCHAR)pop(x);
 	CELL ibuf = get(x, IBUF);
 	CELL ilen = get(x, ILEN);
 	CELL ipos = get(x, IPOS);
@@ -523,7 +518,7 @@ void _word(X* x) {
 	/* Now, copy it to the counted string buffer */
 	cstore(x, to_abs(x, here(x) + CBUF), end - start);
 	for (i = 0; i < (end - start); i++) {
-		cstore(x, to_abs(x, here(x) + CBUF + sCHAR + i*sCHAR), cfetch(x, start + i*sCHAR));
+		cstore(x, to_abs(x, here(x) + CBUF + suCHAR + i*suCHAR), cfetch(x, start + i*suCHAR));
 	}
 	push(x, to_abs(x, here(x) + CBUF));
 	/* If we are not at the end of the input buffer, */
@@ -541,8 +536,8 @@ int compare_without_case(X* x, CELL w, CELL t, CELL l) {
 	int i;
 	if (get_namelen(x, w) != l) return 0;
 	for (i = 0; i < l; i++) {
-		CHAR a = cfetch(x, t + i);
-		CHAR b = cfetch(x, get_name_addr(x, w) + i);
+		uCHAR a = cfetch(x, t + i);
+		uCHAR b = cfetch(x, get_name_addr(x, w) + i);
 		if (a >= 97 && a <= 122) a -= 32;
 		if (b >= 97 && b <= 122) b -= 32;
 		if (a != b) return 0;
@@ -565,7 +560,7 @@ CELL search_word(X* x, CELL n, int l) {
 
 void _find(X* x) {
 	CELL cstring = pop(x);
-	CELL w = search_word(x, cstring + sCHAR, cfetch(x, cstring));
+	CELL w = search_word(x, cstring + suCHAR, cfetch(x, cstring));
 	if (w == 0) {
 		push(x, cstring);
 		push(x, 0);
@@ -593,7 +588,7 @@ void _interpret(X* x) {
 	char buf[15]; char *endptr;
 	while (get(x, IPOS) < get(x, ILEN)) {
 		push(x, 32); _word(x);
-		tok = (char*)(pick(x, 0) + sCHAR);
+		tok = (char*)(pick(x, 0) + suCHAR);
 		tlen = cfetch(x, pick(x, 0));
 		if (tlen == 0) { pop(x); return; }
 		_find(x);
@@ -732,7 +727,7 @@ void _move(X* x) {
 
 /* TODO EMIT/KEY should be implementable by user */
 
-void _emit(X* x) { printf("%c", (CHAR)pop(x)); }
+void _emit(X* x) { printf("%c", (uCHAR)pop(x)); }
 void _key(X* x) { push(x, getch()); }
 
 /* Arithmetic and logical operations */
@@ -969,7 +964,7 @@ void _less_than(X* x) { CELL a = pop(x); push(x, pop(x) < a ? -1 : 0); }
 void _colon(X* x) {
 	CELL tok, tlen;
 	push(x, 32); _word(x);
-	tok = pick(x, 0) + sCHAR;
+	tok = pick(x, 0) + suCHAR;
 	tlen = cfetch(x, pop(x));
 	header(x, tok, tlen);
 	set(x, LATESTXT, get_xt(x, get_latest(x)));
@@ -1033,7 +1028,7 @@ void _compile_comma(X* x) { compile(x, pop(x)); }
 void _create(X* x) {
 	CELL tok, tlen;
 	push(x, 32); _word(x);
-	tok = pick(x, 0) + sCHAR;
+	tok = pick(x, 0) + suCHAR;
 	tlen = cfetch(x, pop(x));
 	header(x, tok, tlen);
 	compile(x, get_xt(x, find_word(x, "(RIP)"))); 
@@ -1082,7 +1077,7 @@ void _to_in(X* x) { push(x, to_abs(x, IPOS)); }
 void _postpone(X* x) { 
 	CELL i, xt, tok, tlen;
 	push(x, 32); _word(x);
-	tok = pick(x, 0) + sCHAR;
+	tok = pick(x, 0) + suCHAR;
 	tlen = cfetch(x, pick(x, 0));
 	if (tlen == 0) { pop(x); return; }
 	_find(x); 
@@ -1166,7 +1161,12 @@ void bootstrap(X* x) {
 
 	/* Variables commonly shared from C and Forth */
 
-	comma(x, 0); /* HERE */
+	/* comma can not be used for first variable because it */
+	/* needs here(x) and that function gets the value from */
+	/* the first variable. */
+
+	*((CELL*)x->d) = sCELL; /* HERE */
+
 	comma(x, 10); /* BASE */
 	comma(x, 0); /* FORTH-WORDLIST */
 	comma(x, 0); /* STATE */
