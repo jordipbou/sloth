@@ -563,10 +563,18 @@ DROP DROP
 ?: TYPE ( c-addr u -- ) 0 ?DO COUNT EMIT LOOP DROP ;
 
 ?: (RETURN-KEY) ( -- n )
-?\		WINDOWS? IF 13
+?\		WINDOWS? IF 13 
 ?\		ELSE LINUX? IF 10 THEN
 ?\		THEN
-?\ ;
+?\		POSTPONE LITERAL
+?\ ; IMMEDIATE
+
+?: (DELETE-KEY) ( -- n )
+?\		WINDOWS? IF 8
+?\		ELSE LINUX? IF 127 THEN
+?\		THEN
+?\		POSTPONE LITERAL
+?\ ; IMMEDIATE
 
 ?: ACCEPT ( c-addr +n1 -- +n2 )
 ?\		BOUNDS ( c-addr2 c-addr1 )
@@ -574,7 +582,7 @@ DROP DROP
 ?\		BEGIN ( c-addr2 c-addr1 )
 ?\			2DUP <> WHILE
 ?\			KEY DUP (RETURN-KEY) <> WHILE
-?\			DUP 127 = IF
+?\			DUP (DELETE-KEY) = IF
 ?\				2DUP - R@ <> IF
 ?\					DROP
 ?\					8 EMIT 32 EMIT 8 EMIT
