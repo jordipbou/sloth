@@ -82,6 +82,11 @@ DROP DROP
 ?: #ORDER ( -- addr ) 15 CELLS TO-ABS ;
 ?: CONTEXT ( -- addr ) 16 CELLS TO-ABS ;
 
+?: (PLATFORM) ( -- addr ) 32 CELLS TO-ABS ;
+
+?: LINUX? ( -- flag ) (PLATFORM) @ 0 = ;
+?: WINDOWS? ( -- flag ) (PLATFORM) @ 1 = ;
+
 ?: SOURCE-ID ( -- 0 | -1 | fileid ) (SOURCE-ID) @ ;
 
 \ -- Adjusting BASE ---------------------------------------
@@ -557,13 +562,18 @@ DROP DROP
 \ Implementation from ANS Forth standard comment
 ?: TYPE ( c-addr u -- ) 0 ?DO COUNT EMIT LOOP DROP ;
 
+?: (RETURN-KEY) ( -- n )
+?\		WINDOWS? IF 13
+?\		ELSE LINUX? IF 10 THEN
+?\		THEN
+?\ ;
+
 ?: ACCEPT ( c-addr +n1 -- +n2 )
 ?\		BOUNDS ( c-addr2 c-addr1 )
 ?\		2DUP - >R
 ?\		BEGIN ( c-addr2 c-addr1 )
 ?\			2DUP <> WHILE
-\ TODO Check if 10 will work on Windows too
-?\			KEY DUP 10 <> WHILE
+?\			KEY DUP (RETURN-KEY) <> WHILE
 ?\			DUP 127 = IF
 ?\				2DUP - R@ <> IF
 ?\					DROP
