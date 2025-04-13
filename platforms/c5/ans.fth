@@ -326,6 +326,8 @@ DROP DROP
 ?: MIN ( n1 n2 -- n3 ) 2DUP > IF SWAP THEN DROP ;
 ?: MAX ( n1 n2 -- n3 ) 2DUP < IF SWAP THEN DROP ;
 
+?: S>D ( n -- d ) DUP 0< ;
+
 ?: U+D		DUP ROT + DUP ROT U< NEGATE ;
 
 ?: DNEGATE ( d1 -- d2 ) INVERT SWAP INVERT 1 U+D ROT + ;

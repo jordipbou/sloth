@@ -363,6 +363,10 @@ void _right_bracket(X* x) { set(x, STATE, 1); }
 void _quit(X* x) { /* TODO */ }
 void _abort(X* x) { /* TODO */ }
 void _abort_quote(X* x) { /* TODO */ }
+void _case(X* x) { /* TODO */ }
+void _of(X* x) { /* TODO */ }
+void _endof(X* x) { /* TODO */ }
+void _endcase(X* x) { /* TODO */ }
 
 /* Constructing compiler and interpreter system extensions */
 
@@ -370,6 +374,7 @@ void _cell_plus(X* x) { push(x, pop(x) + sCELL); }
 void _char_plus(X* x) { push(x, pop(x) + 1); }
 void _c_comma(X* x) { ccomma(x, pop(x)); }
 void _comma(X* x) { comma(x, pop(x)); }
+void _bracket_compile(X* x) { /* TODO */ }
 void _literal(X* x) { literal(x, pop(x)); }
 void _aligned(X* x) { /* TODO */ }
 void _align(X* x) { /* TODO */ }
@@ -563,6 +568,10 @@ void _two_fetch(X* x) {
 	push(x, fetch(x, a));
 }
 
+/* Number-type conversion operators */
+
+void _s_to_d(X* x) { push(x, pick(x, 0) < 0 ? -1 : 0); }
+
 void bootstrap_core_wordset(X* x) {
 	code(x, "2DROP", primitive(x, &_two_drop));
 	code(x, "DUP", primitive(x, &_dup));
@@ -643,6 +652,8 @@ void bootstrap_core_wordset(X* x) {
 	code(x, "CHAR+", primitive(x, &_char_plus));
 	code(x, "C,", primitive(x, &_c_comma));
 	code(x, ",", primitive(x, &_comma));
+	code(x, "[COMPILE]", primitive(x, &_bracket_compile));
+	code(x, "'", primitive(x, &_tick));
 	code(x, "[']", primitive(x, &_bracket_tick)); _immediate(x);
 	code(x, "LITERAL", primitive(x, &_literal)); _immediate(x);
 	code(x, ">BODY", primitive(x, &_to_body));
@@ -682,4 +693,9 @@ void bootstrap_core_wordset(X* x) {
 	code(x, "2!", primitive(x, &_two_store));
 	code(x, "2@", primitive(x, &_two_fetch));
 	code(x, "*/MOD", primitive(x, &_star_slash_mod));
+	code(x, "CASE", primitive(x, &_case));
+	code(x, "OF", primitive(x, &_of));
+	code(x, "ENDOF", primitive(x, &_endof));
+	code(x, "ENDCASE", primitive(x, &_endcase));
+	code(x, "S>D", primitive(x, &_s_to_d));
 }

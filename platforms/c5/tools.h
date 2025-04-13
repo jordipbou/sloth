@@ -69,6 +69,14 @@ void _ahead(X* x) {
 	comma(x, 0); 
 }
 
+void _c_s_pick(X* x) { /* TODO */ }
+void _c_s_roll(X* x) { /* TODO */ }
+
+/* More facilities for defining routines (compiling-mode only) */
+
+void _code(X* x) { /* TODO */ }
+void _semicolon_code(X* x) { /* TODO */ }
+
 void bootstrap_tools_wordset(X* x) {
 	code(x, "ASSEMBLER", primitive(x, &_assembler));
 	code(x, "EDITOR", primitive(x, &_editor));
@@ -81,4 +89,8 @@ void bootstrap_tools_wordset(X* x) {
 	code(x, ".S", primitive(x, &_dot_s));
 	code(x, "SEE", primitive(x, &_see));
 	code(x, "AHEAD", primitive(x, &_ahead));
+	code(x, "CS-PICK", primitive(x, &_c_s_pick));
+	code(x, "CS-ROLL", primitive(x, &_c_s_roll));
+	code(x, "CODE", primitive(x, &_code));
+	code(x, ";CODE", primitive(x, &_semicolon_code));
 }

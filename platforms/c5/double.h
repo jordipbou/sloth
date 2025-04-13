@@ -46,6 +46,19 @@ void _d_two_slash(X* x) {
 
 void _two_rot(X* x) { /* TODO */ }
 
+/* Constructing compiler and interpreter system extensions */
+
+void _two_literal(X* x) { /* TODO */ }
+
+/* Commands to define data structures */
+
+void _two_constant(X* x) { /* TODO */ }
+void _two_variable(X* x) { /* TODO */ }
+
+/* Number-type conversion operators */
+
+void _d_to_s(X* x) { /* TODO */ }
+
 void bootstrap_double_wordset(X* x) {
 	code(x, "DABS", primitive(x, &_d_abs));
 	code(x, "DMAX", primitive(x, &_d_max));
@@ -58,5 +71,8 @@ void bootstrap_double_wordset(X* x) {
 	code(x, "D2*", primitive(x, &_d_two_star));
 	code(x, "D2/", primitive(x, &_d_two_slash));
 	code(x, "2ROT", primitive(x, &_two_rot));
-
+	code(x, "2LITERAL", primitive(x, &_two_literal));
+	code(x, "2CONSTANT", primitive(x, &_two_constant));
+	code(x, "2VARIABLE", primitive(x, &_two_variable));
+	code(x, "D>S", primitive(x, &_d_to_s));
 }
