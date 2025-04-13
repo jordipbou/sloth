@@ -7,6 +7,7 @@
 #include<stdlib.h>
 #include<stdio.h>
 #include<string.h>
+#include<assert.h>
 
 /* This are used by Claude's SM/REM implementation */
 #include <stddef.h>
@@ -102,14 +103,6 @@ typedef uintptr_t uCELL;
 #define RETURN_STACK_SIZE 64
 #endif
 
-#ifndef DSIZE
-#define DSIZE 131072
-#endif
-
-#ifndef PSIZE
-#define PSIZE 512
-#endif
-
 struct VM;
 typedef void (*F)(struct VM*);
 
@@ -133,6 +126,8 @@ typedef struct VM {
 	P *p;
 } X;
 
+/* -- Context de/initialization ------------------------ */
+
 void init(X* x, CELL d, CELL sz) { 
 	x->sp = 0; 
 	x->rp = 0; 
@@ -143,21 +138,42 @@ void init(X* x, CELL d, CELL sz) {
 	x->jmpbuf_idx = -1;
 }
 
-/* Data stack */
+X* sloth(int psize, int dsize) {
+	X* x;
 
-/* TODO: Add checks for stack underflow/overflow */
+	x = malloc(sizeof(X));
+	x->p = malloc(sizeof(P));
+	x->p->p = malloc(sizeof(F) * psize);
+	x->p->last = 0;
+	x->p->sz = psize;
+	x->d = (CELL)malloc(dsize);
+
+	init(x, x->d, dsize);
+
+	return x;
+}
+
+X* sloth_new() { return sloth(512, 262144); }
+
+void sloth_free(X* x) {
+	free((void*)x->d);
+	free(x->p);
+	free(x);
+}
+
+/* -- Data stack --------------------------------------- */
 
 void push(X* x, CELL v) { x->s[x->sp] = v; x->sp++; }
 CELL pop(X* x) { x->sp--; return x->s[x->sp]; }
 CELL pick(X* x, CELL a) { return x->s[x->sp - a - 1]; }
 
-/* Return stack */
+/* -- Return stack ------------------------------------- */
 
 void rpush(X* x, CELL v) { x->r[x->rp] = v; x->rp++; }
 CELL rpop(X* x) { x->rp--; return x->r[x->rp]; }
 CELL rpick(X* x, CELL a) { return x->r[x->rp - a - 1]; }
 
-/* Memory */
+/* -- Memory ------------------------------------------- */
 
 /* 
 STORE/FETCH/CSTORE/cfetch work on absolute address units,
@@ -175,7 +191,7 @@ absolute addresses.
 CELL to_abs(X* x, CELL a) { return (CELL)(x->d + a); }
 CELL to_rel(X* x, CELL a) { return a - x->d; }
 
-/* Inner interpreter */
+/* -- Inner interpreter -------------------------------- */
 
 CELL op(X* x) { 
 	CELL o = fetch(x, to_abs(x, x->ip));
@@ -209,7 +225,7 @@ void eval(X* x, CELL q) {
 	if (q > 0) inner(x); 
 }
 
-/* Exceptions */
+/* -- Exceptions --------------------------------------- */
 
 void catch(X* x, CELL q) {
 	int tsp = x->sp;
@@ -246,23 +262,19 @@ void throw(X* x, CELL e) {
 
 /* Displacement of counted string buffer from here */
 #define CBUF					64	/* Counted string buffer */
-#define SBUF1					128	/* First string buffer */
-#define SBUF2					256	/* Second string buffer */
-#define NBUF					384	/* Pictured numeric output buffer */
-#define PAD						416 /* PAD */
 
 /* Relative addresses of variables accessed both from C */
 /* and Forth. */
 
 #define HERE									0	
 #define BASE									sCELL
-#define FORTH_WORDLIST				2*sCELL
+#define FORTH_WORDLIST				2*sCELL	/* Not used in C */
 #define STATE									3*sCELL
 #define IBUF									4*sCELL
 #define IPOS									5*sCELL
 #define ILEN									6*sCELL
 #define SOURCE_ID							7*sCELL
-#define HLD										8*sCELL
+#define HLD										8*sCELL /* Not used in C */
 #define LATESTXT							9*sCELL
 #define IX										10*sCELL
 #define JX										11*sCELL
@@ -1138,6 +1150,7 @@ void _source(X* x) { push(x, get(x, IBUF)); push(x, get(x, ILEN)); }
 /* -- Helpers to add primitives to the dictionary ------ */
 
 CELL primitive(X* x, F f) { 
+	assert(x->p->last < x->p->sz);
 	x->p->p[x->p->last++] = f; 
 	return 0 - x->p->last; 
 }
@@ -1332,26 +1345,21 @@ void repl(X* x) {
 /* ---------------------------------------------------- */
 
 int main(int argc, char**argv) {
-	X* x = malloc(sizeof(X));
-	x->p = malloc(sizeof(P));
-	x->p->p = malloc(sizeof(F) * PSIZE);
-	x->p->last = 0;
-	x->p->sz = PSIZE;
-	x->d = (CELL)malloc(DSIZE);
-	init(x, x->d, DSIZE);
+	X* x = sloth_new();
 
 	bootstrap(x);
 
 	include(x, "ans.fth");
 
 	if (argc == 1) {
+		repl(x);
+	} else if (strcmp(argv[1], "--test") == 0 
+					|| strcmp(argv[1], "-t") == 0) {
 		chdir("../../forth2012-test-suite/src/");
 		include(x, "runtests.fth");
 	} else {
-		repl(x);
+		include(x, argv[1]);
 	}
 
-	free((void*)x->d);
-	free(x->p);
-	free(x);
+	sloth_free(x);
 }
