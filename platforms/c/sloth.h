@@ -148,23 +148,24 @@ void sloth_throw(X* x, CELL e);
 /* Relative addresses of variables accessed both from C */
 /* and Forth. */
 
-#define SLOTH_HERE						0	
-#define SLOTH_BASE						sCELL
-#define SLOTH_FORTH_WORDLIST	2*sCELL	/* Not used in C */
-#define SLOTH_STATE						3*sCELL
-#define SLOTH_IBUF						4*sCELL
-#define SLOTH_IPOS						5*sCELL
-#define SLOTH_ILEN						6*sCELL
-#define SLOTH_SOURCE_ID				7*sCELL
-#define SLOTH_HLD							8*sCELL /* Not used in C */
-#define SLOTH_LATESTXT				9*sCELL
-#define SLOTH_IX							10*sCELL
-#define SLOTH_JX							11*sCELL
-#define SLOTH_KX							12*sCELL
-#define SLOTH_LX							13*sCELL
-#define SLOTH_CURRENT					14*sCELL
-#define SLOTH_ORDER						15*sCELL
-#define SLOTH_CONTEXT					16*sCELL
+#define SLOTH_HERE							0	
+#define SLOTH_BASE							sCELL
+#define SLOTH_FORTH_WORDLIST		2*sCELL	/* Not used in C */
+#define SLOTH_INTERNAL_WORDLIST	3*sCELL
+#define SLOTH_STATE							4*sCELL
+#define SLOTH_IBUF							5*sCELL
+#define SLOTH_IPOS							6*sCELL
+#define SLOTH_ILEN							7*sCELL
+#define SLOTH_SOURCE_ID					8*sCELL
+#define SLOTH_HLD								9*sCELL /* Not used in C */
+#define SLOTH_LATESTXT					10*sCELL
+#define SLOTH_IX								11*sCELL
+#define SLOTH_JX								12*sCELL
+#define SLOTH_KX								13*sCELL
+#define SLOTH_LX								14*sCELL
+#define SLOTH_CURRENT						15*sCELL
+#define SLOTH_ORDER							16*sCELL
+#define SLOTH_CONTEXT						17*sCELL
 
 /* Word statuses */
 
@@ -1471,6 +1472,7 @@ void sloth_bootstrap(X* x) {
 
 	sloth_comma(x, 10); /* BASE */
 	sloth_comma(x, 0); /* FORTH-WORDLIST */
+	sloth_comma(x, 0); /* INTERNAL-WORDLIST */
 	sloth_comma(x, 0); /* STATE */
 	sloth_comma(x, 0); /* IBUF */
 	sloth_comma(x, 0); /* IPOS */
@@ -1483,9 +1485,10 @@ void sloth_bootstrap(X* x) {
 	sloth_comma(x, 0); /* KX */
 	sloth_comma(x, 0); /* LX */
 	sloth_comma(x, sloth_to_abs(x, SLOTH_FORTH_WORDLIST)); /* CURRENT */
-	sloth_comma(x, 1); /* #ORDER */
+	sloth_comma(x, 2); /* #ORDER */
 	sloth_comma(x, sloth_to_abs(x, SLOTH_FORTH_WORDLIST)); /* CONTEXT 0 */
-	sloth_allot(x, 15*sCELL);
+	sloth_comma(x, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST)); /* CONTEXT 1 */
+	sloth_allot(x, 14*sCELL);
 	/* Variable indicating if we are on Linux or Windows */
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 	sloth_comma(x, 1);
@@ -1496,6 +1499,9 @@ void sloth_bootstrap(X* x) {
 	/* Basic primitives */
 
 	sloth_code(x, "EXIT", sloth_primitive(x, &sloth_exit_));
+
+	sloth_set(x, SLOTH_CURRENT, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST));
+
 	sloth_code(x, "(LIT)", sloth_primitive(x, &sloth_lit_));
 	sloth_code(x, "(RIP)", sloth_primitive(x, &sloth_rip_));
 	sloth_code(x, "(COMPILE)", sloth_primitive(x, &sloth_compile_));
@@ -1506,6 +1512,8 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "(QUOTATION)", sloth_primitive(x, &sloth_quotation_));
 	sloth_code(x, "(DOES)", sloth_primitive(x, &sloth_do_does_));
 	sloth_code(x, "(DOLOOP)", sloth_primitive(x, &sloth_doloop_));
+
+	sloth_set(x, SLOTH_CURRENT, sloth_to_abs(x, SLOTH_FORTH_WORDLIST));
 
 	/* Quotations */
 

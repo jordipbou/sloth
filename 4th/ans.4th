@@ -62,30 +62,44 @@ DROP DROP
 
 ?: ( 41 WORD DROP ; IMMEDIATE
 
+\ -- Compilation wordlist ---------------------------------
+
+\ Defining GET-CURRENT and SET-CURRENT here allows changing
+\ between FORTH-WORDLIST and INTERNAL-WORDLIST from the
+\ beginning and no overpopulate FORTH-WORDLIST.
+
+?: GET-CURRENT ( -- wid ) 15 CELLS TO-ABS @ ;
+?: SET-CURRENT ( wid -- ) 15 CELLS TO-ABS ! ;
+
 \ -- Variables shared with the host -----------------------
 
 ?: BASE ( -- addr ) 1 CELLS TO-ABS ;
 ?: FORTH-WORDLIST ( -- addr ) 2 CELLS TO-ABS ;
-?: STATE ( -- addr ) 3 CELLS TO-ABS ;
-?: (IBUF) ( -- addr ) 4 CELLS TO-ABS ;
-?: (IPOS) ( -- addr ) 5 CELLS TO-ABS ;
-?: (ILEN) ( -- addr ) 6 CELLS TO-ABS ;
-?: (SOURCE-ID) ( -- addr ) 7 CELLS TO-ABS ;
-?: (HLD) ( -- addr ) 8 CELLS TO-ABS ;
-?: (LATESTXT) ( -- addr ) 9 CELLS TO-ABS ;
-?: (IX) ( -- addr ) 10 CELLS TO-ABS ;
-?: (JX) ( -- addr ) 11 CELLS TO-ABS ;
-?: (KX) ( -- addr ) 12 CELLS TO-ABS ;
-?: (LX) ( -- addr ) 13 CELLS TO-ABS ;
+?: INTERNAL-WORDLIST ( -- addr ) 3 CELLS TO-ABS ;
+?: STATE ( -- addr ) 4 CELLS TO-ABS ;
 
-?: (CURRENT) ( -- addr ) 14 CELLS TO-ABS ;
-?: #ORDER ( -- addr ) 15 CELLS TO-ABS ;
-?: CONTEXT ( -- addr ) 16 CELLS TO-ABS ;
+INTERNAL-WORDLIST SET-CURRENT
 
-?: (PLATFORM) ( -- addr ) 32 CELLS TO-ABS ;
+?: (IBUF) ( -- addr ) 5 CELLS TO-ABS ;
+?: (IPOS) ( -- addr ) 6 CELLS TO-ABS ;
+?: (ILEN) ( -- addr ) 7 CELLS TO-ABS ;
+?: (SOURCE-ID) ( -- addr ) 8 CELLS TO-ABS ;
+?: (HLD) ( -- addr ) 9 CELLS TO-ABS ;
+?: (LATESTXT) ( -- addr ) 10 CELLS TO-ABS ;
+?: (IX) ( -- addr ) 11 CELLS TO-ABS ;
+?: (JX) ( -- addr ) 12 CELLS TO-ABS ;
+?: (KX) ( -- addr ) 13 CELLS TO-ABS ;
+?: (LX) ( -- addr ) 14 CELLS TO-ABS ;
+
+?: #ORDER ( -- addr ) 16 CELLS TO-ABS ;
+?: CONTEXT ( -- addr ) 17 CELLS TO-ABS ;
+
+?: (PLATFORM) ( -- addr ) 33 CELLS TO-ABS ;
 
 ?: LINUX? ( -- flag ) (PLATFORM) @ 0 = ;
 ?: WINDOWS? ( -- flag ) (PLATFORM) @ 1 = ;
+
+FORTH-WORDLIST SET-CURRENT
 
 ?: SOURCE-ID ( -- 0 | -1 | fileid ) (SOURCE-ID) @ ;
 
@@ -174,6 +188,8 @@ DROP DROP
 
 \ -- Some constants ---------------------------------------
 
+INTERNAL-WORDLIST SET-CURRENT
+
 64
 ?CONSTANT (CBUF-DISPLACEMENT)	\ Counted string buffer
 
@@ -188,6 +204,8 @@ DROP DROP
 
 416
 ?CONSTANT (PAD-DISPLACEMENT)	\ PAD
+
+FORTH-WORDLIST SET-CURRENT
 
 -1
 ?CONSTANT TRUE
@@ -684,9 +702,6 @@ DROP DROP
 ?\ ;
 
 ?: WORDLIST ( -- wid ) HERE 0 , ;
-
-?: GET-CURRENT ( -- wid ) (CURRENT) @ ;
-?: SET-CURRENT ( wid -- ) (CURRENT) ! ;
 
 ?: ALSO ( -- ) GET-ORDER OVER SWAP 1+ SET-ORDER ;
 ?: DEFINITIONS ( -- ) GET-ORDER SWAP SET-CURRENT DISCARD ;
