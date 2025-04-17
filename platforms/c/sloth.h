@@ -524,6 +524,7 @@ void sloth_throw(X* x, CELL e) {
 	if (x->jmpbuf_idx >= 0) {
 		longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
 	} else {
+		printf("Exception: %ld\n", e);
 		exit(e);
 	}
 }
@@ -1631,6 +1632,12 @@ void sloth_include(X* x, char* f) {
 	sloth_push(x, (CELL)f);
 	sloth_push(x, strlen(f));
 	sloth_included_(x);
+}
+
+void sloth_evaluate(X* x, char* s) {
+	sloth_push(x, (CELL)s);
+	sloth_push(x, (CELL)strlen(s));
+	sloth_evaluate_(x);
 }
 
 /* Helper REPL */
