@@ -44,6 +44,9 @@ int getch();
 typedef uint8_t uCHAR; /* CHARs are always unsigned */
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
+#ifndef SLOTH_NO_FLOATING_POINT
+typedef double FLOAT;
+#endif
 
 #if UINTPTR_MAX == UINT64_MAX
 	#define hCELL_MASK 0xFFFFFFFF
@@ -61,6 +64,9 @@ typedef uintptr_t uCELL;
 #define sCELL sizeof(CELL)
 #define suCHAR sizeof(uCHAR)
 #define CELL_BITS sCELL*8
+#ifndef SLOTH_NO_FLOATING_POINT
+#define sFLOAT sizeof(FLOAT)
+#endif
 
 #ifndef SLOTH_STACK_SIZE
 #define SLOTH_STACK_SIZE 64
@@ -68,6 +74,10 @@ typedef uintptr_t uCELL;
 
 #ifndef SLOTH_RETURN_STACK_SIZE
 #define SLOTH_RETURN_STACK_SIZE 64
+#endif
+
+#ifndef SLOTH_FLOAT_STACK_SIZE
+#define SLOTH_FLOAT_STACK_SIZE 64
 #endif
 
 struct sloth_VM;
@@ -82,6 +92,10 @@ typedef struct sloth_PRIMITIVES {
 typedef struct sloth_VM { 
 	CELL s[SLOTH_STACK_SIZE], sp;
 	CELL r[SLOTH_RETURN_STACK_SIZE], rp;
+	#ifndef SLOTH_NO_FLOATING_POINT
+	FLOAT f[SLOTH_FLOAT_STACK_SIZE]; 
+	CELL fp;
+	#endif
 	CELL ip;
 	CELL d, sz;	/* Dict base address, dict size */
 
@@ -112,12 +126,24 @@ void sloth_rpush(X* x, CELL v);
 CELL sloth_rpop(X* x);
 CELL sloth_rpick(X* x, CELL a);
 
+#ifndef SLOTH_NO_FLOATING_POINT
+/* -- Floating point stack ----------------------------- */
+
+void sloth_fpush(X* x, FLOAT v);
+FLOAT sloth_fpop(X* x);
+FLOAT sloth_fpick(X* x, CELL a);
+#endif
+
 /* -- Memory ------------------------------------------- */
 
 void sloth_store(X* x, CELL a, CELL v);
 CELL sloth_fetch(X* x, CELL a);
 void sloth_cstore(X* x, CELL a, uCHAR v);
 uCHAR sloth_cfetch(X* x, CELL a);
+#ifndef SLOTH_NO_FLOATING_POINT
+void sloth_fstore(X* x, CELL a, FLOAT v);
+FLOAT sloth_ffetch(X* x, CELL a);
+#endif
 
 CELL sloth_to_abs(X* x, CELL a);
 CELL sloth_to_rel(X* x, CELL a);
@@ -182,6 +208,11 @@ CELL sloth_get(X* x, CELL a);
 void sloth_cset(X* x, CELL a, uCHAR v);
 uCHAR sloth_cget(X* x, CELL a);
 
+#ifndef SLOTH_NO_FLOATING_POINT
+void sloth_fset(X* x, CELL a, FLOAT v);
+FLOAT sloth_fget(X* x, CELL a);
+#endif
+
 /* Memory management */
 
 CELL sloth_here(X* x);
@@ -193,9 +224,15 @@ void sloth_align(X* x);
 
 void sloth_comma(X* x, CELL v);
 void sloth_ccomma(X* x, uCHAR v);
+#ifndef SLOTH_NO_FLOATING_POINT
+void sloth_fcomma(X* x, FLOAT v);
+#endif
 
 void sloth_compile(X* x, CELL xt);
 void sloth_literal(X* x, CELL n);
+#ifndef SLOTH_NO_FLOATING_POINT
+void sloth_fliteral(X* x, FLOAT n);
+#endif
 
 /* Headers */
 
@@ -228,6 +265,9 @@ void sloth_unset_flag(X* x, CELL w, uCHAR v);
 
 void sloth_exit_(X* x);
 void sloth_lit_(X* x);
+#ifndef SLOTH_NO_FLOATING_POINT
+void sloth_flit_(X* x);
+#endif
 void sloth_rip_(X* x);
 
 void sloth_compile_(X* x);
@@ -354,6 +394,66 @@ void sloth_postpone_(X* x);
 void sloth_refill_(X* x);
 void sloth_source_(X* x);
 
+/* == Floating point word set ========================== */
+
+/* Constructing compiler and interpreter system extensions */
+
+void sloth_f_align_(X* x);
+void sloth_f_aligned_(X* x);
+void sloth_f_literal_(X* x);
+void sloth_floats_(X* x);
+void sloth_float_plus_(X* x);
+
+/* Manipulating stack items */
+
+void sloth_f_depth_(X* x);
+void sloth_f_drop_(X* x);
+void sloth_f_dup_(X* x);
+void sloth_f_over_(X* x);
+void sloth_f_rot_(X* x);
+void sloth_f_swap_(X* x);
+
+/* Comparison operations */
+
+void sloth_f_less_than_(X* x);
+void sloth_f_zero_less_than_(X* x);
+void sloth_f_zero_equals_(X* x);
+
+/* Memory-stack transfer operations */
+
+void sloth_f_fetch_(X* x);
+void sloth_f_store_(X* x);
+
+/* Commands to define data structures */
+
+void sloth_f_constant_(X* x);
+void sloth_f_variable_(X* x);
+
+/* Number-type conversion operators */
+
+void sloth_d_to_f_(X* x);
+void sloth_f_to_d_(X* x);
+void sloth_s_to_f_(X* x);
+
+/* Arithmetic and logical operations */
+
+void sloth_f_plus_(X* x);
+void sloth_f_minus_(X* x);
+void sloth_f_star_(X* x);
+void sloth_f_slash_(X* x);
+void sloth_floor_(X* x);
+void sloth_f_max_(X* x);
+void sloth_f_min_(X* x);
+void sloth_f_negate_(X* x);
+void sloth_f_round_(X* x);
+
+/* String/numeric conversion */
+
+void sloth_to_float_(X* x);
+void sloth_represent_(X* x);
+
+/* == Helpers and bootstrapping ======================== */
+
 /* -- Helpers to add primitives to the dictionary ------ */
 
 CELL sloth_primitive(X* x, F f);
@@ -406,6 +506,9 @@ void sloth_init(X* x, CELL d, CELL sz) {
 	x->ip = -1; 
 	x->d = d;
 	x->sz = sz;
+	#ifndef SLOTH_NO_FLOATING_POINT
+	x->fp = 0;
+	#endif
 
 	x->jmpbuf_idx = -1;
 }
@@ -447,6 +550,14 @@ void sloth_rpush(X* x, CELL v) { x->r[x->rp] = v; x->rp++; }
 CELL sloth_rpop(X* x) { x->rp--; return x->r[x->rp]; }
 CELL sloth_rpick(X* x, CELL a) { return x->r[x->rp - a - 1]; }
 
+#ifndef SLOTH_NO_FLOATING_POINT
+/* -- Floating point stack ----------------------------- */
+
+void sloth_fpush(X* x, FLOAT v) { x->f[x->fp] = v; x->fp++; }
+FLOAT sloth_fpop(X* x) { x->fp--; return x->f[x->fp]; }
+FLOAT sloth_fpick(X* x, CELL a) { return x->f[x->fp - a - 1]; }
+#endif
+
 /* -- Memory ------------------------------------------- */
 
 /* 
@@ -457,6 +568,10 @@ void sloth_store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
 CELL sloth_fetch(X* x, CELL a) { return *((CELL*)a); }
 void sloth_cstore(X* x, CELL a, uCHAR v) { *((uCHAR*)a) = v; }
 uCHAR sloth_cfetch(X* x, CELL a) { return *((uCHAR*)a); }
+#ifndef SLOTH_NO_FLOATING_POINT
+void sloth_fstore(X* x, CELL a, FLOAT v) { *((FLOAT*)a) = v; }
+FLOAT sloth_ffetch(X* x, CELL a) { return *((FLOAT*)a); }
+#endif
 
 /*
 The next two macros allow transforming from relative to
@@ -472,6 +587,14 @@ CELL sloth_op(X* x) {
 	x->ip += sCELL;
 	return o; 
 }
+
+#ifndef SLOTH_NO_FLOATING_POINT
+FLOAT sloth_fop(X* x) {
+	FLOAT n = sloth_ffetch(x, sloth_to_abs(x, x->ip));
+	x->ip += sFLOAT;
+	return n;
+}
+#endif
 
 void sloth__do_prim(X* x, CELL p) { 
 	(x->p->p[-1 - p])(x); 
@@ -537,11 +660,28 @@ void sloth_throw(X* x, CELL e) {
 
 /* Setting and getting variables (cell and char sized) */
 
-void sloth_set(X* x, CELL a, CELL v) { sloth_store(x, sloth_to_abs(x, a), v); }
-CELL sloth_get(X* x, CELL a) { return sloth_fetch(x, sloth_to_abs(x, a)); }
+void sloth_set(X* x, CELL a, CELL v) { 
+	sloth_store(x, sloth_to_abs(x, a), v); 
+}
+CELL sloth_get(X* x, CELL a) { 
+	return sloth_fetch(x, sloth_to_abs(x, a)); 
+}
 
-void sloth_cset(X* x, CELL a, uCHAR v) { sloth_cstore(x, sloth_to_abs(x, a), v); }
-uCHAR sloth_cget(X* x, CELL a) { return sloth_cfetch(x, sloth_to_abs(x, a)); }
+void sloth_cset(X* x, CELL a, uCHAR v) { 
+	sloth_cstore(x, sloth_to_abs(x, a), v); 
+}
+uCHAR sloth_cget(X* x, CELL a) { 
+	return sloth_cfetch(x, sloth_to_abs(x, a)); 
+}
+
+#ifndef SLOTH_NO_FLOATING_POINT
+void sloth_fset(X* x, CELL a, FLOAT v) { 
+	sloth_fstore(x, sloth_to_abs(x, a), v); 
+}
+FLOAT sloth_fget(X* x, CELL a) { 
+	return sloth_ffetch(x, sloth_to_abs(x, a)); 
+}
+#endif
 
 /* Memory management */
 
@@ -559,8 +699,21 @@ void sloth_align(X* x) {
 
 /* Compilation */
 
-void sloth_comma(X* x, CELL v) { sloth_set(x, sloth_here(x), v); sloth_allot(x, sCELL); }
-void sloth_ccomma(X* x, uCHAR v) { sloth_set(x, sloth_here(x), v); sloth_allot(x, suCHAR); }
+void sloth_comma(X* x, CELL v) { 
+	sloth_set(x, sloth_here(x), v); 
+	sloth_allot(x, sCELL); 
+}
+void sloth_ccomma(X* x, uCHAR v) { 
+	sloth_set(x, sloth_here(x), v); 
+	sloth_allot(x, suCHAR); 
+}
+#ifndef SLOTH_NO_FLOATING_POINT
+void sloth_fcomma(X* x, FLOAT v) { 
+	sloth_fset(x, sloth_here(x), v); 
+	sloth_allot(x, sFLOAT); 
+}
+#endif
+
 
 void sloth_compile(X* x, CELL xt) { sloth_comma(x, xt); }
 
@@ -568,6 +721,13 @@ void sloth_literal(X* x, CELL n) {
 	sloth_comma(x, sloth_get_xt(x, sloth_find_word(x, "(LIT)")));
 	sloth_comma(x, n); 
 }
+
+#ifndef SLOTH_NO_FLOATING_POINT
+void sloth_fliteral(X* x, FLOAT n) {
+	sloth_comma(x, sloth_get_xt(x, sloth_find_word(x, "(FLIT)")));
+	sloth_fcomma(x, n);
+}
+#endif
 
 /* Headers */
 
@@ -633,6 +793,9 @@ void sloth_exit_(X* x) {
 	x->ip = (x->rp > 0) ? sloth_rpop(x) : -1; 
 }
 void sloth_lit_(X* x) { sloth_push(x, sloth_op(x)); }
+#ifndef SLOTH_NO_FLOATING_POINT
+void sloth_flit_(X* x) { sloth_fpush(x, sloth_fop(x)); }
+#endif
 void sloth_rip_(X* x) { 
 	sloth_push(
 		x, 
@@ -912,9 +1075,27 @@ void sloth_interpret_(X* x) {
 					if (sloth_get(x, SLOTH_STATE) == 0) sloth_push(x, n);
 					else sloth_literal(x, n);
 				} else {
+					#ifndef SLOTH_NO_FLOATING_POINT
+					if (sloth_get(x, SLOTH_BASE) == 10) {
+						sloth_push(x, (CELL)tok);
+						sloth_push(x, (CELL)tlen);
+						sloth_to_float_(x);
+						if (sloth_pop(x) == 0) {
+							/* TODO Word not found, throw an exception? */
+							/* printf("%.*s ?\n", tlen, tok); */
+							sloth_throw(x, -13);
+						} else {
+							if (sloth_get(x, SLOTH_STATE) != 0) {
+								sloth_fliteral(x, sloth_fpop(x));
+							}
+						}
+					}
+					#else
+					printf("...NO floating word set present\n");
 					/* TODO Word not found, throw an exception? */
 					/* printf("%.*s ?\n", tlen, tok); */
 					sloth_throw(x, -13);
+					#endif
 				}
 			}
 		}
@@ -1436,6 +1617,89 @@ void sloth_source_(X* x) {
 	sloth_push(x, sloth_get(x, SLOTH_ILEN)); 
 }
 
+/* == Floating point word set ========================== */
+
+/* Constructing compiler and interpreter system extensions */
+
+void sloth_f_align_(X* x) { /* TODO */ }
+void sloth_f_aligned_(X* x) { /* TODO */ }
+void sloth_f_literal_(X* x) { /* TODO */ }
+void sloth_floats_(X* x) { /* TODO */ }
+void sloth_float_plus_(X* x) { /* TODO */ }
+
+/* Manipulating stack items */
+
+void sloth_f_depth_(X* x) { sloth_push(x, x->fp); }
+void sloth_f_drop_(X* x) { sloth_fpop(x); }
+void sloth_f_dup_(X* x) { sloth_fpush(x, sloth_fpick(x, 0)); }
+void sloth_f_over_(X* x) { sloth_fpush(x, sloth_fpick(x, 1)); }
+void sloth_f_rot_(X* x) { /* TODO */}
+void sloth_f_swap_(X* x) { /* TODO */}
+
+/* Comparison operations */
+
+void sloth_f_less_than_(X* x) { /* TODO */}
+void sloth_f_zero_less_than_(X* x) { /* TODO */}
+void sloth_f_zero_equals_(X* x) { /* TODO */}
+
+/* Memory-stack transfer operations */
+
+void sloth_f_fetch_(X* x) { /* TODO */}
+void sloth_f_store_(X* x) { /* TODO */}
+
+/* Commands to define data structures */
+
+void sloth_f_constant_(X* x) { /* TODO */}
+void sloth_f_variable_(X* x) { /* TODO */}
+
+/* Number-type conversion operators */
+
+void sloth_d_to_f_(X* x) { /* TODO */}
+void sloth_f_to_d_(X* x) { /* TODO */}
+void sloth_s_to_f_(X* x) { /* TODO */}
+
+/* Arithmetic and logical operations */
+
+void sloth_f_plus_(X* x) { /* TODO */}
+void sloth_f_minus_(X* x) { /* TODO */}
+void sloth_f_star_(X* x) { /* TODO */}
+void sloth_f_slash_(X* x) { /* TODO */}
+void sloth_floor_(X* x) { /* TODO */}
+void sloth_f_max_(X* x) { /* TODO */}
+void sloth_f_min_(X* x) { /* TODO */}
+void sloth_f_negate_(X* x) { /* TODO */}
+void sloth_f_round_(X* x) { /* TODO */}
+
+/* String/numeric conversion */
+
+void sloth_to_float_(X* x) {
+	char buf[15]; char *endptr;
+	int tlen = (int)sloth_pop(x);
+	char* tok = (char*)sloth_pop(x);
+	double n;
+	strncpy(buf, tok, tlen);
+	buf[tlen] = 0;
+	n = strtod(buf, &endptr);
+	if (n == 0 && endptr == buf) {
+		sloth_push(x, 0);
+	} else {
+		sloth_fpush(x, (float)n);
+		sloth_push(x, -1);
+	}
+}
+
+void sloth_represent_(X* x) { /* TODO */}
+
+/* Non ANS floating point helpers */
+
+void sloth_dot_f_(X* x) {
+	int i;
+	printf("F:<%ld> ", x->fp);
+	for (i = 0; i < x->fp; i++) printf("%f ", x->f[i]);
+}
+
+/* == Helpers and bootstrapping ======================== */
+
 /* -- Helpers to add primitives to the dictionary ------ */
 
 CELL sloth_primitive(X* x, F f) { 
@@ -1504,6 +1768,9 @@ void sloth_bootstrap(X* x) {
 	sloth_set(x, SLOTH_CURRENT, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST));
 
 	sloth_code(x, "(LIT)", sloth_primitive(x, &sloth_lit_));
+	#ifndef SLOTH_NO_FLOATING_POINT
+	sloth_code(x, "(FLIT)", sloth_primitive(x, &sloth_flit_));
+	#endif
 	sloth_code(x, "(RIP)", sloth_primitive(x, &sloth_rip_));
 	sloth_code(x, "(COMPILE)", sloth_primitive(x, &sloth_compile_));
 	sloth_code(x, "(BRANCH)", sloth_primitive(x, &sloth_branch_));
@@ -1615,7 +1882,30 @@ void sloth_bootstrap(X* x) {
 
 	sloth_code(x, "FIND", sloth_primitive(x, &sloth_find_));
 
-	/* Helpers */
+	/* == Floating point word set ======================== */
+
+	/* Constructing compiler and interpreter system extensions */
+
+	sloth_code(x, "FALIGN", sloth_primitive(x, &sloth_f_align_));
+	sloth_code(x, "FALIGNED", sloth_primitive(x, &sloth_f_aligned_));
+	sloth_code(x, "FLITERAL", sloth_primitive(x, &sloth_f_literal_));
+	sloth_code(x, "FLOATS", sloth_primitive(x, &sloth_floats_));
+	sloth_code(x, "FLOAT+", sloth_primitive(x, &sloth_float_plus_));
+
+	/* Manipulating stack items */
+
+	sloth_code(x, "FDEPTH", sloth_primitive(x, &sloth_f_depth_));
+	sloth_code(x, "FDROP", sloth_primitive(x, &sloth_f_drop_));
+	sloth_code(x, "FDUP", sloth_primitive(x, &sloth_f_dup_));
+	sloth_code(x, "FOVER", sloth_primitive(x, &sloth_f_over_));
+	sloth_code(x, "FROT", sloth_primitive(x, &sloth_f_rot_));
+	sloth_code(x, "FSWAP", sloth_primitive(x, &sloth_f_swap_));
+
+	/* Non ANS floating point helpers */
+
+	sloth_code(x, ".F", sloth_primitive(x, &sloth_dot_f_));
+
+	/* == Helpers ======================================== */
 
 	sloth_code(x, "TO-ABS", sloth_primitive(x, &sloth_to_abs_));
 	sloth_code(x, "TO-REL", sloth_primitive(x, &sloth_to_rel_));
