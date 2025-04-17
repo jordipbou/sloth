@@ -946,6 +946,7 @@ SET-CURRENT
 ?\		POSTPONE (STRING) DUP ,
 ?\		HERE OVER CHARS ALLOT
 ?\		SWAP CMOVE
+?\		0 C,	\ Zero ended string literal
 ?\		ALIGN
 ?\ ; IMMEDIATE
 
@@ -953,6 +954,7 @@ SET-CURRENT
 ?\		POSTPONE (CSTRING) DUP C,
 ?\		HERE OVER CHARS ALLOT
 ?\		SWAP CMOVE
+?\		0 C,	\ Zero ended string literal
 ?\		ALIGN
 ?\ ; IMMEDIATE
 

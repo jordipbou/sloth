@@ -652,13 +652,13 @@ void sloth_string_(X* x) {
 	CELL l = sloth_op(x); 
 	sloth_push(x, sloth_to_abs(x, x->ip)); 
 	sloth_push(x, l); 
-	x->ip = sloth_aligned(x->ip + l); 
+	x->ip = sloth_aligned(x->ip + l + 1); 
 }
 
 void sloth_c_string_(X* x) { 
 	uCHAR l = sloth_cfetch(x, sloth_to_abs(x, x->ip)); 
 	sloth_push(x, sloth_to_abs(x, x->ip)); 
-	x->ip = sloth_aligned(x->ip + l + 1);
+	x->ip = sloth_aligned(x->ip + l + 2);
 }
 
 /* Quotations (not in ANS Forth yet) */
