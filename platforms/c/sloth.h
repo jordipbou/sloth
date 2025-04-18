@@ -1164,9 +1164,8 @@ void sloth_interpret_(X* x) {
 						}
 					}
 					#else
-					printf("...NO floating word set present\n");
 					/* TODO Word not found, throw an exception? */
-					/* printf("%.*s ?\n", tlen, tok); */
+					printf("%.*s ?\n", tlen, tok);
 					sloth_throw(x, -13);
 					#endif
 				}
@@ -1690,6 +1689,8 @@ void sloth_source_(X* x) {
 	sloth_push(x, sloth_get(x, SLOTH_ILEN)); 
 }
 
+#ifndef SLOTH_NO_FLOATING_POINT
+
 /* == Floating point word set ========================== */
 
 /* Constructing compiler and interpreter system extensions */
@@ -1706,19 +1707,43 @@ void sloth_f_depth_(X* x) { sloth_push(x, x->fp); }
 void sloth_f_drop_(X* x) { sloth_fpop(x); }
 void sloth_f_dup_(X* x) { sloth_fpush(x, sloth_fpick(x, 0)); }
 void sloth_f_over_(X* x) { sloth_fpush(x, sloth_fpick(x, 1)); }
-void sloth_f_rot_(X* x) { /* TODO */}
-void sloth_f_swap_(X* x) { /* TODO */}
+void sloth_f_rot_(X* x) { 
+	FLOAT c = sloth_fpop(x);
+	FLOAT b = sloth_fpop(x);
+	FLOAT a = sloth_fpop(x);
+	sloth_fpush(x, b);
+	sloth_fpush(x, c);
+	sloth_fpush(x, a);
+}
+void sloth_f_swap_(X* x) { 
+	FLOAT b = sloth_fpop(x);
+	FLOAT a = sloth_fpop(x);
+	sloth_fpush(x, b);
+	sloth_fpush(x, a);
+}
 
 /* Comparison operations */
 
-void sloth_f_less_than_(X* x) { /* TODO */}
-void sloth_f_zero_less_than_(X* x) { /* TODO */}
-void sloth_f_zero_equals_(X* x) { /* TODO */}
+void sloth_f_less_than_(X* x) { 
+	FLOAT b = sloth_fpop(x);
+	FLOAT a = sloth_fpop(x);
+	sloth_push(x, a < b ? -1 : 0);
+}
+void sloth_f_zero_less_than_(X* x) { 
+	sloth_push(x, sloth_fpop(x) < 0.0 ? -1 : 0); 
+}
+void sloth_f_zero_equals_(X* x) {
+	sloth_push(x, sloth_fpop(x) == 0.0 ? -1 : 0);
+}
 
 /* Memory-stack transfer operations */
 
-void sloth_f_fetch_(X* x) { /* TODO */}
-void sloth_f_store_(X* x) { /* TODO */}
+void sloth_f_fetch_(X* x) { 
+	sloth_fpush(x, sloth_ffetch(x, sloth_pop(x))); 
+}
+void sloth_f_store_(X* x) { 
+	sloth_fstore(x, sloth_pop(x), sloth_fpop(x)); 
+}
 
 /* Commands to define data structures */
 
@@ -1770,6 +1795,8 @@ void sloth_dot_f_(X* x) {
 	printf("F:<%ld> ", x->fp);
 	for (i = 0; i < x->fp; i++) printf("%f ", x->f[i]);
 }
+
+#endif
 
 /* == Helpers and bootstrapping ======================== */
 
@@ -1958,6 +1985,8 @@ void sloth_bootstrap(X* x) {
 
 	sloth_code(x, "FIND", sloth_primitive(x, &sloth_find_));
 
+	#ifndef SLOTH_NO_FLOATING_POINT
+
 	/* == Floating point word set ======================== */
 
 	/* Constructing compiler and interpreter system extensions */
@@ -1977,9 +2006,22 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "FROT", sloth_primitive(x, &sloth_f_rot_));
 	sloth_code(x, "FSWAP", sloth_primitive(x, &sloth_f_swap_));
 
+	/* Comparison operations */
+
+	sloth_code(x, "F<", sloth_primitive(x, &sloth_f_less_than_));
+	sloth_code(x, "F0<", sloth_primitive(x, &sloth_f_zero_less_than_));
+	sloth_code(x, "F0=", sloth_primitive(x, &sloth_f_zero_equals_));
+
+	/* Memory-stack transfer operations */
+
+	sloth_code(x, "F@", sloth_primitive(x, &sloth_f_fetch_));
+	sloth_code(x, "F!", sloth_primitive(x, &sloth_f_store_));
+
 	/* Non ANS floating point helpers */
 
 	sloth_code(x, ".F", sloth_primitive(x, &sloth_dot_f_));
+
+	#endif
 
 	/* == Helpers ======================================== */
 

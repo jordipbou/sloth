@@ -1210,60 +1210,6 @@ SET-CURRENT
 ?\		SWAP !           \ set len 
 ?\ ;
 
-\ -- QUIT -------------------------------------------------
-
-?: QUIT
-?\		(EMPTY-RETURN-STACK)
-?\		0 (SOURCE-ID) !		\ Set source to user input device
-?\		POSTPONE [
-?\		BEGIN
-?\			REFILL
-?\		WHILE
-?\			['] INTERPRET CATCH
-?\			CASE
-?\			0 OF STATE @ 0= IF 
-?\				."  OK" 
-?\				DEPTH 0 > IF SPACE DEPTH . THEN
-\ Should be checking if floating point words are present?
-\ Or maybe just make FDEPTH always present and just return 0?
-?\				FDEPTH 0 > IF SPACE ." f:" FDEPTH . THEN
-?\			THEN CR ENDOF
-?\			POSTPONE [
-?\			-1 OF ( TODO Aborted )  ENDOF
-?\			-2 OF ( TODO display message from ABORT" ) ENDOF
-?\			( default ) DUP ." Exception # " . CR
-?\			ENDCASE
-?\		REPEAT BYE
-?\ ;
-
-\ -- Exceptions -------------------------------------------
-
-?: ABORT ( i*x -- ) ( R: j*x -- ) -1 THROW ;
-
-[UNDEFINED] ABORT" [IF] \ " for correct syntax highlighting
-\ TODO INTERNAL-WORDLIST should be defined and used before
-WORDLIST CONSTANT INTERNAL-WORDLIST
-
-INTERNAL-WORDLIST SET-CURRENT
-: (ABORT") ( n c-addr u -- )
-	ROT 0= IF
-		2DROP
-	ELSE
-		-2 THROW
-	THEN
-;
-FORTH-WORDLIST SET-CURRENT
-
-GET-ORDER INTERNAL-WORDLIST SWAP 1+ SET-ORDER
-
-: ABORT"
-	POSTPONE S"
-	POSTPONE (ABORT")
-; IMMEDIATE
-
-PREVIOUS
-[THEN]
-
 \ -- Environment queries ----------------------------------
 
 [UNDEFINED] ENVIRONMENT? [IF]
@@ -1305,6 +1251,74 @@ PREVIOUS
 	THEN THEN THEN THEN THEN THEN THEN THEN THEN
 	THEN THEN THEN THEN THEN THEN
 ;
+[THEN]
+
+\ -- QUIT -------------------------------------------------
+
+[UNDEFINED] QUIT [IF]
+
+INTERNAL-WORDLIST SET-CURRENT
+
+S" FLOATING" ENVIRONMENT? DROP [IF]
+: PRINT-FDEPTH ( -- ) 
+	FDEPTH 0 > IF SPACE ." f:" FDEPTH . THEN
+;
+[ELSE]
+: PRINT-FDEPTH ( -- ) ;
+[THEN]
+
+FORTH-WORDLIST SET-CURRENT
+
+: QUIT
+		(EMPTY-RETURN-STACK)
+		0 (SOURCE-ID) !		\ Set source to user input device
+		POSTPONE [
+		BEGIN
+			REFILL
+		WHILE
+			['] INTERPRET CATCH
+			CASE
+			0 OF STATE @ 0= IF 
+				."  OK" 
+				DEPTH 0 > IF SPACE DEPTH . THEN
+				PRINT-FDEPTH
+		THEN CR ENDOF
+		POSTPONE [
+		-1 OF ( TODO Aborted )  ENDOF
+		-2 OF ( TODO display message from ABORT" ) ENDOF
+		( default ) DUP ." Exception # " . CR
+		ENDCASE
+	REPEAT BYE
+;
+
+[THEN]
+
+\ -- Exceptions -------------------------------------------
+
+?: ABORT ( i*x -- ) ( R: j*x -- ) -1 THROW ;
+
+[UNDEFINED] ABORT" [IF] \ " for correct syntax highlighting
+\ TODO INTERNAL-WORDLIST should be defined and used before
+WORDLIST CONSTANT INTERNAL-WORDLIST
+
+INTERNAL-WORDLIST SET-CURRENT
+: (ABORT") ( n c-addr u -- )
+	ROT 0= IF
+		2DROP
+	ELSE
+		-2 THROW
+	THEN
+;
+FORTH-WORDLIST SET-CURRENT
+
+GET-ORDER INTERNAL-WORDLIST SWAP 1+ SET-ORDER
+
+: ABORT"
+	POSTPONE S"
+	POSTPONE (ABORT")
+; IMMEDIATE
+
+PREVIOUS
 [THEN]
 
 \ -- S\" --------------------------------------------------
