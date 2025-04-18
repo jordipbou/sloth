@@ -46,7 +46,20 @@ typedef intptr_t CELL;
 typedef uintptr_t uCELL;
 #ifndef SLOTH_NO_FLOATING_POINT
 typedef double FLOAT;
+typedef float SFLOAT;
+typedef double DFLOAT;
 #endif
+
+#define sCELL sizeof(CELL)
+#define suCHAR sizeof(uCHAR)
+#define CELL_BITS sCELL*8
+#ifndef SLOTH_NO_FLOATING_POINT
+#define sFLOAT sizeof(FLOAT)
+#define sSFLOAT sizeof(SFLOAT)
+#define sDFLOAT sizeof(DFLOAT)
+#endif
+
+#define ALIGNED(a, t) (((a) + ((t) - 1)) & ~((t) - 1))
 
 #if UINTPTR_MAX == UINT64_MAX
 	#define hCELL_MASK 0xFFFFFFFF
@@ -59,13 +72,6 @@ typedef double FLOAT;
 #if UINTPTR_MAX == UINT16_MAX
 	#define hCELL_MASK 0xFF
 	#define hCELL_BITS 8
-#endif
-
-#define sCELL sizeof(CELL)
-#define suCHAR sizeof(uCHAR)
-#define CELL_BITS sCELL*8
-#ifndef SLOTH_NO_FLOATING_POINT
-#define sFLOAT sizeof(FLOAT)
 #endif
 
 #ifndef SLOTH_STACK_SIZE
@@ -143,6 +149,10 @@ uCHAR sloth_cfetch(X* x, CELL a);
 #ifndef SLOTH_NO_FLOATING_POINT
 void sloth_fstore(X* x, CELL a, FLOAT v);
 FLOAT sloth_ffetch(X* x, CELL a);
+void sloth_sfstore(X* x, CELL a, SFLOAT v);
+SFLOAT sloth_sffetch(X* x, CELL a);
+void sloth_dfstore(X* x, CELL a, DFLOAT v);
+DFLOAT sloth_dffetch(X* x, CELL a);
 #endif
 
 CELL sloth_to_abs(X* x, CELL a);
@@ -408,6 +418,12 @@ void sloth_f_literal_(X* x);
 void sloth_floats_(X* x);
 void sloth_float_plus_(X* x);
 
+void sloth_s_f_aligned_(X* x);
+void sloth_d_f_aligned_(X* x);
+
+void sloth_s_floats_(X* x);
+void sloth_d_floats_(X* x);
+
 /* Manipulating stack items */
 
 void sloth_f_depth_(X* x);
@@ -427,6 +443,10 @@ void sloth_f_zero_equals_(X* x);
 
 void sloth_f_fetch_(X* x);
 void sloth_f_store_(X* x);
+void sloth_s_f_fetch_(X* x);
+void sloth_s_f_store_(X* x);
+void sloth_d_f_fetch_(X* x);
+void sloth_d_f_store_(X* x);
 
 /* Commands to define data structures */
 
@@ -579,6 +599,10 @@ uCHAR sloth_cfetch(X* x, CELL a) { return *((uCHAR*)a); }
 #ifndef SLOTH_NO_FLOATING_POINT
 void sloth_fstore(X* x, CELL a, FLOAT v) { *((FLOAT*)a) = v; }
 FLOAT sloth_ffetch(X* x, CELL a) { return *((FLOAT*)a); }
+void sloth_sfstore(X* x, CELL a, SFLOAT v) { *((SFLOAT*)a) = v; }
+SFLOAT sloth_sffetch(X* x, CELL a) { return *((SFLOAT*)a); }
+void sloth_dfstore(X* x, CELL a, DFLOAT v) { *((DFLOAT*)a) = v; }
+DFLOAT sloth_dffetch(X* x, CELL a) { return *((DFLOAT*)a); }
 #endif
 
 /*
@@ -697,12 +721,14 @@ CELL sloth_here(X* x) { return sloth_get(x, SLOTH_HERE); }
 void sloth_allot(X* x, CELL v) { 
 	sloth_set(x, SLOTH_HERE, sloth_get(x, SLOTH_HERE) + v); 
 }
-CELL sloth_aligned(CELL a) { return (a + (sCELL - 1)) & ~(sCELL - 1); }
+/* CELL sloth_aligned(CELL a) { return (a + (sCELL - 1)) & ~(sCELL - 1); } */
+CELL sloth_aligned(CELL a) { return ALIGNED(a, sCELL); }
 void sloth_align(X* x) { 
 	sloth_set(
 		x, 
 		SLOTH_HERE, 
-		(sloth_get(x, SLOTH_HERE) + (sCELL - 1)) & ~(sCELL - 1)); 
+/*		(sloth_get(x, SLOTH_HERE) + (sCELL - 1)) & ~(sCELL - 1));  */
+		ALIGNED(sloth_get(x, SLOTH_HERE), sCELL));
 }
 
 /* Compilation */
@@ -1699,11 +1725,28 @@ void sloth_source_(X* x) {
 
 /* Constructing compiler and interpreter system extensions */
 
-void sloth_f_align_(X* x) { /* TODO */ }
-void sloth_f_aligned_(X* x) { /* TODO */ }
+void sloth_f_align_(X* x) { 
+	sloth_set(
+		x, 
+		SLOTH_HERE, 
+		ALIGNED(sloth_get(x, SLOTH_HERE), sFLOAT));
+}
+void sloth_f_aligned_(X* x) { 
+	sloth_push(x, ALIGNED(sloth_pop(x), sFLOAT)); 
+}
 void sloth_f_literal_(X* x) { /* TODO */ }
-void sloth_floats_(X* x) { /* TODO */ }
+void sloth_floats_(X* x) { sloth_push(x, sloth_pop(x) * sFLOAT); }
 void sloth_float_plus_(X* x) { /* TODO */ }
+
+void sloth_s_f_aligned_(X* x) { 
+	sloth_push(x, ALIGNED(sloth_pop(x), sSFLOAT)); 
+}
+void sloth_d_f_aligned_(X* x) {
+	sloth_push(x, ALIGNED(sloth_pop(x), sDFLOAT)); 
+}
+
+void sloth_s_floats_(X* x) { sloth_push(x, sloth_pop(x) * sSFLOAT); }
+void sloth_d_floats_(X* x) { sloth_push(x, sloth_pop(x) * sDFLOAT); }
 
 /* Manipulating stack items */
 
@@ -1747,6 +1790,20 @@ void sloth_f_fetch_(X* x) {
 }
 void sloth_f_store_(X* x) { 
 	sloth_fstore(x, sloth_pop(x), sloth_fpop(x)); 
+}
+
+void sloth_s_f_fetch_(X* x) { 
+	sloth_fpush(x, sloth_sffetch(x, sloth_pop(x))); 
+}
+void sloth_s_f_store_(X* x) { 
+	sloth_sfstore(x, sloth_pop(x), sloth_fpop(x)); 
+}
+
+void sloth_d_f_fetch_(X* x) { 
+	sloth_fpush(x, sloth_dffetch(x, sloth_pop(x))); 
+}
+void sloth_d_f_store_(X* x) { 
+	sloth_dfstore(x, sloth_pop(x), sloth_fpop(x)); 
 }
 
 /* Commands to define data structures */
@@ -2001,6 +2058,12 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "FLOATS", sloth_primitive(x, &sloth_floats_));
 	sloth_code(x, "FLOAT+", sloth_primitive(x, &sloth_float_plus_));
 
+	sloth_code(x, "SFALIGNED", sloth_primitive(x, &sloth_s_f_aligned_));
+	sloth_code(x, "DFALIGNED", sloth_primitive(x, &sloth_d_f_aligned_));
+
+	sloth_code(x, "SFLOATS", sloth_primitive(x, &sloth_s_floats_));
+	sloth_code(x, "DFLOATS", sloth_primitive(x, &sloth_d_floats_));
+
 	/* Manipulating stack items */
 
 	sloth_code(x, "FDEPTH", sloth_primitive(x, &sloth_f_depth_));
@@ -2020,6 +2083,12 @@ void sloth_bootstrap(X* x) {
 
 	sloth_code(x, "F@", sloth_primitive(x, &sloth_f_fetch_));
 	sloth_code(x, "F!", sloth_primitive(x, &sloth_f_store_));
+
+	sloth_code(x, "SF@", sloth_primitive(x, &sloth_f_fetch_));
+	sloth_code(x, "SF!", sloth_primitive(x, &sloth_f_store_));
+
+	sloth_code(x, "DF@", sloth_primitive(x, &sloth_d_f_fetch_));
+	sloth_code(x, "DF!", sloth_primitive(x, &sloth_d_f_store_));
 
 	/* Non ANS floating point helpers */
 

@@ -1196,15 +1196,15 @@ SET-CURRENT
 \ TODO Shouldn't CHARS be also aligned?
 ?\		1 CHARS +FIELD 
 ?\ ;
-\ ?: FFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-\ ?\		FALIGNED 1 FLOATS +FIELD 
-\ ?\ ;
-\ ?: SFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-\ ?\		SFALIGNED 1 SFLOATS +FIELD 
-\ ?\ ;
-\ ?: DFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-\ ?\		DFALIGNED 1 DFLOATS +FIELD 
-\ ?\ ;
+?: FFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+?\		FALIGNED 1 FLOATS +FIELD 
+?\ ;
+?: SFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+?\		SFALIGNED 1 SFLOATS +FIELD 
+?\ ;
+?: DFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+?\		DFALIGNED 1 DFLOATS +FIELD 
+?\ ;
 
 ?: END-STRUCTURE ( addr n -- )
 ?\		SWAP !           \ set len 
