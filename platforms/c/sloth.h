@@ -456,6 +456,10 @@ void sloth_f_round_(X* x);
 void sloth_to_float_(X* x);
 void sloth_represent_(X* x);
 
+/* Non ANS floating point helpers */
+
+void sloth_f_dot_s_(X* x);
+
 /* == Helpers and bootstrapping ======================== */
 
 /* -- Helpers to add primitives to the dictionary ------ */
@@ -1790,7 +1794,7 @@ void sloth_represent_(X* x) { /* TODO */}
 
 /* Non ANS floating point helpers */
 
-void sloth_dot_f_(X* x) {
+void sloth_f_dot_s_(X* x) {
 	int i;
 	printf("F:<%ld> ", x->fp);
 	for (i = 0; i < x->fp; i++) printf("%f ", x->f[i]);
@@ -2019,7 +2023,7 @@ void sloth_bootstrap(X* x) {
 
 	/* Non ANS floating point helpers */
 
-	sloth_code(x, ".F", sloth_primitive(x, &sloth_dot_f_));
+	sloth_code(x, "F.S", sloth_primitive(x, &sloth_f_dot_s_));
 
 	#endif
 
