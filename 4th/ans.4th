@@ -94,11 +94,6 @@ INTERNAL-WORDLIST SET-CURRENT
 ?: #ORDER ( -- addr ) 16 CELLS TO-ABS ;
 ?: CONTEXT ( -- addr ) 17 CELLS TO-ABS ;
 
-?: (PLATFORM) ( -- addr ) 33 CELLS TO-ABS ;
-
-?: LINUX? ( -- flag ) (PLATFORM) @ 0 = ;
-?: WINDOWS? ( -- flag ) (PLATFORM) @ 1 = ;
-
 FORTH-WORDLIST SET-CURRENT
 
 ?: SOURCE-ID ( -- 0 | -1 | fileid ) (SOURCE-ID) @ ;
@@ -343,6 +338,14 @@ FORTH-WORDLIST SET-CURRENT
 ?: WITHIN ( n1 | u1 n2 | u2 n3 | u3 -- flag ) 
 ?\		OVER - >R - R> U< 
 ?\ ; 
+
+\ -- Platform definition ----------------------------------
+
+?: LINUX? ( -- flag ) -1 (ENVIRONMENT) 4 = ;
+?: WINDOWS? ( -- flag ) 
+?\		-1 (ENVIRONMENT)
+?\		DUP 0 = SWAP 1 = OR
+?\ ;
 
 \ -- More arithmetic operations ---------------------------
 
@@ -1217,7 +1220,11 @@ SET-CURRENT
 ?\			['] INTERPRET CATCH
 ?\			CASE
 ?\			0 OF STATE @ 0= IF 
-?\				."  OK" DEPTH 0 > IF SPACE DEPTH . THEN
+?\				."  OK" 
+?\				DEPTH 0 > IF SPACE DEPTH . THEN
+\ Should be checking if floating point words are present?
+\ Or maybe just make FDEPTH always present and just return 0?
+?\				FDEPTH 0 > IF SPACE ." f:" FDEPTH . THEN
 ?\			THEN CR ENDOF
 ?\			POSTPONE [
 ?\			-1 OF ( TODO Aborted )  ENDOF
@@ -1260,7 +1267,7 @@ PREVIOUS
 [UNDEFINED] ENVIRONMENT? [IF]
 : ENVIRONMENT? ( c-addr u -- false | i*x true )
 	2DUP s" /COUNTED-STRING" COMPARE 0= IF
-		2DROP 64 TRUE
+		0 (ENVIRONMENT) -1
 	ELSE
 		FALSE
 	THEN

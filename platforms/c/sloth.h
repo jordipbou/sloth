@@ -291,6 +291,10 @@ void sloth__ipop(X* x);
 void sloth_unloop_(X* x);
 void sloth_doloop_(X* x);
 
+/* Environment queries */
+
+void sloth_environment_(X* x);
+
 /* Parsing input */
 
 void sloth_word_(X* x);
@@ -311,7 +315,6 @@ void sloth_interpret_(X* x);
 /* Commands that can help you start or end work sessions */
 
 void sloth_bye_(X* x);
-void sloth_environment_query_(X* x);
 
 /* Commands to inspect memory, debug & view code */
 
@@ -926,6 +929,75 @@ void sloth_doloop_(X* x) {
 	}
 }
 
+/* Environment queries */
+
+void sloth_environment_(X* x) {
+	switch (sloth_pop(x)) {
+	case 0: /* /COUNTED-STRING */
+		sloth_push(x, 64); 
+		break;
+	case 1: /* /HOLD */
+		/* TODO */ 
+		break;
+	case 2: /* /PDA */
+		/* TODO */ 
+		break;
+	case 3: /* ADDRESS-UNIT-BITS */
+ 		sloth_push(x, CHAR_BIT); 
+		break;
+	case 4: /* FLOORED */
+		/* Good explanation about floored/symmetric division: */
+		/* https://www.nimblemachines.com/symmetric-division-considered-harmful/ */
+		sloth_push(x, (-3 / 2 == -2) ? -1 : 0);
+		break;
+	case 5: /* MAX-CHAR */
+		sloth_push(x, UCHAR_MAX); 
+		break;
+	case 6: /* MAX-D */
+		/* TODO */ break;
+	case 7: /* MAX-N */
+		/* TODO */ break;
+	case 8: /* MAX-U */
+		/* TODO */ break;
+	case 9: /* MAX-UD */
+		/* TODO */ break;
+	case 10: /* RETURN-STACK-CELLS */
+		sloth_push(x, SLOTH_RETURN_STACK_SIZE);
+		break;
+	case 11: /* STACK-CELLS */
+		sloth_push(x, SLOTH_STACK_SIZE);
+		break;
+	/* Obsolescent word set queries */
+	case 12: /* FLOATING */
+		#ifndef SLOTH_NO_FLOATING_POINT
+		sloth_push(x, -1);
+		#else
+		sloth_push(x, 0);
+		#endif
+	case 13: /* FLOATING-EXT */
+		/* TODO */
+		break;
+	/* Non standard queries */
+	case -1: /* PLATFORM */
+		/* This code adapted from: */
+		/* https://stackoverflow.com/questions/142508/how-do-i-check-os-with-a-preprocessor-directive */
+		#if defined(_WIN64)
+			sloth_push(x, 0);
+		#elif defined(WIN32) || defined(_WIN32)
+			sloth_push(x, 1);
+		#elif defined(__CYGWIN__) && !defined(_WIN32)
+			sloth_push(x, 2);
+		#elif defined(__ANDROID__)
+			sloth_push(x, 3);
+		#elif defined(__linux__)
+			sloth_push(x, 4);
+		#else
+			sloth_push(x, -1);
+		#endif
+		break;
+	}
+}
+
 /* Parsing input */
 
 /* I would prefer using PARSE-NAME but its not yet */
@@ -1108,65 +1180,6 @@ void sloth_interpret_(X* x) {
 /* Commands that can help you start or end work sessions */
 
 void sloth_bye_(X* x) { printf("\n"); exit(0); }
-void sloth_environment_query_(X* x) {
-	int l = (int)sloth_pop(x);
-	char* a = (char*)sloth_pop(x);
-	if (strncmp(a, "/COUNTED-STRING", l) == 0) {
-		sloth_push(x, 64);	
-		sloth_push(x, -1);
-	} else if (strncmp(a, "/HOLD", l) == 0) {
-	} else if (strncmp(a, "/PAD", l) == 0) {
-	} else if (strncmp(a, "ADDRESS-UNIT-BITS", l) == 0) {
-		sloth_push(x, CHAR_BIT);
-		sloth_push(x, -1);
-	} else if (strncmp(a, "FLOORED", l) == 0) {
-		/* Good explanation about floored/symmetric division: */
-		/* https://www.nimblemachines.com/symmetric-division-considered-harmful/ */
-		sloth_push(x, (-3 / 2 == -2) ? -1 : 0);
-		sloth_push(x, -1);
-	} else if (strncmp(a, "MAX-CHAR", l) == 0) {
-		sloth_push(x, UCHAR_MAX);
-		sloth_push(x, -1);
-	} else if (strncmp(a, "MAX-D", l) == 0) {
-	} else if (strncmp(a, "MAX-N", l) == 0) {
-	} else if (strncmp(a, "MAX-U", l) == 0) {
-	} else if (strncmp(a, "MAX-UD", l) == 0) {
-	} else if (strncmp(a, "RETURN-STACK-CELLS", l) == 0) {
-		sloth_push(x, SLOTH_RETURN_STACK_SIZE);
-		sloth_push(x, -1);
-	} else if (strncmp(a, "STACK-CELLS", l) == 0) {
-		sloth_push(x, SLOTH_STACK_SIZE);
-		sloth_push(x, -1);
-	/* Obsolescent word set queries */
-	} else if (strncmp(a, "FLOATING", l) == 0) {
-		#ifndef SLOTH_NO_FLOATING_POINT
-		sloth_push(x, -1);
-		#else
-		sloth_push(x, 0);
-		#endif
-		sloth_push(x, -1);
-	} else if (strncmp(a, "FLOATING-EXT", l) == 0) {
-		/* TODO */
-	/* Non standard queries */
-	} else if (strncmp(a, "PLATFORM", l) == 0) {
-		/* This code adapted from: */
-		/* https://stackoverflow.com/questions/142508/how-do-i-check-os-with-a-preprocessor-directive */
-		#if defined(_WIN64)
-			sloth_push(x, 0);
-		#elif defined(WIN32) || defined(_WIN32)
-			sloth_push(x, 1);
-		#elif defined(__CYGWIN__) && !defined(_WIN32)
-			sloth_push(x, 2);
-		#elif defined(__ANDROID__)
-			sloth_push(x, 3);
-		#elif defined(__linux__)
-			sloth_push(x, 4);
-		#else
-			sloth_push(x, -1);
-		#endif
-		sloth_push(x, -1);
-	}
-}
 
 /* Commands to inspect memory, debug & view code */
 
@@ -1815,11 +1828,13 @@ void sloth_bootstrap(X* x) {
 	sloth_comma(x, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST)); /* CONTEXT 1 */
 	sloth_allot(x, 14*sCELL);
 	/* Variable indicating if we are on Linux or Windows */
+	/*
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 	sloth_comma(x, 1);
 #else
 	sloth_comma(x, 0);
 #endif
+*/
 
 	/* Basic primitives */
 
@@ -1840,6 +1855,7 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "(QUOTATION)", sloth_primitive(x, &sloth_quotation_));
 	sloth_code(x, "(DOES)", sloth_primitive(x, &sloth_do_does_));
 	sloth_code(x, "(DOLOOP)", sloth_primitive(x, &sloth_doloop_));
+	sloth_code(x, "(ENVIRONMENT)", sloth_primitive(x, &sloth_environment_));
 
 	sloth_set(x, SLOTH_CURRENT, sloth_to_abs(x, SLOTH_FORTH_WORDLIST));
 
@@ -1852,7 +1868,6 @@ void sloth_bootstrap(X* x) {
 
 	sloth_code(x, "UNUSED", sloth_primitive(x, &sloth_unused_));
 	sloth_code(x, "BYE", sloth_primitive(x, &sloth_bye_));
-	sloth_code(x, "ENVIRONMENT?", sloth_primitive(x, &sloth_environment_query_));
 
 	/* Commands to inspect memory, debug & view code */
 
