@@ -939,7 +939,7 @@ void sloth_environment_(X* x) {
 	case 1: /* /HOLD */
 		/* TODO */ 
 		break;
-	case 2: /* /PDA */
+	case 2: /* /PAD */
 		/* TODO */ 
 		break;
 	case 3: /* ADDRESS-UNIT-BITS */
@@ -968,13 +968,13 @@ void sloth_environment_(X* x) {
 		sloth_push(x, SLOTH_STACK_SIZE);
 		break;
 	/* Obsolescent word set queries */
-	case 12: /* FLOATING */
+	case 24: /* FLOATING */
 		#ifndef SLOTH_NO_FLOATING_POINT
 		sloth_push(x, -1);
 		#else
 		sloth_push(x, 0);
 		#endif
-	case 13: /* FLOATING-EXT */
+	case 25: /* FLOATING-EXT */
 		/* TODO */
 		break;
 	/* Non standard queries */
