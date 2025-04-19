@@ -43,6 +43,17 @@ end-structure
 255 0 255 255 rl-define-color: magenta
 245 245 245 255 rl-define-color: raywhite
 
+\ Rectangle
+
+begin-structure rectangle
+	sffield: rectangle.x
+	sffield: rectangle.y
+	sffield: rectangle.width
+	sffield: rectangle.height
+end-structure
+
+\ Other constants
+
 257 constant key-enter
 
 1 constant gesture-tap

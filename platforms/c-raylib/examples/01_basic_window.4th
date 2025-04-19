@@ -9,7 +9,7 @@
 	begin
 		window-should-close 0= while
 		begin-drawing
-		raywhite clear-background
+		maroon clear-background
 		s" Congrats! You created your first window!" 190 200 20 lightgray draw-text
 		end-drawing
 	repeat
