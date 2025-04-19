@@ -679,6 +679,7 @@ void sloth_throw(X* x, CELL e) {
 	if (x->jmpbuf_idx >= 0) {
 		longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
 	} else {
+		printf("BUFFER: <%.*s>\n", (int)(*((CELL*)(x->d+7*sCELL))), (char*)(*((CELL*)((x->d+5*sCELL)))));
 		printf("Exception: %ld\n", e);
 		exit(e);
 	}

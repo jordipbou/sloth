@@ -60,6 +60,9 @@ DROP DROP
 
 \ -- Stack comments ---------------------------------------
 
+\ ( Will be later rewritten to allot multiline comments
+\ when reading a file.
+
 ?: ( 41 WORD DROP ; IMMEDIATE
 
 \ -- Compilation wordlist ---------------------------------
@@ -1298,10 +1301,9 @@ FORTH-WORDLIST SET-CURRENT
 ?: ABORT ( i*x -- ) ( R: j*x -- ) -1 THROW ;
 
 [UNDEFINED] ABORT" [IF] \ " for correct syntax highlighting
-\ TODO INTERNAL-WORDLIST should be defined and used before
-WORDLIST CONSTANT INTERNAL-WORDLIST
 
 INTERNAL-WORDLIST SET-CURRENT
+
 : (ABORT") ( n c-addr u -- )
 	ROT 0= IF
 		2DROP
@@ -1309,6 +1311,7 @@ INTERNAL-WORDLIST SET-CURRENT
 		-2 THROW
 	THEN
 ;
+
 FORTH-WORDLIST SET-CURRENT
 
 GET-ORDER INTERNAL-WORDLIST SWAP 1+ SET-ORDER
@@ -1487,4 +1490,59 @@ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 : RESTORE-INPUT ( xn ... x1 n -- )
 	DROP (IPOS) ! (ILEN) ! (IBUF) ! (SOURCE-ID) ! FALSE
 ;
+[THEN]
+
+\ -- N>R NR> ----------------------------------------------
+
+[UNDEFINED] N>R [IF]
+: N>R ( i*n +n -- ) ( R: -- j*x +n )
+	R> OVER >R SWAP BEGIN 
+		?DUP WHILE 
+		ROT R> 2>R 1 - 
+	REPEAT >R 
+;
+[THEN]
+
+[UNDEFINED] NR> [IF]
+: NR> ( -- i*x +n ) ( R: j*x +n -- )
+	R> R@ BEGIN 
+		?DUP WHILE 
+		2R> >R ROT ROT 1 - 
+	REPEAT R> SWAP >R 
+;
+[THEN]
+
+\ -- Multi-line paren -------------------------------------
+
+\ This takes the fantastic implementation used by
+\ ruv on [IF] [ELSE] [THEN] as it allows not just for
+\ multiline comments but also nested comments.
+
+\ FIXME The only difference between this and the 
+\ [IF] [ELSE] [THEN] implementation is the wordlist
+\ used, refactor both to reuse words.
+
+WORDLIST DUP CONSTANT MULTI-LINE-PAREN-WL 
+GET-CURRENT SWAP SET-CURRENT
+
+: ( ( level1 -- level2 ) 1+ ;
+: ) ( level1 -- level2 ) 1- ;
+
+SET-CURRENT
+
+: ( ( -- )
+   1 BEGIN BEGIN PARSE-NAME DUP WHILE
+      MULTI-LINE-PAREN-WL SEARCH-WORDLIST IF
+         EXECUTE DUP 0= IF DROP EXIT THEN
+      THEN
+   REPEAT 2DROP REFILL 0= UNTIL DROP
+; IMMEDIATE
+
+\ == FLOATING POINT WORD SET ==============================
+
+s" FLOATING" ENVIRONMENT? DROP [IF]
+INTERNAL-WORDLIST SET-CURRENT
+?: F, (	r -- ) HERE F! 1 FLOATS ALLOT ;
+FORTH-WORDLIST SET-CURRENT
+?: FVARIABLE ( "<spaces>name" -- ) CREATE 0E F, ;
 [THEN]
