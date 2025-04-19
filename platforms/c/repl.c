@@ -1,4 +1,5 @@
 #define SLOTH_IMPLEMENTATION
+/* #define SLOTH_NO_FLOATING_POINT */
 #include"sloth.h"
 
 /* ---------------------------------------------------- */
@@ -18,6 +19,9 @@ int main(int argc, char**argv) {
 					|| strcmp(argv[1], "-t") == 0) {
 		chdir("../../forth2012-test-suite/src/");
 		sloth_include(x, "runtests.fth");
+
+		chdir("fp");
+		sloth_include(x, "runfptests.fth");
 	} else {
 		sloth_include(x, argv[1]);
 	}

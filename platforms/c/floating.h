@@ -1,86 +1,116 @@
-#include"sloth.h"
+#ifndef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+#define SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
-void _to_float(X* x) {
-	/* TODO */
-}
+/* #include"sloth.h" */
 
-void _represent(X* x) {
-	/* TODO */
-}
-
-void _f_dot(X* x) {
-	/* TODO */
-}
-
-void _f_e_dot(X* x) {
-	/* TODO */
-}
-
-void _f_s_dot(X* x) {
-	/* TODO */
-}
+/* -- Floating point word set -------------------------- */
 
 /* Constructing compiler and interpreter system extensions */
 
-void _f_align(X* x) { /* TODO */ }
-void _f_aligned(X* x) { /* TODO */ }
-void _f_literal(X* x) { /* TODO */ }
-void _floats(X* x) { /* TODO */ }
-void _float_plus(X* x) { /* TODO */ }
+void sloth_f_align_(X* x);
+void sloth_f_aligned_(X* x);
+void sloth_f_literal_(X* x);
+void sloth_floats_(X* x);
+void sloth_float_plus_(X* x);
 
 /* Manipulating stack items */
 
-void _f_depth(X* x) { /* TODO */ }
-void _f_drop(X* x) { /* TODO */ }
-void _f_dup(X* x) { /* TODO */ }
-void _f_over(X* x) { /* TODO */ }
-void _f_rot(X* x) { /* TODO */ }
-void _f_swap(X* x) { /* TODO */ }
+void sloth_f_depth_(X* x);
+void sloth_f_drop_(X* x);
+void sloth_f_dup_(X* x);
+void sloth_f_over_(X* x);
+void sloth_f_rot_(X* x);
+void sloth_f_swap_(X* x);
 
 /* Comparison operations */
 
-void _f_less_than(X* x) { /* TODO */ }
-void _f_zero_equals(X* x) { /* TODO */ }
-void _f_zero_less_than(X* x) { /* TODO */ }
+void sloth_f_less_than_(X* x);
+void sloth_f_zero_less_than_(X* x);
+void sloth_f_zero_equals_(X* x);
 
 /* Memory-stack transfer operations */
 
-void _f_fetch(X* x) { /* TODO */ }
-void _f_store(X* x) { /* TODO */ }
+void sloth_f_fetch_(X* x);
+void sloth_f_store_(X* x);
 
 /* Commands to define data structures */
 
-void _f_constant(X* x) { /* TODO */ }
-void _f_variable(X* x) { /* TODO */ }
+void sloth_f_constant_(X* x);
+void sloth_f_variable_(X* x);
 
 /* Number-type conversion operators */
 
-void _d_to_f(X* x) { /* TODO */ }
-void _f_to_d(X* x) { /* TODO */ }
+void sloth_d_to_f_(X* x);
+void sloth_f_to_d_(X* x);
+void sloth_s_to_f_(X* x);
 
 /* Arithmetic and logical operations */
 
-void _f_star(X* x) { /* TODO */ }
-void _f_slash(X* x) { /* TODO */ }
-void _f_plus(X* x) { /* TODO */ }
-void _f_plus_store(X* x) { /* TODO */ }
-void _floor(X* x) { /* TODO */ }
-void _f_max(X* x) { /* TODO */ }
-void _f_min(X* x) { /* TODO */ }
-void _f_negate(X* x) { /* TODO */ }
-void _f_round(X* x) { /* TODO */ }
+void sloth_f_plus_(X* x);
+void sloth_f_minus_(X* x);
+void sloth_f_star_(X* x);
+void sloth_f_slash_(X* x);
+void sloth_floor_(X* x);
+void sloth_f_max_(X* x);
+void sloth_f_min_(X* x);
+void sloth_f_negate_(X* x);
+void sloth_f_round_(X* x);
+
+/* String/numeric conversion */
+
+void sloth_to_float_(X* x);
+void sloth_represent_(X* x);
+
+/* Bootstraping the word set */
+
+void bootstrap_floating_wordset(X* x);
+
+/* Constructing compiler and interpreter system extensions */
+
+void sloth_f_align_(X* x) {
+	sloth_set(
+		x,
+		SLOTH_HERE,
+		(sloth_get(x, SLOTH_HERE) + (sFLOAT - 1)) & ~(sFLOAT - 1));
+}
+
+void sloth_f_aligned_(X* x) {
+	sloth_push(x, (sloth_pop(x) + (sFLOAT - 1)) & ~(sFLOAT - 1));
+}
+
+void sloth_f_literal_(X* x) { /* TODO */ }
+void sloth_floats_(X* x) { /* TODO */ }
+void sloth_float_plus_(X* x) { /* TODO */ }
+
+/* String/numeric conversion */
+
+void sloth_to_float_(X* x) { /* TODO */ }
+void sloth_represent_(X* x) { /* TODO */ }
+
+/* Non ANS */
+
+void sloth_dot_f_(X* x) {
+	int i;
+	printf("F:<%ld> ", x->fp);
+	for (i = 0; i < x->fp; i++) printf("%f ", x->f[i]);
+}
+
+/* Bootstrapping */
 
 void bootstrap_floating_wordset(X* x) {
-	code(x, ">FLOAT", primitive(x, &_to_float));
-	code(x, "REPRESENT", primitive(x, &_represent));
+
+	/* Constructing compiler and interpreter system extensions */
+
+	sloth_code(x, "FALIGN", sloth_primitive(x, &sloth_f_align_));
+	sloth_code(x, "FALIGNED", sloth_primitive(x, &sloth_f_aligned_));
+	sloth_code(x, "FLITERAL", sloth_primitive(x, &sloth_f_literal_));
+	sloth_code(x, "FLOATS", sloth_primitive(x, &sloth_floats_));
+	sloth_code(x, "FLOAT+", sloth_primitive(x, &sloth_float_plus_));
+
+	/*
 	code(x, "F.", primitive(x, &_f_dot));
 	code(x, "FE.", primitive(x, &_f_e_dot));
 	code(x, "FS.", primitive(x, &_f_s_dot));
-	code(x, "FALIGN", primitive(x, &_f_align));
-	code(x, "FALIGNED", primitive(x, &_f_aligned));
-	code(x, "FLITERAL", primitive(x, &_f_literal));
-	code(x, "FLOATS", primitive(x, &_floats));
-	code(x, "FLOAT+", primitive(x, &_float_plus));
 	code(x, "FDEPTH", primitive(x, &_f_depth));
 	code(x, "FDROP", primitive(x, &_f_drop));
 	code(x, "FDUP", primitive(x, &_f_dup));
@@ -105,4 +135,15 @@ void bootstrap_floating_wordset(X* x) {
 	code(x, "FMIN", primitive(x, &_f_min));
 	code(x, "FNEGATE", primitive(x, &_f_negate));
 	code(x, "FROUND", primitive(x, &_f_round));
+	*/
+
+	/* String/numeric conversion */
+
+	sloth_code(x, ">FLOAT", sloth_primitive(x, &sloth_to_float_));
+	sloth_code(x, "REPRESENT", sloth_primitive(x, &sloth_represent_));
+
+	/* Non ANS */
+	sloth_code(x, ".F", sloth_primitive(x, &sloth_dot_f_));
 }
+
+#endif
