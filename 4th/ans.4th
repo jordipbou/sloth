@@ -58,78 +58,69 @@ DROP DROP
 \ upper case for definition/lower case for use, I think
 \ its easier to read).
 
-\ -- Stack comments ---------------------------------------
-
-\ ( Will be later rewritten to allot multiline comments
-\ when reading a file.
-
-?: ( 41 WORD DROP ; IMMEDIATE
-
 \ -- Compilation wordlist ---------------------------------
 
 \ Defining GET-CURRENT and SET-CURRENT here allows changing
 \ between FORTH-WORDLIST and INTERNAL-WORDLIST from the
 \ beginning and no overpopulate FORTH-WORDLIST.
 
-?: GET-CURRENT ( -- wid ) 15 CELLS TO-ABS @ ;
-?: SET-CURRENT ( wid -- ) 15 CELLS TO-ABS ! ;
+?: GET-CURRENT 15 CELLS TO-ABS @ ; \ ( -- wid )
+?: SET-CURRENT 15 CELLS TO-ABS ! ; \ ( wid -- )
 
 \ -- Variables shared with the host -----------------------
 
-?: BASE ( -- addr ) 1 CELLS TO-ABS ;
-?: FORTH-WORDLIST ( -- addr ) 2 CELLS TO-ABS ;
-?: INTERNAL-WORDLIST ( -- addr ) 3 CELLS TO-ABS ;
-?: STATE ( -- addr ) 4 CELLS TO-ABS ;
+?: BASE					1 CELLS TO-ABS ;	\ ( -- addr )
+?: FORTH-WORDLIST		2 CELLS TO-ABS ; 	\ ( -- addr )
+?: INTERNAL-WORDLIST	3 CELLS TO-ABS ; 	\ ( -- addr )
+?: STATE				4 CELLS TO-ABS ; 	\ ( -- addr )
 
 INTERNAL-WORDLIST SET-CURRENT
 
-?: (IBUF) ( -- addr ) 5 CELLS TO-ABS ;
-?: (IPOS) ( -- addr ) 6 CELLS TO-ABS ;
-?: (ILEN) ( -- addr ) 7 CELLS TO-ABS ;
-?: (SOURCE-ID) ( -- addr ) 8 CELLS TO-ABS ;
-?: (HLD) ( -- addr ) 9 CELLS TO-ABS ;
-?: (LATESTXT) ( -- addr ) 10 CELLS TO-ABS ;
-?: (IX) ( -- addr ) 11 CELLS TO-ABS ;
-?: (JX) ( -- addr ) 12 CELLS TO-ABS ;
-?: (KX) ( -- addr ) 13 CELLS TO-ABS ;
-?: (LX) ( -- addr ) 14 CELLS TO-ABS ;
+?: (IBUF)				5 CELLS TO-ABS ;	\ ( -- addr )
+?: (IPOS)				6 CELLS TO-ABS ; 	\ ( -- addr )
+?: (ILEN)				7 CELLS TO-ABS ; 	\ ( -- addr )
+?: (SOURCE-ID)			8 CELLS TO-ABS ; 	\ ( -- addr )
+?: (HLD)				9 CELLS TO-ABS ; 	\ ( -- addr )
+?: (LATESTXT)			10 CELLS TO-ABS ;	\ ( -- addr )
+?: (IX)					11 CELLS TO-ABS ; 	\ ( -- addr )
+?: (JX)					12 CELLS TO-ABS ; 	\ ( -- addr )
+?: (KX)					13 CELLS TO-ABS ; 	\ ( -- addr )
+?: (LX)					14 CELLS TO-ABS ;	\ ( -- addr )
 
-?: #ORDER ( -- addr ) 16 CELLS TO-ABS ;
-?: CONTEXT ( -- addr ) 17 CELLS TO-ABS ;
+?: #ORDER				16 CELLS TO-ABS ;	\ ( -- addr )
+?: CONTEXT				17 CELLS TO-ABS ;	\ ( -- addr )
 
 FORTH-WORDLIST SET-CURRENT
 
-?: SOURCE-ID ( -- 0 | -1 | fileid ) (SOURCE-ID) @ ;
+?: SOURCE-ID (SOURCE-ID) @ ; \ ( -- 0 | -1 | fileid )
 
 \ -- Adjusting BASE ---------------------------------------
 
-?: DECIMAL ( -- ) 10 BASE ! ;
-?: HEX ( -- ) 16 BASE ! ;
+?: DECIMAL	10 BASE ! ; \ ( -- )
+?: HEX		16 BASE ! ; \ ( -- )
 
 \ -- Compilation ------------------------------------------
 
-?: , ( x -- ) HERE ! 1 CELLS ALLOT ;
-?: C, ( char -- ) HERE C! 1 CHARS ALLOT ;
+?: ,	HERE ! 1 CELLS ALLOT ; \ ( x -- )
+?: C,	HERE C! 1 CHARS ALLOT ; \ ( char -- )
 
 \ PLATFORM DEPENDENT
-?: LITERAL ( C: x -- ) ( -- x ) 
-?\		POSTPONE (LIT) , 
-?\ ; IMMEDIATE
+?: LITERAL POSTPONE (LIT) , ; IMMEDIATE \ ( C: x -- ) ( -- x )
 
-?: ' ( "<spaces>name" -- xt ) 32 WORD FIND DROP ; 
+?: ' 32 WORD FIND DROP ; \ ( "<spaces>name" -- xt ) 
 
-?: ['] ( "<spaces>name" -- ) ( R: -- xt ) 
+?: ['] \ ( "<spaces>name" -- ) ( R: -- xt ) 
 ?\		' POSTPONE LITERAL 
 ?\ ; IMMEDIATE
 
 \ -- Variables and constants ------------------------------
 
-?: VARIABLE ( "<spaces>name" -- ) CREATE 0 , ;
-?: CONSTANT ( x "<spaces>name" -- ) CREATE , DOES> @ ;
+?: VARIABLE CREATE 0 , ; \ ( "<spaces>name" -- ) 
+?: CONSTANT CREATE , DOES> @ ; \ ( x "<spaces>name" -- ) 
 
-?: BUFFER: ( u "<spaces>name" -- ; -- a-addr ) CREATE ALLOT ;
+?: BUFFER: CREATE ALLOT ; \ ( u "<spaces>name" -- ; -- a-addr ) 
 
-?: VALUE ( x "<spaces>name" -- ) CREATE , DOES> @ ;
+?: VALUE CREATE , DOES> @ ; \ ( x "<spaces>name" -- ) 
 
 \ -- Control structures -----------------------------------
 
@@ -138,40 +129,61 @@ FORTH-WORDLIST SET-CURRENT
 \ are not implemented now.
 
 \ PLATFORM DEPENDENT (depends on implementation of BRANCH)
-?: AHEAD ( C: -- orig ) ( -- ) 
+?: AHEAD \ ( C: -- orig ) ( -- ) 
 ?\		POSTPONE (BRANCH) HERE 0 , 
 ?\ ; IMMEDIATE
 
 \ PLATFORM DEPENDENT (depends on implementation of ?BRANCH)
-?: IF ( C: -- orig ) ( x -- ) 
+?: IF \ ( C: -- orig ) ( x -- ) 
 ?\		POSTPONE (?BRANCH) HERE 0 , 
 ?\ ; IMMEDIATE
 
-?: THEN ( C: -- orig ) ( -- ) HERE OVER - SWAP ! ; IMMEDIATE
+?: THEN \ ( C: -- orig ) ( -- ) 
+?\		HERE OVER - SWAP ! 
+?\ ; IMMEDIATE
 
-?: ELSE ( C: orig1 -- orig2 ) ( -- ) 
+?: ELSE \ ( C: orig1 -- orig2 ) ( -- ) 
 ?\		POSTPONE AHEAD SWAP POSTPONE THEN 
 ?\ ; IMMEDIATE
 
-?: BEGIN ( C: -- dest ) ( -- ) HERE ; IMMEDIATE
+?: BEGIN \ ( C: -- dest ) ( -- ) 
+?\		HERE 
+?\ ; IMMEDIATE
 
 \ PLATFORM DEPENDENT (depends on implementation of ?BRANCH)
-?: UNTIL ( C: dest -- ) ( x -- ) 
+?: UNTIL \ ( C: dest -- ) ( x -- ) 
 ?\		POSTPONE (?BRANCH) HERE - , 
 ?\ ; IMMEDIATE
 
 \ PLATFORM DEPENDENT (depends on implementation of BRANCH)
-?: AGAIN ( C: dest -- ) ( -- ) 
+?: AGAIN \ ( C: dest -- ) ( -- ) 
 ?\		POSTPONE (BRANCH) HERE - , 
 ?\ ; IMMEDIATE
 
-?: WHILE ( C: dest -- orig dest ) ( x -- ) 
+?: WHILE \ ( C: dest -- orig dest ) ( x -- ) 
 ?\		POSTPONE IF SWAP 
 ?\ ; IMMEDIATE
 
-?: REPEAT	( C: orig dest -- ) ( -- ) 
+?: REPEAT \ ( C: orig dest -- ) ( -- ) 
 ?\		POSTPONE AGAIN POSTPONE THEN 
 ?\ ; IMMEDIATE
+
+\ -- Multi-line paren -------------------------------------
+
+?: ( \ ( "ccc<paren>" -- )
+?\		BEGIN
+?\			BEGIN
+?\				SOURCE >IN @ SWAP < WHILE
+?\				>IN @ 0 PICK 1 + >IN !
+?\				CHARS + C@ ')' = IF EXIT THEN
+?\			REPEAT 
+?\		DROP REFILL 0 = UNTIL
+?\ ; IMMEDIATE
+
+(
+	Now we can use stack comments and 
+	multi-line comments!
+)
 
 \ -- Conditional compilation of variables and constants ---
 
@@ -1508,25 +1520,6 @@ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 	REPEAT R> SWAP >R 
 ;
 [THEN]
-
-\ -- Multi-line paren -------------------------------------
-
-\ TODO How complicated would be to have this upper in
-\ this file to not need two different definitions of )
-
-: ( ( "ccc<paren>" -- )
-	BEGIN
-		BEGIN
-			/SOURCE NIP WHILE
-			/SOURCE DROP C@ ')' = IF >IN 1+! EXIT THEN
-			>IN 1+!
-		REPEAT 
-	REFILL 0= UNTIL
-; IMMEDIATE
-
-(
-	Now we can use multi-line comments!
-)
 
 \ == FLOATING POINT WORD SET ==============================
 
