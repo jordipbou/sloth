@@ -1314,14 +1314,11 @@ INTERNAL-WORDLIST SET-CURRENT
 
 FORTH-WORDLIST SET-CURRENT
 
-GET-ORDER INTERNAL-WORDLIST SWAP 1+ SET-ORDER
-
 : ABORT"
 	POSTPONE S"
 	POSTPONE (ABORT")
 ; IMMEDIATE
 
-PREVIOUS
 [THEN]
 
 \ -- S\" --------------------------------------------------
@@ -1514,35 +1511,33 @@ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 
 \ -- Multi-line paren -------------------------------------
 
-\ This takes the fantastic implementation used by
-\ ruv on [IF] [ELSE] [THEN] as it allows not just for
-\ multiline comments but also nested comments.
+\ TODO How complicated would be to have this upper in
+\ this file to not need two different definitions of )
 
-\ FIXME The only difference between this and the 
-\ [IF] [ELSE] [THEN] implementation is the wordlist
-\ used, refactor both to reuse words.
-
-WORDLIST DUP CONSTANT MULTI-LINE-PAREN-WL 
-GET-CURRENT SWAP SET-CURRENT
-
-: ( ( level1 -- level2 ) 1+ ;
-: ) ( level1 -- level2 ) 1- ;
-
-SET-CURRENT
-
-: ( ( -- )
-   1 BEGIN BEGIN PARSE-NAME DUP WHILE
-      MULTI-LINE-PAREN-WL SEARCH-WORDLIST IF
-         EXECUTE DUP 0= IF DROP EXIT THEN
-      THEN
-   REPEAT 2DROP REFILL 0= UNTIL DROP
+: ( ( "ccc<paren>" -- )
+	BEGIN
+		BEGIN
+			/SOURCE NIP WHILE
+			/SOURCE DROP C@ ')' = IF >IN 1+! EXIT THEN
+			>IN 1+!
+		REPEAT 
+	REFILL 0= UNTIL
 ; IMMEDIATE
+
+(
+	Now we can use multi-line comments!
+)
 
 \ == FLOATING POINT WORD SET ==============================
 
 s" FLOATING" ENVIRONMENT? DROP [IF]
+
 INTERNAL-WORDLIST SET-CURRENT
-?: F, (	r -- ) HERE F! 1 FLOATS ALLOT ;
+	
+?: F, (	F: r -- ) HERE F! 1 FLOATS ALLOT ;
+	
 FORTH-WORDLIST SET-CURRENT
+	
 ?: FVARIABLE ( "<spaces>name" -- ) CREATE 0E F, ;
+
 [THEN]
