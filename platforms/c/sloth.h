@@ -11,6 +11,9 @@
 #include<stdio.h>
 #include<string.h>
 #include<assert.h>
+#ifndef SLOTH_NO_FLOATING_POINT
+#include<math.h>
+#endif
 
 /* This are used by Claude's SM/REM implementation */
 #include <stddef.h>
@@ -461,20 +464,29 @@ void sloth_s_to_f_(X* x);
 
 /* Arithmetic and logical operations */
 
+void sloth_f_abs_(X* x);
 void sloth_f_plus_(X* x);
 void sloth_f_minus_(X* x);
 void sloth_f_star_(X* x);
+void sloth_f_star_star_(X* x);
 void sloth_f_slash_(X* x);
 void sloth_floor_(X* x);
 void sloth_f_max_(X* x);
 void sloth_f_min_(X* x);
 void sloth_f_negate_(X* x);
 void sloth_f_round_(X* x);
+void sloth_f_proximate_(X* x);
+void sloth_f_atan2_(X* x);
+void sloth_f_sqrt(X* x);
 
 /* String/numeric conversion */
 
 void sloth_to_float_(X* x);
 void sloth_represent_(X* x);
+
+/* Output operations */
+
+void sloth_f_dot_(X* x);
 
 /* Non ANS floating point helpers */
 
@@ -679,7 +691,11 @@ void sloth_throw(X* x, CELL e) {
 	if (x->jmpbuf_idx >= 0) {
 		longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
 	} else {
-		printf("BUFFER: <%.*s>\n", (int)(*((CELL*)(x->d+7*sCELL))), (char*)(*((CELL*)((x->d+5*sCELL)))));
+		CELL ibuf = *((CELL*)(x->d+5*sCELL));
+		CELL ipos = *((CELL*)(x->d+6*sCELL));
+		CELL ilen = *((CELL*)(x->d+7*sCELL));
+		printf("BUFFER: <%.*s>\n", (int)ilen, (char*)ibuf);
+		printf("TOKEN: <%.*s>\n", (int)(ilen - ipos), (char*)(ibuf + ipos));
 		printf("Exception: %ld\n", e);
 		exit(e);
 	}
@@ -1133,9 +1149,10 @@ CELL sloth_find_word(X* x, char* name) {
 /* INTERPRET is not an ANS word ??!! */
 void sloth_interpret_(X* x) {
 	CELL nt, flag, n;
+	FLOAT r;
 	char* tok;
 	int tlen;
-	char buf[15]; char *endptr;
+	char buf[64]; char *endptr;
 	while (sloth_get(x, SLOTH_IPOS) < sloth_get(x, SLOTH_ILEN)) {
 		sloth_push(x, 32); sloth_word_(x);
 		tok = (char*)(sloth_pick(x, 0) + suCHAR);
@@ -1179,26 +1196,28 @@ void sloth_interpret_(X* x) {
 					if (sloth_get(x, SLOTH_STATE) == 0) sloth_push(x, n);
 					else sloth_literal(x, n);
 				} else {
-					#ifndef SLOTH_NO_FLOATING_POINT
+				#ifndef SLOTH_NO_FLOATING_POINT
 					if (sloth_get(x, SLOTH_BASE) == 10) {
-						sloth_push(x, (CELL)tok);
-						sloth_push(x, (CELL)tlen);
-						sloth_to_float_(x);
-						if (sloth_pop(x) == 0) {
-							/* TODO Word not found, throw an exception? */
-							/* printf("%.*s ?\n", tlen, tok); */
+						r = strtod(buf, &endptr);	
+						if (r == 0 && buf == endptr) {
+							printf("%.*s ?\n", tlen, tok);
 							sloth_throw(x, -13);
 						} else {
-							if (sloth_get(x, SLOTH_STATE) != 0) {
-								sloth_fliteral(x, sloth_fpop(x));
+							if (sloth_get(x, SLOTH_STATE) == 0) {
+								sloth_fpush(x, r);
+							} else {
+								sloth_fliteral(x, r);
 							}
 						}
+					} else {
+						printf("%.*s ?\n", tlen, tok);
+						sloth_throw(x, -13);
 					}
-					#else
+				#else
 					/* TODO Word not found, throw an exception? */
 					printf("%.*s ?\n", tlen, tok);
 					sloth_throw(x, -13);
-					#endif
+				#endif
 				}
 			}
 		}
@@ -1239,6 +1258,8 @@ void sloth_included_(X* x) {
 	filename[l] = 0;
 
 	f = fopen(filename, "r");
+
+	printf("Opening file: %.*s\n", (int)l, (char*)a);
 
 	if (f) {
 		INTERPRET = sloth_get_xt(x, sloth_find_word(x, "INTERPRET"));
@@ -1814,41 +1835,108 @@ void sloth_f_variable_(X* x) { /* TODO */}
 
 /* Number-type conversion operators */
 
-void sloth_d_to_f_(X* x) { /* TODO */}
+void sloth_d_to_f_(X* x) {
+	CELL hi = sloth_pop(x);
+	CELL lo = sloth_pop(x);
+	sloth_fpush(x, (((double)hi)*pow(2.0, CELL_BITS)) + ((double)lo));
+}
 void sloth_f_to_d_(X* x) { /* TODO */}
-void sloth_s_to_f_(X* x) { /* TODO */}
+void sloth_s_to_f_(X* x) {
+	sloth_fpush(x, (double)sloth_pop(x));
+}
 
 /* Arithmetic and logical operations */
 
-void sloth_f_plus_(X* x) { /* TODO */}
-void sloth_f_minus_(X* x) { /* TODO */}
-void sloth_f_star_(X* x) { /* TODO */}
-void sloth_f_slash_(X* x) { /* TODO */}
-void sloth_floor_(X* x) { /* TODO */}
-void sloth_f_max_(X* x) { /* TODO */}
-void sloth_f_min_(X* x) { /* TODO */}
-void sloth_f_negate_(X* x) { /* TODO */}
-void sloth_f_round_(X* x) { /* TODO */}
+void sloth_f_abs_(X* x) {
+	sloth_fpush(x, fabs(sloth_fpop(x)));
+}
+void sloth_f_plus_(X* x) { 
+	FLOAT b = sloth_fpop(x);
+	sloth_fpush(x, sloth_fpop(x) + b);
+}
+void sloth_f_minus_(X* x) { 
+	FLOAT b = sloth_fpop(x);
+	sloth_fpush(x, sloth_fpop(x) - b);
+}
+void sloth_f_star_(X* x) { 
+	FLOAT b = sloth_fpop(x);
+	sloth_fpush(x, sloth_fpop(x) * b);
+}
+void sloth_f_star_star_(X* x) {
+	FLOAT b = sloth_fpop(x);
+	sloth_fpush(x, pow(sloth_fpop(x), b));
+}
+void sloth_f_slash_(X* x) { 
+	FLOAT b = sloth_fpop(x);
+	sloth_fpush(x, sloth_fpop(x) / b);
+}
+void sloth_floor_(X* x) { 
+	sloth_fpush(x, floor(sloth_fpop(x)));
+}
+void sloth_f_max_(X* x) { 
+	FLOAT b = sloth_fpop(x);
+	FLOAT a = sloth_fpop(x);
+	sloth_fpush(x, a > b ? a : b);
+}
+void sloth_f_min_(X* x) { 
+	FLOAT b = sloth_fpop(x);
+	FLOAT a = sloth_fpop(x);
+	sloth_fpush(x, a < b ? a : b);
+}
+void sloth_f_negate_(X* x) { 
+	sloth_fpush(x, -sloth_fpop(x));
+}
+void sloth_f_round_(X* x) {
+	sloth_fpush(x, round(sloth_fpop(x)));
+}
+void sloth_f_proximate_(X* x) {
+	FLOAT r3 = sloth_fpop(x);
+	FLOAT r2 = sloth_fpop(x);
+	FLOAT r1 = sloth_fpop(x);
+	if (r3 > 0.0) {
+		sloth_push(x, fabs(r1 - r2) < r3 ? -1 : 0);
+	} else if (r3 < 0.0) {
+		sloth_push(x, fabs(r1 - r2) < (fabs(r3)*(fabs(r1)+fabs(r2))) ? -1 : 0);
+	} else {
+		/* TODO I'm not sure this is totally correct */
+		sloth_push(x, r1 == r2 ? -1 : 0);
+	}
+}
+void sloth_f_atan2_(X* x) {
+	FLOAT b = sloth_fpop(x);
+	sloth_fpush(x, atan2(sloth_fpop(x), b));
+}
+void sloth_f_sqrt_(X* x) {
+	sloth_fpush(x, sqrt(sloth_fpop(x)));
+}
 
 /* String/numeric conversion */
 
 void sloth_to_float_(X* x) {
-	char buf[15]; char *endptr;
+	char buf[64]; 
+	char *endptr;
 	int tlen = (int)sloth_pop(x);
 	char* tok = (char*)sloth_pop(x);
-	double n;
+	FLOAT n;
 	strncpy(buf, tok, tlen);
 	buf[tlen] = 0;
 	n = strtod(buf, &endptr);
 	if (n == 0 && endptr == buf) {
 		sloth_push(x, 0);
 	} else {
-		sloth_fpush(x, (float)n);
+		sloth_fpush(x, n);
+		sloth_f_dot_s_(x); printf("\n");
 		sloth_push(x, -1);
 	}
 }
 
-void sloth_represent_(X* x) { /* TODO */}
+void sloth_represent_(X* x) { /* TODO */ }
+
+/* Output operations */
+
+void sloth_f_dot_(X* x) {
+	printf("%f ", sloth_fpop(x));
+}
 
 /* Non ANS floating point helpers */
 
@@ -1915,15 +2003,7 @@ void sloth_bootstrap(X* x) {
 	sloth_comma(x, 2); /* #ORDER */
 	sloth_comma(x, sloth_to_abs(x, SLOTH_FORTH_WORDLIST)); /* CONTEXT 0 */
 	sloth_comma(x, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST)); /* CONTEXT 1 */
-	sloth_allot(x, 14*sCELL);
-	/* Variable indicating if we are on Linux or Windows */
-	/*
-#if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
-	sloth_comma(x, 1);
-#else
-	sloth_comma(x, 0);
-#endif
-*/
+	sloth_allot(x, 14*sCELL); /* For a total of 16 wordlists */
 
 	/* Basic primitives */
 
@@ -2090,6 +2170,36 @@ void sloth_bootstrap(X* x) {
 
 	sloth_code(x, "DF@", sloth_primitive(x, &sloth_d_f_fetch_));
 	sloth_code(x, "DF!", sloth_primitive(x, &sloth_d_f_store_));
+
+	/* Number-type conversion operators */
+
+	sloth_code(x, "D>F", sloth_primitive(x, &sloth_d_to_f_));
+	sloth_code(x, "S>F", sloth_primitive(x, &sloth_s_to_f_));
+
+	/* Arithmetic and logical operations */
+
+	sloth_code(x, "FABS", sloth_primitive(x, &sloth_f_abs_));
+	sloth_code(x, "F+", sloth_primitive(x, &sloth_f_plus_));
+	sloth_code(x, "F-", sloth_primitive(x, &sloth_f_minus_));
+	sloth_code(x, "F*", sloth_primitive(x, &sloth_f_star_));
+	sloth_code(x, "F**", sloth_primitive(x, &sloth_f_star_star_));
+	sloth_code(x, "F/", sloth_primitive(x, &sloth_f_slash_));
+	sloth_code(x, "FLOOR", sloth_primitive(x, &sloth_floor_));
+	sloth_code(x, "FMAX", sloth_primitive(x, &sloth_f_max_));
+	sloth_code(x, "FMIN", sloth_primitive(x, &sloth_f_min_));
+	sloth_code(x, "FNEGATE", sloth_primitive(x, &sloth_f_negate_));
+	sloth_code(x, "FROUND", sloth_primitive(x, &sloth_f_round_));
+	sloth_code(x, "F~", sloth_primitive(x, &sloth_f_proximate_));
+	sloth_code(x, "FATAN2", sloth_primitive(x, &sloth_f_atan2_));
+	sloth_code(x, "FSQRT", sloth_primitive(x, &sloth_f_sqrt_));
+
+	/* String/numeric conversion */
+
+	sloth_code(x, ">FLOAT", sloth_primitive(x, &sloth_to_float_));
+
+	/* Output operations */
+
+	sloth_code(x, "F.", sloth_primitive(x, &sloth_f_dot_));
 
 	/* Non ANS floating point helpers */
 

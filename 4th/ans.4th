@@ -69,6 +69,7 @@ DROP DROP
 
 \ -- Variables shared with the host -----------------------
 
+\ HERE is defined in 0 CELLS TO-ABS
 ?: BASE					1 CELLS TO-ABS ;	\ ( -- addr )
 ?: FORTH-WORDLIST		2 CELLS TO-ABS ; 	\ ( -- addr )
 ?: INTERNAL-WORDLIST	3 CELLS TO-ABS ; 	\ ( -- addr )
@@ -86,7 +87,7 @@ INTERNAL-WORDLIST SET-CURRENT
 ?: (JX)					12 CELLS TO-ABS ; 	\ ( -- addr )
 ?: (KX)					13 CELLS TO-ABS ; 	\ ( -- addr )
 ?: (LX)					14 CELLS TO-ABS ;	\ ( -- addr )
-
+\ CURRENT goes on 15 CELLS TO-ABS, above defined SET- GET-
 ?: #ORDER				16 CELLS TO-ABS ;	\ ( -- addr )
 ?: CONTEXT				17 CELLS TO-ABS ;	\ ( -- addr )
 
@@ -1532,5 +1533,8 @@ INTERNAL-WORDLIST SET-CURRENT
 FORTH-WORDLIST SET-CURRENT
 	
 ?: FVARIABLE ( "<spaces>name" -- ) CREATE 0E F, ;
+?: FCONSTANT ( r "<spaces>name" ) CREATE F, DOES> F@ ;
+
+?: S>F ( n -- r ) S>D D>F ; 
 
 [THEN]
