@@ -477,7 +477,25 @@ void sloth_f_negate_(X* x);
 void sloth_f_round_(X* x);
 void sloth_f_proximate_(X* x);
 void sloth_f_atan2_(X* x);
-void sloth_f_sqrt(X* x);
+void sloth_f_sqrt_(X* x);
+void sloth_f_l_n_(X* x);
+void sloth_f_sine_(X* x);
+void sloth_f_cos_(X* x);
+void sloth_f_sine_cos_(X* x);
+void sloth_f_tan_(X* x);
+void sloth_f_a_sine_(X* x);
+void sloth_f_a_cos_(X* x);
+void sloth_f_a_tan_(X* x);
+void sloth_f_exp_(X* x);
+void sloth_f_exp_m_one_(X* x);
+void sloth_f_log_ten_(X* x);
+void sloth_f_l_n_p_one_(X* x);
+void sloth_f_a_log_(X* x);
+void sloth_f_sin_h_(X* x);
+void sloth_f_cos_h_(X* x);
+void sloth_f_tan_h_(X* x);
+void sloth_f_a_sine_h_(X* x);
+void sloth_f_a_cos_h_(X* x);
 
 /* String/numeric conversion */
 
@@ -1153,6 +1171,7 @@ void sloth_interpret_(X* x) {
 	char* tok;
 	int tlen;
 	char buf[64]; char *endptr;
+	int is_double;
 	while (sloth_get(x, SLOTH_IPOS) < sloth_get(x, SLOTH_ILEN)) {
 		sloth_push(x, 32); sloth_word_(x);
 		tok = (char*)(sloth_pick(x, 0) + suCHAR);
@@ -1176,6 +1195,7 @@ void sloth_interpret_(X* x) {
 				else 
 					sloth_literal(x, *(tok + 1));
 			} else {
+				is_double = 0;
 				if (*tok == '#') {
 					temp_base = 10;
 					tlen--;
@@ -1188,13 +1208,21 @@ void sloth_interpret_(X* x) {
 					temp_base = 2;
 					tlen--;
 					tok++;
+				} else if (*(tok + tlen - 1) == '.') {
+					tlen--;
+					is_double = 1;
 				}
 				strncpy(buf, tok, tlen);
 				buf[tlen] = 0;
 				n = strtol(buf, &endptr, temp_base);	
 				if (*endptr == '\0') {
-					if (sloth_get(x, SLOTH_STATE) == 0) sloth_push(x, n);
-					else sloth_literal(x, n);
+					if (sloth_get(x, SLOTH_STATE) == 0) {
+						sloth_push(x, n);
+						if (is_double) sloth_push(x, n < 0 ? -1 : 0);
+					} else { 
+						sloth_literal(x, n);
+						if (is_double) sloth_literal(x, n < 0 ? -1 : 0);
+					}
 				} else {
 				#ifndef SLOTH_NO_FLOATING_POINT
 					if (sloth_get(x, SLOTH_BASE) == 10) {
@@ -1840,7 +1868,43 @@ void sloth_d_to_f_(X* x) {
 	CELL lo = sloth_pop(x);
 	sloth_fpush(x, (((double)hi)*pow(2.0, CELL_BITS)) + ((double)lo));
 }
-void sloth_f_to_d_(X* x) { /* TODO */}
+void sloth_f_to_d_(X* x) {
+	FLOAT i;
+	modf(sloth_fpop(x), &i);
+	sloth_push(x, (CELL)i);
+	sloth_push(x, i < 0 ? -1 : 0);
+}
+/* Helper to F>D defined in pForth */
+/* #define FP_DHI1 (((FLOAT)((CELL)1<<(sizeof(CELL)*8-2)))*4.0) */
+/* Taken from pForth */
+/*
+void sloth_f_to_d_(X* x) {
+	uCELL dlo;
+	CELL dhi;
+	int ifNeg;
+	FLOAT fpScratch, fpTemp = sloth_fpop(x);
+	ifNeg = (fpTemp < 0.0);
+	if( ifNeg )
+	{
+		fpTemp = 0.0 - fpTemp;
+	}
+	fpScratch = fpTemp / FP_DHI1;
+	dhi = (CELL) fpScratch; */  /* dhi */
+/*
+	fpScratch = ((FLOAT) dhi) * FP_DHI1;
+	
+	fpTemp = fpTemp - fpScratch; */ /* Remainder */
+/*
+	dlo = (CELL) fpTemp;
+	if( ifNeg )
+	{
+		dlo = 0 - dlo;
+		dhi = 0 - dhi - 1;
+	}
+	sloth_push(x, dlo);
+	sloth_push(x, dhi);
+}
+*/
 void sloth_s_to_f_(X* x) {
 	sloth_fpush(x, (double)sloth_pop(x));
 }
@@ -1908,6 +1972,62 @@ void sloth_f_atan2_(X* x) {
 }
 void sloth_f_sqrt_(X* x) {
 	sloth_fpush(x, sqrt(sloth_fpop(x)));
+}
+void sloth_f_l_n_(X* x) {
+	sloth_fpush(x, log(sloth_fpop(x)));
+}
+void sloth_f_sine_(X* x) {
+	sloth_fpush(x, sin(sloth_fpop(x)));
+}
+void sloth_f_cos_(X* x) {
+	sloth_fpush(x, cos(sloth_fpop(x)));
+}
+void sloth_f_sine_cos_(X* x) {
+	FLOAT r = sloth_fpop(x);
+	sloth_fpush(x, sin(r));
+	sloth_fpush(x, cos(r));
+}
+void sloth_f_tan_(X* x) {
+	sloth_fpush(x, tan(sloth_fpop(x)));
+}
+void sloth_f_a_sine_(X* x) {
+	sloth_fpush(x, asin(sloth_fpop(x)));
+}
+void sloth_f_a_cos_(X* x) {
+	sloth_fpush(x, acos(sloth_fpop(x)));
+}
+void sloth_f_a_tan_(X* x) {
+	sloth_fpush(x, atan(sloth_fpop(x)));
+}
+void sloth_f_exp_(X* x) {
+	sloth_fpush(x, exp(sloth_fpop(x)));
+}
+void sloth_f_exp_m_one_(X* x) {
+	sloth_fpush(x, exp(sloth_fpop(x)) - 1.0);
+}
+void sloth_f_log_ten_(X* x) {
+	sloth_fpush(x, log10(sloth_fpop(x)));
+}
+void sloth_f_l_n_p_one_(X* x) {
+	sloth_fpush(x, log(sloth_fpop(x)) + 1.0);
+}
+void sloth_f_a_log_(X* x) {
+	sloth_fpush(x, pow(10.0, sloth_fpop(x)));
+}
+void sloth_f_sin_h_(X* x) {
+	sloth_fpush(x, sinh(sloth_fpop(x)));
+}
+void sloth_f_cos_h_(X* x) {
+	sloth_fpush(x, cosh(sloth_fpop(x)));
+}
+void sloth_f_tan_h_(X* x) {
+	sloth_fpush(x, tanh(sloth_fpop(x)));
+}
+void sloth_f_a_sine_h_(X* x) {
+	sloth_fpush(x, asinh(sloth_fpop(x)));
+}
+void sloth_f_a_cos_h_(X* x) {
+	sloth_fpush(x, acosh(sloth_fpop(x)));
 }
 
 /* String/numeric conversion */
@@ -2174,6 +2294,7 @@ void sloth_bootstrap(X* x) {
 	/* Number-type conversion operators */
 
 	sloth_code(x, "D>F", sloth_primitive(x, &sloth_d_to_f_));
+	sloth_code(x, "F>D", sloth_primitive(x, &sloth_f_to_d_));
 	sloth_code(x, "S>F", sloth_primitive(x, &sloth_s_to_f_));
 
 	/* Arithmetic and logical operations */
@@ -2192,6 +2313,24 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "F~", sloth_primitive(x, &sloth_f_proximate_));
 	sloth_code(x, "FATAN2", sloth_primitive(x, &sloth_f_atan2_));
 	sloth_code(x, "FSQRT", sloth_primitive(x, &sloth_f_sqrt_));
+	sloth_code(x, "FLN", sloth_primitive(x, &sloth_f_l_n_));
+	sloth_code(x, "FSIN", sloth_primitive(x, &sloth_f_sine_));
+	sloth_code(x, "FCOS", sloth_primitive(x, &sloth_f_cos_));
+	sloth_code(x, "FSINCOS", sloth_primitive(x, &sloth_f_sine_cos_));
+	sloth_code(x, "FTAN", sloth_primitive(x, &sloth_f_tan_));
+	sloth_code(x, "FASIN", sloth_primitive(x, &sloth_f_a_sine_));
+	sloth_code(x, "FACOS", sloth_primitive(x, &sloth_f_a_cos_));
+	sloth_code(x, "FATAN", sloth_primitive(x, &sloth_f_a_tan_));
+	sloth_code(x, "FEXP", sloth_primitive(x, &sloth_f_exp_));
+	sloth_code(x, "FEXPM1", sloth_primitive(x, &sloth_f_exp_m_one_));
+	sloth_code(x, "FLOG", sloth_primitive(x, &sloth_f_log_ten_));
+	sloth_code(x, "FLNP1", sloth_primitive(x, &sloth_f_l_n_p_one_));
+	sloth_code(x, "FALOG", sloth_primitive(x, &sloth_f_a_log_));
+	sloth_code(x, "FSINH", sloth_primitive(x, &sloth_f_sin_h_));
+	sloth_code(x, "FCOSH", sloth_primitive(x, &sloth_f_cos_h_));
+	sloth_code(x, "FTANH", sloth_primitive(x, &sloth_f_tan_h_));
+	sloth_code(x, "FASINH", sloth_primitive(x, &sloth_f_a_sine_h_));
+	sloth_code(x, "FACOSH", sloth_primitive(x, &sloth_f_a_cos_h_));
 
 	/* String/numeric conversion */
 

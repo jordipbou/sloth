@@ -226,7 +226,11 @@ FORTH-WORDLIST SET-CURRENT
 
 \ -- Controlling state ------------------------------------
 
+INTERNAL-WORDLIST SET-CURRENT
+
 ?VARIABLE (PREV-STATE)
+
+FORTH-WORDLIST SET-CURRENT
 
 ?: [ ( -- ) STATE @ (PREV-STATE) ! 0 STATE ! ; IMMEDIATE
 ?: ] ( -- ) (PREV-STATE) @ STATE ! ; IMMEDIATE
@@ -371,6 +375,7 @@ FORTH-WORDLIST SET-CURRENT
 ?: MAX ( n1 n2 -- n3 ) 2DUP < IF SWAP THEN DROP ;
 
 ?: S>D ( n -- d ) DUP 0< ;
+?: D>S ( d -- n ) DROP ;
 
 ?: U+D		DUP ROT + DUP ROT U< NEGATE ;
 
