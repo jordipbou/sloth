@@ -2050,7 +2050,47 @@ void sloth_to_float_(X* x) {
 	}
 }
 
-void sloth_represent_(X* x) { /* TODO */ }
+void sloth_represent_(X* x) {
+	FLOAT r = sloth_fpop(x);
+	CELL u = sloth_pop(x);
+	CELL addr = sloth_pop(x);
+	/* This implementation uses the algorithm found in */
+	/* represent_in_c.zip in Taygeta FTP. */
+	/* I'm ignoring the REPRESENT-CHARS part */
+	int i, j;
+	char buf[64], *endptr;
+	/* 1. Fill buffer at caddr with n blanks (space chars) */
+	/* where n is the greater of n1 or REPRESENT-CHARS. */
+	for (i = 0; i < u; i++) sloth_cstore(x, addr + i, ' ');
+	/* 2. Apply sprintf to r using %#.*E where * is */
+	/* MAX-FLOAT-DIGITS less 1. */
+	sprintf(buf, "%#.*E", (int)(u - 1), r);
+	/* 3. Check if its a non-number representation. */
+	for (i = 0; i < strlen(buf); i++) {
+		if (buf[i] == 'n' || buf[i] == 'N') {
+			for (j = 0; j < strlen(buf); j++) {
+				sloth_cstore(x, addr + j, buf[j]);
+				sloth_push(x, 0);
+				sloth_push(x, 0);
+				return;
+			}
+		}
+	}
+	/* 4. r was a finite number. */
+	for (i = 0; i < u; i++) sloth_cstore(x, addr + i, '0');
+	for (i = 0, j = 0; i < strlen(buf); i++) {
+		if (buf[i] == 'E') {
+			sloth_push(x, (strtol(buf + i + 1, &endptr, 10)) - 1);
+			break;
+		} else if (buf[i] != '-' && buf[i] != '.') {
+			sloth_cstore(x, addr + j, buf[i]);
+			j++;
+		}
+	}
+	sloth_push(x, r < 0.0 ? -1 : 0);
+	/* When should this return 0 as invalid result? */
+	sloth_push(x, -1);
+}
 
 /* Output operations */
 
@@ -2335,6 +2375,7 @@ void sloth_bootstrap(X* x) {
 	/* String/numeric conversion */
 
 	sloth_code(x, ">FLOAT", sloth_primitive(x, &sloth_to_float_));
+	sloth_code(x, "REPRESENT", sloth_primitive(x, &sloth_represent_));
 
 	/* Output operations */
 

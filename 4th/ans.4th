@@ -119,6 +119,8 @@ FORTH-WORDLIST SET-CURRENT
 ?: VARIABLE CREATE 0 , ; \ ( "<spaces>name" -- ) 
 ?: CONSTANT CREATE , DOES> @ ; \ ( x "<spaces>name" -- ) 
 
+?: 2VARIABLE CREATE 0 , 0 , ; \ ( "<spaces>name" -- )
+
 ?: BUFFER: CREATE ALLOT ; \ ( u "<spaces>name" -- ; -- a-addr ) 
 
 ?: VALUE CREATE , DOES> @ ; \ ( x "<spaces>name" -- ) 
