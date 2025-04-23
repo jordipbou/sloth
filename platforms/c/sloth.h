@@ -460,7 +460,7 @@ void sloth_f_variable_(X* x);
 
 void sloth_d_to_f_(X* x);
 void sloth_f_to_d_(X* x);
-void sloth_s_to_f_(X* x);
+/* Not needed: void sloth_s_to_f_(X* x); */
 
 /* Arithmetic and logical operations */
 
@@ -505,6 +505,7 @@ void sloth_represent_(X* x);
 /* Output operations */
 
 void sloth_f_dot_(X* x);
+void sloth_f_e_dot_(X* x);
 
 /* Non ANS floating point helpers */
 
@@ -1032,15 +1033,18 @@ void sloth_environment_(X* x) {
 	case 11: /* STACK-CELLS */
 		sloth_push(x, SLOTH_STACK_SIZE);
 		break;
-	/* Obsolescent word set queries */
-	case 24: /* FLOATING */
+	case 12: /* FLOATING-STACK */
+		#ifndef SLOTH_NO_FLOATING_POINT
+		sloth_push(x, SLOTH_FLOAT_STACK_SIZE);
+		#endif
+		break;
+	/* Obsolescent queries (but required for tests) */
+	case 100:
 		#ifndef SLOTH_NO_FLOATING_POINT
 		sloth_push(x, -1);
 		#else
 		sloth_push(x, 0);
 		#endif
-	case 25: /* FLOATING-EXT */
-		/* TODO */
 		break;
 	/* Non standard queries */
 	case -1: /* PLATFORM */
@@ -1905,9 +1909,11 @@ void sloth_f_to_d_(X* x) {
 	sloth_push(x, dhi);
 }
 */
+/* Not needed:
 void sloth_s_to_f_(X* x) {
 	sloth_fpush(x, (double)sloth_pop(x));
 }
+*/
 
 /* Arithmetic and logical operations */
 
@@ -1962,8 +1968,10 @@ void sloth_f_proximate_(X* x) {
 	} else if (r3 < 0.0) {
 		sloth_push(x, fabs(r1 - r2) < (fabs(r3)*(fabs(r1)+fabs(r2))) ? -1 : 0);
 	} else {
-		/* TODO I'm not sure this is totally correct */
-		sloth_push(x, r1 == r2 ? -1 : 0);
+		uint64_t a, b;
+		memcpy(&a, &r1, sizeof(double));
+		memcpy(&b, &r2, sizeof(double));
+		sloth_push(x, a == b ? -1 : 0);
 	}
 }
 void sloth_f_atan2_(X* x) {
@@ -2080,7 +2088,7 @@ void sloth_represent_(X* x) {
 	for (i = 0; i < u; i++) sloth_cstore(x, addr + i, '0');
 	for (i = 0, j = 0; i < strlen(buf); i++) {
 		if (buf[i] == 'E') {
-			sloth_push(x, (strtol(buf + i + 1, &endptr, 10)) - 1);
+			sloth_push(x, (strtol(buf + i + 1, &endptr, 10)) + 1);
 			break;
 		} else if (buf[i] != '-' && buf[i] != '.') {
 			sloth_cstore(x, addr + j, buf[i]);
@@ -2096,6 +2104,40 @@ void sloth_represent_(X* x) {
 
 void sloth_f_dot_(X* x) {
 	printf("%f ", sloth_fpop(x));
+}
+/* Engineering notation with special case handling */
+/* by ChatGPT */
+void sloth_f_e_dot_(X* x) {
+	FLOAT r = sloth_fpop(x);
+	int exp;
+	double scaled;
+
+	if (isnan(r)) {
+		printf("NaN ");
+		return;
+	}
+	
+	if (isinf(r)) {
+		if (r > 0) {
+			printf("Inf ");
+		} else {
+			printf("-Inf ");
+		}
+		return;
+	}
+	
+	if (r == 0.0) {
+		/* Will not differentiate between positive and */
+		/* negative zero. */
+		printf("0.0E+00 ");
+		return;
+	}
+	
+	exp = (int)floor(log10(fabs(r)) / 3.0) * 3;
+	scaled = r / pow(10, exp);
+	
+	/* Format with 3 digits after decimal — tweak to taste */
+	printf("%.3fE%+03d ", scaled, exp);
 }
 
 /* Non ANS floating point helpers */
@@ -2335,7 +2377,7 @@ void sloth_bootstrap(X* x) {
 
 	sloth_code(x, "D>F", sloth_primitive(x, &sloth_d_to_f_));
 	sloth_code(x, "F>D", sloth_primitive(x, &sloth_f_to_d_));
-	sloth_code(x, "S>F", sloth_primitive(x, &sloth_s_to_f_));
+	/* Not needed: sloth_code(x, "S>F", sloth_primitive(x, &sloth_s_to_f_)); */
 
 	/* Arithmetic and logical operations */
 
@@ -2380,6 +2422,7 @@ void sloth_bootstrap(X* x) {
 	/* Output operations */
 
 	sloth_code(x, "F.", sloth_primitive(x, &sloth_f_dot_));
+	sloth_code(x, "FE.", sloth_primitive(x, &sloth_f_e_dot_));
 
 	/* Non ANS floating point helpers */
 
