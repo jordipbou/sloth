@@ -410,7 +410,9 @@ void sloth_f_proximate_(X* x) {
 	FLOAT r3 = sloth_fpop(x);
 	FLOAT r2 = sloth_fpop(x);
 	FLOAT r1 = sloth_fpop(x);
-	if (r3 > 0.0) {
+	if (isnan(r3)) {
+		sloth_push(x, 0);
+	} else if (r3 > 0.0) {
 		sloth_push(x, fabs(r1 - r2) < r3 ? -1 : 0);
 	} else if (r3 < 0.0) {
 		sloth_push(x, fabs(r1 - r2) < (fabs(r3)*(fabs(r1)+fabs(r2))) ? -1 : 0);
