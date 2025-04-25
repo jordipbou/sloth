@@ -1,6 +1,5 @@
 #define SLOTH_IMPLEMENTATION
-/* #define SLOTH_NO_FLOATING_POINT */
-#include"sloth.h"
+#include"fsloth.h"
 
 /* ---------------------------------------------------- */
 /* -- main -------------------------------------------- */
