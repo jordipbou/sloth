@@ -11,6 +11,8 @@ typedef double DFLOAT;
 #define sSFLOAT sizeof(SFLOAT)
 #define sDFLOAT sizeof(DFLOAT)
 
+#define sFLOAT_BITS sFLOAT*8
+
 struct sloth_VM;
 
 /* Pre-definitions */
@@ -297,7 +299,7 @@ void sloth_s_f_fetch_(X* x) {
 	sloth_fpush(x, sloth_sffetch(x, sloth_pop(x))); 
 }
 void sloth_s_f_store_(X* x) { 
-	sloth_sfstore(x, sloth_pop(x), sloth_fpop(x)); 
+	sloth_sfstore(x, sloth_pop(x), (SFLOAT)sloth_fpop(x));
 }
 
 void sloth_d_f_fetch_(X* x) { 
@@ -317,7 +319,16 @@ void sloth_f_variable_(X* x) { /* TODO */}
 void sloth_d_to_f_(X* x) {
 	CELL hi = sloth_pop(x);
 	CELL lo = sloth_pop(x);
-	sloth_fpush(x, (((double)hi)*pow(2.0, CELL_BITS)) + ((double)lo));
+	double r;
+	if (hi >= 0) {
+		r = ldexp((double)hi, sFLOAT_BITS) + (double)lo;
+	} else {
+		/* negative number: -(2^128 - unsigned_value) */
+		/* compute unsigned_value = ( (uint64_t)hi << 64 ) | lo */
+		/* but better to subtract from 0.0 */
+		r = - ( ldexp((double)(~(uCELL)hi), sFLOAT_BITS) + (double)(~lo) + 1.0 );
+	}
+	sloth_fpush(x, r);
 }
 void sloth_f_to_d_(X* x) {
 	FLOAT i;
@@ -404,7 +415,16 @@ void sloth_f_negate_(X* x) {
 	sloth_fpush(x, -sloth_fpop(x));
 }
 void sloth_f_round_(X* x) {
-	sloth_fpush(x, round(sloth_fpop(x)));
+	FLOAT r = sloth_fpop(x);
+	if (r >= 0.0) {
+		/* floor(x + 0.5) works for non-negative x */
+		sloth_fpush(x, floor(r + 0.5));
+	} else {
+		/* for negative x, ties away from zero: ceil(x - 0.5)
+		 * but many C89 libs lack ceil(), so use -floor(0.5 - x)
+		 */
+		sloth_fpush(x, -floor(0.5 - r));
+	}
 }
 void sloth_f_proximate_(X* x) {
 	FLOAT r3 = sloth_fpop(x);
@@ -489,14 +509,75 @@ void sloth_f_a_cos_h_(X* x) {
 
 /* String/numeric conversion */
 
+/* This function gets complicated to correctly represent */
+/* the ANS Forth standard. It would be easier if just was */
+/* a mirror to the strtod C function. */
 void sloth_to_float_(X* x) {
 	char buf[64]; 
 	char *endptr;
 	int tlen = (int)sloth_pop(x);
 	char* tok = (char*)sloth_pop(x);
 	FLOAT n;
-	strncpy(buf, tok, tlen);
-	buf[tlen] = 0;
+	int i, j, nlen, marker;;
+	/* >FLOAT does not allow trailing spaces (although */
+	/* strtod does). But, at the same time, a string of */
+	/* blanks must be considered as a special case */
+	/* representing zero. */
+	if (*tok == ' ' || tlen == 0) {
+		for (i = 0; i < tlen; i++) {
+			/* If a non space character is found, we have a */
+			/* trailing space string, and that means we */
+			/* cannot convert it (by the standard). */
+			if (*(tok + i) != ' ') {
+				sloth_push(x, 0);
+				return;
+			}
+		}
+		/* If the string was made only of blanks, its a 0E */
+		sloth_push(x, -1);
+		sloth_fpush(x, 0.0);
+		return;
+	}
+	if (*(tok + tlen - 1) == ' ') {
+		sloth_push(x, 0);
+		return;
+	}
+	/* Let's copy the string but taking into account the */
+	/* possibility of not having the E in the string. */
+	nlen = tlen;
+	marker = 0;
+	for (i = 0, j = 0; i < tlen; i++) {
+		/* Forth's >FLOAT is a lot more restrictive than strtod */
+		/* so we check if any non specified character appears in */
+		/* the string to just do not allow the conversion. */
+		if (*(tok + i) != '0' && *(tok + i) != '1' && *(tok + i) != '2'
+		 && *(tok + i) != '3' && *(tok + i) != '4' && *(tok + i) != '5'
+		 && *(tok + i) != '6' && *(tok + i) != '7' && *(tok + i) != '8'
+		 && *(tok + i) != '9' && *(tok + i) != '+' && *(tok + i) != '-'
+		 && *(tok + i) != 'D' && *(tok + i) != 'd' && *(tok + i) != 'E'
+		 && *(tok + i) != 'e' && *(tok + i) != '.') {
+			sloth_push(x, 0);
+			return;
+		}
+		/* Being correct characters, D/d E/e must not appear */
+		/* more than once. */
+		if (*(tok + i) == 'D' || *(tok + i) == 'd' || *(tok + i) == 'E'
+		 || *(tok + i) == 'e') {
+			if (marker == 0) marker = 1;
+			else {
+				sloth_push(x, 0);
+				return;
+			}
+		}
+		if (i != 0
+		 && (*(tok + i) == '+' || *(tok + i) == '-')
+		 && (*(tok + i - 1) != 'E' && *(tok + i - 1) != 'e')) {
+			buf[j++] = 'E';
+			nlen++;
+		}
+		buf[j++] = *(tok + i);
+	}
+	buf[nlen] = 0;
 	n = strtod(buf, &endptr);
 	if (n == 0 && endptr == buf) {
 		sloth_push(x, 0);
@@ -638,8 +719,8 @@ void sloth_bootstrap_floating_point_word_set(X* x) {
 	sloth_code(x, "F@", sloth_primitive(x, &sloth_f_fetch_));
 	sloth_code(x, "F!", sloth_primitive(x, &sloth_f_store_));
 
-	sloth_code(x, "SF@", sloth_primitive(x, &sloth_f_fetch_));
-	sloth_code(x, "SF!", sloth_primitive(x, &sloth_f_store_));
+	sloth_code(x, "SF@", sloth_primitive(x, &sloth_s_f_fetch_));
+	sloth_code(x, "SF!", sloth_primitive(x, &sloth_s_f_store_));
 
 	sloth_code(x, "DF@", sloth_primitive(x, &sloth_d_f_fetch_));
 	sloth_code(x, "DF!", sloth_primitive(x, &sloth_d_f_store_));
