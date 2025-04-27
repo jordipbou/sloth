@@ -113,7 +113,6 @@ void sloth_f_variable_(X* x);
 
 void sloth_d_to_f_(X* x);
 void sloth_f_to_d_(X* x);
-/* Not needed: void sloth_s_to_f_(X* x); */
 
 /* Arithmetic and logical operations */
 
@@ -158,6 +157,7 @@ void sloth_represent_(X* x);
 /* Output operations */
 
 void sloth_f_dot_(X* x);
+void sloth_f_s_dot_(X* x);
 void sloth_f_e_dot_(X* x);
 
 /* Non ANS floating point helpers */
@@ -336,42 +336,6 @@ void sloth_f_to_d_(X* x) {
 	sloth_push(x, (CELL)i);
 	sloth_push(x, i < 0 ? -1 : 0);
 }
-/* Helper to F>D defined in pForth */
-/* #define FP_DHI1 (((FLOAT)((CELL)1<<(sizeof(CELL)*8-2)))*4.0) */
-/* Taken from pForth */
-/*
-void sloth_f_to_d_(X* x) {
-	uCELL dlo;
-	CELL dhi;
-	int ifNeg;
-	FLOAT fpScratch, fpTemp = sloth_fpop(x);
-	ifNeg = (fpTemp < 0.0);
-	if( ifNeg )
-	{
-		fpTemp = 0.0 - fpTemp;
-	}
-	fpScratch = fpTemp / FP_DHI1;
-	dhi = (CELL) fpScratch; */  /* dhi */
-/*
-	fpScratch = ((FLOAT) dhi) * FP_DHI1;
-	
-	fpTemp = fpTemp - fpScratch; */ /* Remainder */
-/*
-	dlo = (CELL) fpTemp;
-	if( ifNeg )
-	{
-		dlo = 0 - dlo;
-		dhi = 0 - dhi - 1;
-	}
-	sloth_push(x, dlo);
-	sloth_push(x, dhi);
-}
-*/
-/* Not needed:
-void sloth_s_to_f_(X* x) {
-	sloth_fpush(x, (double)sloth_pop(x));
-}
-*/
 
 /* Arithmetic and logical operations */
 
@@ -486,7 +450,7 @@ void sloth_f_log_ten_(X* x) {
 	sloth_fpush(x, log10(sloth_fpop(x)));
 }
 void sloth_f_l_n_p_one_(X* x) {
-	sloth_fpush(x, log(sloth_fpop(x)) + 1.0);
+	sloth_fpush(x, log(sloth_fpop(x) + 1.0));
 }
 void sloth_f_a_log_(X* x) {
 	sloth_fpush(x, pow(10.0, sloth_fpop(x)));
@@ -500,11 +464,27 @@ void sloth_f_cos_h_(X* x) {
 void sloth_f_tan_h_(X* x) {
 	sloth_fpush(x, tanh(sloth_fpop(x)));
 }
+/* There's no asinh function in math.h in C89. It */
+/* appeared on C99. */
 void sloth_f_a_sine_h_(X* x) {
-	sloth_fpush(x, asinh(sloth_fpop(x)));
+	FLOAT r = sloth_fpop(x);
+	if (r == 0) {
+		sloth_fpush(x, 0.0);
+	} else if (r > 0) {
+		sloth_fpush(x, log(r + sqrt(r * r + 1.0)));
+	} else {
+		sloth_fpush(x, -log(-r + sqrt(r * r + 1.0)));
+	}
 }
 void sloth_f_a_cos_h_(X* x) {
-	sloth_fpush(x, acosh(sloth_fpop(x)));
+	FLOAT r = sloth_fpop(x);
+	if (r < 1.0) {
+		/* undefined, push NaN, as nan is not present in C89 */
+		/* push the result of dividing 0.0 from 0.0 */
+		sloth_fpush(x, -(0.0/0.0)); 
+	} else {
+		sloth_fpush(x, log(r + sqrt(r * r - 1.0)));
+	}
 }
 
 /* String/numeric conversion */
@@ -632,9 +612,26 @@ void sloth_represent_(X* x) {
 
 /* Output operations */
 
+#define PRECISION 33*sCELL
+
 void sloth_f_dot_(X* x) {
-	printf("%f ", sloth_fpop(x));
+	FLOAT r = sloth_fpop(x);
+	int int_digits = (r == 0.0) ? 1 : (int)log10(fabs(r)) + 1;
+	int decimals;
+	if (r == floor(r)) {
+		printf("%.0f. ", r);
+	} else if (floor(r) == 0.0 || floor(r) == -1.0) {
+		printf("%.*f ", (int)sloth_get(x, PRECISION), r);
+	} else {
+		decimals = sloth_get(x, PRECISION) - int_digits;
+		printf("%.*f ", decimals, r);
+	}
 }
+
+void sloth_f_s_dot_(X* x) {
+	printf("%.*E ", (int)sloth_get(x, PRECISION) - 1, sloth_fpop(x));
+}
+
 /* Engineering notation with special case handling */
 /* by ChatGPT */
 void sloth_f_e_dot_(X* x) {
@@ -679,6 +676,7 @@ void sloth_f_dot_s_(X* x) {
 }
 
 void sloth_bootstrap_floating_point_word_set(X* x) {
+
 	/* == Primitives ===================================== */
 
 	sloth_code(x, "(FLIT)", sloth_primitive(x, &sloth_flit_));
@@ -774,6 +772,7 @@ void sloth_bootstrap_floating_point_word_set(X* x) {
 	/* Output operations */
 
 	sloth_code(x, "F.", sloth_primitive(x, &sloth_f_dot_));
+	sloth_code(x, "FS.", sloth_primitive(x, &sloth_f_s_dot_));
 	sloth_code(x, "FE.", sloth_primitive(x, &sloth_f_e_dot_));
 
 	/* Non ANS floating point helpers */

@@ -1654,6 +1654,12 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_comma(x, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST)); /* CONTEXT 1 */
 	sloth_allot(x, 14*sCELL); /* For a total of 16 wordlists */
 
+	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+
+	sloth_comma(x, 15); /* PRECISION */
+
+	#endif
+
 	/* Basic primitives */
 
 	sloth_code(x, "EXIT", sloth_primitive(x, &sloth_exit_));
