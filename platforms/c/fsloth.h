@@ -479,9 +479,8 @@ void sloth_f_a_sine_h_(X* x) {
 void sloth_f_a_cos_h_(X* x) {
 	FLOAT r = sloth_fpop(x);
 	if (r < 1.0) {
-		/* undefined, push NaN, as nan is not present in C89 */
-		/* push the result of dividing 0.0 from 0.0 */
-		sloth_fpush(x, -(0.0/0.0)); 
+		/* undefined, push NaN */
+		sloth_fpush(x, nan(""));
 	} else {
 		sloth_fpush(x, log(r + sqrt(r * r - 1.0)));
 	}
