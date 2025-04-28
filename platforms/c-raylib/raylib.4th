@@ -9,6 +9,7 @@ end-structure
 : rl-define-color: ( u1 u2 u3 u4 -- )
 	here color allot dup >r constant
 	\ c! is not correct on non 8 byte/char platforms
+	\ should be b!
 	r@ color.a c!
 	r@ color.b c!
 	r@ color.g c!
@@ -17,7 +18,7 @@ end-structure
 
 200 200 200 255 rl-define-color: lightgray
 130 130 130 255 rl-define-color: gray
-80 80 80 255 rl-define-color: drakgray
+80 80 80 255 rl-define-color: darkgray
 253 249 0 255 rl-define-color: yellow
 255 203 0 255 rl-define-color: gold
 255 161 0 255 rl-define-color: orange
@@ -52,8 +53,34 @@ begin-structure rectangle
 	sffield: rectangle.height
 end-structure
 
+\ Vector2, 2 components
+
+begin-structure vector2
+	sffield: vector2.x
+	sffield: vector2.y
+end-structure
+
+\ Camera2D, defines position/orientation in 2d space
+
+begin-structure camera2d
+	sffield: camera2d.offset.x
+	sffield: camera2d.offset.y
+	sffield: camera2d.target.x
+	sffield: camera2d.target.y
+	sffield: camera2d.rotation
+	sffield: camera2d.zoom
+end-structure
+
 \ Other constants
 
+\ Alphanumeric keys
+65 constant key-a
+82 constant key-r
+83 constant key-s
+
+\ Function keys
 257 constant key-enter
+262 constant key-right
+263 constant key-left
 
 1 constant gesture-tap
