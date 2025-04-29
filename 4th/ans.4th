@@ -64,8 +64,8 @@ DROP DROP
 \ between FORTH-WORDLIST and INTERNAL-WORDLIST from the
 \ beginning and no overpopulate FORTH-WORDLIST.
 
-?: GET-CURRENT 15 CELLS TO-ABS @ ; \ ( -- wid )
-?: SET-CURRENT 15 CELLS TO-ABS ! ; \ ( wid -- )
+?: GET-CURRENT 16 CELLS TO-ABS @ ; \ ( -- wid )
+?: SET-CURRENT 16 CELLS TO-ABS ! ; \ ( wid -- )
 
 \ -- Variables shared with the host -----------------------
 
@@ -87,9 +87,10 @@ INTERNAL-WORDLIST SET-CURRENT
 ?: (JX)					12 CELLS TO-ABS ; 	\ ( -- addr )
 ?: (KX)					13 CELLS TO-ABS ; 	\ ( -- addr )
 ?: (LX)					14 CELLS TO-ABS ;	\ ( -- addr )
-\ CURRENT goes on 15 CELLS TO-ABS, above defined SET- GET-
-?: #ORDER				16 CELLS TO-ABS ;	\ ( -- addr )
-?: CONTEXT				17 CELLS TO-ABS ;	\ ( -- addr )
+?: (INTERPRET)			15 CELLS TO-ABS ;	\ ( -- addr )
+\ CURRENT goes on 16 CELLS TO-ABS, above defined SET- GET-
+?: #ORDER				17 CELLS TO-ABS ;	\ ( -- addr )
+?: CONTEXT				18 CELLS TO-ABS ;	\ ( -- addr )
 
 FORTH-WORDLIST SET-CURRENT
 
@@ -805,6 +806,16 @@ FORTH-WORDLIST SET-CURRENT
 ?\		THEN
 ?\ ;
 
+\ For debugging, not ANS
+?: .RET ( -- )
+?\		'[' EMIT RDEPTH 0 0 D.R ']' EMIT SPACE
+?\		RDEPTH 0 > IF
+?\			1 RDEPTH 1- DO
+?\				I 1- RPICK .
+?\			-1 +LOOP
+?\		THEN
+?\ ;
+
 \ -- Parsing ----------------------------------------------
 
 ?: /SOURCE ( -- c-addr n )
@@ -841,6 +852,10 @@ FORTH-WORDLIST SET-CURRENT
 ?: PARSE-NAME ( "<spaces>name<space>" -- c-addr u )
 ?\		[: BL <= ;] *P <P [: BL > ;] *P P> 
 ?\ ;
+
+\ -- Including source code --------------------------------
+
+?: INCLUDE ( i*x "name" -- j*x ) PARSE-NAME INCLUDED ;
 
 \ -- Combinators ------------------------------------------
 
@@ -914,17 +929,17 @@ FORTH-WORDLIST SET-CURRENT
 ?\		2R> 2DROP
 ?\ ;
 
-\ \ Not ANS yet
-\ ?: FIND-NAME ( c-addr u -- nt | 0 )
-\ TODO I need some way to traverse the search order
-\ TODO and execute FIND-NAME-IN until the word is found
-\ ?\ ;
-
-\ TODO I need to implement wordlists and search order to
-\ be able to implement FIND-NAME.
-\ It would be interesting to implement it in C also, as
-\ find_word is used from C and it needs to work even when
-\ the search order is implemented in Forth.
+\ Not ANS yet
+?: FIND-NAME ( c-addr u -- nt | 0 )
+?\		CONTEXT ( c-addr u addr )
+?\		#ORDER @ 0 DO ( c-addr u addr )
+?\			>R 2DUP R@ @ FIND-NAME-IN ?DUP 0<> IF 
+?\				-ROT 2DROP R> DROP UNLOOP EXIT 
+?\			THEN
+?\			R> CELL+
+?\		LOOP
+?\		DROP DROP DROP 0
+?\ ;
 
 \ -- ANS Forth conditional compilation --------------------
 
@@ -1156,6 +1171,7 @@ SET-CURRENT
 \ quotations and strings.
 
 \ PLATFORM DEPENDENT
+\ SEE fails to print quotations (and lots of other things)
 ?: SEE ( "<spaces>name" -- )
 ?\		BL WORD DUP FIND
 ?\		DUP IF
@@ -1277,6 +1293,9 @@ SET-CURRENT
 [THEN]
 
 \ -- QUIT -------------------------------------------------
+
+DEFER INTERPRET
+(INTERPRET) @ IS INTERPRET
 
 [UNDEFINED] QUIT [IF]
 
@@ -1529,6 +1548,9 @@ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 ;
 [THEN]
 
+\ -- Interpreter ------------------------------------------
+
+
 \ == FLOATING POINT WORD SET ==============================
 
 S" FLOATING-STACK" ENVIRONMENT? [IF] DROP
@@ -1547,7 +1569,7 @@ FORTH-WORDLIST SET-CURRENT
 
 [UNDEFINED] SET-PRECISION [IF]
 
-: (PRECISION) ( -- addr ) 33 CELLS TO-ABS ;
+: (PRECISION) ( -- addr ) 34 CELLS TO-ABS ;
 
 : SET-PRECISION ( u -- ) (PRECISION) ! ;
 
@@ -1556,3 +1578,172 @@ FORTH-WORDLIST SET-CURRENT
 ?: F> ( -- flag ) ( F: r1 r2 -- ) FSWAP F< ;
 
 [THEN]
+
+\ ** Non ANS code *****************************************
+
+\ -- Dataflow combinators ---------------------------------
+
+?: DIP ( n xt -- n ) SWAP >R EXECUTE R> ;
+?: 2DIP ( n1 n2 xt -- n1 n2 ) -ROT 2>R EXECUTE 2R> ;
+
+?: KEEP ( n xt[ n -- i*x ] -- i*x n ) OVER >R EXECUTE R> ;
+
+[UNDEFINED] 2KEEP [IF]
+: 2KEEP ( n1 n2 xt -- n1 n2 ) 
+	2 PICK 2 PICK 2>R EXECUTE 2R>
+;
+[THEN]
+
+\ -- Looping/Iterator combinators -------------------------
+
+INTERNAL-WORDLIST SET-CURRENT 
+VARIABLE __TIMES-XT__
+FORTH-WORDLIST SET-CURRENT
+: TIMES ( n xt -- )
+	__TIMES-XT__ @ >R
+	__TIMES-XT__ !
+	0 ?DO
+		__TIMES-XT__ @ EXECUTE
+	LOOP
+	R> __TIMES-XT__ !
+;
+
+\	[UNDEFINED] ITER [IF]
+\	: ITER ( addr u xt -- ) 
+\		-ROT CELLS BOUNDS DO
+\			>R I @ R@ EXECUTE R> CELL
+\		+LOOP DROP 
+\	;
+\	[THEN]
+\	
+\	[UNDEFINED] ITER/ADDR [IF]
+\	: ITER/ADDR	( addr u xt -- ) 
+\		SWAP [: DUP >R KEEP CELL+ R> ;] TIMES 2DROP 
+\	;
+\	[THEN]
+
+\	\ -- Software stacks --------------------------------------
+\	
+\	\ Additional stacks
+\	
+\	[UNDEFINED] STACK: [IF]
+\	
+\	: STACK: ( u "name" -- ) 
+\		CREATE DUP , 0 , CELLS ALLOT DOES> 2 CELLS + 
+\	; 
+\	
+\	: >STACK ( x sid -- ) 
+\		[: DUP CELL- @ CELLS + ! ;] KEEP CELL- 1+! 
+\	;
+\	
+\	: STACK> ( sid -- x ) 
+\		DUP CELL- 1-! DUP CELL- @ CELLS + @ 
+\	;
+\	
+\	: @STACK ( u sid -- ) 
+\		DUP CELL- @ ROT 1+ - CELLS + 
+\	;
+\	
+\	: SET-STACK ( xn .. x1 n sid -- )
+\		[: SWAP [: ! ;] ITER/ADDR ;] 2KEEP CELL- ! 
+\	;
+\	
+\	: GET-STACK ( sid -- xn .. x1 n ) 
+\		DUP CELL- @ [: [: @ ;] -ITER/ADDR ;] KEEP 
+\	;
+\	
+\	: MAP-STACK ( xt rid -- f ) DUP CELL- @ ROT *ITER ;
+\	
+\	[THEN]
+\	
+\	\ -- Recognizer based interpreter -------------------------
+\	
+\	[UNDEFINED] RECOGNIZE [IF]
+\	
+\	17 stack: (FORTH-RECOGNIZERS)
+\	
+\	: SET-RECOGNIZERS ( xtn ... xt1 n -- ) 
+\		(FORTH-RECOGNIZERS) SET-STACK 
+\	;
+\	
+\	: GET-RECOGNIZERS ( -- xtn ... xt1 n ) 
+\		(FORTH-RECOGNIZERS) GET-STACK 
+\	;
+\	
+\	: +RECOGNIZER ( xt -- ) 
+\		(FORTH-RECOGNIZERS) >STACK 
+\	;
+\	
+\	: -RECOGNIZER ( -- ) 
+\		(FORTH-RECOGNIZERS) STACK> DROP 
+\	;
+\	
+\	\ Taken from theforth.net/recognizers package
+\	
+\	: RECTYPE: ( xt-int xt-comp xt-post "<spaces>name" -- )
+\		CREATE SWAP ROT , , , 
+\	;
+\	
+\	\ Default recognizer (word not found)
+\	:NONAME ." I don't know what your talking about." CR TYPE -13 THROW ; 
+\	DUP 
+\	DUP 
+\	RECTYPE: RECTYPE-NULL
+\	
+\	: (RECOGNIZE) ( addr u xt -- addr len 0 | i*x rtok -1 )
+\		2KEEP ROT DUP RECTYPE-NULL = IF DROP 0 ELSE NIP NIP -1 THEN 
+\	;
+\	
+\	: RECOGNIZE ( addr u rid -- rtok | rnull ) 
+\		['] (RECOGNIZE) SWAP MAP-STACK 0= IF RECTYPE-NULL THEN 
+\	;
+\	
+\	\ \ Word recognizer based on find-name (uses current wordlists order)
+\	\ \ These are implementation dependent.
+\	\ 
+\	\ :NONAME	
+\	\ 	DUP COLON? -IF DUP NT>DT SWAP THEN NT>XT ?DUP IF EXECUTE THEN ;
+\	\ :noname
+\	\ 	dup colon? -if dup nt>dt postpone literal then
+\	\ 	dup immediate? if
+\	\ 		nt>xt ?dup if execute then
+\	\ 	else
+\	\ 		nt>xt ?dup if compile, then
+\	\ 	then
+\	\ ;
+\	\ :noname 
+\	\ 	dup colon? -if dup nt>dt postpone literal ['] literal compile, then
+\	\ 	dup immediate? if
+\	\ 		nt>xt ?dup if compile, then
+\	\ 	else
+\	\ 		nt>xt ?dup if postpone literal ['] compile, compile, then
+\	\ 	then
+\	\ ;
+\	\ rectype: RECTYPE-NT
+\	\ 
+\	\ : REC-FIND ( c-addr len -- xt flags rectype-nt | rectype-null )
+\	\ 	find-name ?dup if 
+\	\ 		rectype-nt 
+\	\ 	else 
+\	\ 		rectype-null 
+\	\ 	then 
+\	\ ;
+\	
+\	\ ---------------------------------------------------------
+\	
+\	RECTYPE-NULL +RECOGNIZER
+\	
+\	?: @EXECUTE @ ?dup if execute then ;
+\	
+\	\ Taken from SwiftForth
+\	: RECOGNIZERS-BASED-INTERPRET
+\		BEGIN \ ?STACK -- check stack?
+\			PARSE-NAME DUP WHILE
+\			FORTH-RECOGNIZER RECOGNIZE
+\			STATE @ CELLS + @EXECUTE
+\		REPEAT 2DROP
+\	;
+\	
+\	' RECOGNIZERS-BASED-INTERPRET IS INTERPRET
+\	
+\	[THEN]
