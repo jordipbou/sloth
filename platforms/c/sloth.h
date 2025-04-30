@@ -177,9 +177,10 @@ void sloth_throw(X* x, CELL e);
 #define SLOTH_JX								12*sCELL
 #define SLOTH_KX								13*sCELL
 #define SLOTH_LX								14*sCELL
-#define SLOTH_CURRENT						15*sCELL
-#define SLOTH_ORDER							16*sCELL
-#define SLOTH_CONTEXT						17*sCELL
+#define SLOTH_INTERPRET					15*sCELL
+#define SLOTH_CURRENT						16*sCELL
+#define SLOTH_ORDER							17*sCELL
+#define SLOTH_CONTEXT						18*sCELL
 
 /* Word statuses */
 
@@ -293,6 +294,7 @@ void sloth_bye_(X* x);
 /* Commands to inspect memory, debug & view code */
 
 void sloth_depth_(X* x);
+void sloth_r_depth_(X* x);
 void sloth_unused_(X* x);
 
 /* Source code preprocessing, interpreting & auditing commands */
@@ -350,6 +352,7 @@ void sloth_throw_(X* x);
 void sloth_drop_(X* x);
 void sloth_over_(X* x);
 void sloth_pick_(X* x);
+void sloth_r_pick_(X* x);
 void sloth_to_r_(X* x);
 void sloth_r_from_(X* x);
 void sloth_swap_(X* x);
@@ -1089,6 +1092,7 @@ void sloth_bye_(X* x) { printf("\n"); exit(0); }
 /* Commands to inspect memory, debug & view code */
 
 void sloth_depth_(X* x) { sloth_push(x, x->sp); }
+void sloth_r_depth_(X* x) { sloth_push(x, x->rp); }
 void sloth_unused_(X* x) { 
 	sloth_push(x, x->sz - sloth_get(x, SLOTH_HERE)); 
 }
@@ -1115,10 +1119,8 @@ void sloth_included_(X* x) {
 
 	f = fopen(filename, "r");
 
-	printf("Opening file: %.*s\n", (int)l, (char*)a);
-
 	if (f) {
-		INTERPRET = sloth_get_xt(x, sloth_find_word(x, "INTERPRET"));
+		INTERPRET = sloth_get(x, SLOTH_INTERPRET);
 
 		sloth_set(x, SLOTH_SOURCE_ID, (CELL)f);
 
@@ -1460,6 +1462,7 @@ void sloth_drop_(X* x) {
 }
 void sloth_over_(X* x) { sloth_push(x, sloth_pick(x, 1)); }
 void sloth_pick_(X* x) {  sloth_push(x, sloth_pick(x, sloth_pop(x))); }
+void sloth_r_pick_(X* x) { sloth_push(x, sloth_rpick(x, sloth_pop(x))); }
 void sloth_to_r_(X* x) { sloth_rpush(x, sloth_pop(x)); }
 void sloth_r_from_(X* x) { sloth_push(x, sloth_rpop(x)); }
 void sloth_swap_(X* x) { CELL a = sloth_pop(x); CELL b = sloth_pop(x);sloth_push(x, a); sloth_push(x, b); }
@@ -1648,11 +1651,13 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_comma(x, 0); /* JX */
 	sloth_comma(x, 0); /* KX */
 	sloth_comma(x, 0); /* LX */
+	sloth_comma(x, 0); /* OUTER INTERPRETER */
 	sloth_comma(x, sloth_to_abs(x, SLOTH_FORTH_WORDLIST)); /* CURRENT */
 	sloth_comma(x, 2); /* #ORDER */
 	sloth_comma(x, sloth_to_abs(x, SLOTH_FORTH_WORDLIST)); /* CONTEXT 0 */
 	sloth_comma(x, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST)); /* CONTEXT 1 */
 	sloth_allot(x, 14*sCELL); /* For a total of 16 wordlists */
+
 
 	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
@@ -1693,6 +1698,7 @@ void sloth_bootstrap_kernel(X* x) {
 	/* Commands to inspect memory, debug & view code */
 
 	sloth_code(x, "DEPTH", sloth_primitive(x, &sloth_depth_));
+	sloth_code(x, "RDEPTH", sloth_primitive(x, &sloth_r_depth_));
 
 	/* Source code preprocessing, interpreting & auditing commands */
 
@@ -1753,6 +1759,7 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "DROP", sloth_primitive(x, &sloth_drop_));
 	sloth_code(x, "OVER", sloth_primitive(x, &sloth_over_));
 	sloth_code(x, "PICK", sloth_primitive(x, &sloth_pick_));
+	sloth_code(x, "RPICK", sloth_primitive(x, &sloth_r_pick_));
 	sloth_code(x, ">R", sloth_primitive(x, &sloth_to_r_));
 	sloth_code(x, "R>", sloth_primitive(x, &sloth_r_from_));
 	sloth_code(x, "SWAP", sloth_primitive(x, &sloth_swap_));
@@ -1783,10 +1790,7 @@ void sloth_bootstrap_kernel(X* x) {
 
 	sloth_code(x, "TO-ABS", sloth_primitive(x, &sloth_to_abs_));
 	sloth_code(x, "TO-REL", sloth_primitive(x, &sloth_to_rel_));
-	/* TODO Maybe INTERPRET should be deferred or as a */
-	/* variable to be able to create an INTERPRET for */
-	/* debugging in Forth itself. */
-	sloth_code(x, "INTERPRET", sloth_primitive(x, &sloth_interpret_));
+	sloth_set(x, SLOTH_INTERPRET, sloth_primitive(x, &sloth_interpret_));
 	sloth_code(x, "(EMPTY-RETURN-STACK)", sloth_primitive(x, &sloth_empty_rs_));
 }
 

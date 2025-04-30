@@ -58,6 +58,16 @@ DROP DROP
 \ upper case for definition/lower case for use, I think
 \ its easier to read).
 
+\ -- Required non ANS words -------------------------------
+
+\ FIXME Right now, this file contains non ANS words that
+\ make it impossible to correctly load on an ANS forth
+\ like Gforth.
+
+\ INTERNAL-WORDLIST being based on a variable is one of
+\ them. Change it to be a word and create it if it does
+\ not exist. (It can point to a variable the same way)
+
 \ -- Compilation wordlist ---------------------------------
 
 \ Defining GET-CURRENT and SET-CURRENT here allows changing
@@ -1579,36 +1589,41 @@ FORTH-WORDLIST SET-CURRENT
 
 [THEN]
 
-\ ** Non ANS code *****************************************
-
-\ -- Dataflow combinators ---------------------------------
-
-?: DIP ( n xt -- n ) SWAP >R EXECUTE R> ;
-?: 2DIP ( n1 n2 xt -- n1 n2 ) -ROT 2>R EXECUTE 2R> ;
-
-?: KEEP ( n xt[ n -- i*x ] -- i*x n ) OVER >R EXECUTE R> ;
-
-[UNDEFINED] 2KEEP [IF]
-: 2KEEP ( n1 n2 xt -- n1 n2 ) 
-	2 PICK 2 PICK 2>R EXECUTE 2R>
-;
-[THEN]
-
-\ -- Looping/Iterator combinators -------------------------
-
-INTERNAL-WORDLIST SET-CURRENT 
-VARIABLE __TIMES-XT__
-FORTH-WORDLIST SET-CURRENT
-: TIMES ( n xt -- )
-	__TIMES-XT__ @ >R
-	__TIMES-XT__ !
-	0 ?DO
-		__TIMES-XT__ @ EXECUTE
-	LOOP
-	R> __TIMES-XT__ !
-;
-
+\	\ ** Non ANS code *****************************************
+\	
+\	?: NOOP ;
+\	
+\	\ -- Dataflow combinators ---------------------------------
+\	
+\	?: DIP ( n xt -- n ) SWAP >R EXECUTE R> ;
+\	?: 2DIP ( n1 n2 xt -- n1 n2 ) -ROT 2>R EXECUTE 2R> ;
+\	
+\	?: KEEP ( n xt[ n -- i*x ] -- i*x n ) OVER >R EXECUTE R> ;
+\	
+\	[UNDEFINED] 2KEEP [IF]
+\	: 2KEEP ( n1 n2 xt -- n1 n2 ) 
+\		2 PICK 2 PICK 2>R EXECUTE 2R>
+\	;
+\	[THEN]
+\	
+\	\ -- Looping/Iterator combinators -------------------------
+\	
+\	INTERNAL-WORDLIST SET-CURRENT 
+\	VARIABLE __TIMES-XT__
+\	
+\	FORTH-WORDLIST SET-CURRENT
+\	\ Looping combinator
+\	: TIMES ( n xt -- )
+\		__TIMES-XT__ @ >R
+\		__TIMES-XT__ !
+\		0 ?DO
+\			__TIMES-XT__ @ EXECUTE
+\		LOOP
+\		R> __TIMES-XT__ !
+\	;
+\	
 \	[UNDEFINED] ITER [IF]
+\	\ Cell based array iterator over items
 \	: ITER ( addr u xt -- ) 
 \		-ROT CELLS BOUNDS DO
 \			>R I @ R@ EXECUTE R> CELL
@@ -1617,11 +1632,39 @@ FORTH-WORDLIST SET-CURRENT
 \	[THEN]
 \	
 \	[UNDEFINED] ITER/ADDR [IF]
+\	\ Cell based array iterator over items address
 \	: ITER/ADDR	( addr u xt -- ) 
 \		SWAP [: DUP >R KEEP CELL+ R> ;] TIMES 2DROP 
 \	;
 \	[THEN]
-
+\	
+\	[UNDEFINED] -ITER/ADDR [IF]
+\	\ Cell based reverse array iterator over items address
+\	: -ITER/ADDR ( addr u xt -- )
+\		OVER 2>R 1- CELLS + 2R> 
+\		[: DUP >R KEEP CELL- R> ;] TIMES 
+\		2DROP 
+\	;
+\	[THEN]
+\	
+\	[UNDEFINED] ITER-UNTIL [IF]
+\	\ Executes xt for each item of the array. 
+\	\ If executing xt over some item returns true, 
+\	\ leaves the loop and returns -1
+\	\ else it ends the loop and returns 0
+\	: ITER-UNTIL ( addr u xt -- ) 
+\		-ROT CELLS BOUNDS ?DO 
+\			I @	SWAP 
+\			DUP >R EXECUTE R> 
+\			SWAP ?DUP IF 
+\				NIP UNLOOP EXIT 
+\			THEN 
+\			CELL 
+\		+LOOP 
+\		DROP 0
+\	;
+\	[THEN]
+\	
 \	\ -- Software stacks --------------------------------------
 \	
 \	\ Additional stacks
@@ -1652,7 +1695,9 @@ FORTH-WORDLIST SET-CURRENT
 \		DUP CELL- @ [: [: @ ;] -ITER/ADDR ;] KEEP 
 \	;
 \	
-\	: MAP-STACK ( xt rid -- f ) DUP CELL- @ ROT *ITER ;
+\	: ITER-STACK-UNTIL ( xt sid -- flag ) 
+\		DUP CELL- @ ROT ITER-UNTIL 
+\	;
 \	
 \	[THEN]
 \	
@@ -1685,7 +1730,7 @@ FORTH-WORDLIST SET-CURRENT
 \	;
 \	
 \	\ Default recognizer (word not found)
-\	:NONAME ." I don't know what your talking about." CR TYPE -13 THROW ; 
+\	:NONAME TYPE -13 THROW ; 
 \	DUP 
 \	DUP 
 \	RECTYPE: RECTYPE-NULL
@@ -1695,51 +1740,43 @@ FORTH-WORDLIST SET-CURRENT
 \	;
 \	
 \	: RECOGNIZE ( addr u rid -- rtok | rnull ) 
-\		['] (RECOGNIZE) SWAP MAP-STACK 0= IF RECTYPE-NULL THEN 
+\		['] (RECOGNIZE) ( addr u rid 'recognize )
+\		SWAP ( addr u 'recognize rid )
+\		ITER-STACK-UNTIL 0= IF 
+\			RECTYPE-NULL 
+\		THEN 
 \	;
 \	
-\	\ \ Word recognizer based on find-name (uses current wordlists order)
-\	\ \ These are implementation dependent.
-\	\ 
-\	\ :NONAME	
-\	\ 	DUP COLON? -IF DUP NT>DT SWAP THEN NT>XT ?DUP IF EXECUTE THEN ;
-\	\ :noname
-\	\ 	dup colon? -if dup nt>dt postpone literal then
-\	\ 	dup immediate? if
-\	\ 		nt>xt ?dup if execute then
-\	\ 	else
-\	\ 		nt>xt ?dup if compile, then
-\	\ 	then
-\	\ ;
-\	\ :noname 
-\	\ 	dup colon? -if dup nt>dt postpone literal ['] literal compile, then
-\	\ 	dup immediate? if
-\	\ 		nt>xt ?dup if compile, then
-\	\ 	else
-\	\ 		nt>xt ?dup if postpone literal ['] compile, compile, then
-\	\ 	then
-\	\ ;
-\	\ rectype: RECTYPE-NT
-\	\ 
-\	\ : REC-FIND ( c-addr len -- xt flags rectype-nt | rectype-null )
-\	\ 	find-name ?dup if 
-\	\ 		rectype-nt 
-\	\ 	else 
-\	\ 		rectype-null 
-\	\ 	then 
-\	\ ;
+\	\ WORD recognizer
 \	
-\	\ ---------------------------------------------------------
+\	' EXECUTE ' COMPILE, ' POSTPONE RECTYPE: RECTYPE-WORD
+\	' EXECUTE ' EXECUTE ' COMPILE, RECTYPE: RECTYPE-IMM
 \	
-\	RECTYPE-NULL +RECOGNIZER
+\	: REC-FIND ( c-addr len -- xt addr1 | addr2 )
+\	 	FIND-NAME ?DUP IF
+\			DUP IMMEDIATE? IF
+\				NAME>XT RECTYPE-IMM
+\			ELSE
+\				NAME>XT RECTYPE-WORD
+\			THEN
+\		ELSE
+\			RECTYPE-NULL
+\		THEN
+\	;
 \	
+\	' REC-FIND +RECOGNIZER
+\	
+\	INCLUDE recognizers/2.1.0/rec-num.4th
+\	
+\	' REC-NUM +RECOGNIZER
+\		
 \	?: @EXECUTE @ ?dup if execute then ;
 \	
 \	\ Taken from SwiftForth
 \	: RECOGNIZERS-BASED-INTERPRET
 \		BEGIN \ ?STACK -- check stack?
 \			PARSE-NAME DUP WHILE
-\			FORTH-RECOGNIZER RECOGNIZE
+\			(FORTH-RECOGNIZERS) RECOGNIZE
 \			STATE @ CELLS + @EXECUTE
 \		REPEAT 2DROP
 \	;
