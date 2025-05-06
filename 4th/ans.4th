@@ -708,16 +708,27 @@ FORTH-WORDLIST SET-CURRENT
 2
 ?CONSTANT IMMEDIATE-FLAG
 
-\ PLATFORM DEPENDENT
+\ Non ANS - PLATFORM DEPENDENT
 ?: NAME>LINK ( nt -- nt ) TO-ABS @ ;
+\ Non ANS - PLATFORM DEPENDENT
 ?: NAME>XT ( nt -- xt ) CELL+ TO-ABS @ ;
+\ PLATFORM DEPENDENT
+?: NAME>INTERPRET ( nt -- xt | 0 )
+	\ TODO Something should be done for words that 
+	\ have no defined interpretation semantics
+	NAME>XT
+;
+\ PLATFORM DEPENDENT
 ?: NAME>STRING ( nt -- c-addr u )
 ?\		2 CELLS + CHAR+ TO-ABS COUNT
 ?\ ;
 
+\ Non ANS - PLATFORM DEPENDENT
 ?: NAME>FLAGS ( nt -- n ) 2 CELLs + TO-ABS C@ ;
 
+\ Non ANS
 ?: HIDDEN? ( nt -- flag ) NAME>FLAGS HIDDEN-FLAG AND ;
+\ Non ANS
 ?: IMMEDIATE? ( nt -- flag ) NAME>FLAGS IMMEDIATE-FLAG AND ;
 
 \ -- Search order -----------------------------------------

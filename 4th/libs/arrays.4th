@@ -1,27 +1,3 @@
-marker arrays
-
-variable there
-here unused + there !
-
-: tallot ( n -- )
-	unused over < if -8 throw then
-	there @ swap - there !
-;
-
-variable tmarker
-
-\ Compilation only
-: tmark ( -- )
-	r> tmarker @ >r >r
-	there @ tmarker !
-;
-
-\ Compilation only
-: tfree ( -- )
-	tmarker @ there !
-	r> r> tmarker ! >r
-;
-
 \ Array: an arrangement of items at equally spaced 
 \ addresses in computer memory
 
@@ -153,5 +129,40 @@ variable 2iter-addr2
 	r> 2iter-addr1 !
 	r> 2iter-addr2 !
 	r> iter-xt !
+;
+
+\ == Mapping ==============================================
+
+variable map-xt
+
+: cmap! ( c-addr n xt -- )
+	map-xt @ >r map-xt !
+	[: c@ map-xt @ execute i c! ;] caddr-iter
+	r> map-xt !
+;
+
+\ == Strings ==============================================
+
+: ch>upper ( char -- char )
+	dup 97 123 within if 32 - then
+;
+
+: ch>lower ( char -- char )
+	dup 65 91 within if 32 + then
+;
+
+: str>upper! ( c-addr n -- c-addr n ) 
+	2dup ['] ch>upper cmap! 
+;
+
+: str>lower! ( c-addr n -- c-addr n )
+	2dup ['] ch>lower cmap!
+;
+
+: %creverse! ( c-addr n -- c-addr n )
+	2dup 2dup 1- chars + -rot 2/ bounds do
+		i c@ >r dup c@ i c! dup r> swap c! 1 chars -
+	1 chars +loop
+	drop
 ;
 
