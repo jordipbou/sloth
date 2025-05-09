@@ -62,7 +62,7 @@ end-structure
 
 \ Camera2D, defines position/orientation in 2d space
 
-begin-structure camera2d
+begin-structure Camera2d
 	sffield: camera2d.offset.x
 	sffield: camera2d.offset.y
 	sffield: camera2d.target.x
@@ -71,9 +71,23 @@ begin-structure camera2d
 	sffield: camera2d.zoom
 end-structure
 
+\ Texture, tex data stored in GPU memory (VRAM)
+
+begin-structure texture
+	intfield: texture.id
+	intfield: texture.width
+	intfield: texture.height
+	intfield: texture.mipmaps
+	intfield: texture.format
+end-structure
+
+\ TODO Texture2D is an alias of Texture
+
 \ Other constants
 
 \ Alphanumeric keys
+49 constant key-one
+50 constant key-two
 65 constant key-a
 82 constant key-r
 83 constant key-s
@@ -84,3 +98,71 @@ end-structure
 263 constant key-left
 
 1 constant gesture-tap
+
+\ Mouse buttons
+0 constant mouse-button-left
+1 constant mouse-button-right
+2 constant mouse-button-middle
+
+\ Words that return a structure and need a memory
+\ buffer for it may use transient memory.
+
+[UNDEFINED] there [IF]
+variable there
+here unused + there !
+[THEN]
+
+[UNDEFINED] Tallot [IF]
+: Tallot ( n -- )
+	unused over < if -8 throw then
+	there @ swap - there !
+;
+[THEN]
+
+[UNDEFINED] Tmarker [IF]
+variable Tmarker
+[THEN]
+
+[UNDEFINED] Tmark [IF]
+\ Compilation only
+: tmark ( -- )
+	r> tmarker @ >r >r
+	there @ tmarker !
+;
+[THEN]
+
+[UNDEFINED] Tfree [IF]
+\ Compilation only
+: tfree ( -- )
+	tmarker @ there !
+	r> r> tmarker ! >r
+;
+[THEN]
+
+: Tget-screen-to-world-2d ( vector2 camera2d -- vector2 )
+	vector2 Tallot There @ get-screen-to-world-2d There @
+;
+
+: Tget-mouse-position ( -- vector2 )
+	vector2 Tallot There @ get-mouse-position There @
+;
+
+: Tget-mouse-delta ( -- vector2 )
+	vector2 Tallot There @ get-mouse-delta There @
+;
+
+: Tfade ( Color Color -- Color ) ( F: r -- )
+	Color Tallot There @ fade There @
+;
+
+\ : Tget-font-default ( -- font )
+\ 	font tallot get-font-default there @
+\ ;
+
+: Tvector2add ( vector2 vector2 -- vector2 )
+	vector2 Tallot There @ vector2add There @
+;
+
+: Tvector2scale ( vector2 -- vector2 ) ( F: r -- )
+	vector2 Tallot There @ vector2scale There @
+;

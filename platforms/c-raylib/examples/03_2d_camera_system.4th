@@ -5,7 +5,7 @@
 	here swap allot constant
 ;
 
-rectangle structure: player
+Rectangle structure: player
 400E player rectangle.x sf!
 280E player rectangle.y sf!
 40E player rectangle.width sf!
@@ -53,7 +53,7 @@ screen-height s>f 2E f/ camera camera2d.offset.y sf!
 
 	60 set-target-fps
 
-	begin
+	begin Tmark
 		window-should-close 0= while
 		
 		\ -- Update
@@ -147,7 +147,10 @@ screen-height s>f 2E f/ camera camera2d.offset.y sf!
 			screen-width 5 - 5 5 screen-height 10 - red draw-rectangle
 			0 screen-height 5 - screen-width 5 red draw-rectangle
 
-			10 10 250 113 0.5E skyblue fade draw-rectangle
+			10 10 250 113 
+			0.5E skyblue Tfade
+			draw-rectangle
+
 			10 10 250 113 blue draw-rectangle-lines
 
 			s" Free 2d camera controls:" 20 20 10 black draw-text
@@ -158,7 +161,7 @@ screen-height s>f 2E f/ camera camera2d.offset.y sf!
 
 		end-drawing
 
-	repeat
+	Tfree repeat
 
 	\ De-initialization
 

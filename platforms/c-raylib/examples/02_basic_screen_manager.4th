@@ -10,7 +10,9 @@ variable current-screen
 variable frames-counter
 
 : main
-	screen-width screen-height s" raylib [core] example - basic screen manager" init-window
+	screen-width screen-height 
+	s" raylib [core] example - basic screen manager" 
+	init-window
 
 	logo current-screen !
 	0 frames-counter !
