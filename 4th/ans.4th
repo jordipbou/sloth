@@ -1249,13 +1249,18 @@ SET-CURRENT
 ?\		DOES> @ +
 ?\ ;
 
+\ Cell field
 ?: FIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
 ?\		ALIGNED 1 CELLS +FIELD 
 ?\ ;
+
+\ Char field
 ?: CFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
 \ TODO Shouldn't CHARS be also aligned?
 ?\		1 CHARS +FIELD 
 ?\ ;
+
+\ Floating point fields
 ?: FFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
 ?\		FALIGNED 1 FLOATS +FIELD 
 ?\ ;
@@ -1264,6 +1269,12 @@ SET-CURRENT
 ?\ ;
 ?: DFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
 ?\		DFALIGNED 1 DFLOATS +FIELD 
+?\ ;
+
+\ Fields with exact C datatype sizes
+?: INTFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+?\		1 INTS + 1- 1 INTS 1- INVERT AND \ int based align
+?\		1 INTS +FIELD
 ?\ ;
 
 ?: END-STRUCTURE ( addr n -- )
@@ -1345,11 +1356,13 @@ FORTH-WORDLIST SET-CURRENT
 				."  OK" 
 				DEPTH 0 > IF SPACE DEPTH . THEN
 				PRINT-FDEPTH
-		THEN CR ENDOF
-		POSTPONE [
-		-1 OF ( TODO Aborted )  ENDOF
-		-2 OF ( TODO display message from ABORT" ) ENDOF
-		( default ) DUP ." Exception # " . CR
+			ELSE
+				." Compiling"
+			THEN CR ENDOF
+			POSTPONE [
+			-1 OF ( TODO Aborted )  ENDOF
+			-2 OF ( TODO display message from ABORT" ) ENDOF
+			( default ) DUP ." Exception # " . CR
 		ENDCASE
 	REPEAT BYE
 ;
