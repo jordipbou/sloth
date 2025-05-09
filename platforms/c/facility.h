@@ -27,55 +27,55 @@ void sleep_ms(int milliseconds){ /* cross-platform sleep */
 #endif
 }
 
-void _time_and_date(X* x) {
+void sloth_time_and_date_(X* x) {
 	time_t t = time(NULL);
 	struct tm *tm = localtime(&t);
-	push(x, tm->tm_sec);
-	push(x, tm->tm_min);
-	push(x, tm->tm_hour);
-	push(x, tm->tm_mday);
-	push(x, tm->tm_mon + 1);
-	push(x, tm->tm_year + 1900);
+	sloth_push(x, tm->tm_sec);
+	sloth_push(x, tm->tm_min);
+	sloth_push(x, tm->tm_hour);
+	sloth_push(x, tm->tm_mday);
+	sloth_push(x, tm->tm_mon + 1);
+	sloth_push(x, tm->tm_year + 1900);
 }
 
-void _ms(X* x) { 
-	sleep_ms(pop(x)); 
+void sloth_ms_(X* x) { 
+	sleep_ms(sloth_pop(x)); 
 }
 
-void _e_key(X* x) {
+void sloth_e_key_(X* x) {
 	/* TODO */
 }
 
-void _e_key_to_char(X* x) {
+void sloth_e_key_to_char_(X* x) {
 	/* TODO */
 }
 
-void _e_key_question(X* x) {
+void sloth_e_key_question_(X* x) {
 	/* TODO */
 }
 
-void _emit_question(X* x) {
+void sloth_emit_question_(X* x) {
 	/* TODO */
 }
 
-void _key_question(X* x) {
+void sloth_key_question_(X* x) {
 	/* TODO */
 }
 
-void _page(X* x) {
+void sloth_page_(X* x) {
 	/* TODO */
 }
 
-void _at_x_y(X* x) { /* TODO */ }
+void sloth_at_x_y_(X* x) { /* TODO */ }
 
-void bootstrap_facility_wordset(X* x) {
-	code(x, "TIME&DATE", primitive(x, &_time_and_date));
-	code(x, "MS", primitive(x, &_ms));
-	code(x, "EKEY", primitive(x, &_e_key));
-	code(x, "EKEY>CHAR", primitive(x, &_e_key_to_char));
-	code(x, "EKEY?", primitive(x, &_e_key_question));
-	code(x, "EMIT?", primitive(x, &_emit_question));
-	code(x, "KEY?", primitive(x, &_key_question));
-	code(x, "PAGE", primitive(x, &_page));
-	code(x, "AT-XY", primitive(x, &_at_x_y));
+void sloth_bootstrap_facility_wordset(X* x) {
+	sloth_code(x, "TIME&DATE", sloth_primitive(x, &sloth_time_and_date_));
+	sloth_code(x, "MS", sloth_primitive(x, &sloth_ms_));
+	sloth_code(x, "EKEY", sloth_primitive(x, &sloth_e_key_));
+	sloth_code(x, "EKEY>CHAR", sloth_primitive(x, &sloth_e_key_to_char_));
+	sloth_code(x, "EKEY?", sloth_primitive(x, &sloth_e_key_question_));
+	sloth_code(x, "EMIT?", sloth_primitive(x, &sloth_emit_question_));
+	sloth_code(x, "KEY?", sloth_primitive(x, &sloth_key_question_));
+	sloth_code(x, "PAGE", sloth_primitive(x, &sloth_page_));
+	sloth_code(x, "AT-XY", sloth_primitive(x, &sloth_at_x_y_));
 }

@@ -1625,6 +1625,10 @@ void sloth_to_rel_(X* x) { sloth_push(x, sloth_pop(x) - x->d); }
 
 void sloth_empty_rs_(X* x) { x->rp = 0; }
 
+/* Helper to work with structs with C data sizes */
+
+void sloth_ints_(X* x) { sloth_push(x, sloth_pop(x)*sizeof(int)); }
+
 /* -- Bootstrapping ------------------------------------ */
 
 void sloth_bootstrap_kernel(X* x) {
@@ -1792,6 +1796,8 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "TO-REL", sloth_primitive(x, &sloth_to_rel_));
 	sloth_set(x, SLOTH_INTERPRET, sloth_primitive(x, &sloth_interpret_));
 	sloth_code(x, "(EMPTY-RETURN-STACK)", sloth_primitive(x, &sloth_empty_rs_));
+
+	sloth_code(x, "INTS", sloth_primitive(x, &sloth_ints_));
 }
 
 #ifndef SLOTH_FLOATING_POINT_WORD_SET_HEADER

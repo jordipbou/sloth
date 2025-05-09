@@ -1,5 +1,6 @@
 #define SLOTH_IMPLEMENTATION
 #include"fsloth.h"
+#include"facility.h"
 
 /* ---------------------------------------------------- */
 /* -- main -------------------------------------------- */
@@ -9,6 +10,7 @@ int main(int argc, char**argv) {
 	X* x = sloth_new();
 
 	sloth_bootstrap(x);
+	sloth_bootstrap_facility_wordset(x);
 
 	sloth_include(x, "../../4th/ans.4th");
 
