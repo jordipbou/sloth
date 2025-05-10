@@ -456,7 +456,7 @@ FORTH-WORDLIST SET-CURRENT
 \ -- Deferred words ---------------------------------------
 
 \ PLATFORM DEPENDENT
-?: >BODY ( xt -- a-addr ) 4 CELLS + TO-ABS ;
+?: >BODY ( xt -- a-addr ) 4 CELLS + ;
 
 ?: DEFER ( "<spaces>name" -- ) ( EX: i*x -- j*x )
 ?\		CREATE 0 , DOES> @ EXECUTE ;
@@ -709,9 +709,11 @@ FORTH-WORDLIST SET-CURRENT
 ?CONSTANT IMMEDIATE-FLAG
 
 \ Non ANS - PLATFORM DEPENDENT
-?: NAME>LINK ( nt -- nt ) TO-ABS @ ;
+?: NAME>LINK ( nt -- nt ) @ ;
+
 \ Non ANS - PLATFORM DEPENDENT
-?: NAME>XT ( nt -- xt ) CELL+ TO-ABS @ ;
+?: NAME>XT ( nt -- xt ) CELL+ @ ;
+
 \ PLATFORM DEPENDENT
 ?: NAME>INTERPRET ( nt -- xt | 0 )
 	\ TODO Something should be done for words that 
@@ -719,12 +721,10 @@ FORTH-WORDLIST SET-CURRENT
 	NAME>XT
 ;
 \ PLATFORM DEPENDENT
-?: NAME>STRING ( nt -- c-addr u )
-?\		2 CELLS + CHAR+ TO-ABS COUNT
-?\ ;
+?: NAME>STRING ( nt -- c-addr u ) 2 CELLS + CHAR+ COUNT ;
 
 \ Non ANS - PLATFORM DEPENDENT
-?: NAME>FLAGS ( nt -- n ) 2 CELLs + TO-ABS C@ ;
+?: NAME>FLAGS ( nt -- n ) 2 CELLS + C@ ;
 
 \ Non ANS
 ?: HIDDEN? ( nt -- flag ) NAME>FLAGS HIDDEN-FLAG AND ;
@@ -889,7 +889,6 @@ FORTH-WORDLIST SET-CURRENT
 \ Applies xt to n1 and then applies xt to n2
 ?: BI@ ( n1 n2 xt -- ) DUP BI* ;
 
-
 \ -- Finding words ----------------------------------------
 
 ?: LETTER>UPPER ( char -- char )
@@ -1003,7 +1002,7 @@ SET-CURRENT
 ?: [THEN]	; IMMEDIATE \ ( -- )
 
 ?: [IF]		0= IF POSTPONE [ELSE] THEN ; IMMEDIATE \ ( flag -- )
-   
+
 \ -- String literals --------------------------------------
 
 ?: SLITERAL ( c-addr1 u -- ) ( -- c-addr2 u )
@@ -1200,7 +1199,8 @@ SET-CURRENT
 ?\			0< IF ." NON " THEN ." IMMEDIATE" CR
 ?\			DUP ." XT: " . CR
 ?\			DUP 0> IF
-?\				TO-ABS BEGIN
+?\				BEGIN
+
 ?\					DUP @ ['] EXIT <> WHILE
 ?\					DUP @ . 
 ?\					CELL+

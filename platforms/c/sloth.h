@@ -171,7 +171,7 @@ void sloth_throw(X* x, CELL e);
 #define SLOTH_IPOS							6*sCELL
 #define SLOTH_ILEN							7*sCELL
 #define SLOTH_SOURCE_ID					8*sCELL
-#define SLOTH_HLD								9*sCELL /* Not used in C */
+/* #define SLOTH_HLD								9*sCELL */ /* Not used in C */
 #define SLOTH_LATESTXT					10*sCELL
 #define SLOTH_IX								11*sCELL
 #define SLOTH_JX								12*sCELL
@@ -461,6 +461,7 @@ X* sloth_new() { return sloth_create(512, 262144); }
 
 void sloth_free(X* x) {
 	free((void*)x->d);
+	free(x->p->p);
 	free(x->p);
 	free(x);
 }
@@ -489,18 +490,19 @@ void sloth_cstore(X* x, CELL a, uCHAR v) { *((uCHAR*)a) = v; }
 uCHAR sloth_cfetch(X* x, CELL a) { return *((uCHAR*)a); }
 
 /*
-The next two macros allow transforming from relative to
+The next two functions allow transforming from relative to
 absolute addresses.
 */
 CELL sloth_to_abs(X* x, CELL a) { return (CELL)(x->d + a); }
+
 CELL sloth_to_rel(X* x, CELL a) { return a - x->d; }
 
 /* -- Inner interpreter -------------------------------- */
 
-CELL sloth_op(X* x) { 
-	CELL o = sloth_fetch(x, sloth_to_abs(x, x->ip));
+CELL sloth_op(X* x) {
+	CELL o = sloth_fetch(x, x->ip);
 	x->ip += sCELL;
-	return o; 
+	return o;
 }
 
 void sloth__do_prim(X* x, CELL p) { 
@@ -532,10 +534,10 @@ void sloth_eval(X* x, CELL q) {
 /* -- Exceptions --------------------------------------- */
 
 void sloth_catch(X* x, CELL q) {
-	int tsp = x->sp;
-	int trp = x->rp;
-	int tip = x->ip;
-	int e;
+	volatile int tsp = x->sp;
+	volatile int trp = x->rp;
+	volatile CELL tip = x->ip;
+	volatile int e;
 
 	if (!(e = setjmp(x->jmpbuf[++x->jmpbuf_idx]))) {
 		sloth_eval(x, q);
@@ -557,8 +559,10 @@ void sloth_throw(X* x, CELL e) {
 		CELL ibuf = *((CELL*)(x->d+5*sCELL));
 		CELL ipos = *((CELL*)(x->d+6*sCELL));
 		CELL ilen = *((CELL*)(x->d+7*sCELL));
-		printf("BUFFER: <%.*s>\n", (int)ilen, (char*)ibuf);
-		printf("TOKEN: <%.*s>\n", (int)(ilen - ipos), (char*)(ibuf + ipos));
+		if (ibuf && ipos <= ilen) {
+		    printf("BUFFER: <%.*s>\n", (int)ilen, (char*)ibuf);
+		    printf("TOKEN: <%.*s>\n", (int)(ilen - ipos), (char*)(ibuf + ipos));
+		}
 		printf("Exception: %ld\n", e);
 		exit(e);
 	}
@@ -573,7 +577,7 @@ void sloth_throw(X* x, CELL e) {
 /* Setting and getting variables (cell and char sized) */
 
 void sloth_set(X* x, CELL a, CELL v) { 
-	sloth_store(x, sloth_to_abs(x, a), v); 
+	sloth_store(x, sloth_to_abs(x, a), v);
 }
 CELL sloth_get(X* x, CELL a) { 
 	return sloth_fetch(x, sloth_to_abs(x, a)); 
@@ -588,9 +592,12 @@ uCHAR sloth_cget(X* x, CELL a) {
 
 /* Memory management */
 
-CELL sloth_here(X* x) { return sloth_get(x, SLOTH_HERE); }
+CELL sloth_here(X* x) { 
+	return sloth_get(x, SLOTH_HERE);
+}
+
 void sloth_allot(X* x, CELL v) { 
-	sloth_set(x, SLOTH_HERE, sloth_get(x, SLOTH_HERE) + v); 
+	sloth_set(x, SLOTH_HERE, sloth_here(x) + v); 
 }
 /* CELL sloth_aligned(CELL a) { return (a + (sCELL - 1)) & ~(sCELL - 1); } */
 CELL sloth_aligned(CELL a) { return ALIGNED(a, sCELL); }
@@ -599,17 +606,17 @@ void sloth_align(X* x) {
 		x, 
 		SLOTH_HERE, 
 /*		(sloth_get(x, SLOTH_HERE) + (sCELL - 1)) & ~(sCELL - 1));  */
-		ALIGNED(sloth_get(x, SLOTH_HERE), sCELL));
+		ALIGNED(sloth_here(x), sCELL));
 }
 
 /* Compilation */
 
 void sloth_comma(X* x, CELL v) { 
-	sloth_set(x, sloth_here(x), v); 
+	sloth_store(x, sloth_here(x), v);
 	sloth_allot(x, sCELL); 
 }
 void sloth_ccomma(X* x, uCHAR v) { 
-	sloth_set(x, sloth_here(x), v); 
+	sloth_cstore(x, sloth_here(x), v);
 	sloth_allot(x, suCHAR); 
 }
 
@@ -648,46 +655,56 @@ CELL sloth_header(X* x, CELL n, CELL l) {
 	sloth_ccomma(x, l); /* Name length */
 	for (i = 0; i < l; i++) sloth_ccomma(x, sloth_fetch(x, n + i)); /* Name */
 	sloth_align(x); /* Align XT address */
-	sloth_set(x, w + sCELL, sloth_here(x));
+	sloth_store(x, w + sCELL, sloth_here(x));
 	return w;
 }
 
-CELL sloth_get_link(X* x, CELL w) { return sloth_get(x, w); }
-
-CELL sloth_get_xt(X* x, CELL w) { return sloth_get(x, w + sCELL); }
-void sloth_set_xt(X* x, CELL w, CELL xt) { sloth_set(x, w + sCELL, xt); }
-
-uCHAR sloth_get_flags(X* x, CELL w) { return sloth_cget(x, w + 2*sCELL); }
-CELL sloth_has_flag(X* x, CELL w, CELL v) { return sloth_get_flags(x, w) & v; }
-
-uCHAR sloth_get_namelen(X* x, CELL w) { 
-	return sloth_cget(x, w + 2*sCELL + suCHAR); 
+CELL sloth_get_link(X* x, CELL w) {
+	return sloth_fetch(x, w);
 }
-CELL sloth_get_name_addr(X* x, CELL w) { 
-	return sloth_to_abs(x, w + 2*sCELL + 2*suCHAR); 
+
+CELL sloth_get_xt(X* x, CELL w) {
+	return sloth_fetch(x, w + sCELL);
+}
+
+void sloth_set_xt(X* x, CELL w, CELL xt) { 
+	sloth_store(x, w + sCELL, xt); 
+}
+
+uCHAR sloth_get_flags(X* x, CELL w) {
+	return sloth_cfetch(x, w + 2*sCELL);
+}
+
+CELL sloth_has_flag(X* x, CELL w, CELL v) { 
+	return sloth_get_flags(x, w) & v; 
+}
+
+uCHAR sloth_get_namelen(X* x, CELL w) {
+	return sloth_cfetch(x, w + 2*sCELL + suCHAR);
+}
+
+CELL sloth_get_name_addr(X* x, CELL w) {
+	return w + 2*sCELL + 2*suCHAR;
 }
 
 /* Setting flags */
 
-void sloth_set_flag(X* x, CELL w, uCHAR v) { 
-	sloth_cset(x, w + 2*sCELL, sloth_get_flags(x, w) | v); 
+void sloth_set_flag(X* x, CELL w, uCHAR v) {
+	sloth_cstore(x, w + 2*sCELL, sloth_get_flags(x, w) | v);
 }
-void sloth_unset_flag(X* x, CELL w, uCHAR v) { 
-	sloth_cset(x, w + 2*sCELL, sloth_get_flags(x, w) & ~v); 
+
+void sloth_unset_flag(X* x, CELL w, uCHAR v) {
+	sloth_cstore(x, w + 2*sCELL, sloth_get_flags(x, w) & ~v);
 }
 
 /* -- Primitives -------------------------------------- */
-
-/* _exit does exist, so p_exit is used (from sloth_primitive) */
 
 void sloth_exit_(X* x) { 
 	x->ip = (x->rp > 0) ? sloth_rpop(x) : -1; 
 }
 void sloth_lit_(X* x) { sloth_push(x, sloth_op(x)); }
-void sloth_rip_(X* x) { 
-	sloth_push(
-		x, 
-		sloth_to_abs(x, x->ip) + sloth_op(x) - sCELL); 
+void sloth_rip_(X* x) {
+	sloth_push(x, x->ip + sloth_op(x) - sCELL);
 }
 
 void sloth_compile_(X* x) { sloth_compile(x, sloth_pop(x)); }
@@ -699,16 +716,16 @@ void sloth_zbranch_(X* x) {
 		: sCELL; 
 }
 
-void sloth_string_(X* x) { 
-	CELL l = sloth_op(x); 
-	sloth_push(x, sloth_to_abs(x, x->ip)); 
-	sloth_push(x, l); 
-	x->ip = sloth_aligned(x->ip + l + 1); 
+void sloth_string_(X* x) {
+	CELL l = sloth_op(x);
+	sloth_push(x, x->ip);
+	sloth_push(x, l);
+	x->ip = sloth_aligned(x->ip + l + 1);
 }
 
-void sloth_c_string_(X* x) { 
-	uCHAR l = sloth_cfetch(x, sloth_to_abs(x, x->ip)); 
-	sloth_push(x, sloth_to_abs(x, x->ip)); 
+void sloth_c_string_(X* x) {
+	uCHAR l = sloth_cfetch(x, x->ip);
+	sloth_push(x, x->ip);
 	x->ip = sloth_aligned(x->ip + l + 2);
 }
 
@@ -726,7 +743,7 @@ void sloth_start_quotation_(X* x) {
 		sloth_push(x, sloth_here(x) + 2*sCELL);
 	sloth_push(x, sloth_get(x, SLOTH_LATESTXT));
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(QUOTATION)")));
-	sloth_push(x, sloth_to_abs(x, sloth_here(x)));
+	sloth_push(x, sloth_here(x));
 	sloth_comma(x, 0);
 	sloth_set(x, SLOTH_LATESTXT, sloth_here(x));
 }
@@ -734,7 +751,7 @@ void sloth_start_quotation_(X* x) {
 void sloth_end_quotation_(X* x) {
 	CELL s = sloth_get(x, SLOTH_STATE), a = sloth_pop(x);
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
-	sloth_store(x, a, sloth_to_abs(x, sloth_here(x)) - a - sCELL);
+	sloth_store(x, a, sloth_here(x) - a - sCELL);
 	sloth_set(x, SLOTH_LATESTXT, sloth_pop(x));
 	sloth_set(x, SLOTH_STATE, s < 0 ? s + 1 : s - 1);
 }
@@ -922,11 +939,16 @@ void sloth_word_(X* x) {
 	}
 	end = ibuf + ipos;	
 	/* Now, copy it to the counted string buffer */
-	sloth_cstore(x, sloth_to_abs(x, sloth_here(x) + SLOTH_CBUF), end - start);
+	sloth_cstore(x, sloth_here(x) + SLOTH_CBUF, end - start);
+
 	for (i = 0; i < (end - start); i++) {
-		sloth_cstore(x, sloth_to_abs(x, sloth_here(x) + SLOTH_CBUF + suCHAR + i*suCHAR), sloth_cfetch(x, start + i*suCHAR));
+		sloth_cstore(
+			x, 
+			sloth_here(x) + SLOTH_CBUF + suCHAR + i*suCHAR, 
+			sloth_cfetch(x, start + i*suCHAR));
 	}
-	sloth_push(x, sloth_to_abs(x, sloth_here(x) + SLOTH_CBUF));
+	sloth_push(x, sloth_here(x) + SLOTH_CBUF);
+
 	/* If we are not at the end of the input buffer, */
 	/* skip c after the word, but its not part of the counted */
 	/* string */
@@ -1014,7 +1036,8 @@ void sloth_interpret_(X* x) {
 				sloth_compile(x, sloth_pop(x));
 			}
 		} else {
-			CELL temp_base = sloth_get(x, SLOTH_BASE);
+			CELL temp_base;
+			temp_base = sloth_get(x, SLOTH_BASE);
 			sloth_pop(x);
 			if (tlen == 3 && *tok == '\'' && (*(tok + 2)) == '\'') {
 				/* Character literal */
@@ -1403,8 +1426,13 @@ void sloth_u_m_slash_mod_(X* x) {
 
 void sloth_c_fetch_(X* x) { sloth_push(x, sloth_cfetch(x, sloth_pop(x))); }
 void sloth_c_store_(X* x) { CELL a = sloth_pop(x); sloth_cstore(x, a, sloth_pop(x)); }
-void sloth_fetch_(X* x) { sloth_push(x, sloth_fetch(x, sloth_pop(x))); }
-void sloth_store_(X* x) { CELL a = sloth_pop(x); sloth_store(x, a, sloth_pop(x)); }
+void sloth_fetch_(X* x) { 
+	sloth_push(x, sloth_fetch(x, sloth_pop(x))); 
+}
+void sloth_store_(X* x) { 
+	CELL a = sloth_pop(x); 
+	sloth_store(x, a, sloth_pop(x)); 
+}
 
 /* Comparison operations */
 
@@ -1498,8 +1526,10 @@ void sloth_create_(X* x) {
 /* compiled by CREATE on the new created word with a call */
 /* to the code after the DOES> in the CREATE DOES> word */
 void sloth_do_does_(X* x) {
-	sloth_set(x, sloth_get_xt(x, sloth_get_latest(x)) + 2*sCELL, sloth_pop(x));
+	CELL a = sloth_pop(x);
+	sloth_store(x, sloth_get_xt(x, sloth_get_latest(x)) + 2*sCELL, a);
 }
+
 void sloth_does_(X* x) {
 	sloth_literal(x, sloth_here(x) + 4*sCELL);
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(DOES)")));
@@ -1529,7 +1559,8 @@ void sloth_evaluate_(X* x) {
 	sloth_set(x, SLOTH_ILEN, previlen);
 }
 void sloth_execute_(X* x) { sloth_eval(x, sloth_pop(x)); }
-void sloth_here_(X* x) { sloth_push(x, sloth_to_abs(x, sloth_here(x))); }
+void sloth_here_(X* x) { sloth_push(x, sloth_here(x)); }
+
 void sloth_immediate_(X* x) { 
 	sloth_set_flag(x, sloth_get_latest(x), SLOTH_IMMEDIATE); 
 }
@@ -1633,13 +1664,40 @@ void sloth_ints_(X* x) { sloth_push(x, sloth_pop(x)*sizeof(int)); }
 
 void sloth_bootstrap_kernel(X* x) {
 
+	/* User variables (per context/user/thread/actor/whatever) */
+	/* (CURRENT) */
+	/* BASE */
+	/* STATE */
+	/* (IBUF) */
+	/* (IPOS) */
+	/* (ILEN) */
+	/* SOURCE-ID */
+	/* (LATESTXT) -- I'm not really sure if user area, test */
+	/* (IX) */
+	/* (JX) */
+	/* (KX) */
+	/* (LX) */
+	/* (INTERPRET) */ 
+	/* (#ORDER) */
+	/* (ORDER) + 15 CELLS */
+	/* (PRECISION) -- Only if floating point present */
+
+	/* Dictionary variables */
+	/* HERE */
+	/* (INTERNAL-WORDLIST) -- Is needed before FORRTH-WORDLIST */
+	/* FORTH-WORDLIST */
+
+	/* Not needed variables */
+	/* HLD */
+
+
 	/* Variables commonly shared from C and Forth */
 
 	/* comma can not be used for first variable because it */
 	/* needs sloth_here(x) and that function gets the value from */
 	/* the first variable. */
 
-	*((CELL*)x->d) = sCELL; /* HERE */
+	*((CELL*)x->d) = sloth_to_abs(x, sCELL); /* HERE */
 
 	sloth_comma(x, 10); /* BASE */
 	sloth_comma(x, 0); /* FORTH-WORDLIST */
@@ -1825,7 +1883,7 @@ void sloth_evaluate(X* x, char* s) {
 /* Helper REPL */
 
 void sloth_repl(X* x) {
-	char buf[80];
+	char buf[125];
 	sloth_set(x, SLOTH_IBUF, (CELL)buf);
 	sloth_set(x, SLOTH_IPOS, 0);
 	sloth_set(x, SLOTH_ILEN, 80);

@@ -51,8 +51,10 @@ FLOAT sloth_fop(X* x);
 
 /* Setting and getting variables (cell and char sized) */
 
+/* ABS CHANGES
 void sloth_fset(X* x, CELL a, FLOAT v);
 FLOAT sloth_fget(X* x, CELL a);
+*/
 
 /* Compilation */
 
@@ -188,7 +190,9 @@ DFLOAT sloth_dffetch(X* x, CELL a) { return *((DFLOAT*)a); }
 /* -- Inner interpreter -------------------------------- */
 
 FLOAT sloth_fop(X* x) {
-	FLOAT n = sloth_ffetch(x, sloth_to_abs(x, x->ip));
+	/* ABS CHANGES
+	FLOAT n = sloth_ffetch(x, sloth_to_abs(x, x->ip)); */
+	FLOAT n = sloth_ffetch(x, x->ip);
 	x->ip += sFLOAT;
 	return n;
 }
@@ -201,17 +205,21 @@ FLOAT sloth_fop(X* x) {
 
 /* Setting and getting variables (cell and char sized) */
 
+/* ABS CHANGES
 void sloth_fset(X* x, CELL a, FLOAT v) { 
 	sloth_fstore(x, sloth_to_abs(x, a), v); 
 }
 FLOAT sloth_fget(X* x, CELL a) { 
 	return sloth_ffetch(x, sloth_to_abs(x, a)); 
 }
+*/
 
 /* Compilation */
 
 void sloth_fcomma(X* x, FLOAT v) { 
-	sloth_fset(x, sloth_here(x), v); 
+	/* ABS CHANGES
+	sloth_fset(x, sloth_here(x), v); */
+	sloth_fstore(x, sloth_here(x), v);
 	sloth_allot(x, sFLOAT); 
 }
 
