@@ -164,26 +164,34 @@ void sloth_throw(X* x, CELL e);
 /* and Forth. */
 
 #define SLOTH_HERE							0	
-#define SLOTH_INTERNAL_WORDLIST	1*sCELL
-#define SLOTH_FORTH_WORDLIST		2*sCELL
-#define SLOTH_CONTEXT						3*sCELL
+#define SLOTH_INTERNAL_WL				1*sCELL
+#define SLOTH_FORTH_WL					2*sCELL
 
 /* User area variables */
 
 #define SLOTH_CURRENT						0*sCELL
 #define SLOTH_ORDER							1*sCELL
-#define SLOTH_BASE							2*sCELL
-#define SLOTH_STATE							3*sCELL
-#define SLOTH_IBUF							4*sCELL
-#define SLOTH_IPOS							5*sCELL
-#define SLOTH_ILEN							6*sCELL
-#define SLOTH_SOURCE_ID					7*sCELL
-#define SLOTH_LATESTXT					8*sCELL
-#define SLOTH_IX								9*sCELL
-#define SLOTH_JX								10*sCELL
-#define SLOTH_KX								11*sCELL
-#define SLOTH_LX								12*sCELL
-#define SLOTH_INTERPRET					13*sCELL
+#define SLOTH_CONTEXT						2*sCELL
+/* There are 16 CELLS reserved to search order */
+#define SLOTH_BASE							18*sCELL
+#define SLOTH_STATE							19*sCELL
+#define SLOTH_IBUF							20*sCELL
+#define SLOTH_IPOS							21*sCELL
+#define SLOTH_ILEN							22*sCELL
+#define SLOTH_SOURCE_ID					23*sCELL
+#define SLOTH_LATESTXT					24*sCELL
+#define SLOTH_IX								25*sCELL
+#define SLOTH_JX								26*sCELL
+#define SLOTH_KX								27*sCELL
+#define SLOTH_LX								28*sCELL
+#define SLOTH_INTERPRET					29*sCELL
+
+#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+
+#define SLOTH_PRECISION					30*sCELL
+
+#endif
+
 
 /* Word statuses */
 
@@ -998,7 +1006,7 @@ int sloth__compare_without_case(X* x, CELL w, CELL t, CELL l) {
 CELL sloth__search_word(X* x, CELL n, int l) {
 	CELL wl, w, i;
 	for (i = 0; i < sloth_user_area_get(x, SLOTH_ORDER); i++) {
-		wl = sloth_get(x, SLOTH_CONTEXT + i*sCELL);
+		wl = sloth_user_area_get(x, SLOTH_CONTEXT + i*sCELL);
 		w = sloth_fetch(x, wl);
 		while (w != 0) {
 			if (!sloth_has_flag(x, w, SLOTH_HIDDEN) 
@@ -1696,67 +1704,65 @@ void sloth_ints_(X* x) { sloth_push(x, sloth_pop(x)*sizeof(int)); }
 
 void sloth_bootstrap_kernel(X* x) {
 
-	/* User variables (per context/user/thread/actor/whatever) */
-	/* (CURRENT) */
-	/* BASE */
-	/* STATE */
-	/* (IBUF) */
-	/* (IPOS) */
-	/* (ILEN) */
-	/* SOURCE-ID */
-	/* (LATESTXT) */
-	/* (IX) */
-	/* (JX) */
-	/* (KX) */
-	/* (LX) */
-	/* (INTERPRET) */ 
-	/* (#ORDER) */
-	/* (ORDER) + 15 CELLS */
-	/* (PRECISION) -- Only if floating point present */
+	/* TODO Better comments for memory initialization */
 
-	/* Dictionary variables */
-	/* HERE */
-	/* (INTERNAL-WORDLIST) -- Is needed before FORTH-WORDLIST */
-	/* FORTH-WORDLIST */
-
-	/* Not needed variables */
-	/* HLD */
-
-
-	/* Variables commonly shared from C and Forth */
-
-	/* comma can not be used for first variable because it */
-	/* needs sloth_here(x) and that function gets the value from */
-	/* the first variable. */
+	/* Initialization of dictionary */
 
 	*((CELL*)x->d) = sloth_to_abs(x, sCELL); /* HERE */
 	sloth_comma(x, 0); /* INTERNAL-WORDLIST */
 	sloth_comma(x, 0); /* FORTH-WORDLIST */
 
-	sloth_comma(x, sloth_to_abs(x, SLOTH_FORTH_WORDLIST)); /* CONTEXT 0 */
-	sloth_comma(x, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST)); /* CONTEXT 1 */
-	sloth_allot(x, 14*sCELL); /* For a total of 16 wordlists */
+	/* Initialization of user area */
 
-	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
-
-	sloth_comma(x, 15); /* PRECISION */
-
-	#endif
-
-	/* User area variables */
-
-	/* Initialize (CURRENT) to allow use of sloth_variable */
-	*((CELL*)x->u) = sloth_to_abs(x, SLOTH_FORTH_WORDLIST);
-	/* Initialize #ORDER to be able to search EXIT and (LIT) */
-	*((CELL*)(x->u + sCELL)) = 2;
-
+	*((CELL*)x->u) = sloth_to_abs(x, SLOTH_FORTH_WL); /* CURRENT */
+	*((CELL*)(x->u + 1*sCELL)) = 2; /* #ORDER */
+	/* CONTEXT 0 */
+	*((CELL*)(x->u + 2*sCELL)) = sloth_to_abs(x, SLOTH_FORTH_WL);
+	/* CONTEXT 1 */
+	*((CELL*)(x->u + 3*sCELL)) = sloth_to_abs(x, SLOTH_INTERNAL_WL);
+	
 	/* Basic primitives */
+
+	/* EXIT and (LIT) must be defined before using */
+	/* user_area_variable. */
 
 	sloth_code(x, "EXIT", sloth_primitive(x, &sloth_exit_));
 
-	sloth_user_area_set(x, SLOTH_CURRENT, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST));
+	sloth_user_area_set(x, SLOTH_CURRENT, sloth_to_abs(x, SLOTH_INTERNAL_WL));
 
 	sloth_code(x, "(LIT)", sloth_primitive(x, &sloth_lit_));
+
+	/* User area variables */
+
+	/* TODO Comment why (CURREN) #ORDER and CONTEXT are */
+	/* reinitialized. */
+
+	sloth_user_variable(x, "(CURRENT)", SLOTH_CURRENT, sloth_to_abs(x, SLOTH_FORTH_WL));
+	sloth_user_variable(x, "#ORDER", SLOTH_ORDER, 2);
+	sloth_user_variable(x, "CONTEXT", SLOTH_CONTEXT, sloth_to_abs(x, SLOTH_FORTH_WL));
+	sloth_user_variable(x, "BASE", SLOTH_BASE, 10);
+	sloth_user_variable(x, "STATE", SLOTH_STATE, 0);
+	sloth_user_variable(x, "(IBUF)", SLOTH_IBUF, 0);
+	sloth_user_variable(x, ">IN", SLOTH_IPOS, 0);
+	sloth_user_variable(x, "(ILEN)", SLOTH_ILEN, 0);
+	sloth_user_variable(x, "(SOURCE-ID)", SLOTH_SOURCE_ID, 0);
+	sloth_user_variable(x, "(LATESTXT)", SLOTH_LATESTXT, 0);
+	/* TODO IX, JX, KX, LX could be registers of the context */
+	/* and I, J the words used. Think about it. */
+	sloth_user_variable(x, "(IX)", SLOTH_IX, 0);
+	sloth_user_variable(x, "(JX)", SLOTH_JX, 0);
+	sloth_user_variable(x, "(KX)", SLOTH_KX, 0);
+	sloth_user_variable(x, "(LX)", SLOTH_LX, 0);
+	sloth_user_variable(x, "(INTERPRET)", SLOTH_INTERPRET, 0);
+
+	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+
+	sloth_user_variable(x, "(PRECISION)", SLOTH_PRECISION, 15);
+
+	#endif
+
+	/* -- Primitives */
+
 	sloth_code(x, "(RIP)", sloth_primitive(x, &sloth_rip_));
 	sloth_code(x, "(COMPILE)", sloth_primitive(x, &sloth_compile_));
 	sloth_code(x, "(BRANCH)", sloth_primitive(x, &sloth_branch_));
@@ -1767,26 +1773,6 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "(DOES)", sloth_primitive(x, &sloth_do_does_));
 	sloth_code(x, "(DOLOOP)", sloth_primitive(x, &sloth_doloop_));
 	sloth_code(x, "(ENVIRONMENT)", sloth_primitive(x, &sloth_environment_));
-
-	/* User area variables */
-
-	/* Create variable (CURRENT) and reinitialize */
-	sloth_user_variable(x, "(CURRENT)", 0, sloth_to_abs(x, SLOTH_FORTH_WORDLIST));
-	sloth_user_variable(x, "#ORDER", 1*sCELL, 2);
-	sloth_user_variable(x, "BASE", 2*sCELL, 10);
-	sloth_user_variable(x, "STATE", 3*sCELL, 0);
-	sloth_user_variable(x, "(IBUF)", 4*sCELL, 0);
-	sloth_user_variable(x, ">IN", 5*sCELL, 0);
-	sloth_user_variable(x, "(ILEN)", 6*sCELL, 0);
-	sloth_user_variable(x, "(SOURCE-ID)", 7*sCELL, 0);
-	sloth_user_variable(x, "(LATESTXT)", 8*sCELL, 0);
-	/* TODO IX, JX, KX, LX could be registers of the context */
-	/* and I, J the words used. Think about it. */
-	sloth_user_variable(x, "(IX)", 9*sCELL, 0);
-	sloth_user_variable(x, "(JX)", 10*sCELL, 0);
-	sloth_user_variable(x, "(KX)", 11*sCELL, 0);
-	sloth_user_variable(x, "(LX)", 12*sCELL, 0);
-	sloth_user_variable(x, "(INTERPRET)", 13*sCELL, 0);
 
 	/* Quotations */
 

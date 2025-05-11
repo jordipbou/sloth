@@ -619,8 +619,6 @@ void sloth_represent_(X* x) {
 
 /* Output operations */
 
-#define PRECISION 19*sCELL
-
 void sloth_f_dot_(X* x) {
 	FLOAT r = sloth_fpop(x);
 	int int_digits = (r == 0.0) ? 1 : (int)log10(fabs(r)) + 1;
@@ -628,15 +626,15 @@ void sloth_f_dot_(X* x) {
 	if (r == floor(r)) {
 		printf("%.0f. ", r);
 	} else if (floor(r) == 0.0 || floor(r) == -1.0) {
-		printf("%.*f ", (int)sloth_get(x, PRECISION), r);
+		printf("%.*f ", (int)sloth_user_area_get(x, SLOTH_PRECISION), r);
 	} else {
-		decimals = sloth_get(x, PRECISION) - int_digits;
+		decimals = sloth_user_area_get(x, SLOTH_PRECISION) - int_digits;
 		printf("%.*f ", decimals, r);
 	}
 }
 
 void sloth_f_s_dot_(X* x) {
-	printf("%.*E ", (int)sloth_get(x, PRECISION) - 1, sloth_fpop(x));
+	printf("%.*E ", (int)sloth_user_area_get(x, SLOTH_PRECISION) - 1, sloth_fpop(x));
 }
 
 /* Engineering notation with special case handling */

@@ -83,10 +83,6 @@ DROP DROP
 ?: INTERNAL-WORDLIST	1 CELLS TO-ABS ; 	\ ( -- addr )
 ?: FORTH-WORDLIST		2 CELLS TO-ABS ; 	\ ( -- addr )
 
-INTERNAL-WORDLIST SET-CURRENT
-
-?: CONTEXT				3 CELLS TO-ABS ;	\ ( -- addr )
-
 FORTH-WORDLIST SET-CURRENT
 
 ?: SOURCE-ID (SOURCE-ID) @ ; \ ( -- 0 | -1 | fileid )
