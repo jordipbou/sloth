@@ -74,33 +74,18 @@ DROP DROP
 \ between FORTH-WORDLIST and INTERNAL-WORDLIST from the
 \ beginning and no overpopulate FORTH-WORDLIST.
 
-?: GET-CURRENT 16 CELLS TO-ABS @ ; \ ( -- wid )
-?: SET-CURRENT 16 CELLS TO-ABS ! ; \ ( wid -- )
+?: GET-CURRENT (CURRENT) @ ; \ ( -- wid )
+?: SET-CURRENT (CURRENT) ! ; \ ( wid -- )
 
 \ -- Variables shared with the host -----------------------
 
 \ HERE is defined in 0 CELLS TO-ABS
-?: BASE					1 CELLS TO-ABS ;	\ ( -- addr )
+?: INTERNAL-WORDLIST	1 CELLS TO-ABS ; 	\ ( -- addr )
 ?: FORTH-WORDLIST		2 CELLS TO-ABS ; 	\ ( -- addr )
-?: INTERNAL-WORDLIST	3 CELLS TO-ABS ; 	\ ( -- addr )
-?: STATE				4 CELLS TO-ABS ; 	\ ( -- addr )
 
 INTERNAL-WORDLIST SET-CURRENT
 
-?: (IBUF)				5 CELLS TO-ABS ;	\ ( -- addr )
-?: (IPOS)				6 CELLS TO-ABS ; 	\ ( -- addr )
-?: (ILEN)				7 CELLS TO-ABS ; 	\ ( -- addr )
-?: (SOURCE-ID)			8 CELLS TO-ABS ; 	\ ( -- addr )
-?: (HLD)				9 CELLS TO-ABS ; 	\ ( -- addr )
-?: (LATESTXT)			10 CELLS TO-ABS ;	\ ( -- addr )
-?: (IX)					11 CELLS TO-ABS ; 	\ ( -- addr )
-?: (JX)					12 CELLS TO-ABS ; 	\ ( -- addr )
-?: (KX)					13 CELLS TO-ABS ; 	\ ( -- addr )
-?: (LX)					14 CELLS TO-ABS ;	\ ( -- addr )
-?: (INTERPRET)			15 CELLS TO-ABS ;	\ ( -- addr )
-\ CURRENT goes on 16 CELLS TO-ABS, above defined SET- GET-
-?: #ORDER				17 CELLS TO-ABS ;	\ ( -- addr )
-?: CONTEXT				18 CELLS TO-ABS ;	\ ( -- addr )
+?: CONTEXT				3 CELLS TO-ABS ;	\ ( -- addr )
 
 FORTH-WORDLIST SET-CURRENT
 
@@ -1558,7 +1543,7 @@ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 ;
 
 : RESTORE-INPUT ( xn ... x1 n -- )
-	DROP (IPOS) ! (ILEN) ! (IBUF) ! (SOURCE-ID) ! FALSE
+	DROP >IN ! (ILEN) ! (IBUF) ! (SOURCE-ID) ! FALSE
 ;
 [THEN]
 
@@ -1603,7 +1588,7 @@ FORTH-WORDLIST SET-CURRENT
 
 [UNDEFINED] SET-PRECISION [IF]
 
-: (PRECISION) ( -- addr ) 34 CELLS TO-ABS ;
+: (PRECISION) ( -- addr ) 19 CELLS TO-ABS ;
 
 : SET-PRECISION ( u -- ) (PRECISION) ! ;
 

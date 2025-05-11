@@ -619,7 +619,7 @@ void sloth_represent_(X* x) {
 
 /* Output operations */
 
-#define PRECISION 33*sCELL
+#define PRECISION 19*sCELL
 
 void sloth_f_dot_(X* x) {
 	FLOAT r = sloth_fpop(x);

@@ -98,6 +98,7 @@ typedef struct sloth_VM {
 
 	CELL ip;
 	CELL d, sz;	/* Dict base address, dict size */
+	CELL u, uz; /* User area base address and size */
 
 	/* Jump buffers used for exceptions */
 	jmp_buf jmpbuf[8];
@@ -109,8 +110,8 @@ typedef struct sloth_VM {
 
 /* -- Context initialization/destruction --------------- */
 
-void sloth_init(X* x, CELL d, CELL sz);
-X* sloth_create(int psize, int dsize);
+void sloth_init(X* x, CELL d, CELL sz, CELL u, CELL uz);
+X* sloth_create(int psize, int dsize, int usize);
 X* sloth_new();
 void sloth_free(X* x);
 
@@ -163,24 +164,26 @@ void sloth_throw(X* x, CELL e);
 /* and Forth. */
 
 #define SLOTH_HERE							0	
-#define SLOTH_BASE							sCELL
-#define SLOTH_FORTH_WORDLIST		2*sCELL	/* Not used in C */
-#define SLOTH_INTERNAL_WORDLIST	3*sCELL
-#define SLOTH_STATE							4*sCELL
-#define SLOTH_IBUF							5*sCELL
-#define SLOTH_IPOS							6*sCELL
-#define SLOTH_ILEN							7*sCELL
-#define SLOTH_SOURCE_ID					8*sCELL
-/* #define SLOTH_HLD								9*sCELL */ /* Not used in C */
-#define SLOTH_LATESTXT					10*sCELL
-#define SLOTH_IX								11*sCELL
-#define SLOTH_JX								12*sCELL
-#define SLOTH_KX								13*sCELL
-#define SLOTH_LX								14*sCELL
-#define SLOTH_INTERPRET					15*sCELL
-#define SLOTH_CURRENT						16*sCELL
-#define SLOTH_ORDER							17*sCELL
-#define SLOTH_CONTEXT						18*sCELL
+#define SLOTH_INTERNAL_WORDLIST	1*sCELL
+#define SLOTH_FORTH_WORDLIST		2*sCELL
+#define SLOTH_CONTEXT						3*sCELL
+
+/* User area variables */
+
+#define SLOTH_CURRENT						0*sCELL
+#define SLOTH_ORDER							1*sCELL
+#define SLOTH_BASE							2*sCELL
+#define SLOTH_STATE							3*sCELL
+#define SLOTH_IBUF							4*sCELL
+#define SLOTH_IPOS							5*sCELL
+#define SLOTH_ILEN							6*sCELL
+#define SLOTH_SOURCE_ID					7*sCELL
+#define SLOTH_LATESTXT					8*sCELL
+#define SLOTH_IX								9*sCELL
+#define SLOTH_JX								10*sCELL
+#define SLOTH_KX								11*sCELL
+#define SLOTH_LX								12*sCELL
+#define SLOTH_INTERPRET					13*sCELL
 
 /* Word statuses */
 
@@ -196,6 +199,9 @@ CELL sloth_get(X* x, CELL a);
 
 void sloth_cset(X* x, CELL a, uCHAR v);
 uCHAR sloth_cget(X* x, CELL a);
+
+void sloth_user_area_set(X* x, CELL a, CELL v);
+CELL sloth_user_area_get(X* x, CELL a);
 
 /* Memory management */
 
@@ -370,7 +376,7 @@ void sloth_evaluate_(X* x);
 void sloth_execute_(X* x);
 void sloth_here_(X* x);
 void sloth_immediate_(X* x);
-void sloth_to_in_(X* x);
+/* void sloth_to_in_(X* x); */
 void sloth_postpone_(X* x);
 void sloth_refill_(X* x);
 void sloth_source_(X* x);
@@ -424,12 +430,14 @@ int getch() {
 
 /* -- Context initialization/destruction --------------- */
 
-void sloth_init(X* x, CELL d, CELL sz) { 
+void sloth_init(X* x, CELL d, CELL sz, CELL u, CELL uz) { 
 	x->sp = 0; 
 	x->rp = 0; 
 	x->ip = -1; 
 	x->d = d;
 	x->sz = sz;
+	x->u = u;
+	x->uz = uz;
 
 	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
@@ -442,7 +450,7 @@ void sloth_init(X* x, CELL d, CELL sz) {
 
 /* TODO Allot the ability to not use malloc at all in */
 /* this file. */
-X* sloth_create(int psize, int dsize) {
+X* sloth_create(int psize, int dsize, int usize) {
 	X* x;
 
 	x = malloc(sizeof(X));
@@ -451,13 +459,14 @@ X* sloth_create(int psize, int dsize) {
 	x->p->last = 0;
 	x->p->sz = psize;
 	x->d = (CELL)malloc(dsize);
+	x->u = (CELL)malloc(usize);
 
-	sloth_init(x, x->d, dsize);
+	sloth_init(x, x->d, dsize, x->u, usize);
 
 	return x;
 }
 
-X* sloth_new() { return sloth_create(512, 262144); }
+X* sloth_new() { return sloth_create(512, 262144, 1024); }
 
 void sloth_free(X* x) {
 	free((void*)x->d);
@@ -590,6 +599,13 @@ uCHAR sloth_cget(X* x, CELL a) {
 	return sloth_cfetch(x, sloth_to_abs(x, a)); 
 }
 
+void sloth_user_area_set(X* x, CELL a, CELL v) {
+	sloth_store(x, x->u + a, v);
+}
+CELL sloth_user_area_get(X* x, CELL a) {
+	return sloth_fetch(x, x->u + a);
+}
+
 /* Memory management */
 
 CELL sloth_here(X* x) { 
@@ -630,10 +646,16 @@ void sloth_literal(X* x, CELL n) {
 /* Headers */
 
 CELL sloth_get_latest(X* x) { 
+	/*
 	return sloth_fetch(x, sloth_get(x, SLOTH_CURRENT)); 
+	*/
+	return sloth_fetch(x, sloth_user_area_get(x, SLOTH_CURRENT));
 }
 void sloth_set_latest(X* x, CELL w) { 
+	/*
 	sloth_store(x, sloth_get(x, SLOTH_CURRENT), w); 
+	*/
+	sloth_store(x, sloth_user_area_get(x, SLOTH_CURRENT), w);
 }
 
 /* Header structure: */
@@ -737,50 +759,50 @@ void sloth_quotation_(X* x) {
 	x->ip += d; 
 }
 void sloth_start_quotation_(X* x) {
-	CELL s = sloth_get(x, SLOTH_STATE);
-	sloth_set(x, SLOTH_STATE, s <= 0 ? s - 1 : s + 1);
-	if (sloth_get(x, SLOTH_STATE) == -1) 
+	CELL s = sloth_user_area_get(x, SLOTH_STATE);
+	sloth_user_area_set(x, SLOTH_STATE, s <= 0 ? s - 1 : s + 1);
+	if (sloth_user_area_get(x, SLOTH_STATE) == -1) 
 		sloth_push(x, sloth_here(x) + 2*sCELL);
-	sloth_push(x, sloth_get(x, SLOTH_LATESTXT));
+	sloth_push(x, sloth_user_area_get(x, SLOTH_LATESTXT));
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(QUOTATION)")));
 	sloth_push(x, sloth_here(x));
 	sloth_comma(x, 0);
-	sloth_set(x, SLOTH_LATESTXT, sloth_here(x));
+	sloth_user_area_set(x, SLOTH_LATESTXT, sloth_here(x));
 }
 
 void sloth_end_quotation_(X* x) {
-	CELL s = sloth_get(x, SLOTH_STATE), a = sloth_pop(x);
+	CELL s = sloth_user_area_get(x, SLOTH_STATE), a = sloth_pop(x);
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 	sloth_store(x, a, sloth_here(x) - a - sCELL);
-	sloth_set(x, SLOTH_LATESTXT, sloth_pop(x));
-	sloth_set(x, SLOTH_STATE, s < 0 ? s + 1 : s - 1);
+	sloth_user_area_set(x, SLOTH_LATESTXT, sloth_pop(x));
+	sloth_user_area_set(x, SLOTH_STATE, s < 0 ? s + 1 : s - 1);
 }
 
 /* Loop helpers */
 
 void sloth__ipush(X* x) { 
-	sloth_rpush(x, sloth_get(x, SLOTH_KX));
-	sloth_set(x, SLOTH_KX, sloth_get(x, SLOTH_JX));
-	sloth_set(x, SLOTH_JX, sloth_get(x, SLOTH_IX));
-	sloth_set(x, SLOTH_LX, 0);
+	sloth_rpush(x, sloth_user_area_get(x, SLOTH_KX));
+	sloth_user_area_set(x, SLOTH_KX, sloth_user_area_get(x, SLOTH_JX));
+	sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_IX));
+	sloth_user_area_set(x, SLOTH_LX, 0);
 }
 void sloth__ipop(X* x) { 
-	sloth_set(x, SLOTH_LX, 0);
-	sloth_set(x, SLOTH_IX, sloth_get(x, SLOTH_JX));
-	sloth_set(x, SLOTH_JX, sloth_get(x, SLOTH_KX));
-	sloth_set(x, SLOTH_KX, sloth_rpop(x));
+	sloth_user_area_set(x, SLOTH_LX, 0);
+	sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
+	sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
+	sloth_user_area_set(x, SLOTH_KX, sloth_rpop(x));
 }
 
 void sloth_unloop_(X* x) { 
-	sloth_set(x, SLOTH_LX, sloth_get(x, SLOTH_LX) - 1);
-	if (sloth_get(x, SLOTH_LX) == -1) {
-		sloth_set(x, SLOTH_IX, sloth_get(x, SLOTH_JX));
-		sloth_set(x, SLOTH_JX, sloth_get(x, SLOTH_KX));
-		sloth_set(x, SLOTH_KX, sloth_rpick(x, 1));
-	} else if (sloth_get(x, SLOTH_LX) == -2) {
-		sloth_set(x, SLOTH_IX, sloth_get(x, SLOTH_JX));
-		sloth_set(x, SLOTH_JX, sloth_get(x, SLOTH_KX));
-		sloth_set(x, SLOTH_KX, sloth_rpick(x, 3));
+	sloth_user_area_set(x, SLOTH_LX, sloth_user_area_get(x, SLOTH_LX) - 1);
+	if (sloth_user_area_get(x, SLOTH_LX) == -1) {
+		sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
+		sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
+		sloth_user_area_set(x, SLOTH_KX, sloth_rpick(x, 1));
+	} else if (sloth_user_area_get(x, SLOTH_LX) == -2) {
+		sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
+		sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
+		sloth_user_area_set(x, SLOTH_KX, sloth_rpick(x, 3));
 	}
 }
 
@@ -791,40 +813,40 @@ void sloth_doloop_(X* x) {
 	sloth__ipush(x);
 	q = sloth_pop(x);
 	do_first_loop = sloth_pop(x);
-	sloth_set(x, SLOTH_IX, sloth_pop(x));
+	sloth_user_area_set(x, SLOTH_IX, sloth_pop(x));
 	l = sloth_pop(x);
 
-	o = sloth_get(x, SLOTH_IX) - l;
+	o = sloth_user_area_get(x, SLOTH_IX) - l;
 	d = 0;
 
 	/* First iteration is executed always on a DO */
 	if (do_first_loop == 1) {
 		sloth_eval(x, q);
-		if (sloth_get(x, SLOTH_LX) == 0) {
+		if (sloth_user_area_get(x, SLOTH_LX) == 0) {
 			d = sloth_pop(x);
-			o = sloth_get(x, SLOTH_IX) - l;
-			sloth_set(x, SLOTH_IX, sloth_get(x, SLOTH_IX) + d);
+			o = sloth_user_area_get(x, SLOTH_IX) - l;
+			sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_IX) + d);
 			/* printf("LX == 0 l %ld o %ld d %ld\n", l, o, d); */
 		}
 	}
 
 	if (!(do_first_loop == 0 && o == 0)) {
-		while (((o ^ (o + d)) & (o ^ d)) >= 0 && sloth_get(x, SLOTH_LX) == 0) {
+		while (((o ^ (o + d)) & (o ^ d)) >= 0 && sloth_user_area_get(x, SLOTH_LX) == 0) {
 			sloth_eval(x, q);
-			if (sloth_get(x, SLOTH_LX) == 0) { /* Avoid pop if we're leaving */
+			if (sloth_user_area_get(x, SLOTH_LX) == 0) { /* Avoid pop if we're leaving */
 				d = sloth_pop(x);
-				o = sloth_get(x, SLOTH_IX) - l;
-				sloth_set(x, SLOTH_IX, sloth_get(x, SLOTH_IX) + d);
+				o = sloth_user_area_get(x, SLOTH_IX) - l;
+				sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_IX) + d);
 			}
 		}
 	}
 
-	if (sloth_get(x, SLOTH_LX) == 0 || sloth_get(x, SLOTH_LX) == 1) { 
+	if (sloth_user_area_get(x, SLOTH_LX) == 0 || sloth_user_area_get(x, SLOTH_LX) == 1) { 
 		/* Leave case */
 		sloth__ipop(x);
-	} else if (sloth_get(x, SLOTH_LX) < 0) {
+	} else if (sloth_user_area_get(x, SLOTH_LX) < 0) {
 		/* Unloop case */
-		sloth_set(x, SLOTH_LX, sloth_get(x, SLOTH_LX) + 1);
+		sloth_user_area_set(x, SLOTH_LX, sloth_user_area_get(x, SLOTH_LX) + 1);
 		sloth_rpop(x);
 		sloth_exit_(x);
 	}
@@ -917,9 +939,9 @@ void sloth_word_(X* x) {
 	/* The region to store WORD counted strings starts */
 	/* at here + CBUF. */
 	uCHAR c = (uCHAR)sloth_pop(x);
-	CELL ibuf = sloth_get(x, SLOTH_IBUF);
-	CELL ilen = sloth_get(x, SLOTH_ILEN);
-	CELL ipos = sloth_get(x, SLOTH_IPOS);
+	CELL ibuf = sloth_user_area_get(x, SLOTH_IBUF);
+	CELL ilen = sloth_user_area_get(x, SLOTH_ILEN);
+	CELL ipos = sloth_user_area_get(x, SLOTH_IPOS);
 	CELL start, end, i;
 	/* First, ignore c until not c is found */
 	/* The Forth Standard says that if the control character is */
@@ -953,7 +975,7 @@ void sloth_word_(X* x) {
 	/* skip c after the word, but its not part of the counted */
 	/* string */
 	if (ipos < ilen) ipos++;
-	sloth_set(x, SLOTH_IPOS, ipos);
+	sloth_user_area_set(x, SLOTH_IPOS, ipos);
 }
 
 /* Finding words */
@@ -975,7 +997,7 @@ int sloth__compare_without_case(X* x, CELL w, CELL t, CELL l) {
 
 CELL sloth__search_word(X* x, CELL n, int l) {
 	CELL wl, w, i;
-	for (i = 0; i < sloth_get(x, SLOTH_ORDER); i++) {
+	for (i = 0; i < sloth_user_area_get(x, SLOTH_ORDER); i++) {
 		wl = sloth_get(x, SLOTH_CONTEXT + i*sCELL);
 		w = sloth_fetch(x, wl);
 		while (w != 0) {
@@ -1022,26 +1044,26 @@ void sloth_interpret_(X* x) {
 	int tlen;
 	char buf[64]; char *endptr;
 	int is_double;
-	while (sloth_get(x, SLOTH_IPOS) < sloth_get(x, SLOTH_ILEN)) {
+	while (sloth_user_area_get(x, SLOTH_IPOS) < sloth_user_area_get(x, SLOTH_ILEN)) {
 		sloth_push(x, 32); sloth_word_(x);
 		tok = (char*)(sloth_pick(x, 0) + suCHAR);
 		tlen = sloth_cfetch(x, sloth_pick(x, 0));
 		if (tlen == 0) { sloth_pop(x); return; }
 		sloth_find_(x);
 		if ((flag = sloth_pop(x)) != 0) {
-			if (sloth_get(x, SLOTH_STATE) == 0
-			|| (sloth_get(x, SLOTH_STATE) != 0 && flag == 1)) {
+			if (sloth_user_area_get(x, SLOTH_STATE) == 0
+			|| (sloth_user_area_get(x, SLOTH_STATE) != 0 && flag == 1)) {
 				sloth_eval(x, sloth_pop(x));	
 			} else {
 				sloth_compile(x, sloth_pop(x));
 			}
 		} else {
 			CELL temp_base;
-			temp_base = sloth_get(x, SLOTH_BASE);
+			temp_base = sloth_user_area_get(x, SLOTH_BASE);
 			sloth_pop(x);
 			if (tlen == 3 && *tok == '\'' && (*(tok + 2)) == '\'') {
 				/* Character literal */
-				if (sloth_get(x, SLOTH_STATE) == 0)	
+				if (sloth_user_area_get(x, SLOTH_STATE) == 0)	
 					sloth_push(x, *(tok + 1));
 				else 
 					sloth_literal(x, *(tok + 1));
@@ -1067,7 +1089,7 @@ void sloth_interpret_(X* x) {
 				buf[tlen] = 0;
 				n = strtol(buf, &endptr, temp_base);	
 				if (*endptr == '\0') {
-					if (sloth_get(x, SLOTH_STATE) == 0) {
+					if (sloth_user_area_get(x, SLOTH_STATE) == 0) {
 						sloth_push(x, n);
 						if (is_double) sloth_push(x, n < 0 ? -1 : 0);
 					} else { 
@@ -1077,13 +1099,13 @@ void sloth_interpret_(X* x) {
 				} else {
 				#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
-					if (sloth_get(x, SLOTH_BASE) == 10) {
+					if (sloth_user_area_get(x, SLOTH_BASE) == 10) {
 						r = strtod(buf, &endptr);	
 						if (r == 0 && buf == endptr) {
 							printf("%.*s ?\n", tlen, tok);
 							sloth_throw(x, -13);
 						} else {
-							if (sloth_get(x, SLOTH_STATE) == 0) {
+							if (sloth_user_area_get(x, SLOTH_STATE) == 0) {
 								sloth_fpush(x, r);
 							} else {
 								sloth_fliteral(x, r);
@@ -1128,11 +1150,11 @@ void sloth_included_(X* x) {
 	char linebuf[1024];
 	CELL INTERPRET, e;
 
-	CELL previbuf = sloth_get(x, SLOTH_IBUF);
-	CELL previpos = sloth_get(x, SLOTH_IPOS);
-	CELL previlen = sloth_get(x, SLOTH_ILEN);
+	CELL previbuf = sloth_user_area_get(x, SLOTH_IBUF);
+	CELL previpos = sloth_user_area_get(x, SLOTH_IPOS);
+	CELL previlen = sloth_user_area_get(x, SLOTH_ILEN);
 
-	CELL prevsourceid = sloth_get(x, SLOTH_SOURCE_ID);
+	CELL prevsourceid = sloth_user_area_get(x, SLOTH_SOURCE_ID);
 
 	CELL l = sloth_pop(x);
 	CELL a = sloth_pop(x);
@@ -1143,9 +1165,9 @@ void sloth_included_(X* x) {
 	f = fopen(filename, "r");
 
 	if (f) {
-		INTERPRET = sloth_get(x, SLOTH_INTERPRET);
+		INTERPRET = sloth_user_area_get(x, SLOTH_INTERPRET);
 
-		sloth_set(x, SLOTH_SOURCE_ID, (CELL)f);
+		sloth_user_area_set(x, SLOTH_SOURCE_ID, (CELL)f);
 
 		while (fgets(linebuf, 1024, f)) {
 			/* printf(">>>> %s\n", linebuf); */
@@ -1155,27 +1177,27 @@ void sloth_included_(X* x) {
 			/* when doing some REFILL from Forth (for an [IF] */
 			/* for example). So I left this here to be able to */
 			/* use linebuf here. */
-			sloth_set(x, SLOTH_IBUF, (CELL)linebuf);
-			sloth_set(x, SLOTH_IPOS, 0);
+			sloth_user_area_set(x, SLOTH_IBUF, (CELL)linebuf);
+			sloth_user_area_set(x, SLOTH_IPOS, 0);
 			if (linebuf[strlen(linebuf) - 1] < ' ') {
-				sloth_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
+				sloth_user_area_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
 			} else {
-				sloth_set(x, SLOTH_ILEN, strlen(linebuf));
+				sloth_user_area_set(x, SLOTH_ILEN, strlen(linebuf));
 			}
 
 			sloth_eval(x, INTERPRET);
 		}
 
-		sloth_set(x, SLOTH_SOURCE_ID, prevsourceid);
+		sloth_user_area_set(x, SLOTH_SOURCE_ID, prevsourceid);
 
 		fclose(f);
 	} else {
 		printf("ERROR: Can't open file (%.*s)\n", (int)l, (char*)a);
 	}
 
-	sloth_set(x, SLOTH_IBUF, previbuf);
-	sloth_set(x, SLOTH_IPOS, previpos);
-	sloth_set(x, SLOTH_ILEN, previlen);
+	sloth_user_area_set(x, SLOTH_IBUF, previbuf);
+	sloth_user_area_set(x, SLOTH_IPOS, previpos);
+	sloth_user_area_set(x, SLOTH_ILEN, previlen);
 }
 
 /* String operations */
@@ -1447,24 +1469,24 @@ void sloth_colon_(X* x) {
 	tok = sloth_pick(x, 0) + suCHAR;
 	tlen = sloth_cfetch(x, sloth_pop(x));
 	sloth_header(x, tok, tlen);
-	sloth_set(x, SLOTH_LATESTXT, sloth_get_xt(x, sloth_get_latest(x)));
+	sloth_user_area_set(x, SLOTH_LATESTXT, sloth_get_xt(x, sloth_get_latest(x)));
 	sloth_set_flag(x, sloth_get_latest(x), SLOTH_HIDDEN);
-	sloth_set(x, SLOTH_STATE, 1);
+	sloth_user_area_set(x, SLOTH_STATE, 1);
 }
 void sloth_colon_no_name_(X* x) { 
 	sloth_push(x, sloth_here(x));
-	sloth_set(x, SLOTH_LATESTXT, sloth_here(x));
-	sloth_set(x, SLOTH_STATE, 1);
+	sloth_user_area_set(x, SLOTH_LATESTXT, sloth_here(x));
+	sloth_user_area_set(x, SLOTH_STATE, 1);
 }
 void sloth_semicolon_(X* x) {
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
-	sloth_set(x, SLOTH_STATE, 0);
+	sloth_user_area_set(x, SLOTH_STATE, 0);
 	/* Don't change flags for nonames */
-	if (sloth_get_xt(x, sloth_get_latest(x)) == sloth_get(x, SLOTH_LATESTXT))
+	if (sloth_get_xt(x, sloth_get_latest(x)) == sloth_user_area_get(x, SLOTH_LATESTXT))
 		sloth_unset_flag(x, sloth_get_latest(x), SLOTH_HIDDEN);
 }
 
-void sloth_recurse_(X* x) { sloth_compile(x, sloth_get(x, SLOTH_LATESTXT)); }
+void sloth_recurse_(X* x) { sloth_compile(x, sloth_user_area_get(x, SLOTH_LATESTXT)); }
 void sloth_catch_(X* x) { sloth_catch(x, sloth_pop(x)); }
 void sloth_throw_(X* x) { 
 	CELL e = sloth_pop(x); 
@@ -1538,25 +1560,25 @@ void sloth_does_(X* x) {
 void sloth_evaluate_(X* x) {
 	CELL l = sloth_pop(x), a = sloth_pop(x);
 
-	CELL previbuf = sloth_get(x, SLOTH_IBUF);
-	CELL previpos = sloth_get(x, SLOTH_IPOS);
-	CELL previlen = sloth_get(x, SLOTH_ILEN);
+	CELL previbuf = sloth_user_area_get(x, SLOTH_IBUF);
+	CELL previpos = sloth_user_area_get(x, SLOTH_IPOS);
+	CELL previlen = sloth_user_area_get(x, SLOTH_ILEN);
 
-	CELL prevsourceid = sloth_get(x, SLOTH_SOURCE_ID);
+	CELL prevsourceid = sloth_user_area_get(x, SLOTH_SOURCE_ID);
 
-	sloth_set(x, SLOTH_SOURCE_ID, -1);
+	sloth_user_area_set(x, SLOTH_SOURCE_ID, -1);
 
-	sloth_set(x, SLOTH_IBUF, a);
-	sloth_set(x, SLOTH_IPOS, 0);
-	sloth_set(x, SLOTH_ILEN, l);
+	sloth_user_area_set(x, SLOTH_IBUF, a);
+	sloth_user_area_set(x, SLOTH_IPOS, 0);
+	sloth_user_area_set(x, SLOTH_ILEN, l);
 
 	sloth_interpret_(x);
 
-	sloth_set(x, SLOTH_SOURCE_ID, prevsourceid);
+	sloth_user_area_set(x, SLOTH_SOURCE_ID, prevsourceid);
 
-	sloth_set(x, SLOTH_IBUF, previbuf);
-	sloth_set(x, SLOTH_IPOS, previpos);
-	sloth_set(x, SLOTH_ILEN, previlen);
+	sloth_user_area_set(x, SLOTH_IBUF, previbuf);
+	sloth_user_area_set(x, SLOTH_IPOS, previpos);
+	sloth_user_area_set(x, SLOTH_ILEN, previlen);
 }
 void sloth_execute_(X* x) { sloth_eval(x, sloth_pop(x)); }
 void sloth_here_(X* x) { sloth_push(x, sloth_here(x)); }
@@ -1564,9 +1586,11 @@ void sloth_here_(X* x) { sloth_push(x, sloth_here(x)); }
 void sloth_immediate_(X* x) { 
 	sloth_set_flag(x, sloth_get_latest(x), SLOTH_IMMEDIATE); 
 }
+/* Not needed anymore
 void sloth_to_in_(X* x) { 
 	sloth_push(x, sloth_to_abs(x, SLOTH_IPOS)); 
 }
+*/
 void sloth_postpone_(X* x) { 
 	CELL i, xt, tok, tlen;
 	sloth_push(x, 32); sloth_word_(x);
@@ -1591,21 +1615,21 @@ void sloth_postpone_(X* x) {
 void sloth_refill_(X* x) {
 	char linebuf[1024];
 	int i;
-	switch (sloth_get(x, SLOTH_SOURCE_ID)) {
+	switch (sloth_user_area_get(x, SLOTH_SOURCE_ID)) {
 	case -1: 
 		sloth_push(x, 0);
 		break;
 	case 0:
-		sloth_push(x, sloth_get(x, SLOTH_IBUF)); sloth_push(x, 80);
+		sloth_push(x, sloth_user_area_get(x, SLOTH_IBUF)); sloth_push(x, 80);
 		sloth_eval(x, sloth_get_xt(x, sloth_find_word(x, "ACCEPT")));
-		sloth_set(x, SLOTH_ILEN, sloth_pop(x));
-		sloth_set(x, SLOTH_IPOS, 0);
+		sloth_user_area_set(x, SLOTH_ILEN, sloth_pop(x));
+		sloth_user_area_set(x, SLOTH_IPOS, 0);
 		sloth_push(x, -1); 
 		break;
 	default: 
-		if (fgets(linebuf, 1024, (FILE *)sloth_get(x, SLOTH_SOURCE_ID))) {
-			sloth_set(x, SLOTH_IBUF, (CELL)linebuf);
-			sloth_set(x, SLOTH_IPOS, 0);
+		if (fgets(linebuf, 1024, (FILE *)sloth_user_area_get(x, SLOTH_SOURCE_ID))) {
+			sloth_user_area_set(x, SLOTH_IBUF, (CELL)linebuf);
+			sloth_user_area_set(x, SLOTH_IPOS, 0);
 			/* Although I haven't found anywhere that \n should */
 			/* not be part of the input buffer when reading from */
 			/* a file, the results from preliminary tests when */
@@ -1614,9 +1638,9 @@ void sloth_refill_(X* x) {
 			/* So I just added a check to remove the \n at then */
 			/* end. */
 			if (linebuf[strlen(linebuf) - 1] < ' ') {
-				sloth_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
+				sloth_user_area_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
 			} else {
-				sloth_set(x, SLOTH_ILEN, strlen(linebuf));
+				sloth_user_area_set(x, SLOTH_ILEN, strlen(linebuf));
 			}
 			sloth_push(x, -1);
 		} else {
@@ -1627,8 +1651,8 @@ void sloth_refill_(X* x) {
 }
 
 void sloth_source_(X* x) { 
-	sloth_push(x, sloth_get(x, SLOTH_IBUF)); 
-	sloth_push(x, sloth_get(x, SLOTH_ILEN)); 
+	sloth_push(x, sloth_user_area_get(x, SLOTH_IBUF)); 
+	sloth_push(x, sloth_user_area_get(x, SLOTH_ILEN)); 
 }
 
 /* == Helpers and bootstrapping ======================== */
@@ -1645,6 +1669,14 @@ CELL sloth_code(X* x, char* name, CELL xt) {
 	CELL w = sloth_header(x, (CELL)name, strlen(name));
 	sloth_set_xt(x, w, xt);
 	return xt; 
+}
+
+void sloth_user_variable(X* x, char*name, CELL d, CELL v) {
+	CELL w = sloth_header(x, (CELL)name, strlen(name));
+	sloth_set_xt(x, w, sloth_here(x));
+	sloth_literal(x, x->u + d);
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
+	sloth_store(x, x->u + d, v);
 }
 
 /* Helper to work with absolute/relative memory addresses */
@@ -1672,7 +1704,7 @@ void sloth_bootstrap_kernel(X* x) {
 	/* (IPOS) */
 	/* (ILEN) */
 	/* SOURCE-ID */
-	/* (LATESTXT) -- I'm not really sure if user area, test */
+	/* (LATESTXT) */
 	/* (IX) */
 	/* (JX) */
 	/* (KX) */
@@ -1684,7 +1716,7 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* Dictionary variables */
 	/* HERE */
-	/* (INTERNAL-WORDLIST) -- Is needed before FORRTH-WORDLIST */
+	/* (INTERNAL-WORDLIST) -- Is needed before FORTH-WORDLIST */
 	/* FORTH-WORDLIST */
 
 	/* Not needed variables */
@@ -1698,28 +1730,12 @@ void sloth_bootstrap_kernel(X* x) {
 	/* the first variable. */
 
 	*((CELL*)x->d) = sloth_to_abs(x, sCELL); /* HERE */
-
-	sloth_comma(x, 10); /* BASE */
-	sloth_comma(x, 0); /* FORTH-WORDLIST */
 	sloth_comma(x, 0); /* INTERNAL-WORDLIST */
-	sloth_comma(x, 0); /* STATE */
-	sloth_comma(x, 0); /* IBUF */
-	sloth_comma(x, 0); /* IPOS */
-	sloth_comma(x, 0); /* ILEN */
-	sloth_comma(x, 0); /* SOURCE_ID */
-	sloth_comma(x, 0); /* HLD */
-	sloth_comma(x, 0); /* LATESTXT */
-	sloth_comma(x, 0); /* IX */
-	sloth_comma(x, 0); /* JX */
-	sloth_comma(x, 0); /* KX */
-	sloth_comma(x, 0); /* LX */
-	sloth_comma(x, 0); /* OUTER INTERPRETER */
-	sloth_comma(x, sloth_to_abs(x, SLOTH_FORTH_WORDLIST)); /* CURRENT */
-	sloth_comma(x, 2); /* #ORDER */
+	sloth_comma(x, 0); /* FORTH-WORDLIST */
+
 	sloth_comma(x, sloth_to_abs(x, SLOTH_FORTH_WORDLIST)); /* CONTEXT 0 */
 	sloth_comma(x, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST)); /* CONTEXT 1 */
 	sloth_allot(x, 14*sCELL); /* For a total of 16 wordlists */
-
 
 	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
@@ -1727,11 +1743,18 @@ void sloth_bootstrap_kernel(X* x) {
 
 	#endif
 
+	/* User area variables */
+
+	/* Initialize (CURRENT) to allow use of sloth_variable */
+	*((CELL*)x->u) = sloth_to_abs(x, SLOTH_FORTH_WORDLIST);
+	/* Initialize #ORDER to be able to search EXIT and (LIT) */
+	*((CELL*)(x->u + sCELL)) = 2;
+
 	/* Basic primitives */
 
 	sloth_code(x, "EXIT", sloth_primitive(x, &sloth_exit_));
 
-	sloth_set(x, SLOTH_CURRENT, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST));
+	sloth_user_area_set(x, SLOTH_CURRENT, sloth_to_abs(x, SLOTH_INTERNAL_WORDLIST));
 
 	sloth_code(x, "(LIT)", sloth_primitive(x, &sloth_lit_));
 	sloth_code(x, "(RIP)", sloth_primitive(x, &sloth_rip_));
@@ -1745,7 +1768,25 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "(DOLOOP)", sloth_primitive(x, &sloth_doloop_));
 	sloth_code(x, "(ENVIRONMENT)", sloth_primitive(x, &sloth_environment_));
 
-	sloth_set(x, SLOTH_CURRENT, sloth_to_abs(x, SLOTH_FORTH_WORDLIST));
+	/* User area variables */
+
+	/* Create variable (CURRENT) and reinitialize */
+	sloth_user_variable(x, "(CURRENT)", 0, sloth_to_abs(x, SLOTH_FORTH_WORDLIST));
+	sloth_user_variable(x, "#ORDER", 1*sCELL, 2);
+	sloth_user_variable(x, "BASE", 2*sCELL, 10);
+	sloth_user_variable(x, "STATE", 3*sCELL, 0);
+	sloth_user_variable(x, "(IBUF)", 4*sCELL, 0);
+	sloth_user_variable(x, ">IN", 5*sCELL, 0);
+	sloth_user_variable(x, "(ILEN)", 6*sCELL, 0);
+	sloth_user_variable(x, "(SOURCE-ID)", 7*sCELL, 0);
+	sloth_user_variable(x, "(LATESTXT)", 8*sCELL, 0);
+	/* TODO IX, JX, KX, LX could be registers of the context */
+	/* and I, J the words used. Think about it. */
+	sloth_user_variable(x, "(IX)", 9*sCELL, 0);
+	sloth_user_variable(x, "(JX)", 10*sCELL, 0);
+	sloth_user_variable(x, "(KX)", 11*sCELL, 0);
+	sloth_user_variable(x, "(LX)", 12*sCELL, 0);
+	sloth_user_variable(x, "(INTERPRET)", 13*sCELL, 0);
 
 	/* Quotations */
 
@@ -1840,7 +1881,7 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "EXECUTE", sloth_primitive(x, &sloth_execute_));
 	sloth_code(x, "HERE", sloth_primitive(x, &sloth_here_));
 	sloth_code(x, "IMMEDIATE", sloth_primitive(x, &sloth_immediate_));
-	sloth_code(x, ">IN", sloth_primitive(x, &sloth_to_in_));
+	/* sloth_code(x, ">IN", sloth_primitive(x, &sloth_to_in_)); */
 	sloth_code(x, "POSTPONE", sloth_primitive(x, &sloth_postpone_)); sloth_immediate_(x);
 	sloth_code(x, "REFILL", sloth_primitive(x, &sloth_refill_));
 	sloth_code(x, "SOURCE", sloth_primitive(x, &sloth_source_));
@@ -1852,7 +1893,7 @@ void sloth_bootstrap_kernel(X* x) {
 
 	sloth_code(x, "TO-ABS", sloth_primitive(x, &sloth_to_abs_));
 	sloth_code(x, "TO-REL", sloth_primitive(x, &sloth_to_rel_));
-	sloth_set(x, SLOTH_INTERPRET, sloth_primitive(x, &sloth_interpret_));
+	sloth_user_area_set(x, SLOTH_INTERPRET, sloth_primitive(x, &sloth_interpret_));
 	sloth_code(x, "(EMPTY-RETURN-STACK)", sloth_primitive(x, &sloth_empty_rs_));
 
 	sloth_code(x, "INTS", sloth_primitive(x, &sloth_ints_));
@@ -1884,9 +1925,9 @@ void sloth_evaluate(X* x, char* s) {
 
 void sloth_repl(X* x) {
 	char buf[125];
-	sloth_set(x, SLOTH_IBUF, (CELL)buf);
-	sloth_set(x, SLOTH_IPOS, 0);
-	sloth_set(x, SLOTH_ILEN, 80);
+	sloth_user_area_set(x, SLOTH_IBUF, (CELL)buf);
+	sloth_user_area_set(x, SLOTH_IPOS, 0);
+	sloth_user_area_set(x, SLOTH_ILEN, 80);
 	sloth_eval(x, sloth_get_xt(x, sloth_find_word(x, "QUIT")));
 }
 
