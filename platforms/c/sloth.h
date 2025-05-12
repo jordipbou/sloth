@@ -19,6 +19,10 @@
 /* -- getch multiplatform definition ------------------- */
 
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
+#define WINDOWS
+#endif
+
+#if defined(WINDOWS)
 #include <conio.h>
 #else
 #include <termios.h>
@@ -474,7 +478,7 @@ X* sloth_create(int psize, int dsize, int usize) {
 	return x;
 }
 
-X* sloth_new() { return sloth_create(512, 262144, 1024); }
+X* sloth_new() { return sloth_create(512, 262144, 2048); }
 
 void sloth_free(X* x) {
 	free((void*)x->d);
@@ -580,7 +584,11 @@ void sloth_throw(X* x, CELL e) {
 		    printf("BUFFER: <%.*s>\n", (int)ilen, (char*)ibuf);
 		    printf("TOKEN: <%.*s>\n", (int)(ilen - ipos), (char*)(ibuf + ipos));
 		}
+#if defined(WINDOWS)
+		printf("Exception: %Id\n", e);
+#else
 		printf("Exception: %ld\n", e);
+#endif
 		exit(e);
 	}
 }
@@ -734,7 +742,9 @@ void sloth_exit_(X* x) {
 }
 void sloth_lit_(X* x) { sloth_push(x, sloth_op(x)); }
 void sloth_rip_(X* x) {
-	sloth_push(x, x->ip + sloth_op(x) - sCELL);
+	CELL ip = x->ip;
+	CELL o = sloth_op(x);
+	sloth_push(x, ip + o - sCELL);
 }
 
 void sloth_compile_(X* x) { sloth_compile(x, sloth_pop(x)); }
@@ -1008,7 +1018,7 @@ CELL sloth__search_word(X* x, CELL n, int l) {
 	for (i = 0; i < sloth_user_area_get(x, SLOTH_ORDER); i++) {
 		wl = sloth_user_area_get(x, SLOTH_CONTEXT + i*sCELL);
 		w = sloth_fetch(x, wl);
-		while (w != 0) {
+		while (w > 0) {
 			if (!sloth_has_flag(x, w, SLOTH_HIDDEN) 
 			 && sloth__compare_without_case(x, w, n, l)) 
 				return w;
@@ -1628,7 +1638,8 @@ void sloth_refill_(X* x) {
 		sloth_push(x, 0);
 		break;
 	case 0:
-		sloth_push(x, sloth_user_area_get(x, SLOTH_IBUF)); sloth_push(x, 80);
+		sloth_push(x, sloth_user_area_get(x, SLOTH_IBUF)); 
+		sloth_push(x, 80);
 		sloth_eval(x, sloth_get_xt(x, sloth_find_word(x, "ACCEPT")));
 		sloth_user_area_set(x, SLOTH_ILEN, sloth_pop(x));
 		sloth_user_area_set(x, SLOTH_IPOS, 0);
@@ -1682,7 +1693,7 @@ CELL sloth_code(X* x, char* name, CELL xt) {
 void sloth_user_variable(X* x, char*name, CELL d, CELL v) {
 	CELL w = sloth_header(x, (CELL)name, strlen(name));
 	sloth_set_xt(x, w, sloth_here(x));
-	sloth_literal(x, x->u + d);
+	sloth_literal(x, (CELL)(x->u + d));
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 	sloth_store(x, x->u + d, v);
 }

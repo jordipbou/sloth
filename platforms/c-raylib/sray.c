@@ -22,7 +22,7 @@ void sloth2raylib_InitWindow_(X* x) {
 	/* Copy the string only if it's not a zero ended string */
 	if (a[l] != 0) {
 		int i;
-		for (i = 0; i < l; i++) title[i] = sloth_cfetch(x, a + i);
+		for (i = 0; i < l; i++) title[i] = sloth_cfetch(x, (CELL)(a + i));
 		title[l] = 0;
 		InitWindow(width, height, title);
 	} else {
@@ -124,7 +124,7 @@ void sloth2raylib_GetMouseY_(X* x) {
 
 void sloth2raylib_GetMousePosition_(X* x) {
 	Vector2 *dest = (Vector2*)sloth_pop(x);
-	Vector2 position = GetMousePosition(x);
+	Vector2 position = GetMousePosition();
 	memcpy(dest, &position, sizeof(Vector2));
 }
 
@@ -230,7 +230,7 @@ void sloth2raylib_DrawText_(X* x) {
 	char *a = (char*)sloth_pop(x);
 	if (a[l] != 0) {
 		int i;
-		for (i = 0; i < l; i++) text[i] = sloth_cfetch(x, a + i);
+		for (i = 0; i < l; i++) text[i] = sloth_cfetch(x, (CELL)(a + i));
 		text[l] = 0;
 		DrawText(text, pos_x, pos_y, font_size, *color);
 	} else {

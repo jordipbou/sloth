@@ -676,7 +676,11 @@ void sloth_f_e_dot_(X* x) {
 
 void sloth_f_dot_s_(X* x) {
 	int i;
+#if defined(WINDOWS)
+	printf("F:<%Id> ", x->fp);
+#else
 	printf("F:<%ld> ", x->fp);
+#endif
 	for (i = 0; i < x->fp; i++) printf("%f ", x->f[i]);
 }
 
