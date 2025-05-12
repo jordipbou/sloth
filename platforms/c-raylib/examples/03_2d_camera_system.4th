@@ -148,7 +148,7 @@ screen-height s>f 2E f/ camera camera2d.offset.y sf!
 			0 screen-height 5 - screen-width 5 red draw-rectangle
 
 			10 10 250 113 
-			0.5E skyblue Tfade
+			skyblue 0.5E Tfade
 			draw-rectangle
 
 			10 10 250 113 blue draw-rectangle-lines

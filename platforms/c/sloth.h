@@ -1156,8 +1156,8 @@ void sloth_bye_(X* x) { printf("\n"); exit(0); }
 
 void sloth_depth_(X* x) { sloth_push(x, x->sp); }
 void sloth_r_depth_(X* x) { sloth_push(x, x->rp); }
-void sloth_unused_(X* x) { 
-	sloth_push(x, x->sz - sloth_get(x, SLOTH_HERE)); 
+void sloth_unused_(X* x) {
+	sloth_push(x, x->d + x->sz - sloth_get(x, SLOTH_HERE)); 
 }
 
 /* Source code preprocessing, interpreting & auditing commands */
