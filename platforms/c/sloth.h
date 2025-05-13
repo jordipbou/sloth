@@ -190,9 +190,13 @@ void sloth_throw(X* x, CELL e);
 #define SLOTH_LX								28*sCELL
 #define SLOTH_INTERPRET					29*sCELL
 
+#define SLOTH_PATH_START				30*sCELL
+#define SLOTH_PATH_END					31*sCELL
+#define SLOTH_PATH							32*sCELL
+
 #ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
-#define SLOTH_PRECISION					30*sCELL
+#define SLOTH_PRECISION					97*sCELL
 
 #endif
 
@@ -478,7 +482,7 @@ X* sloth_create(int psize, int dsize, int usize) {
 	return x;
 }
 
-X* sloth_new() { return sloth_create(512, 262144, 2048); }
+X* sloth_new() { return sloth_create(512, 262144, 1024); }
 
 void sloth_free(X* x) {
 	free((void*)x->d);
@@ -1164,7 +1168,6 @@ void sloth_unused_(X* x) {
 
 void sloth_included_(X* x) {
 	FILE *f;
-	char filename[1024];
 	char linebuf[1024];
 	CELL INTERPRET, e;
 
@@ -1174,15 +1177,45 @@ void sloth_included_(X* x) {
 
 	CELL prevsourceid = sloth_user_area_get(x, SLOTH_SOURCE_ID);
 
-	CELL l = sloth_pop(x);
-	CELL a = sloth_pop(x);
+	size_t l = (size_t)sloth_pop(x);
+	char* a = (char*)sloth_pop(x);
 
-	strncpy(filename, (char*)a, (size_t)l);
-	filename[l] = 0;
-
-	f = fopen(filename, "r");
+	/* Store current path pointers */
+	char* prevstart = (char*)sloth_user_area_get(x, SLOTH_PATH_START);
+	char* prevend = (char*)sloth_user_area_get(x, SLOTH_PATH_END);
+	/* Variables for working with path */
+	char* pathstart = prevstart;
+	char* pathend = prevend;
+	char* path_pos;
+	/* Copy filename to end of current path */
+	strncpy(pathend, a, l);
+	*(pathend + l) = 0;
+	/* Try to use it as absolute path filename or relative to */
+	/* current directory. */
+	f = fopen(pathend, "r");
+	if (f) {
+		/* Storing path as absolute or relative to cwd */
+		pathstart = pathend;
+		pathend = pathend + l;
+	} else {
+		/* Trying as relative to previous path. */
+		f = fopen(pathstart, "r");
+		if (f) pathend = pathend + l;
+	}
 
 	if (f) {
+		/* Remove filename from path... */
+		while (pathend > pathstart) {
+			if (*pathend == '/' || *pathend == '\\') {
+				pathend++;
+				break;
+			}
+			pathend--;
+		}
+		/* ...and store for nested includes. */
+		sloth_user_area_set(x, SLOTH_PATH_START, (CELL)pathstart);
+		sloth_user_area_set(x, SLOTH_PATH_END, (CELL)pathend);
+
 		INTERPRET = sloth_user_area_get(x, SLOTH_INTERPRET);
 
 		sloth_user_area_set(x, SLOTH_SOURCE_ID, (CELL)f);
@@ -1213,6 +1246,11 @@ void sloth_included_(X* x) {
 		printf("ERROR: Can't open file (%.*s)\n", (int)l, (char*)a);
 	}
 
+	/* Restore previous path */
+	sloth_user_area_set(x, SLOTH_PATH_START, (CELL)prevstart);
+	sloth_user_area_set(x, SLOTH_PATH_END, (CELL)prevend);
+
+	/* Restore previous input buffer */
 	sloth_user_area_set(x, SLOTH_IBUF, previbuf);
 	sloth_user_area_set(x, SLOTH_IPOS, previpos);
 	sloth_user_area_set(x, SLOTH_ILEN, previlen);
@@ -1765,6 +1803,10 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_user_variable(x, "(KX)", SLOTH_KX, 0);
 	sloth_user_variable(x, "(LX)", SLOTH_LX, 0);
 	sloth_user_variable(x, "(INTERPRET)", SLOTH_INTERPRET, 0);
+
+	sloth_user_variable(x, "(SLOTH_PATH_START)", SLOTH_PATH_START, x->u + SLOTH_PATH);
+	sloth_user_variable(x, "(SLOTH_PATH_END)", SLOTH_PATH_END, x->u + SLOTH_PATH);
+	sloth_user_variable(x, "(SLOTH_PATH)", SLOTH_PATH, 0);
 
 	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 

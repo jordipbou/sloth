@@ -18,11 +18,8 @@ int main(int argc, char**argv) {
 		sloth_repl(x);
 	} else if (strcmp(argv[1], "--test") == 0 
 					|| strcmp(argv[1], "-t") == 0) {
-		chdir("../../forth2012-test-suite/src/");
-		sloth_include(x, "runtests.fth");
-
-		chdir("fp");
-		sloth_include(x, "runfptests.fth");
+		sloth_include(x, "../../forth2012-test-suite/src/runtests.fth");
+		sloth_include(x, "../../forth2012-test-suite/src/fp/runfptests.fth");
 	} else {
 		sloth_include(x, argv[1]);
 	}
