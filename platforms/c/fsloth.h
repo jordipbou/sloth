@@ -3,22 +3,22 @@
 
 #include<math.h>
 
-typedef double FLOAT;
-typedef float SFLOAT;
-typedef double DFLOAT;
+typedef double FCELL;
+typedef float SFCELL;
+typedef double DFCELL;
 	
-#define sFLOAT sizeof(FLOAT)
-#define sSFLOAT sizeof(SFLOAT)
-#define sDFLOAT sizeof(DFLOAT)
+#define sFCELL sizeof(FCELL)
+#define sSFCELL sizeof(SFCELL)
+#define sDFCELL sizeof(DFCELL)
 
-#define sFLOAT_BITS sFLOAT*8
+#define sFCELL_BITS sFCELL*8
 
 struct sloth_VM;
 
 /* Pre-definitions */
 
-void sloth_fpush(struct sloth_VM* x, FLOAT v);
-void sloth_fliteral(struct sloth_VM* x, FLOAT n);
+void sloth_fpush(struct sloth_VM* x, FCELL v);
+void sloth_fliteral(struct sloth_VM* x, FCELL n);
 
 #include"sloth.h"
 
@@ -28,22 +28,22 @@ void sloth_fliteral(struct sloth_VM* x, FLOAT n);
 
 /* -- Floating point stack ----------------------------- */
 	
-void sloth_fpush(X* x, FLOAT v);
-FLOAT sloth_fpop(X* x);
-FLOAT sloth_fpick(X* x, CELL a);
+void sloth_fpush(X* x, FCELL v);
+FCELL sloth_fpop(X* x);
+FCELL sloth_fpick(X* x, CELL a);
 
 /* -- Memory ------------------------------------------- */
 
-void sloth_fstore(X* x, CELL a, FLOAT v);
-FLOAT sloth_ffetch(X* x, CELL a);
-void sloth_sfstore(X* x, CELL a, SFLOAT v);
-SFLOAT sloth_sffetch(X* x, CELL a);
-void sloth_dfstore(X* x, CELL a, DFLOAT v);
-DFLOAT sloth_dffetch(X* x, CELL a);
+void sloth_fstore(X* x, CELL a, FCELL v);
+FCELL sloth_ffetch(X* x, CELL a);
+void sloth_sfstore(X* x, CELL a, SFCELL v);
+SFCELL sloth_sffetch(X* x, CELL a);
+void sloth_dfstore(X* x, CELL a, DFCELL v);
+DFCELL sloth_dffetch(X* x, CELL a);
 
 /* -- Inner interpreter -------------------------------- */
 
-FLOAT sloth_fop(X* x);
+FCELL sloth_fop(X* x);
 
 /* ---------------------------------------------------- */
 /* -- Forth Kernel ------------------------------------ */
@@ -52,15 +52,15 @@ FLOAT sloth_fop(X* x);
 /* Setting and getting variables (cell and char sized) */
 
 /* ABS CHANGES
-void sloth_fset(X* x, CELL a, FLOAT v);
-FLOAT sloth_fget(X* x, CELL a);
+void sloth_fset(X* x, CELL a, FCELL v);
+FCELL sloth_fget(X* x, CELL a);
 */
 
 /* Compilation */
 
-void sloth_fcomma(X* x, FLOAT v);
+void sloth_fcomma(X* x, FCELL v);
 
-void sloth_fliteral(X* x, FLOAT n);
+void sloth_fliteral(X* x, FCELL n);
 
 /* -- Primitives -------------------------------------- */
 
@@ -174,26 +174,26 @@ void sloth_f_dot_s_(X* x);
 
 /* -- Floating point stack ----------------------------- */
 
-void sloth_fpush(X* x, FLOAT v) { x->f[x->fp] = v; x->fp++; }
-FLOAT sloth_fpop(X* x) { x->fp--; return x->f[x->fp]; }
-FLOAT sloth_fpick(X* x, CELL a) { return x->f[x->fp - a - 1]; }
+void sloth_fpush(X* x, FCELL v) { x->f[x->fp] = v; x->fp++; }
+FCELL sloth_fpop(X* x) { x->fp--; return x->f[x->fp]; }
+FCELL sloth_fpick(X* x, CELL a) { return x->f[x->fp - a - 1]; }
 
 /* -- Memory ------------------------------------------- */
 
-void sloth_fstore(X* x, CELL a, FLOAT v) { *((FLOAT*)a) = v; }
-FLOAT sloth_ffetch(X* x, CELL a) { return *((FLOAT*)a); }
-void sloth_sfstore(X* x, CELL a, SFLOAT v) { *((SFLOAT*)a) = v; }
-SFLOAT sloth_sffetch(X* x, CELL a) { return *((SFLOAT*)a); }
-void sloth_dfstore(X* x, CELL a, DFLOAT v) { *((DFLOAT*)a) = v; }
-DFLOAT sloth_dffetch(X* x, CELL a) { return *((DFLOAT*)a); }
+void sloth_fstore(X* x, CELL a, FCELL v) { *((FCELL*)a) = v; }
+FCELL sloth_ffetch(X* x, CELL a) { return *((FCELL*)a); }
+void sloth_sfstore(X* x, CELL a, SFCELL v) { *((SFCELL*)a) = v; }
+SFCELL sloth_sffetch(X* x, CELL a) { return *((SFCELL*)a); }
+void sloth_dfstore(X* x, CELL a, DFCELL v) { *((DFCELL*)a) = v; }
+DFCELL sloth_dffetch(X* x, CELL a) { return *((DFCELL*)a); }
 
 /* -- Inner interpreter -------------------------------- */
 
-FLOAT sloth_fop(X* x) {
+FCELL sloth_fop(X* x) {
 	/* ABS CHANGES
-	FLOAT n = sloth_ffetch(x, sloth_to_abs(x, x->ip)); */
-	FLOAT n = sloth_ffetch(x, x->ip);
-	x->ip += sFLOAT;
+	FCELL n = sloth_ffetch(x, sloth_to_abs(x, x->ip)); */
+	FCELL n = sloth_ffetch(x, x->ip);
+	x->ip += sFCELL;
 	return n;
 }
 
@@ -206,24 +206,24 @@ FLOAT sloth_fop(X* x) {
 /* Setting and getting variables (cell and char sized) */
 
 /* ABS CHANGES
-void sloth_fset(X* x, CELL a, FLOAT v) { 
+void sloth_fset(X* x, CELL a, FCELL v) { 
 	sloth_fstore(x, sloth_to_abs(x, a), v); 
 }
-FLOAT sloth_fget(X* x, CELL a) { 
+FCELL sloth_fget(X* x, CELL a) { 
 	return sloth_ffetch(x, sloth_to_abs(x, a)); 
 }
 */
 
 /* Compilation */
 
-void sloth_fcomma(X* x, FLOAT v) { 
+void sloth_fcomma(X* x, FCELL v) { 
 	/* ABS CHANGES
 	sloth_fset(x, sloth_here(x), v); */
 	sloth_fstore(x, sloth_here(x), v);
-	sloth_allot(x, sFLOAT); 
+	sloth_allot(x, sFCELL); 
 }
 
-void sloth_fliteral(X* x, FLOAT n) {
+void sloth_fliteral(X* x, FCELL n) {
 	sloth_comma(x, sloth_get_xt(x, sloth_find_word(x, "(FLIT)")));
 	sloth_fcomma(x, n);
 }
@@ -240,24 +240,24 @@ void sloth_f_align_(X* x) {
 	sloth_set(
 		x, 
 		SLOTH_HERE, 
-		ALIGNED(sloth_get(x, SLOTH_HERE), sFLOAT));
+		ALIGNED(sloth_get(x, SLOTH_HERE), sFCELL));
 }
 void sloth_f_aligned_(X* x) { 
-	sloth_push(x, ALIGNED(sloth_pop(x), sFLOAT)); 
+	sloth_push(x, ALIGNED(sloth_pop(x), sFCELL)); 
 }
 void sloth_f_literal_(X* x) { /* TODO */ }
-void sloth_floats_(X* x) { sloth_push(x, sloth_pop(x) * sFLOAT); }
+void sloth_floats_(X* x) { sloth_push(x, sloth_pop(x) * sFCELL); }
 void sloth_float_plus_(X* x) { /* TODO */ }
 
 void sloth_s_f_aligned_(X* x) { 
-	sloth_push(x, ALIGNED(sloth_pop(x), sSFLOAT)); 
+	sloth_push(x, ALIGNED(sloth_pop(x), sSFCELL)); 
 }
 void sloth_d_f_aligned_(X* x) {
-	sloth_push(x, ALIGNED(sloth_pop(x), sDFLOAT)); 
+	sloth_push(x, ALIGNED(sloth_pop(x), sDFCELL)); 
 }
 
-void sloth_s_floats_(X* x) { sloth_push(x, sloth_pop(x) * sSFLOAT); }
-void sloth_d_floats_(X* x) { sloth_push(x, sloth_pop(x) * sDFLOAT); }
+void sloth_s_floats_(X* x) { sloth_push(x, sloth_pop(x) * sSFCELL); }
+void sloth_d_floats_(X* x) { sloth_push(x, sloth_pop(x) * sDFCELL); }
 
 /* Manipulating stack items */
 
@@ -266,16 +266,16 @@ void sloth_f_drop_(X* x) { sloth_fpop(x); }
 void sloth_f_dup_(X* x) { sloth_fpush(x, sloth_fpick(x, 0)); }
 void sloth_f_over_(X* x) { sloth_fpush(x, sloth_fpick(x, 1)); }
 void sloth_f_rot_(X* x) { 
-	FLOAT c = sloth_fpop(x);
-	FLOAT b = sloth_fpop(x);
-	FLOAT a = sloth_fpop(x);
+	FCELL c = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
+	FCELL a = sloth_fpop(x);
 	sloth_fpush(x, b);
 	sloth_fpush(x, c);
 	sloth_fpush(x, a);
 }
 void sloth_f_swap_(X* x) { 
-	FLOAT b = sloth_fpop(x);
-	FLOAT a = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
+	FCELL a = sloth_fpop(x);
 	sloth_fpush(x, b);
 	sloth_fpush(x, a);
 }
@@ -283,8 +283,8 @@ void sloth_f_swap_(X* x) {
 /* Comparison operations */
 
 void sloth_f_less_than_(X* x) { 
-	FLOAT b = sloth_fpop(x);
-	FLOAT a = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
+	FCELL a = sloth_fpop(x);
 	sloth_push(x, a < b ? -1 : 0);
 }
 void sloth_f_zero_less_than_(X* x) { 
@@ -307,7 +307,7 @@ void sloth_s_f_fetch_(X* x) {
 	sloth_fpush(x, sloth_sffetch(x, sloth_pop(x))); 
 }
 void sloth_s_f_store_(X* x) { 
-	sloth_sfstore(x, sloth_pop(x), (SFLOAT)sloth_fpop(x));
+	sloth_sfstore(x, sloth_pop(x), (SFCELL)sloth_fpop(x));
 }
 
 void sloth_d_f_fetch_(X* x) { 
@@ -329,17 +329,17 @@ void sloth_d_to_f_(X* x) {
 	CELL lo = sloth_pop(x);
 	double r;
 	if (hi >= 0) {
-		r = ldexp((double)hi, sFLOAT_BITS) + (double)lo;
+		r = ldexp((double)hi, sFCELL_BITS) + (double)lo;
 	} else {
 		/* negative number: -(2^128 - unsigned_value) */
 		/* compute unsigned_value = ( (uint64_t)hi << 64 ) | lo */
 		/* but better to subtract from 0.0 */
-		r = - ( ldexp((double)(~(uCELL)hi), sFLOAT_BITS) + (double)(~lo) + 1.0 );
+		r = - ( ldexp((double)(~(uCELL)hi), sFCELL_BITS) + (double)(~lo) + 1.0 );
 	}
 	sloth_fpush(x, r);
 }
 void sloth_f_to_d_(X* x) {
-	FLOAT i;
+	FCELL i;
 	modf(sloth_fpop(x), &i);
 	sloth_push(x, (CELL)i);
 	sloth_push(x, i < 0 ? -1 : 0);
@@ -351,43 +351,43 @@ void sloth_f_abs_(X* x) {
 	sloth_fpush(x, fabs(sloth_fpop(x)));
 }
 void sloth_f_plus_(X* x) { 
-	FLOAT b = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
 	sloth_fpush(x, sloth_fpop(x) + b);
 }
 void sloth_f_minus_(X* x) { 
-	FLOAT b = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
 	sloth_fpush(x, sloth_fpop(x) - b);
 }
 void sloth_f_star_(X* x) { 
-	FLOAT b = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
 	sloth_fpush(x, sloth_fpop(x) * b);
 }
 void sloth_f_star_star_(X* x) {
-	FLOAT b = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
 	sloth_fpush(x, pow(sloth_fpop(x), b));
 }
 void sloth_f_slash_(X* x) { 
-	FLOAT b = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
 	sloth_fpush(x, sloth_fpop(x) / b);
 }
 void sloth_floor_(X* x) { 
 	sloth_fpush(x, floor(sloth_fpop(x)));
 }
 void sloth_f_max_(X* x) { 
-	FLOAT b = sloth_fpop(x);
-	FLOAT a = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
+	FCELL a = sloth_fpop(x);
 	sloth_fpush(x, a > b ? a : b);
 }
 void sloth_f_min_(X* x) { 
-	FLOAT b = sloth_fpop(x);
-	FLOAT a = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
+	FCELL a = sloth_fpop(x);
 	sloth_fpush(x, a < b ? a : b);
 }
 void sloth_f_negate_(X* x) { 
 	sloth_fpush(x, -sloth_fpop(x));
 }
 void sloth_f_round_(X* x) {
-	FLOAT r = sloth_fpop(x);
+	FCELL r = sloth_fpop(x);
 	if (r >= 0.0) {
 		/* floor(x + 0.5) works for non-negative x */
 		sloth_fpush(x, floor(r + 0.5));
@@ -399,9 +399,9 @@ void sloth_f_round_(X* x) {
 	}
 }
 void sloth_f_proximate_(X* x) {
-	FLOAT r3 = sloth_fpop(x);
-	FLOAT r2 = sloth_fpop(x);
-	FLOAT r1 = sloth_fpop(x);
+	FCELL r3 = sloth_fpop(x);
+	FCELL r2 = sloth_fpop(x);
+	FCELL r1 = sloth_fpop(x);
 	if (isnan(r3)) {
 		sloth_push(x, 0);
 	} else if (r3 > 0.0) {
@@ -416,7 +416,7 @@ void sloth_f_proximate_(X* x) {
 	}
 }
 void sloth_f_atan2_(X* x) {
-	FLOAT b = sloth_fpop(x);
+	FCELL b = sloth_fpop(x);
 	sloth_fpush(x, atan2(sloth_fpop(x), b));
 }
 void sloth_f_sqrt_(X* x) {
@@ -432,7 +432,7 @@ void sloth_f_cos_(X* x) {
 	sloth_fpush(x, cos(sloth_fpop(x)));
 }
 void sloth_f_sine_cos_(X* x) {
-	FLOAT r = sloth_fpop(x);
+	FCELL r = sloth_fpop(x);
 	sloth_fpush(x, sin(r));
 	sloth_fpush(x, cos(r));
 }
@@ -475,7 +475,7 @@ void sloth_f_tan_h_(X* x) {
 /* There's no asinh function in math.h in C89. It */
 /* appeared on C99. */
 void sloth_f_a_sine_h_(X* x) {
-	FLOAT r = sloth_fpop(x);
+	FCELL r = sloth_fpop(x);
 	if (r == 0) {
 		sloth_fpush(x, 0.0);
 	} else if (r > 0) {
@@ -485,7 +485,7 @@ void sloth_f_a_sine_h_(X* x) {
 	}
 }
 void sloth_f_a_cos_h_(X* x) {
-	FLOAT r = sloth_fpop(x);
+	FCELL r = sloth_fpop(x);
 	if (r < 1.0) {
 		/* undefined, push NaN */
 		sloth_fpush(x, nan(""));
@@ -504,7 +504,7 @@ void sloth_to_float_(X* x) {
 	char *endptr;
 	int tlen = (int)sloth_pop(x);
 	char* tok = (char*)sloth_pop(x);
-	FLOAT n;
+	FCELL n;
 	int i, j, nlen, marker;;
 	/* >FLOAT does not allow trailing spaces (although */
 	/* strtod does). But, at the same time, a string of */
@@ -576,7 +576,7 @@ void sloth_to_float_(X* x) {
 }
 
 void sloth_represent_(X* x) {
-	FLOAT r = sloth_fpop(x);
+	FCELL r = sloth_fpop(x);
 	CELL u = sloth_pop(x);
 	CELL addr = sloth_pop(x);
 	/* This implementation uses the algorithm found in */
@@ -620,7 +620,7 @@ void sloth_represent_(X* x) {
 /* Output operations */
 
 void sloth_f_dot_(X* x) {
-	FLOAT r = sloth_fpop(x);
+	FCELL r = sloth_fpop(x);
 	int int_digits = (r == 0.0) ? 1 : (int)log10(fabs(r)) + 1;
 	int decimals;
 	if (r == floor(r)) {
@@ -640,7 +640,7 @@ void sloth_f_s_dot_(X* x) {
 /* Engineering notation with special case handling */
 /* by ChatGPT */
 void sloth_f_e_dot_(X* x) {
-	FLOAT r = sloth_fpop(x);
+	FCELL r = sloth_fpop(x);
 	int exp;
 	double scaled;
 

@@ -95,7 +95,7 @@ typedef struct sloth_VM {
 
 	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
-		FLOAT f[SLOTH_FLOAT_STACK_SIZE]; 
+		FCELL f[SLOTH_FLOAT_STACK_SIZE]; 
 		CELL fp;
 
 	#endif
@@ -1061,7 +1061,7 @@ CELL sloth_find_word(X* x, char* name) {
 /* INTERPRET is not an ANS word ??!! */
 void sloth_interpret_(X* x) {
 	CELL nt, flag, n;
-	FLOAT r;
+	FCELL r;
 	char* tok;
 	int tlen;
 	char buf[64]; char *endptr;
