@@ -139,29 +139,36 @@ variable Tmarker
 [THEN]
 
 : Tget-screen-to-world-2d ( vector2 camera2d -- vector2 )
-	vector2 Tallot there get-screen-to-world-2d there
+	Vector2 Tallot there get-screen-to-world-2d there
 ;
 
 : Tget-mouse-position ( -- vector2 )
-	vector2 Tallot there get-mouse-position there
+	Vector2 Tallot there get-mouse-position there
 ;
 
 : Tget-mouse-delta ( -- vector2 )
-	vector2 Tallot there get-mouse-delta there
+	Vector2 Tallot there get-mouse-delta there
 ;
 
 : Tfade ( Color r -- Color ) ( F: r -- )
 	Color Tallot there fade there
 ;
 
-\ : Tget-font-default ( -- font )
-\ 	font tallot there get-font-default there
-\ ;
+: Tget-font-default ( -- font )
+	\ I have not defined Font structure yet,
+	\ store enough space for anything there.
+	\ Font tallot there get-font-default there
+	1024 tallot there get-font-default there
+;
 
 : Tvector2add ( vector2 vector2 -- vector2 )
-	vector2 Tallot there vector2add there
+	Vector2 Tallot there vector2add there
 ;
 
 : Tvector2scale ( vector2 -- vector2 ) ( F: r -- )
-	vector2 Tallot there vector2scale there
+	Vector2 Tallot there vector2scale there
+;
+
+: Ttext-format-2 ( c-addr n n n c-addr -- c-addr l )
+	1024 tallot there text-format-2 there swap
 ;

@@ -69,7 +69,9 @@ create mouse-text-pos -44E sf, -24E sf,
 
 		0 zoom-mode @ = if
 			\ Zoom based on mouse wheel
-			get-mouse-wheel-move ?dup if
+			get-mouse-wheel-move fdup f0= if
+				fdrop
+			else
 				Tget-mouse-position
 				camera
 				Tget-screen-to-world-2d
@@ -113,7 +115,7 @@ create mouse-text-pos -44E sf, -24E sf,
 				\ and centered around 0,0 just so we have
 				\ something in the XY plane
 				rl-push-matrix
-					0E 25E 50E f* 0E rl-translate
+					0E 25E 50E f* 0E rl-translatef
 					90E 1E 0E 0E rl-rotatef
 					100 50E draw-grid
 				rl-pop-matrix
@@ -129,12 +131,12 @@ create mouse-text-pos -44E sf, -24E sf,
 			Tget-mouse-position
 			4E darkgray draw-circle-v
 
-\			\ get-font-default
-\			\ s" [%i, %i]" get-mouse-x get-mouse-y text-format-2
-\			\ mouse-position mouse-text-pos vector2add
-\			\ 20 2 black
-\			\ draw-text-ex
-\
+			Tget-font-default
+			s" [%i, %i]" get-mouse-x get-mouse-y Ttext-format-2
+			Tget-mouse-position mouse-text-pos Tvector2add
+			20E 2E black
+			draw-text-ex
+
 			s" [1][2] Select mouse zoom mode (Wheel or Move)"
 			20 20 20 darkgray
 			draw-text

@@ -1,6 +1,7 @@
 #define SLOTH_IMPLEMENTATION
 #include"fsloth.h"
 #include"raylib.h"
+#include"rlgl.h"
 #include"raymath.h"
 
 #define SLOTH2RAYLIB(f) void sloth2raylib_##f##_(X* x) { f(); }
@@ -150,7 +151,7 @@ void raylib_is_gesture_detected_(X* x) {
 
 void sloth2raylib_Fade_(X* x) {
 	Color *dest = (Color*)sloth_pop(x);	
-	SFLOAT alpha = (SFLOAT)sloth_fpop(x);
+	SFCELL alpha = (SFCELL)sloth_fpop(x);
 	Color color = *((Color*)sloth_pop(x));
 	Color faded_color = Fade(color, alpha);
 	memcpy(dest, &faded_color, sizeof(Color));
@@ -238,11 +239,45 @@ void sloth2raylib_DrawText_(X* x) {
 	}
 }
 
+void sloth2raylib_DrawTextEx_(X* x) {
+	char text[255];
+	Color* tint = (Color*)sloth_pop(x);
+	float spacing = (float)sloth_fpop(x);
+	float fontSize = (float)sloth_fpop(x);
+	Vector2* position = (Vector2*)sloth_pop(x);
+	int l = (int)sloth_pop(x);
+	char* a = (char*)sloth_pop(x);
+	Font* font = (Font*)sloth_pop(x);
+	if (a[l] != 0) {
+		int i;
+		for (i = 0; i < l; i++) text[i] = sloth_cfetch(x, (CELL)(a + i));
+		text[l] = 0;
+		DrawTextEx(*font, text, *position, fontSize, spacing, *tint);
+	} else {
+		DrawTextEx(*font, a, *position, fontSize, spacing, *tint);
+	}
+}
+
 /* -- Text strings management functions ---------------- */
 
-void sloth2raylib_TextFormat_(X* x) {
-	 /* TODO I will need to pass number of parameters, */
-	 /* I suppose. */
+void sloth2raylib_TextFormat2_(X* x) {
+	char text[255];
+	char* dest = (char*)sloth_pop(x);
+	int p2 = (int)sloth_pop(x);
+	int p1 = (int)sloth_pop(x);
+	int l = (int)sloth_pop(x);
+	char *a = (char*)sloth_pop(x);
+	char *res;
+	if (a[l] != 0) {
+		int i;
+		for (i = 0; i < l; i++) text[i] = sloth_cfetch(x, (CELL)(a + i));
+		text[l] = 0;
+		res = TextFormat(text, p1, p2);
+	} else {
+		res = TextFormat(a, p1, p2);
+	}
+	memcpy(dest, res, strlen(res));
+	sloth_push(x, strlen(res));
 }
 
 /* == MODULE RMODELS =================================== */
@@ -296,7 +331,7 @@ void sloth2raylib_rlPopMatrix_(X* x) {
 	rlPopMatrix();
 }
 
-void sloth2raylib_rlTranslate_(X* x) {
+void sloth2raylib_rlTranslatef_(X* x) {
 	float dz = (float)sloth_fpop(x);
 	float dy = (float)sloth_fpop(x);
 	float dx = (float)sloth_fpop(x);
@@ -400,6 +435,11 @@ void bootstrap_raylib(X* x) {
 	/* -- Text drawing functions ------------------------- */
 
 	SLOTH2RAYLIB_CODE("DRAW-TEXT", DrawText);
+	SLOTH2RAYLIB_CODE("DRAW-TEXT-EX", DrawTextEx);
+
+	/* -- Text strings management functions -------------- */
+
+	SLOTH2RAYLIB_CODE("TEXT-FORMAT-2", TextFormat2);
 
 	/* == MODULE RMODELS ================================= */
 	
@@ -424,7 +464,7 @@ void bootstrap_raylib(X* x) {
 
 	SLOTH2RAYLIB_CODE("RL-PUSH-MATRIX", rlPushMatrix);
 	SLOTH2RAYLIB_CODE("RL-POP-MATRIX", rlPopMatrix);
-	SLOTH2RAYLIB_CODE("RL-TRANSLATE", rlTranslate);
+	SLOTH2RAYLIB_CODE("RL-TRANSLATEF", rlTranslatef);
 	SLOTH2RAYLIB_CODE("RL-ROTATEF", rlRotatef);
 
 	/* Restore wordlist */
