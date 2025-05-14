@@ -1060,10 +1060,9 @@ CELL sloth_find_word(X* x, char* name) {
 /* INTERPRET is not an ANS word ??!! */
 void sloth_interpret_(X* x) {
 	CELL nt, flag, n;
-	FCELL r;
 	char* tok;
 	int tlen;
-	char buf[64]; char *endptr;
+	char buf[128]; char *endptr;
 	int is_double;
 	while (sloth_user_area_get(x, SLOTH_IPOS) < sloth_user_area_get(x, SLOTH_ILEN)) {
 		sloth_push(x, 32); sloth_word_(x);
@@ -1108,7 +1107,7 @@ void sloth_interpret_(X* x) {
 				}
 				strncpy(buf, tok, tlen);
 				buf[tlen] = 0;
-				n = strtol(buf, &endptr, temp_base);	
+				n = strtoll(buf, &endptr, temp_base);	
 				if (*endptr == '\0') {
 					if (sloth_user_area_get(x, SLOTH_STATE) == 0) {
 						sloth_push(x, n);
@@ -1119,7 +1118,7 @@ void sloth_interpret_(X* x) {
 					}
 				} else {
 				#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
-
+					FCELL r;
 					if (sloth_user_area_get(x, SLOTH_BASE) == 10) {
 						r = strtod(buf, &endptr);	
 						if (r == 0 && buf == endptr) {
