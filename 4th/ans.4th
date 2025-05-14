@@ -308,13 +308,6 @@ FORTH-WORDLIST SET-CURRENT
 
 \ -- Arithmetic -------------------------------------------
 
-?: */MOD ( n1 n2 n3 -- n4 n5 ) >R M* R> SM/REM ;
-
-?: / ( n1 n2 -- n3 ) 1 SWAP */MOD SWAP DROP ;
-?: */ ( n1 n2 n3 -- n4 ) */MOD SWAP DROP ;
-?: MOD ( n1 n2 -- n3 ) 1 SWAP */MOD DROP ;
-?: /MOD	( n1 n2 -- n3 n4 ) 1 SWAP */MOD ;
-
 ?: 1+ ( n1 | u1 -- n2 | u2 ) 1 + ;
 ?: 1- ( n1 | u1 -- n2 | u2 ) 1 - ;
 
@@ -389,7 +382,8 @@ FORTH-WORDLIST SET-CURRENT
 ?\ ;
 
 \ Taken from ANS Forth Standard reference implementation
-
+\ Floored divide of double by single. Return remainder n2
+\ and quotient n3.
 ?: FM/MOD ( d n -- rem quot )
 ?\		DUP >R
 ?\		SM/REM
@@ -401,6 +395,17 @@ FORTH-WORDLIST SET-CURRENT
 ?\			RDROP
 ?\		THEN
 ?\ ;
+
+\ The set of division operators can be defined
+\ in terms of SM/REM (symmetric division) or
+\ FM/MOD (floored division). The standard allows
+\ both. Sloth is based on symmetric division.
+?: */MOD ( n1 n2 n3 -- n4 n5 ) >R M* R> SM/REM ;
+
+?: / ( n1 n2 -- n3 ) 1 SWAP */MOD SWAP DROP ;
+?: */ ( n1 n2 n3 -- n4 ) */MOD SWAP DROP ;
+?: MOD ( n1 n2 -- n3 ) 1 SWAP */MOD DROP ;
+?: /MOD	( n1 n2 -- n3 n4 ) 1 SWAP */MOD ;
 
 \ -- Memory -----------------------------------------------
 

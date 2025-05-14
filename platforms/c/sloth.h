@@ -339,7 +339,6 @@ void sloth_invert_(X* x);
 void sloth_l_shift_(X* x);
 void sloth_m_star_(X* x);
 void sloth_minus_(X* x);
-void sloth_s_m_slash_rem_(X* x);
 void sloth_plus_(X* x);
 void sloth_d_plus_(X* x);
 void sloth_r_shift_(X* x);
@@ -1330,83 +1329,6 @@ void sloth_m_star_(X* x) {
 
 void sloth_minus_(X* x) { CELL a = sloth_pop(x); sloth_push(x, sloth_pop(x) - a); }
 
-void sloth_s_m_slash_rem_(X* x) {
-	CELL n1 = sloth_pop(x), d1_hi = sloth_pop(x), d1_lo = sloth_pop(x);
-
-	uCELL q, r;
-	
-	/* Track signs */
-	CELL d_neg = (d1_hi < 0);
-	CELL n_neg = (n1 < 0);
-	
-	/* Use unsigned arithmetic for the algorithm */
-	uCELL abs_n1 = n_neg ? (uCELL)-n1 : (uCELL)n1;
-	uCELL abs_d_hi, abs_d_lo;
-	
-	/* Get absolute value of double-word dividend */
-	if (d_neg) {
-		/* Two's complement negation for double word */
-		abs_d_lo = (uCELL)-d1_lo;
-		abs_d_hi = (uCELL)(~d1_hi + (abs_d_lo == 0));
-	} else {
-		abs_d_hi = (uCELL)d1_hi;
-		abs_d_lo = (uCELL)d1_lo;
-	}
-	
-	/* Initialize quotient and remainder */
-	q = 0;
-	r = 0;
-	
-	/* Process 128 bits of the dividend (64 high bits + 64 low bits) 
-	 * using the standard long division algorithm
-	 */
-	
-	/* First the high bits */
-	{
-		CELL i;
-		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
-			/* Shift remainder left by 1 bit and bring in next bit of dividend */
-			r = (r << 1) | ((abs_d_hi >> i) & 1);
-			
-			/* If remainder >= divisor, subtract and set quotient bit */
-			if (r >= abs_n1) {
-				r -= abs_n1;
-				q |= (1UL << i);
-			}
-		}
-	}
-	
-	/* Then the low bits */
-	{
-		CELL i;
-		for (i = sCELL * CHAR_BIT - 1; i >= 0; i--) {
-			/* Shift remainder left by 1 bit and bring in next bit of dividend */
-			r = (r << 1) | ((abs_d_lo >> i) & 1);
-			
-			/* If remainder >= divisor, subtract and set quotient bit */
-			if (r >= abs_n1) {
-				r -= abs_n1;
-				q |= (1UL << i);
-			}
-		}
-	}
-	
-	/* Apply sign to results */
-	{
-		/* For symmetric division (SM/REM):
-		 * 1. Quotient sign depends on operand signs (like normal division)
-		 * 2. Remainder has the same sign as the dividend
-		 * 3. No adjustment needed - we just truncate toward zero
-		 */
-		CELL quotient = (d_neg != n_neg) ? -(CELL)q : q;
-		CELL remainder = d_neg ? -(CELL)r : r;
-		
-		/* Push results back onto the stack */
-		sloth_push(x, remainder);
-		sloth_push(x, quotient);
-	}
-}
-
 void sloth_plus_(X* x) { CELL a = sloth_pop(x); sloth_push(x, sloth_pop(x) + a); }
 
 /* Code adapted from pForth */
@@ -1862,7 +1784,6 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "LSHIFT", sloth_primitive(x, &sloth_l_shift_));
 	sloth_code(x, "M*", sloth_primitive(x, &sloth_m_star_));
 	sloth_code(x, "-", sloth_primitive(x, &sloth_minus_));
-	sloth_code(x, "SM/REM", sloth_primitive(x, &sloth_s_m_slash_rem_));
 	sloth_code(x, "+", sloth_primitive(x, &sloth_plus_));
 	sloth_code(x, "D+", sloth_primitive(x, &sloth_d_plus_));
 	sloth_code(x, "RSHIFT", sloth_primitive(x, &sloth_r_shift_));
