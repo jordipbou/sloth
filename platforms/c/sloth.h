@@ -916,6 +916,10 @@ void sloth_environment_(X* x) {
 
 			sloth_push(x, SLOTH_FLOAT_STACK_SIZE);
 
+		#else
+
+			sloth_push(x, -1);
+
 		#endif
 		break;
 	/* Obsolescent queries (but required for tests) */

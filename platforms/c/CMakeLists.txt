@@ -3,7 +3,7 @@ project(SLOTH-REPL LANGUAGES C)
 
 add_executable(sloth repl.c)
 
-add_compile_definitions(ROOT_PATH="../../../")
+add_compile_definitions(ROOT_PATH="${PROJECT_SOURCE_DIR}/../../")
 
 if (WIN32)
 	target_link_libraries(sloth PRIVATE msvcrt.lib)
