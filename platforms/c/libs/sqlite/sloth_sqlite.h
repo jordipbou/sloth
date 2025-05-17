@@ -1,4 +1,5 @@
-/* TODO Use exceptions for errors received from sqlite3? */
+/* TODO Add the different column functions */
+/* TODO Add bind function (and reset?) */
 
 #include"sloth.h"
 #include"sqlite3.h"
@@ -48,6 +49,70 @@ void sloth2sqlite_step_(X* x) {
 	sloth_push(x, sqlite3_step(stmt));
 }
 
+void sloth2sqlite_finalize_(X* x) {
+	int err = sqlite3_finalize((sqlite3_stmt*)sloth_pop(x));
+	if (err != SQLITE_OK) {
+		sloth_throw(x, -10000 - err);
+	}
+}
+
+void sloth2sqlite_close_(X* x) {
+	int err = sqlite3_close((sqlite3*)sloth_pop(x));
+	if (err != SQLITE_OK) {
+		sloth_throw(x, -10000 - err);
+	}
+}
+
+/* -- Execute ------------------------------------------ */
+
+typedef struct {
+	X* x;
+	CELL xt;
+	char *sql;
+} sloth2sqlite_callback_data;
+
+int sloth2sqlite__generic_callback(void *cdata, int count, char **data, char **columns) {
+	X* x = ((sloth2sqlite_callback_data*)cdata)->x;
+	CELL xt = ((sloth2sqlite_callback_data*)cdata)->xt;
+
+	int i;
+	for (i = 0; i < count; i++) {
+		sloth_push(x, (CELL)data[i]);
+		sloth_push(x, strlen(data[i]));
+	}
+
+	sloth_push(x, (CELL)count);
+	sloth_eval(x, xt);
+
+	return 0;
+}
+
+void sloth2sqlite_exec_(X* x) {
+	CELL err;
+	sloth2sqlite_callback_data cdata;
+
+	CELL xt = sloth_pop(x);
+	CELL l = sloth_pop(x);
+	char *a = (char *)sloth_pop(x);
+	sqlite3 *db = (sqlite3 *)sloth_pop(x);
+
+	cdata.x = x;
+	cdata.xt = xt;
+	cdata.sql = malloc(l + 1);
+	memcpy(cdata.sql, a, l);
+	cdata.sql[l] = 0;
+
+	err = sqlite3_exec(db, cdata.sql, &sloth2sqlite__generic_callback, &cdata, NULL);
+
+	free(cdata.sql);
+
+	if (err != SQLITE_OK) {
+		sloth_throw(x, -10000 - err);
+	}
+}
+
+/* -- Columns ------------------------------------------ */
+
 void sloth2sqlite_column_text_(X* x) {
 	const char *res;
 	int icol = (int)sloth_pop(x);
@@ -57,14 +122,23 @@ void sloth2sqlite_column_text_(X* x) {
 	sloth_push(x, strlen(res));
 }
 
+/* -- Bootstrapping ------------------------------------ */
+
 void sloth_bootstrap_sqlite(X* x) {
-	/* Create SQLITE wordlist */
+	/* TODO Create SQLITE wordlist */
 
 	SLOTH2SQLITE_CODE("LIBVERSION", libversion);
 	SLOTH2SQLITE_CODE("OPEN", open);
 	SLOTH2SQLITE_CODE("PREPARE", prepare_v2);
 	SLOTH2SQLITE_CODE("STEP", step);
-	SLOTH2SQLITE_CODE("COLUMN-TEXT", column_text);
+	SLOTH2SQLITE_CODE("FINALIZE", finalize);
+	SLOTH2SQLITE_CODE("CLOSE", close);
 
-	/* Add constants here or in a 4th file */
+	/* -- Execute ---------------------------------------- */
+
+	SLOTH2SQLITE_CODE("EXEC", exec);
+
+	/* -- Columns ---------------------------------------- */
+
+	SLOTH2SQLITE_CODE("COLUMN-TEXT", column_text);
 }
