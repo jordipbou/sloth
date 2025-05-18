@@ -76,7 +76,7 @@ int sloth2sqlite__generic_callback(void *cdata, int count, char **data, char **c
 	CELL xt = ((sloth2sqlite_callback_data*)cdata)->xt;
 
 	int i;
-	for (i = 0; i < count; i++) {
+	for (i = count - 1; i >= 0; i--) {
 		sloth_push(x, (CELL)data[i]);
 		sloth_push(x, strlen(data[i]));
 	}

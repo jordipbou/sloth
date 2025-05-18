@@ -17,6 +17,7 @@ int main(int argc, char**argv) {
 	sloth_bootstrap_sqlite(x);
 
 	sloth_include(x, ROOT_PATH "4th/ans.4th");
+	sloth_include(x, ROOT_PATH "platforms/c/libs/sqlite/sloth_sqlite.4th");
 
 	if (argc == 1) {
 		sloth_repl(x);

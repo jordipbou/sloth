@@ -1220,53 +1220,6 @@ SET-CURRENT
 ?\		'H' EMIT
 ?\ ;
 
-\ -- Structures -------------------------------------------
-
-\ Structure implementation taken from ANS Forth standard
-
-?: BEGIN-STRUCTURE  ( -- addr 0 ; -- size )
-?\		CREATE
-?\			HERE 0 0 ,      \ mark stack, lay dummy
-?\		DOES> @             \ -- rec-len
-;
-
-?: +FIELD  ( n <"name"> -- ; Exec: addr -- 'addr )
-?\		CREATE OVER , +
-?\		DOES> @ +
-?\ ;
-
-\ Cell field
-?: FIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-?\		ALIGNED 1 CELLS +FIELD 
-?\ ;
-
-\ Char field
-?: CFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-\ TODO Shouldn't CHARS be also aligned?
-?\		1 CHARS +FIELD 
-?\ ;
-
-\ Floating point fields
-?: FFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-?\		FALIGNED 1 FLOATS +FIELD 
-?\ ;
-?: SFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-?\		SFALIGNED 1 SFLOATS +FIELD 
-?\ ;
-?: DFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-?\		DFALIGNED 1 DFLOATS +FIELD 
-?\ ;
-
-\ Fields with exact C datatype sizes
-?: INTFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-?\		1 INTS + 1- 1 INTS 1- INVERT AND \ int based align
-?\		1 INTS +FIELD
-?\ ;
-
-?: END-STRUCTURE ( addr n -- )
-?\		SWAP !           \ set len 
-?\ ;
-
 \ -- Environment queries ----------------------------------
 
 [UNDEFINED] ENVIRONMENT? [IF]
@@ -1296,7 +1249,7 @@ SET-CURRENT
 	ELSE 2DUP S" STACK-CELLS" COMPARE 0= IF
 		2DROP 11 (ENVIRONMENT) -1
 	ELSE 2DUP S" FLOATING-STACK" COMPARE 0= IF
-		2DROP 12 (ENVIRONMENT) -1
+		2DROP 12 (ENVIRONMENT) DUP -1 = IF DROP 0 ELSE -1 THEN
 \ Obsolescent environmental queries
 	ELSE 2DUP S" FLOATING" COMPARE 0= IF
 		2DROP 100 (ENVIRONMENT) -1
@@ -1309,6 +1262,58 @@ SET-CURRENT
 	THEN THEN THEN THEN THEN THEN
 ;
 [THEN]
+
+\ -- Structures -------------------------------------------
+
+\ Structure implementation taken from ANS Forth standard
+
+?: BEGIN-STRUCTURE  ( -- addr 0 ; -- size )
+?\		CREATE
+?\			HERE 0 0 ,      \ mark stack, lay dummy
+?\		DOES> @             \ -- rec-len
+?\ ;
+
+?: +FIELD  ( n <"name"> -- ; Exec: addr -- 'addr )
+?\		CREATE OVER , +
+?\		DOES> @ +
+?\ ;
+
+\ Cell field
+?: FIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+?\		ALIGNED 1 CELLS +FIELD 
+?\ ;
+
+\ Char field
+?: CFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+\ TODO Shouldn't CHARS be also aligned?
+?\		1 CHARS +FIELD 
+?\ ;
+
+S" FLOATING-STACK" ENVIRONMENT? [IF] DROP
+
+
+\ Floating point fields
+?: FFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+?\		FALIGNED 1 FLOATS +FIELD 
+?\ ;
+?: SFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+?\		SFALIGNED 1 SFLOATS +FIELD 
+?\ ;
+?: DFFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+?\		DFALIGNED 1 DFLOATS +FIELD 
+?\ ;
+
+[THEN]
+
+\ Fields with exact C datatype sizes
+?: INTFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+?\		1 INTS + 1- 1 INTS 1- INVERT AND \ int based align
+?\		1 INTS +FIELD
+?\ ;
+
+?: END-STRUCTURE ( addr n -- )
+?\		SWAP !           \ set len 
+?\ ;
 
 \ -- QUIT -------------------------------------------------
 
