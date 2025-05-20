@@ -1,14 +1,22 @@
 #include"sloth.h"
 #include<errno.h>
 
+#if defined(WINDOWS)
+#include <io.h>
+#define F_OK 0
+#define access _access
+#else
+#include<unistd.h>
+#endif
+
 #define SLOTH_CODE(w, f) sloth_code(x, w, sloth_primitive(x, &sloth_##f##_));
 
 /* -- File access methods ------------------------------ */
 
 const char SLOTH_READ_ONLY[] = "r";
 const char SLOTH_READ_ONLY_BIN[] = "rb";
-const char SLOTH_READ_WRITE[] = "w+";
-const char SLOTH_READ_WRITE_BIN[] = "wb+";
+const char SLOTH_READ_WRITE[] = "r+";
+const char SLOTH_READ_WRITE_BIN[] = "rb+";
 const char SLOTH_WRITE_ONLY[] = "w";
 const char SLOTH_WRITE_ONLY_BIN[] = "wb";
 
@@ -84,11 +92,11 @@ void sloth_close_file_(X* x) {
 	sloth_push(x, fclose((FILE*)sloth_pop(x)));
 }
 
-/* TODO All positions and sizes are in double numbers!!! */
-
 void sloth_file_position_(X* x) {
 	FILE *fptr = (FILE*)sloth_pop(x);
+	/* FIXME This will simulate a double number for now */
 	sloth_push(x, ftell(fptr));
+	sloth_push(x, 0);
 	if (ferror(fptr)) {
 		sloth_push(x, -37);
 	} else {
@@ -103,7 +111,9 @@ void sloth_file_size_(X* x) {
 	fseek(fptr, 0, SEEK_END); // seek to end of file
 	size = ftell(fptr); // get current file pointer
 	fseek(fptr, pos, SEEK_SET); // seek back to beginning of file
+	/* FIXME This will simulate a double number for now */
 	sloth_push(x, size);
+	sloth_push(x, 0);
 	if (ferror(fptr)) {
 		sloth_push(x, -37);
 	} else {
@@ -113,8 +123,9 @@ void sloth_file_size_(X* x) {
 
 void sloth_reposition_file_(X* x) {
 	FILE *fptr = (FILE*)sloth_pop(x);
-	unsigned int ud = (unsigned int)sloth_pop(x);
-	fseek(fptr, ud, SEEK_SET);
+	uCELL udh = (uCELL)sloth_pop(x);
+	uCELL udl = (uCELL)sloth_pop(x);
+	fseek(fptr, udl, SEEK_SET);
 	if (ferror(fptr)) {
 		sloth_push(x, -37);
 	} else {
@@ -127,6 +138,52 @@ void sloth_flush_file_(X* x) {
 	sloth_push(x, fflush(fptr));
 }
 
+void sloth_resize_file_(X* x) {
+	FILE *fptr = (FILE*)sloth_pop(x);
+	uCELL udh = (uCELL)sloth_pop(x);
+	uCELL udl = (uCELL)sloth_pop(x);
+	#if defined(WINDOWS)
+	/* TODO Needs SetFilePointer and SetEndOfFile */
+	#else
+	if (ftruncate(fileno(fptr), udl)) {
+		sloth_push(x, -37);
+	} else {
+		sloth_push(x, 0);
+	}
+	#endif
+}
+
+void sloth_delete_file_(X* x) {
+	int l = (int)sloth_pop(x);
+	char *caddr = (char*)sloth_pop(x);
+	char buf[512];
+	memcpy(buf, caddr, l);
+	buf[l] = 0;
+	sloth_push(x, !remove(buf) ? 0 : -37);
+}
+
+void sloth_rename_file_(X* x) {
+	unsigned int u2 = (unsigned int)sloth_pop(x);
+	char *caddr2 = (char*)sloth_pop(x);
+	unsigned int u1 = (unsigned int)sloth_pop(x);
+	char *caddr1 = (char*)sloth_pop(x);
+	char buf2[512], buf1[512];
+	memcpy(buf1, caddr1, u1);
+	buf1[u1] = 0;
+	memcpy(buf2, caddr2, u2);
+	buf2[u2] = 0;
+	sloth_push(x, !rename(buf1, buf2) ? 0 : -37);
+}
+
+void sloth_file_status_(X* x) {
+	unsigned int u = (unsigned int)sloth_pop(x);
+	char *caddr = (char*)sloth_pop(x);
+	char buf[512];
+	memcpy(buf, caddr, u);
+	buf[u] = 0;
+	sloth_push(x, !access(buf, F_OK) ? 0 : -37);
+}
+
 /* -- Read operations ---------------------------------- */
 
 void sloth_read_line_(X* x) {
@@ -134,25 +191,35 @@ void sloth_read_line_(X* x) {
 	FILE *fptr = (FILE*)sloth_pop(x);
 	int u1 = (int)sloth_pop(x);
 	char *caddr = (char*)sloth_pop(x);
-	int u2;
+	int u2, l;
 	char *res;
-	/* Reads u1 characters + (maybe)two */
-	/* implementation-defined line-terminating */
-	/* characters + null terminator */
-	if (fgets(buf, u1 + 3, fptr)) {
-		/* TODO Remove the line terminator characters */
-		/* from the count */
-		u2 = strlen(buf);
-		/* Copy without the null terminator character */
-		memcpy(caddr, buf, u2);
-		sloth_push(x, u2);
+	/* Read at most u1 characters */
+	if (u1 == 0) {
+		sloth_push(x, 0);
 		sloth_push(x, -1);
 		sloth_push(x, 0);
 	} else {
-		sloth_push(x, 0);
-		sloth_push(x, 0);
-		if (feof(fptr)) sloth_push(x, 0);
-		else sloth_push(x, -37);
+		/* We need to read u1 + 1 because fgets counts the */
+		/* zero at the end. */
+		if (fgets(buf, u1 + 1, fptr)) {
+			l = u2 = strlen(buf);
+			/* Detect CR/LF to substract it from counted chars */
+			if (buf[u2 - 1] == 10 || buf[u2 - 1] == 13) u2--;
+			/* In case of CRLF, substract one again */
+			if (buf[u2 - 1] == 10) u2--;
+			memcpy(caddr, buf, l);
+			sloth_push(x, u2);
+			sloth_push(x, -1);
+			sloth_push(x, 0);
+		} else {
+			sloth_push(x, 0);
+			sloth_push(x, 0);
+			if (feof(fptr)) {
+				sloth_push(x, 0);
+			} else {
+				sloth_push(x, -37);
+			}
+		}
 	}
 }
 
@@ -178,7 +245,7 @@ void sloth_write_line_(X* x) {
 	int l = (int)sloth_pop(x);
 	char *caddr = (char*)sloth_pop(x);
 	int count = fwrite(caddr, suCHAR, l, fptr);
-	/* TODO Add the implementation dependent line terminator */
+	fprintf(fptr, "\n");
 	if (ferror(fptr)) {
 		sloth_push(x, -37);
 	} else {
@@ -215,6 +282,10 @@ void sloth_bootstrap_file_wordset(X* x) {
 	SLOTH_CODE("FILE-SIZE", file_size);
 	SLOTH_CODE("REPOSITION-FILE", reposition_file);
 	SLOTH_CODE("FLUSH-FILE", flush_file);
+	SLOTH_CODE("RESIZE-FILE", resize_file);
+	SLOTH_CODE("DELETE-FILE", delete_file);
+	SLOTH_CODE("RENAME-FILE", rename_file);
+	SLOTH_CODE("FILE-STATUS", file_status);
 
 	/* -- Read operations -------------------------------- */
 

@@ -1122,11 +1122,14 @@ void sloth_interpret_(X* x) {
 					}
 				} else {
 				#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+
 					FCELL r;
 					if (sloth_user_area_get(x, SLOTH_BASE) == 10) {
 						r = strtod(buf, &endptr);	
 						if (r == 0 && buf == endptr) {
-							printf("%.*s ?\n", tlen, tok);
+							if (sloth_user_area_get(x, SLOTH_SOURCE_ID) != -1) {
+								printf("%.*s ?\n", tlen, tok);
+							}
 							sloth_throw(x, -13);
 						} else {
 							if (sloth_user_area_get(x, SLOTH_STATE) == 0) {
@@ -1136,13 +1139,17 @@ void sloth_interpret_(X* x) {
 							}
 						}
 					} else {
-						printf("%.*s ?\n", tlen, tok);
+						if (sloth_user_area_get(x, SLOTH_SOURCE_ID) != -1) {
+							printf("%.*s ?\n", tlen, tok);
+						}
 						sloth_throw(x, -13);
 					}
 
 				#else
 
-					printf("%.*s ?\n", tlen, tok);
+					if (sloth_user_area_get(x, SLOTH_SOURCE_ID) != -1) {
+						printf("%.*s ?\n", tlen, tok);
+					}
 					sloth_throw(x, -13);
 
 				#endif
@@ -1539,6 +1546,7 @@ void sloth_does_(X* x) {
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 }
 void sloth_evaluate_(X* x) {
+	CELL e;
 	CELL l = sloth_pop(x), a = sloth_pop(x);
 
 	CELL previbuf = sloth_user_area_get(x, SLOTH_IBUF);
@@ -1553,13 +1561,21 @@ void sloth_evaluate_(X* x) {
 	sloth_user_area_set(x, SLOTH_IPOS, 0);
 	sloth_user_area_set(x, SLOTH_ILEN, l);
 
-	sloth_interpret_(x);
-
+	/* To ensure that the input buffer is restored correctly */
+	/* even in case of a throw, I catch any possible throw */
+	/* here and rethrow it after restoring the input buffer. */
+	sloth_catch(x, sloth_user_area_get(x, SLOTH_INTERPRET));
+		
 	sloth_user_area_set(x, SLOTH_SOURCE_ID, prevsourceid);
 
 	sloth_user_area_set(x, SLOTH_IBUF, previbuf);
 	sloth_user_area_set(x, SLOTH_IPOS, previpos);
 	sloth_user_area_set(x, SLOTH_ILEN, previlen);
+	
+	e = sloth_pop(x);
+	if (e != 0) {
+		sloth_throw(x, e);
+	}
 }
 void sloth_execute_(X* x) { sloth_eval(x, sloth_pop(x)); }
 void sloth_here_(X* x) { sloth_push(x, sloth_here(x)); }
