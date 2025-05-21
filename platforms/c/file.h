@@ -181,6 +181,11 @@ void sloth_file_status_(X* x) {
 	char buf[512];
 	memcpy(buf, caddr, u);
 	buf[u] = 0;
+	/* A value with implementation-defined information */
+	/* about the file has to be returned. As I don't have */
+	/* any clue about what time of information is expected */
+	/* I just return 0. */
+	sloth_push(x, 0); 
 	sloth_push(x, !access(buf, F_OK) ? 0 : -37);
 }
 
@@ -265,6 +270,42 @@ void sloth_write_file_(X* x) {
 	}
 }
 
+/* -- Loading scripts ---------------------------------- */
+
+int sloth__is_file_included(X* x, char *a1, uCELL u1) {
+	/* TODO iterate from last included file to first */
+	CELL name = sloth_user_area_get(x, SLOTH_INCLUDED_FILES);
+	while (name != 0) {
+		CELL u2 = sloth_fetch(x, name + sCELL);
+		CELL a2 = name + 2*sCELL;
+		if (sloth__compare_without_case(x, (CELL)a1, u1, a2, u2)) {
+			return 1;
+		}
+		name = sloth_fetch(x, name);
+	}
+	return 0;
+}
+
+void sloth_required_(X* x) {
+	uCELL u = (uCELL)sloth_pop(x);
+	char* caddr = (char*)sloth_pop(x);
+	if (!sloth__is_file_included(x, caddr, u)) {
+		sloth_push(x, (CELL)caddr);
+		sloth_push(x, u);
+		sloth_included_(x);
+	}
+}
+
+void sloth_require_(X* x) {
+	CELL name, namelen;
+	sloth_push(x, 32); sloth_word_(x);
+	name = sloth_pick(x, 0) + suCHAR;
+	namelen = sloth_cfetch(x, sloth_pop(x));
+	sloth_push(x, name);
+	sloth_push(x, namelen);
+	sloth_required_(x);
+}
+
 void sloth_bootstrap_file_wordset(X* x) {
 	/* -- File access methods ---------------------------- */
 
@@ -296,4 +337,9 @@ void sloth_bootstrap_file_wordset(X* x) {
 
 	SLOTH_CODE("WRITE-LINE", write_line);
 	SLOTH_CODE("WRITE-FILE", write_file);
+
+	/* -- Loading scripts -------------------------------- */
+
+	SLOTH_CODE("REQUIRED", required);
+	SLOTH_CODE("REQUIRE", require);
 }

@@ -194,6 +194,8 @@ void sloth_throw(X* x, CELL e);
 #define SLOTH_PATH_END					31*sCELL
 #define SLOTH_PATH							32*sCELL
 
+#define SLOTH_INCLUDED_FILES		96*sCELL
+
 #ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
 #define SLOTH_PRECISION					97*sCELL
@@ -298,7 +300,7 @@ void sloth_word_(X* x);
 
 /* Finding words */
 
-int sloth__compare_without_case(X* x, CELL w, CELL t, CELL l);
+int sloth__compare_without_case(X* x, CELL a1, uCELL u1, CELL a2, uCELL u2);
 CELL sloth__search_word(X* x, CELL n, int l);
 void sloth_find_(X* x);
 CELL sloth_find_word(X* x, char* name);
@@ -1007,12 +1009,12 @@ void sloth_word_(X* x) {
 
 /* Helper function to compare a string and a word's name */
 /* without case sensitivity. */
-int sloth__compare_without_case(X* x, CELL w, CELL t, CELL l) {
+int sloth__compare_without_case(X* x, CELL a1, uCELL u1, CELL a2, uCELL u2) {
 	int i;
-	if (sloth_get_namelen(x, w) != l) return 0;
-	for (i = 0; i < l; i++) {
-		uCHAR a = sloth_cfetch(x, t + i);
-		uCHAR b = sloth_cfetch(x, sloth_get_name_addr(x, w) + i);
+	if (u1 != u2) return 0;
+	for (i = 0; i < u2; i++) {
+		uCHAR a = sloth_cfetch(x, a1 + i);
+		uCHAR b = sloth_cfetch(x, a2 + i);
 		if (a >= 97 && a <= 122) a -= 32;
 		if (b >= 97 && b <= 122) b -= 32;
 		if (a != b) return 0;
@@ -1027,7 +1029,10 @@ CELL sloth__search_word(X* x, CELL n, int l) {
 		w = sloth_fetch(x, wl);
 		while (w > 0) {
 			if (!sloth_has_flag(x, w, SLOTH_HIDDEN) 
-			 && sloth__compare_without_case(x, w, n, l)) 
+			 && sloth__compare_without_case(
+						x, 
+						sloth_get_name_addr(x, w), sloth_get_namelen(x, w),
+						n, l)) 
 				return w;
 			w = sloth_get_link(x, w);
 		}
@@ -1178,7 +1183,7 @@ void sloth_unused_(X* x) {
 void sloth_included_(X* x) {
 	FILE *f;
 	char linebuf[1024];
-	CELL INTERPRET, e;
+	CELL INTERPRET, e, here, i;
 
 	CELL previbuf = sloth_user_area_get(x, SLOTH_IBUF);
 	CELL previpos = sloth_user_area_get(x, SLOTH_IPOS);
@@ -1228,6 +1233,17 @@ void sloth_included_(X* x) {
 		INTERPRET = sloth_user_area_get(x, SLOTH_INTERPRET);
 
 		sloth_user_area_set(x, SLOTH_SOURCE_ID, (CELL)f);
+
+		/* Add path+filename to INCLUDED FILES */
+		/* TODO Check if this file has been included before, */
+		/* and don't add it to the linked list. */
+		here = sloth_here(x);
+		sloth_comma(x, sloth_user_area_get(x, SLOTH_INCLUDED_FILES));
+		sloth_user_area_set(x, SLOTH_INCLUDED_FILES, here);
+		sloth_comma(x, l);
+		memcpy((char*)sloth_here(x), a, l);
+		sloth_allot(x, l);
+		sloth_align(x);
 
 		while (fgets(linebuf, 1024, f)) {
 			/* printf(">>>> %s\n", linebuf); */
@@ -1701,6 +1717,7 @@ void sloth_bootstrap_kernel(X* x) {
 	*((CELL*)x->d) = sloth_to_abs(x, sCELL); /* HERE */
 	sloth_comma(x, 0); /* INTERNAL-WORDLIST */
 	sloth_comma(x, 0); /* FORTH-WORDLIST */
+	sloth_comma(x, 0); /* INCLUDED FILES LINKED LIST */
 
 	/* Initialization of user area */
 
@@ -1748,6 +1765,8 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_user_variable(x, "(SLOTH_PATH_START)", SLOTH_PATH_START, x->u + SLOTH_PATH);
 	sloth_user_variable(x, "(SLOTH_PATH_END)", SLOTH_PATH_END, x->u + SLOTH_PATH);
 	sloth_user_variable(x, "(SLOTH_PATH)", SLOTH_PATH, 0);
+
+	sloth_user_variable(x, "(INCLUDED-FILES)", SLOTH_INCLUDED_FILES, 0);
 
 	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
