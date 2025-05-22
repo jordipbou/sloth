@@ -1516,6 +1516,14 @@ create CRLF$    \ -- addr ; CR/LF as counted string
   r> drop
 ;
 
+\ The tests on filetest.fth from forth2012-test-suite
+\ require two different buffers for strings. Both S" and S\".
+\ As originally here there was only one buffer, it did not 
+\ pass the tests.
+\ This has been modified to allow two buffers.
+
+variable (CURRENT-POCKET) 0 (CURRENT-POCKET) !
+
 create pocket  \ -- addr
 \ *G A tempory buffer to hold processed string.
 \    This would normally be an internal system buffer.
@@ -1523,14 +1531,30 @@ create pocket  \ -- addr
 s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 1 chars + allot
 
-: readEscaped	\ "ccc" -- c-addr
-\ *G Parses an escaped string from the input stream according to
-\ ** the rules of *\fo{parse\"} above, returning the address
-\ ** of the translated counted string in *\fo{POCKET}.
-  source >in @ /string tuck             \ -- len caddr len
-  pocket parse\" nip
-  - >in +!
-  pocket
+create pocket2
+s" /COUNTED-STRING" environment? 0= [if] 256 [then]
+1 chars + allot
+
+: CHANGE-POCKET ( -- )
+	1 (CURRENT-POCKET) @ - (CURRENT-POCKET) !
+;
+
+: GET-POCKET ( u -- caddr )
+	(CURRENT-POCKET) @ IF pocket2 ELSE pocket THEN
+;
+
+\ This word has been modified to deal with two different
+\ string buffers.
+
+: readEscaped
+\ \ *G Parses an escaped string from the input stream according to
+\ \ ** the rules of *\fo{parse\"} above, returning the address
+\ \ ** of the translated counted string in *\fo{POCKET}.
+	change-pocket
+	source >in @ /string tuck		\ -- len caddr len
+	get-pocket parse\" nip
+	- >in +!
+	get-pocket
 ;
 
 : S\"           \ "string" -- caddr u
@@ -1542,6 +1566,10 @@ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 [THEN]
 
 \ -- Input state ------------------------------------------
+
+\ FIXME SAVE-INPUT and RESTORE-INPUT must take into account
+\ the line if evaluating an script from a file. It must be
+\ able to go back to the line...after SAVE-INPUT?
 
 [UNDEFINED] SAVE-INPUT [UNDEFINED] RESTORE-INPUT AND [IF]
 : SAVE-INPUT ( -- xn ... x1 n )
