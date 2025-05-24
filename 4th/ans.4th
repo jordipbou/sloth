@@ -1565,22 +1565,6 @@ s" /COUNTED-STRING" environment? 0= [if] 256 [then]
 ; IMMEDIATE
 [THEN]
 
-\ -- Input state ------------------------------------------
-
-\ FIXME SAVE-INPUT and RESTORE-INPUT must take into account
-\ the line if evaluating an script from a file. It must be
-\ able to go back to the line...after SAVE-INPUT?
-
-[UNDEFINED] SAVE-INPUT [UNDEFINED] RESTORE-INPUT AND [IF]
-: SAVE-INPUT ( -- xn ... x1 n )
-	SOURCE-ID SOURCE >IN @ 3
-;
-
-: RESTORE-INPUT ( xn ... x1 n -- )
-	DROP >IN ! (ILEN) ! (IBUF) ! (SOURCE-ID) ! FALSE
-;
-[THEN]
-
 \ -- N>R NR> ----------------------------------------------
 
 [UNDEFINED] N>R [IF]
