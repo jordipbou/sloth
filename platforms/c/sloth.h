@@ -183,22 +183,26 @@ void sloth_throw(X* x, CELL e);
 #define SLOTH_IPOS							21*sCELL
 #define SLOTH_ILEN							22*sCELL
 #define SLOTH_SOURCE_ID					23*sCELL
-#define SLOTH_LATESTXT					24*sCELL
-#define SLOTH_IX								25*sCELL
-#define SLOTH_JX								26*sCELL
-#define SLOTH_KX								27*sCELL
-#define SLOTH_LX								28*sCELL
-#define SLOTH_INTERPRET					29*sCELL
+#define SLOTH_SOURCE_POS				24*sCELL
+#define SLOTH_LATESTXT					25*sCELL
+#define SLOTH_IX								26*sCELL
+#define SLOTH_JX								27*sCELL
+#define SLOTH_KX								28*sCELL
+#define SLOTH_LX								29*sCELL
+#define SLOTH_INTERPRET					30*sCELL
 
-#define SLOTH_PATH_START				30*sCELL
-#define SLOTH_PATH_END					31*sCELL
-#define SLOTH_PATH							32*sCELL
+#define SLOTH_PATH_START				31*sCELL
+#define SLOTH_PATH_END					32*sCELL
+#define SLOTH_PATH							33*sCELL
 
-#define SLOTH_INCLUDED_FILES		96*sCELL
+/* Space between SLOTH_PATH and SLOTH_INCLUDED_FILES */
+/* reserved to store paths. */
+
+#define SLOTH_INCLUDED_FILES		97*sCELL
 
 #ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
-#define SLOTH_PRECISION					97*sCELL
+#define SLOTH_PRECISION					98*sCELL
 
 #endif
 
@@ -323,6 +327,9 @@ void sloth_unused_(X* x);
 
 /* Source code preprocessing, interpreting & auditing commands */
 
+void sloth_refill_(X* x);
+void sloth_save_input_(X* x);
+void sloth_restore_input_(X* x);
 void sloth_included_(X* x);
 
 /* String operations */
@@ -395,7 +402,6 @@ void sloth_here_(X* x);
 void sloth_immediate_(X* x);
 /* void sloth_to_in_(X* x); */
 void sloth_postpone_(X* x);
-void sloth_refill_(X* x);
 void sloth_source_(X* x);
 
 /* == Helpers and bootstrapping ======================== */
@@ -1180,6 +1186,77 @@ void sloth_unused_(X* x) {
 
 /* Source code preprocessing, interpreting & auditing commands */
 
+void sloth_refill_(X* x) {
+	/* FIXME I'm using linebuf here but this buffer will */
+	/* disappear when I return from sloth_refill_ !!!! */
+	/* I suppose REFILL is just being used without using its */
+	/* content and it just works by miracle !!!! */
+	char linebuf[1024];
+	int i;
+	switch (sloth_user_area_get(x, SLOTH_SOURCE_ID)) {
+	case -1: 
+		sloth_push(x, 0);
+		break;
+	case 0:
+		sloth_push(x, sloth_user_area_get(x, SLOTH_IBUF)); 
+		sloth_push(x, 80);
+		sloth_eval(x, sloth_get_xt(x, sloth_find_word(x, "ACCEPT")));
+		sloth_user_area_set(x, SLOTH_ILEN, sloth_pop(x));
+		sloth_user_area_set(x, SLOTH_IPOS, 0);
+		sloth_push(x, -1); 
+		break;
+	default:
+		sloth_user_area_set(x, SLOTH_SOURCE_POS, ftell((FILE*)sloth_user_area_get(x, SLOTH_SOURCE_ID)));
+		if (fgets(linebuf, 1024, (FILE *)sloth_user_area_get(x, SLOTH_SOURCE_ID))) {
+			sloth_user_area_set(x, SLOTH_IBUF, (CELL)linebuf);
+			sloth_user_area_set(x, SLOTH_IPOS, 0);
+			/* Although I haven't found anywhere that \n should */
+			/* not be part of the input buffer when reading from */
+			/* a file, the results from preliminary tests when */
+			/* using SOURCE ... TYPE add newlines (because they */
+			/* are present) and on some other Forths they do not. */
+			/* So I just added a check to remove the \n at then */
+			/* end. */
+			if (linebuf[strlen(linebuf) - 1] < ' ') {
+				sloth_user_area_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
+			} else {
+				sloth_user_area_set(x, SLOTH_ILEN, strlen(linebuf));
+			}
+			sloth_push(x, -1);
+		} else {
+			sloth_push(x, 0);
+		}
+		break;
+	}	
+}
+
+void sloth_save_input_(X* x) {
+	sloth_push(x, sloth_user_area_get(x, SLOTH_SOURCE_POS));
+	sloth_push(x, sloth_user_area_get(x, SLOTH_SOURCE_ID));
+	sloth_push(x, sloth_user_area_get(x, SLOTH_IBUF));
+	sloth_push(x, sloth_user_area_get(x, SLOTH_IPOS));
+	sloth_push(x, sloth_user_area_get(x, SLOTH_ILEN));
+	sloth_push(x, 5);
+}
+
+void sloth_restore_input_(X* x) {
+	CELL source_id, source_pos;
+	sloth_pop(x); /* Just drop count */
+	sloth_user_area_set(x, SLOTH_ILEN, sloth_pop(x));
+	sloth_user_area_set(x, SLOTH_IPOS, sloth_pop(x));
+	sloth_user_area_set(x, SLOTH_IBUF, sloth_pop(x));
+	sloth_user_area_set(x, SLOTH_SOURCE_ID, sloth_pop(x));
+	sloth_user_area_set(x, SLOTH_SOURCE_POS, sloth_pop(x));
+	if (sloth_user_area_get(x, SLOTH_SOURCE_ID) > 0) {
+		fseek(
+			(FILE*)sloth_user_area_get(x, SLOTH_SOURCE_ID),
+			sloth_user_area_get(x, SLOTH_SOURCE_POS),
+			SEEK_SET);
+		fgets((char*)sloth_user_area_get(x, SLOTH_IBUF), 1024, (FILE*)sloth_user_area_get(x, SLOTH_SOURCE_ID));
+	}
+	sloth_push(x, 0);
+}
+
 void sloth_included_(X* x) {
 	FILE *f;
 	char linebuf[1024];
@@ -1245,8 +1322,10 @@ void sloth_included_(X* x) {
 		sloth_allot(x, l);
 		sloth_align(x);
 
+		sloth_user_area_set(x, SLOTH_SOURCE_POS, ftell(f));
 		while (fgets(linebuf, 1024, f)) {
 			/* printf(">>>> %s\n", linebuf); */
+
 			/* I tried to use _refill from here as the next */
 			/* lines of code do exactly the same but, the */
 			/* input buffer of the included file is overwritten */
@@ -1262,6 +1341,8 @@ void sloth_included_(X* x) {
 			}
 
 			sloth_eval(x, INTERPRET);
+
+			sloth_user_area_set(x, SLOTH_SOURCE_POS, ftell(f));
 		}
 
 		sloth_user_area_set(x, SLOTH_SOURCE_ID, prevsourceid);
@@ -1599,11 +1680,7 @@ void sloth_here_(X* x) { sloth_push(x, sloth_here(x)); }
 void sloth_immediate_(X* x) { 
 	sloth_set_flag(x, sloth_get_latest(x), SLOTH_IMMEDIATE); 
 }
-/* Not needed anymore
-void sloth_to_in_(X* x) { 
-	sloth_push(x, sloth_to_abs(x, SLOTH_IPOS)); 
-}
-*/
+
 void sloth_postpone_(X* x) { 
 	CELL i, xt, tok, tlen;
 	sloth_push(x, 32); sloth_word_(x);
@@ -1624,44 +1701,6 @@ void sloth_postpone_(X* x) {
 
 		sloth_compile(x, xt);
 	}
-}
-void sloth_refill_(X* x) {
-	char linebuf[1024];
-	int i;
-	switch (sloth_user_area_get(x, SLOTH_SOURCE_ID)) {
-	case -1: 
-		sloth_push(x, 0);
-		break;
-	case 0:
-		sloth_push(x, sloth_user_area_get(x, SLOTH_IBUF)); 
-		sloth_push(x, 80);
-		sloth_eval(x, sloth_get_xt(x, sloth_find_word(x, "ACCEPT")));
-		sloth_user_area_set(x, SLOTH_ILEN, sloth_pop(x));
-		sloth_user_area_set(x, SLOTH_IPOS, 0);
-		sloth_push(x, -1); 
-		break;
-	default: 
-		if (fgets(linebuf, 1024, (FILE *)sloth_user_area_get(x, SLOTH_SOURCE_ID))) {
-			sloth_user_area_set(x, SLOTH_IBUF, (CELL)linebuf);
-			sloth_user_area_set(x, SLOTH_IPOS, 0);
-			/* Although I haven't found anywhere that \n should */
-			/* not be part of the input buffer when reading from */
-			/* a file, the results from preliminary tests when */
-			/* using SOURCE ... TYPE add newlines (because they */
-			/* are present) and on some other Forths they do not. */
-			/* So I just added a check to remove the \n at then */
-			/* end. */
-			if (linebuf[strlen(linebuf) - 1] < ' ') {
-				sloth_user_area_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
-			} else {
-				sloth_user_area_set(x, SLOTH_ILEN, strlen(linebuf));
-			}
-			sloth_push(x, -1);
-		} else {
-			sloth_push(x, 0);
-		}
-		break;
-	}	
 }
 
 void sloth_source_(X* x) { 
@@ -1753,6 +1792,7 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_user_variable(x, ">IN", SLOTH_IPOS, 0);
 	sloth_user_variable(x, "(ILEN)", SLOTH_ILEN, 0);
 	sloth_user_variable(x, "(SOURCE-ID)", SLOTH_SOURCE_ID, 0);
+	sloth_user_variable(x, "(SOURCE-POS)", SLOTH_SOURCE_POS, 0);
 	sloth_user_variable(x, "(LATESTXT)", SLOTH_LATESTXT, 0);
 	/* TODO IX, JX, KX, LX could be registers of the context */
 	/* and I, J the words used. Think about it. */
@@ -1804,6 +1844,9 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* Source code preprocessing, interpreting & auditing commands */
 
+	sloth_code(x, "REFILL", sloth_primitive(x, &sloth_refill_));
+	sloth_code(x, "SAVE-INPUT", sloth_primitive(x, &sloth_save_input_));
+	sloth_code(x, "RESTORE-INPUT", sloth_primitive(x, &sloth_restore_input_));
 	sloth_code(x, "INCLUDED", sloth_primitive(x, &sloth_included_));
 
 	/* String operations */
@@ -1881,7 +1924,6 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "IMMEDIATE", sloth_primitive(x, &sloth_immediate_));
 	/* sloth_code(x, ">IN", sloth_primitive(x, &sloth_to_in_)); */
 	sloth_code(x, "POSTPONE", sloth_primitive(x, &sloth_postpone_)); sloth_immediate_(x);
-	sloth_code(x, "REFILL", sloth_primitive(x, &sloth_refill_));
 	sloth_code(x, "SOURCE", sloth_primitive(x, &sloth_source_));
 	sloth_code(x, "WORD", sloth_primitive(x, &sloth_word_));
 
