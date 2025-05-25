@@ -63,7 +63,7 @@ void sloth_key_question_(X* x) {
 }
 
 void sloth_page_(X* x) {
-	/* TODO */
+	printf("\033\143");
 }
 
 void sloth_at_x_y_(X* x) { /* TODO */ }
