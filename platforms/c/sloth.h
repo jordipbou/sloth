@@ -200,12 +200,7 @@ void sloth_throw(X* x, CELL e);
 
 #define SLOTH_INCLUDED_FILES		97*sCELL
 
-#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
-
-#define SLOTH_PRECISION					98*sCELL
-
-#endif
-
+#define SLOTH_LAST_USER_VAR			98*sCELL
 
 /* Word statuses */
 
@@ -1807,12 +1802,6 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_user_variable(x, "(SLOTH_PATH)", SLOTH_PATH, 0);
 
 	sloth_user_variable(x, "(INCLUDED-FILES)", SLOTH_INCLUDED_FILES, 0);
-
-	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
-
-	sloth_user_variable(x, "(PRECISION)", SLOTH_PRECISION, 15);
-
-	#endif
 
 	/* -- Primitives */
 

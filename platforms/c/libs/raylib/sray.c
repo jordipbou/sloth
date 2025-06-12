@@ -480,11 +480,11 @@ int main(int argc, char** argv) {
 	/* It's important to include ans.4th before */
 	/* bootstrapping raylib to allow evaluating */
 	/* forth code in bootstrap_raylib function. */
-	sloth_include(x, "../../../4th/ans.4th");
+	sloth_include(x, FORTH_PATH "ans.4th");
 
 	bootstrap_raylib(x);
 
-	sloth_include(x, "../raylib.4th");
+	sloth_include(x, ROOT_PATH "raylib.4th");
 
 	if (argc == 1) {
 		sloth_repl(x);

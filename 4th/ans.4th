@@ -1606,13 +1606,14 @@ FORTH-WORDLIST SET-CURRENT
 
 [UNDEFINED] SET-PRECISION [IF]
 
-: (PRECISION) ( -- addr ) 19 CELLS TO-ABS ;
+: PRECISION ( -- n ) (PRECISION) @ ;
 
 : SET-PRECISION ( u -- ) (PRECISION) ! ;
 
 [THEN]
 
 ?: F> ( -- flag ) ( F: r1 r2 -- ) FSWAP F< ;
+?: F0> ( -- flag ) ( F: r -- ) 0E F> ;
 
 [THEN]
 

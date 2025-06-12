@@ -49,6 +49,8 @@ FCELL sloth_fop(X* x);
 /* -- Forth Kernel ------------------------------------ */
 /* ---------------------------------------------------- */
 
+#define SLOTH_PRECISION			SLOTH_LAST_USER_VAR+0*sCELL
+
 /* Setting and getting variables (cell and char sized) */
 
 /* ABS CHANGES
@@ -685,6 +687,8 @@ void sloth_f_dot_s_(X* x) {
 }
 
 void sloth_bootstrap_floating_point_word_set(X* x) {
+
+	sloth_user_variable(x, "(PRECISION)", SLOTH_PRECISION, 15);
 
 	/* == Primitives ===================================== */
 
