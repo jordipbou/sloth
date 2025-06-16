@@ -566,6 +566,21 @@ void sloth_catch(X* x, CELL q) {
 	volatile CELL tip = x->ip;
 	volatile int e;
 
+	/* Catch is restoring sp/rp/ip but not source data, */
+	/* like ibuf, ipos, ilen and source-id. That makes */
+	/* refilling the buffer brake everything after an */
+	/* exception has been thrown. */
+	/* The thing is that those things don't belong to */
+	/* context and as such should not be saved here */
+	/* I will try to save them just to see if it works well: */
+	/*
+	volatile CELL ibuf = *((CELL*)(x->u+20*sCELL));
+	volatile CELL ipos = *((CELL*)(x->u+21*sCELL));
+	volatile CELL ilen = *((CELL*)(x->u+22*sCELL));
+	volatile CELL source_id = *((CELL*)(x->u+23*sCELL));
+	volatile CELL source_pos = *((CELL*)(x->u+24*sCELL));
+	*/
+
 	if (!(e = setjmp(x->jmpbuf[++x->jmpbuf_idx]))) {
 		sloth_eval(x, q);
 		sloth_push(x, 0);
@@ -574,6 +589,13 @@ void sloth_catch(X* x, CELL q) {
 		x->rp = trp;
 		x->ip = tip;
 		sloth_push(x, (CELL)e);
+		/*
+		*((CELL*)(x->u+20*sCELL)) = ibuf;
+		*((CELL*)(x->u+21*sCELL)) = ipos;
+		*((CELL*)(x->u+22*sCELL)) = ilen;
+		*((CELL*)(x->u+23*sCELL)) = source_id;
+		*((CELL*)(x->u+24*sCELL)) = source_pos;
+		*/
 	}
 
 	x->jmpbuf_idx--;
@@ -583,9 +605,9 @@ void sloth_throw(X* x, CELL e) {
 	if (x->jmpbuf_idx >= 0) {
 		longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
 	} else {
-		CELL ibuf = *((CELL*)(x->d+5*sCELL));
-		CELL ipos = *((CELL*)(x->d+6*sCELL));
-		CELL ilen = *((CELL*)(x->d+7*sCELL));
+		CELL ibuf = *((CELL*)(x->u+20*sCELL));
+		CELL ipos = *((CELL*)(x->u+21*sCELL));
+		CELL ilen = *((CELL*)(x->u+22*sCELL));
 		if (ibuf && ipos <= ilen) {
 		    printf("BUFFER: <%.*s>\n", (int)ilen, (char*)ibuf);
 		    printf("TOKEN: <%.*s>\n", (int)(ilen - ipos), (char*)(ibuf + ipos));

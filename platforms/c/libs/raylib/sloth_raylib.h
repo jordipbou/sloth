@@ -348,7 +348,7 @@ void sloth2raylib_rlRotatef_(X* x) {
 
 /* == BOOTSTRAPPING ==================================== */
 
-void bootstrap_raylib(X* x) {
+void sloth_bootstrap_raylib(X* x) {
 	/* Create a new wordlist for raylib words and set it */
 	/* as current. */
 

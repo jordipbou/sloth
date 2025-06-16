@@ -1,6 +1,6 @@
 #define SLOTH_IMPLEMENTATION
 #include"fsloth.h"
-#include"sloth_raylib.h"
+#include"sloth_raylib.c"
 
 int main(int argc, char** argv) {
 	X* x = sloth_new();

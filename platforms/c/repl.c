@@ -3,6 +3,9 @@
 #include"facility.h"
 #include"file.h"
 
+#include"sloth_sqlite.h"
+#include"sloth_raylib.h"
+
 /* ---------------------------------------------------- */
 /* -- main -------------------------------------------- */
 /* ---------------------------------------------------- */
@@ -19,6 +22,12 @@ int main(int argc, char**argv) {
 	sloth_bootstrap_file_wordset(x);
 
 	sloth_include(x, ROOT_PATH "4th/ans.4th");
+
+	sloth_bootstrap_sqlite(x);
+	sloth_include(x, ROOT_PATH "platforms/c/libs/sqlite/sloth_sqlite.4th");
+
+	sloth_bootstrap_raylib(x);
+	sloth_include(x, ROOT_PATH "platforms/c/libs/raylib/sloth_raylib.4th");
 
 	if (argc == 1) {
 		sloth_repl(x);

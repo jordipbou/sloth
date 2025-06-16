@@ -1,20 +1,27 @@
-cmake_minimum_required(VERSION 3.21)
-project(C-RAYLIB LANGUAGES C)
+cmake_minimum_required(VERSION 3.16)
+project(SLOTH-RAYLIB LANGUAGES C)
 
-add_executable(repl repl.c)
+add_library(raylib STATIC IMPORTED)
+if(WIN32)
+	set_target_properties(raylib PROPERTIES
+		IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/raylib-5.5_win64_msvc16/lib/raylib.lib"
+		INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/raylib-5.5_win64_msvc16/include"
+	)
+elseif(UNIX)
+	set_target_properties(raylib PROPERTIES
+		IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/raylib-5.5_linux_amd64/lib/libraylib.a"
+		INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/raylib-5.5_linux_amd64/include"
+	)
+endif()
 
-add_compile_definitions(ROOT_PATH="${PROJECT_SOURCE_DIR}/")
-add_compile_definitions(FORTH_PATH="${PROJECT_SOURCE_DIR}/../../../../4th/")
+add_library(sloth_raylib INTERFACE)
+target_include_directories(sloth_raylib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/)
+target_link_libraries(sloth_raylib INTERFACE raylib)
 
-# The next lines are only valid for Windows
-# I don't know if the PRIVATE is needed, or important
-
-if (WIN32)
-	target_include_directories (repl PRIVATE raylib-5.5_win64_msvc16/include ${CMAKE_SOURCE_DIR}/../../)
-	
-	target_link_libraries (repl PRIVATE ${CMAKE_SOURCE_DIR}/raylib-5.5_win64_msvc16/lib/raylib.lib)
-	target_link_libraries(repl PRIVATE winmm.lib)
-	target_link_libraries(repl PRIVATE OpenGL32.lib)
-	target_link_libraries(repl PRIVATE msvcrt.lib)
-endif (WIN32)
+if(WIN32)
+	target_link_libraries(sloth_raylib INTERFACE winmm.lib)
+	target_link_libraries(sloth_raylib INTERFACE OpenGL32.lib)
+	target_link_libraries(sloth_raylib INTERFACE msvcrt.lib)
+elseif(UNIX)
+endif()
 

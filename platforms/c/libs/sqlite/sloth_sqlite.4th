@@ -44,12 +44,13 @@ previous
 : SQL[ get-order DB-WORDLIST swap 1+ set-order ;
 : ]SQL previous ;
 
-\ Tests
 
-SQL[
-in-memory-db
-create table test (id int, name text);
-insert into test values (1, "Jordi");
-insert into test values (2, "Natalia");
-select * from test;
-]SQL
+\	\ Tests
+\	
+\	SQL[
+\	in-memory-db
+\	create table test (id int, name text);
+\	insert into test values (1, "Jordi");
+\	insert into test values (2, "Natalia");
+\	select * from test;
+\	]SQL

@@ -1315,6 +1315,31 @@ S" FLOATING-STACK" ENVIRONMENT? [IF] DROP
 ?\		SWAP !           \ set len 
 ?\ ;
 
+\ -- THROW/CATCH ------------------------------------------
+
+\ Although THROW and CATCH are primitive words, they only
+\ store the stack pointer, the return stack pointer and
+\ the instruction pointer.
+
+\ All the buffer pointers and information depend on the
+\ implementation (not as much on the low level context) so
+\ here CATCH is rewritten reusing original CATCH but also
+\ saving buffer information.
+
+\ No optional definition (?:) used here.
+: CATCH ( i*x xt -- j*x 0 | i*x n )
+	(IBUF) @ >R	>IN @ >R (ILEN) @ >R
+	(SOURCE-ID) @ >R (SOURCE-POS) @ >R
+	CATCH DUP IF
+		\ An exception has been thrown, restore input
+		R> (SOURCE-POS) ! R> (SOURCE-ID) !
+		R> (ILEN) ! R> >IN ! R> (IBUF) ! 
+	ELSE
+		\ No exception, just remove items from return stack
+		R> DROP R> DROP R> DROP R> DROP R> DROP
+	THEN
+;
+
 \ -- QUIT -------------------------------------------------
 
 DEFER INTERPRET

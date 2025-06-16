@@ -5,7 +5,10 @@
 /* Taken from: https://stackoverflow.com/a/28827188 */
 
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
-#include <windows.h>
+/* Instead of including windows.h we just pre-define here */
+/* the Sleep function on the windows.h API. Including the */
+/* windows.h header introduces conflicts with RayLib. */
+void __stdcall Sleep(unsigned long ms);
 #elif _POSIX_C_SOURCE >= 199309L
 #include <time.h>   /* for nanosleep */
 #else
