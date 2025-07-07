@@ -29,9 +29,14 @@ int main(int argc, char**argv) {
 	sloth_bootstrap_raylib(x);
 	sloth_include(x, ROOT_PATH "platforms/c/libs/raylib/sloth_raylib.4th");
 
-	/* Include ROOT-PATH as base path for INCLUDED */
-	memcpy(x->u + SLOTH_PATH, ROOT_PATH, strlen(ROOT_PATH));
-	sloth_user_area_set(x, SLOTH_PATH_END, x->u + SLOTH_PATH + strlen(ROOT_PATH));
+	/* Set ROOT PATH */
+	sloth_set_root_path(x, ROOT_PATH "4th/");
+	/*
+	memcpy(x->u + SLOTH_PATHS, ROOT_PATH, strlen(ROOT_PATH));
+	sloth_user_area_set(x, SLOTH_ROOT_PATH_LENGTH, strlen(ROOT_PATH));
+	sloth_user_area_set(x, SLOTH_PATH_START, x->u + SLOTH_PATH + strlen(ROOT_PATH));
+	sloth_user_area_set(x, SLOTH_PATH_END, s->u + SLOTH_PATH + strlen(ROOT_PATH));
+	*/
 
 	if (argc == 1) {
 		sloth_repl(x);
