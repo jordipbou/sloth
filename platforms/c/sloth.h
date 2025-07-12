@@ -425,6 +425,7 @@ void sloth_bootstrap(X* x);
 /* Helpers to work with files from C */
 
 void sloth_include(X* x, char* f);
+void sloth_evaluate(X* x, char* s);
 
 /* Helper REPL */
 

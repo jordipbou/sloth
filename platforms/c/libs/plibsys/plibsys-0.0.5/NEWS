@@ -1,0 +1,192 @@
+Changes in plibsys 0.0.5
+========================
+
+* Export CMake targets properly together with package files
+* Major performance improvement for shared memory buffer (#105)
+* Improved code quality based on SonarQube findings
+* Switch to CMake built-in toolchain for Apple devices
+* Improved support for new GCC versions on AmigaOS
+* Improved detection of ARM-based CPUs
+* Improved detection of MIPS-based CPUs
+
+* New supported platforms and compilers:
+  Apple Clang compiler for visionOS
+  MSVC (AArch64) compiler on Windows
+  Clang compiler on Solaris (x86, x64)
+  Intel DPC++/C++ compiler (ICX) on Linux (x86, x64)
+  NVIDIA HPC SDK compilers as PGI on Linux (x64)
+  IBM Clang-based XL C compiler on Linux (PPC)
+  IBM Open XL compiler on Linux (PPC)
+  Clang and GCC compilers on Linux (s390x)
+  Clang compiler on AIX (PPC)
+  LCC compiler for Linux (Elbrus 2000)
+  GCC compiler for Linux (LoongArch)
+  Detection of ARMv9 architecture
+  Detection of MIPS-V architecture
+  Detection of RISC-V architecture
+  Clang-based compiler for OpenVMS 9.4 (x64) (#108)
+
+* New API
+  Allow to assign names to threads (#81)
+
+* CI/CD
+  AppVeyor: Update MinGW GCC7 to 7.3.0
+  AppVeyor: Add build with MinGW GCC 8.1.0
+  AppVeyor: Add builds with VS 2019
+  AppVeyor: Add builds with VS 2022
+  AppVeyor: Drop Cygwin x86 due to EOL
+  Migrate from Travis to Github Actions for Linux/macOS
+  Update support for modern Codecov versions
+  Update support for Coverity
+  Integrate SonarQube for code quality analysis
+
+* Fixes
+  Set CMP0063 policy to new behaviour (#101)
+  Set CMP0075 policy to new behaviour
+  Update support for MSYS
+  Update support for Cygwin
+  Update support for NetBSD
+  Update support for Haiku
+  Update support for Doxygen
+  Remove duplicate static declaration in AVL tree (#75)
+  Do not calculate hash value twice for hash tables (#83)
+  Do not use CMake binary directory for outputs (#76)
+  Avoid using deprecated readdir_r() on Android
+  Always link with -lthread for multi-threading on Solaris
+  Make script to run tests compatible with AmigaOS
+  Free resources related to library loader at exit
+  Do not rely on global interfaces for ELF and EClock on AmigaOS
+  Pass RTLD_MEMBER flag to dlopen() call on AIX
+  Allow opening shared library inside archive on AIX
+  Rename functions in memory table to avoid clashes with system macros
+  Disable warnings for compilers simulating MSVC
+  Fix compiler warnings when comparing enum values
+  Fix calculation of free space in shared memory buffer (#88)
+  Fix CPU detection macro for Apple M chips (#94)
+  Fix visibility attribute detection for GCC
+  Fix shared memory segments > 4GB on Windows (#106, #107)
+  Fix missing math library in tests on Tru64 with Compaq compiler
+  Fix typos in docs (#90)
+
+Changes in plibsys 0.0.4
+========================
+
+* Switch to MIT license from LGPLv2+ (#71)
+* Replace Boost test framework with own one (#56)
+* Add visibility support for APIs
+* Add Debian package (in separate branch) (#54)
+* Add gear package (ALT Linux)
+* Add Conan packages
+* Add option to generate Doxygen documentation
+
+* New supported platforms and compilers:
+  BlackBerry 10 (AArch32, x86)
+  Cray Linux Environment
+  AmigaOS 4.1 (PPC) (#59)
+  Android (x86, x64, AArch32, AArch64) (#69)
+  iOS, tvOS, watchOS (x86, x64, AArch32, AArch64) (#70)
+  PGI (x64) compiler on macOS
+
+* New API
+  Macros for variable arguments
+
+* AppVeyor
+  Add Visual Studio 2017 builds (#53)
+  Build tests for Watcom compiler (#57)
+
+* Travis
+  Add GCC 7.x builds (#48)
+  Add Clang 4.0 and 5.0 builds
+  Add MinGW 7.1.x (x64) builds
+  Update MinGW builds to 6.3.x (x64)
+  Add Xcode 8.3 and 9.1 builds
+
+* Fixes
+  Do not use deprecated readdir_r() with glibc >= 2.24
+  Use CryptoPro S-box instead of testing in GOST hashing
+  Initialize POSIX semaphore with given value in create mode
+  Setup proper SONAME value (not the same as API version)
+
+Changes in plibsys 0.0.3
+========================
+
+* Introduce models for shared library loading (#37)
+* HP-UX shared library loading model (#39)
+* Use lldiv() to improve time profiler accuracy
+* Better error handling for shared library loading (#40)
+* CPU architecture detection macros (#44)
+* Prefer clock_nanosleep() over nanosleep() if available (#47)
+
+* New supported platforms and compilers:
+  BeOS on x86 (GCC)
+  OS/2 on x86 (GCC + kLIBC) (#41)
+  PGI (x64) compiler on Linux
+  PGI (x86) compiler on macOS
+
+* New API
+  Add routine to check for IPv6 support
+  Add routine to check if library loading is reference counted
+  Add detection of number of the CPU cores (#43)
+
+* AppVeyor
+  MSYS2 build is disabled due to a bug in CMake package
+
+* Travis
+  Correct Brew formula names for GCC on macOS
+  Update Xcode8 image to 8.3 version
+  Fix Coverity scan
+
+* Fixes
+  Do not use poll() on macOS as it can be broken
+  Do not treat some non-UNIX systems as UNIX (#42)
+  Always define P_SOCKET_FAMILY_INET6
+  Use PLIBSYS_PLATFORM_LDFLAGS to perform system checks
+  Prevent Doxygen from generating duplicate macros (#46)
+
+Changes in plibsys 0.0.2
+========================
+
+* Rename project to lower case letters
+* Move to LGPL license 
+* Print routine names in warning and error output
+* Add CMake option PLIBSYS_TESTS to disable tests completely
+* Add ability to use general model for read-write locks explicitly
+
+* New API:
+  New hashing algorithms: SHA-256/224, SHA-512/384, SHA-3
+  Add routines to get and set last native error codes
+
+* New supported platforms and compilers:
+  OpenVMS on Alpha and IA64 (DEC C)
+  Tru64 on Alpha (Compaq, GCC)
+  Linux on PPC64le (IBM XL C, GCC)
+  Syllable (GCC)
+
+* AppVeyor:
+  Add parallel builds for Microsoft compilers
+  Add LLVM (x64) build
+  Add MinGW 4.9, 5.4 and 6.2 builds 
+  Add MSYS64 (x64) build
+  Add MSYS64 (MinGW x86) build
+  Add Cygwin (x86, x64) builds
+  Add OpenWatcom 1.9 build
+
+* Travis:
+  Move to container-based builds
+  Add GCC 4.9, 5.4 and 6.x builds (x86, x64) for Linux
+  Add Clang 3.6, 3.7 and 3.8 builds (x64) for Linux
+  Add GCC 4.9, 5.4 and 6.x builds (x64) for macOS
+  Add Xcode 6.4, 7.3 and 8 builds (x64) for macOS
+
+* Boost:
+  Backport changes from 1.62 to fix warnings with GCC 6.x
+
+* Fixes:
+  Fix race condition on Solaris when creating a TLS key
+  Fix potential leak on SCO when creating a TLS key
+  Fix building tests in QNX
+
+Changes in plibsys 0.0.1
+========================
+
+* Initial release

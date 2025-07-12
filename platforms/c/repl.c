@@ -5,6 +5,7 @@
 
 #include"sloth_sqlite.h"
 #include"sloth_raylib.h"
+#include"sloth_plibsys.h"
 
 /* ---------------------------------------------------- */
 /* -- main -------------------------------------------- */
@@ -28,6 +29,8 @@ int main(int argc, char**argv) {
 
 	sloth_bootstrap_raylib(x);
 	sloth_include(x, ROOT_PATH "platforms/c/libs/raylib/sloth_raylib.4th");
+
+	sloth_bootstrap_plibsys(x);
 
 	/* Set ROOT PATH */
 	sloth_set_root_path(x, ROOT_PATH "4th/");
