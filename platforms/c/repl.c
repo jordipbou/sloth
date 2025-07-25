@@ -25,10 +25,10 @@ int main(int argc, char**argv) {
 	sloth_include(x, ROOT_PATH "4th/ans.4th");
 
 	sloth_bootstrap_sqlite(x);
-	sloth_include(x, ROOT_PATH "platforms/c/libs/sqlite/sloth_sqlite.4th");
+	sloth_include(x, ROOT_PATH "4th/libs/sloth_sqlite.4th");
 
 	sloth_bootstrap_raylib(x);
-	sloth_include(x, ROOT_PATH "platforms/c/libs/raylib/sloth_raylib.4th");
+	sloth_include(x, ROOT_PATH "4th/libs/sloth_raylib.4th");
 
 	sloth_bootstrap_plibsys(x);
 

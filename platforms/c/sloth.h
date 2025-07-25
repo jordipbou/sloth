@@ -46,6 +46,8 @@ int getch();
 /* ----------------------------------------------------- */
 
 typedef uint8_t uCHAR; /* CHARs are always unsigned */
+typedef int16_t WYDE;
+typedef int32_t LONG;
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
 
@@ -514,10 +516,14 @@ CELL sloth_rpick(X* x, CELL a) { return x->r[x->rp - a - 1]; }
 STORE/FETCH/CSTORE/cfetch work on absolute address units,
 not just inside SLOTH dictionary (memory block).
 */
-void sloth_store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
-CELL sloth_fetch(X* x, CELL a) { return *((CELL*)a); }
 void sloth_cstore(X* x, CELL a, uCHAR v) { *((uCHAR*)a) = v; }
 uCHAR sloth_cfetch(X* x, CELL a) { return *((uCHAR*)a); }
+void sloth_wstore(X* x, CELL a, WYDE v) { *((WYDE*)a) = v; }
+WYDE sloth_wfetch(X* x, CELL a) { return *((WYDE*)a); }
+void sloth_lstore(X* x, CELL a, LONG v) { *((LONG*)a) = v; }
+LONG sloth_lfetch(X* x, CELL a) { return *((LONG*)a); }
+void sloth_store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
+CELL sloth_fetch(X* x, CELL a) { return *((CELL*)a); }
 
 /*
 The next two functions allow transforming from relative to
@@ -1394,6 +1400,8 @@ void sloth_move_(X* x) {
 /* More input/output operations */
 
 #ifndef SLOTH_CUSTOM_EMIT
+/* Unicode does not work correctly on Windows cmd.exe or */
+/* Windows Terminal because Windows uses UTF-16 by default. */
 void sloth_emit_(X* x) { printf("%c", (uCHAR)sloth_pop(x)); }
 #endif
 #ifndef SLOTH_CUSTOM_KEY
@@ -1544,6 +1552,10 @@ void sloth_u_m_slash_mod_(X* x) {
 
 void sloth_c_fetch_(X* x) { sloth_push(x, sloth_cfetch(x, sloth_pop(x))); }
 void sloth_c_store_(X* x) { CELL a = sloth_pop(x); sloth_cstore(x, a, sloth_pop(x)); }
+void sloth_w_fetch_(X* x) { sloth_push(x, sloth_wfetch(x, sloth_pop(x))); }
+void sloth_w_store_(X* x) { CELL a = sloth_pop(x); sloth_wstore(x, a, sloth_pop(x)); }
+void sloth_l_fetch_(X* x) { sloth_push(x, sloth_lfetch(x, sloth_pop(x))); }
+void sloth_l_store_(X* x) { CELL a = sloth_pop(x); sloth_lstore(x, a, sloth_pop(x)); }
 void sloth_fetch_(X* x) { 
 	sloth_push(x, sloth_fetch(x, sloth_pop(x))); 
 }
@@ -1881,8 +1893,16 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* Memory-stack transfer operations */
 
+	/* sloth_code(x, "B@", sloth_primitive(x, &sloth_b_fetch_)); */
+	/* sloth_code(x, "B!", sloth_primitive(x, &sloth_b_store_)); */
 	sloth_code(x, "C@", sloth_primitive(x, &sloth_c_fetch_));
 	sloth_code(x, "C!", sloth_primitive(x, &sloth_c_store_));
+	sloth_code(x, "W@", sloth_primitive(x, &sloth_w_fetch_));
+	sloth_code(x, "W!", sloth_primitive(x, &sloth_w_store_));
+	sloth_code(x, "L@", sloth_primitive(x, &sloth_l_fetch_));
+	sloth_code(x, "L!", sloth_primitive(x, &sloth_l_store_));
+	/* sloth_code(x, "X@", sloth_primitive(x, &sloth_x_fetch_)); */
+	/* sloth_code(x, "X!", sloth_primitive(x, &sloth_x_store_)); */
 	sloth_code(x, "@", sloth_primitive(x, &sloth_fetch_));
 	sloth_code(x, "!", sloth_primitive(x, &sloth_store_));
 

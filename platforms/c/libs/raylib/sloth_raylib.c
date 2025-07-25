@@ -33,8 +33,16 @@ void sloth2raylib_WindowShouldClose_(X* x) {
 	sloth_push(x, WindowShouldClose());
 }
 
+void sloth2raylib_IsWindowReady_(X* x) {
+	sloth_push(x, IsWindowReady() == 0 ? 0 : -1);
+}
+
 void sloth2raylib_SetWindowState_(X* x) {
 	SetWindowState(((uCELL)sloth_pop(x)));
+}
+
+void sloth2raylib_ToggleFullscreen_(X* x) {
+	ToggleFullscreen();
 }
 
 void sloth2raylib_SetWindowSize_(X* x) {
@@ -113,6 +121,10 @@ void sloth2raylib_IsKeyPressed_(X* x) {
 
 void sloth2raylib_IsKeyDown_(X* x) {
 	sloth_push(x, IsKeyDown(sloth_pop(x)) ? -1 : 0);
+}
+
+void sloth2raylib_GetCharPressed_(X* x) {
+	sloth_push(x, GetCharPressed(x));
 }
 
 /* Mouse */
@@ -226,6 +238,39 @@ void sloth2raylib_DrawRectangleLines_(X* x) {
 void sloth2raylib_GetFontDefault_(X* x) {
 	Font *dest = (Font*)sloth_pop(x);
 	Font font = GetFontDefault();
+	memcpy(dest, &font, sizeof(Font));
+}
+
+void sloth2raylib_LoadFont_(X* x) {
+	char text[255];
+	Font *dest = (Font*)sloth_pop(x);
+	int l = (int)sloth_pop(x);
+	char *a = (char*)sloth_pop(x);
+	if (a[l] != 0) {
+		int i;
+		for (i = 0; i < l; i++) text[i] = sloth_cfetch(x, (CELL)(a + i));
+		text[l] = 0;
+		a = text;
+	}
+	Font font = LoadFont(a);
+	memcpy(dest, &font, sizeof(Font));
+}
+
+void sloth2raylib_LoadFontEx_(X* x) {
+	char text[255];
+	Font *dest = (Font*)sloth_pop(x);
+	int codepointCount = (int)sloth_pop(x);
+	int *codepoints = (int*)sloth_pop(x);
+	int fontSize = (int)sloth_pop(x);
+	int l = (int)sloth_pop(x);
+	char *a = (char*)sloth_pop(x);
+	if (a[l] != 0) {
+		int i;
+		for (i = 0; i < l; i++) text[i] = sloth_cfetch(x, (CELL)(a + i));
+		text[l] = 0;
+		a = text;
+	}
+	Font font = LoadFontEx(a, fontSize, codepoints, codepointCount);
 	memcpy(dest, &font, sizeof(Font));
 }
 
@@ -373,7 +418,9 @@ void sloth_bootstrap_raylib(X* x) {
 	SLOTH2RAYLIB_CODE("INIT-WINDOW", InitWindow);
 	SLOTH2RAYLIB_CODE("CLOSE-WINDOW", CloseWindow);
 	SLOTH2RAYLIB_CODE("WINDOW-SHOULD-CLOSE", WindowShouldClose);
+	SLOTH2RAYLIB_CODE("IS-WINDOW-READY", IsWindowReady);
 	SLOTH2RAYLIB_CODE("SET-WINDOW-STATE", SetWindowState);
+	SLOTH2RAYLIB_CODE("TOGGLE-FULLSCREEN", ToggleFullscreen);
 	SLOTH2RAYLIB_CODE("SET-WINDOW-SIZE", SetWindowSize);
 	SLOTH2RAYLIB_CODE("GET-SCREEN-WIDTH", GetScreenWidth);
 	SLOTH2RAYLIB_CODE("GET-SCREEN-HEIGHT", GetScreenHeight);
@@ -404,6 +451,7 @@ void sloth_bootstrap_raylib(X* x) {
 
 	SLOTH2RAYLIB_CODE("IS-KEY-PRESSED", IsKeyPressed);
 	SLOTH2RAYLIB_CODE("IS-KEY-DOWN", IsKeyDown);
+	SLOTH2RAYLIB_CODE("GET-CHAR-PRESSED", GetCharPressed);
 
 	sloth_code(x, "IS-GESTURE-DETECTED", sloth_primitive(x, &raylib_is_gesture_detected_));
 
@@ -447,6 +495,8 @@ void sloth_bootstrap_raylib(X* x) {
 	/* -- Font loading/unloading functions --------------- */
 
 	SLOTH2RAYLIB_CODE("GET-FONT-DEFAULT", GetFontDefault);
+	SLOTH2RAYLIB_CODE("LOAD-FONT", LoadFont);
+	SLOTH2RAYLIB_CODE("LOAD-FONT-EX", LoadFontEx);
 
 	/* -- Text drawing functions ------------------------- */
 

@@ -175,11 +175,21 @@ variable Tmarker
 	Color Tallot there fade there
 ;
 
+\ == MODULE RTEXT ===================================== 
+
 : Tget-font-default ( -- font )
 	\ I have not defined Font structure yet,
 	\ store enough space for anything there.
 	\ Font tallot there get-font-default there
 	1024 tallot there get-font-default there
+;
+
+: Tload-font ( c-addr u -- font )
+	1024 tallot there load-font there
+;
+
+: Tload-font-ex ( c-addr u n n n -- font )
+	1024 tallot there load-font-ex there
 ;
 
 : Tvector2add ( vector2 vector2 -- vector2 )

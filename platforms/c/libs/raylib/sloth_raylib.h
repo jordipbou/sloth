@@ -9,7 +9,9 @@
 void sloth2raylib_InitWindow_(X* x);
 void sloth2raylib_CloseWindow_(X* x);
 void sloth2raylib_WindowShouldClose_(X* x);
+void sloth2raylib_IsWindowReady_(X* x);
 void sloth2raylib_SetWindowState_(X* x);
+void sloth2raylib_ToggleFullscreen_(X* x);
 void sloth2raylib_SetWindowSize_(X* x);
 void sloth2raylib_GetScreenWidth_(X* x);
 void sloth2raylib_GetScreenHeight_(X* x);
@@ -44,6 +46,7 @@ void sloth2raylib_GetRandomValue_(X* x);
 
 void sloth2raylib_IsKeyPressed_(X* x);
 void sloth2raylib_IsKeyDown_(X* x);
+void sloth2raylib_GetCharPressed_(X* x);
 
 /* Mouse */
 
@@ -81,6 +84,8 @@ void sloth2raylib_DrawRectangleLines_(X* x);
 /* -- Font loading/unloading functions ----------------- */
 
 void sloth2raylib_GetFontDefault_(X* x);
+void sloth2raylib_LoadFont_(X* x);
+void sloth2raylib_LoadFontEx_(X* x);
 
 /* -- Text drawing functions --------------------------- */
 
