@@ -114,7 +114,7 @@ void sloth_page_(X* x) {
 
 /* == Facility extension words ========================= */
 
-void sloth_plus_field__does_part(X* x) {
+void sloth_fetch_plus_(X* x) {
 	sloth_fetch_(x);
 	sloth_plus_(x);
 }
@@ -124,7 +124,15 @@ void sloth_plus_field_(X* x) {
 	sloth_over_(x);
 	sloth_comma(x, sloth_pop(x));
 	sloth_plus_(x);
-	sloth_do_does(x, sloth_get_xt(x, sloth_find_word(x, "(+FIELD-DOES)")));
+	sloth_do_does(x, sloth_get_xt(x, sloth_find_word(x, "@+")));
+}
+
+void sloth_begin_structure_(X* x) {
+	sloth_create_(x);
+	sloth_here_(x);
+	sloth_push(x, 0);
+	sloth_comma(x, 0);
+	sloth_do_does(x, sloth_get_xt(x, sloth_find_word(x, "@")));
 }
 
 /* == Bootstrapping ==================================== */
@@ -139,8 +147,10 @@ void sloth_bootstrap_facility_wordset(X* x) {
 
 	/* == Facility extension words ======================= */
 
-	sloth_code(x, "(+FIELD-DOES)", sloth_primitive(x, &sloth_plus_field__does_part));
+	/* Move to INTERNAL wordlist */
+	sloth_code(x, "@+", sloth_primitive(x, &sloth_fetch_plus_));
 	sloth_code(x, "+FIELD", sloth_primitive(x, &sloth_plus_field_));
+	sloth_code(x, "BEGIN-STRUCTURE", sloth_primitive(x, &sloth_begin_structure_));
 
 	sloth_code(x, "TIME&DATE", sloth_primitive(x, &sloth_time_and_date_));
 	sloth_code(x, "MS", sloth_primitive(x, &sloth_ms_));
