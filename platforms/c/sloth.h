@@ -647,7 +647,6 @@ CELL sloth_here(X* x) {
 void sloth_allot(X* x, CELL v) { 
 	sloth_set(x, SLOTH_HERE, sloth_here(x) + v); 
 }
-/* CELL sloth_aligned(CELL a) { return (a + (sCELL - 1)) & ~(sCELL - 1); } */
 CELL sloth_aligned(CELL a) { return ALIGNED(a, sCELL); }
 void sloth_align(X* x) { 
 	sloth_set(
