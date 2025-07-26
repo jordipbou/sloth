@@ -64,6 +64,7 @@ void sleep_ms(int milliseconds){ /* cross-platform sleep */
 #endif
 }
 
+
 void sloth_time_and_date_(X* x) {
 	time_t t = time(NULL);
 	struct tm *tm = localtime(&t);
@@ -113,6 +114,19 @@ void sloth_page_(X* x) {
 
 /* == Facility extension words ========================= */
 
+void sloth_plus_field__does_part(X* x) {
+	sloth_fetch_(x);
+	sloth_plus_(x);
+}
+
+void sloth_plus_field_(X* x) {
+	sloth_create_(x);
+	sloth_over_(x);
+	sloth_comma(x, sloth_pop(x));
+	sloth_plus_(x);
+	sloth_do_does(x, sloth_get_xt(x, sloth_find_word(x, "(+FIELD-DOES)")));
+}
+
 /* == Bootstrapping ==================================== */
 
 void sloth_bootstrap_facility_wordset(X* x) {
@@ -124,6 +138,9 @@ void sloth_bootstrap_facility_wordset(X* x) {
 	sloth_code(x, "PAGE", sloth_primitive(x, &sloth_page_));
 
 	/* == Facility extension words ======================= */
+
+	sloth_code(x, "(+FIELD-DOES)", sloth_primitive(x, &sloth_plus_field__does_part));
+	sloth_code(x, "+FIELD", sloth_primitive(x, &sloth_plus_field_));
 
 	sloth_code(x, "TIME&DATE", sloth_primitive(x, &sloth_time_and_date_));
 	sloth_code(x, "MS", sloth_primitive(x, &sloth_ms_));

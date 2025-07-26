@@ -393,6 +393,7 @@ void sloth_cells_(X* x);
 void sloth_chars_(X* x);
 void sloth_compile_comma_(X* x);
 void sloth_create_(X* x);
+void sloth_do_does(X* x, CELL a);
 void sloth_do_does_(X* x);
 void sloth_does_(X* x);
 void sloth_evaluate_(X* x);
@@ -1655,16 +1656,17 @@ void sloth_create_(X* x) {
 /* Helper compiled by DOES> that replaces the first EXIT */
 /* compiled by CREATE on the new created word with a call */
 /* to the code after the DOES> in the CREATE DOES> word */
-void sloth_do_does_(X* x) {
-	CELL a = sloth_pop(x);
+void sloth_do_does(X* x, CELL a) {
 	sloth_store(x, sloth_get_xt(x, sloth_get_latest(x)) + 2*sCELL, a);
 }
+void sloth_do_does_(X* x) { sloth_do_does(x, sloth_pop(x)); }
 
 void sloth_does_(X* x) {
 	sloth_literal(x, sloth_here(x) + 4*sCELL);
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(DOES)")));
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 }
+
 void sloth_evaluate_(X* x) {
 	CELL e;
 	CELL l = sloth_pop(x), a = sloth_pop(x);

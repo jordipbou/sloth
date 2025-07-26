@@ -1267,7 +1267,7 @@ SET-CURRENT
 
 \ Structure implementation taken from ANS Forth standard
 
-?: BEGIN-STRUCTURE  ( -- addr 0 ; -- size )
+?: BEGIN-STRUCTURE  ( "<spaces>name" -- addr 0 ) ( -- size )
 ?\		CREATE
 ?\			HERE 0 0 ,      \ mark stack, lay dummy
 ?\		DOES> @             \ -- rec-len
