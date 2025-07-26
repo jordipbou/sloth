@@ -124,7 +124,7 @@ void sloth2raylib_IsKeyDown_(X* x) {
 }
 
 void sloth2raylib_GetCharPressed_(X* x) {
-	sloth_push(x, GetCharPressed(x));
+	sloth_push(x, GetCharPressed());
 }
 
 /* Mouse */

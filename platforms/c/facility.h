@@ -1,5 +1,39 @@
 #include"sloth.h"
 #include<time.h>
+#include<stdio.h>
+
+#ifdef _WIN32
+    #include <conio.h>
+#else
+    #include <termios.h>
+    #include <unistd.h>
+    #include <fcntl.h>
+
+    int kbhit(void) {
+        struct termios oldt, newt;
+        int ch;
+        int oldf;
+
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+        fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+        ch = getchar();
+
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+        if (ch != EOF) {
+            ungetc(ch, stdin);
+            return 1;
+        }
+
+        return 0;
+    }
+#endif
 
 /* -- Milliseconds multiplatform implementation -------- */
 /* Taken from: https://stackoverflow.com/a/28827188 */
@@ -61,24 +95,40 @@ void sloth_emit_question_(X* x) {
 	/* TODO */
 }
 
+/* == Facility words =================================== */
+
+void sloth_at_x_y_(X* x) {
+	int _y = (int)sloth_pop(x);
+	int _x = (int)sloth_pop(x);
+	printf("\x1b[%d;%dH", _y + 1, _x + 1);
+}
+
 void sloth_key_question_(X* x) {
-	/* TODO */
+	sloth_push(x, kbhit() == 1 ? -1 : 0);
 }
 
 void sloth_page_(X* x) {
 	printf("\033\143");
 }
 
-void sloth_at_x_y_(X* x) { /* TODO */ }
+/* == Facility extension words ========================= */
+
+/* == Bootstrapping ==================================== */
 
 void sloth_bootstrap_facility_wordset(X* x) {
+
+	/* == Facility words ================================= */
+
+	sloth_code(x, "AT-XY", sloth_primitive(x, &sloth_at_x_y_));
+	sloth_code(x, "KEY?", sloth_primitive(x, &sloth_key_question_));
+	sloth_code(x, "PAGE", sloth_primitive(x, &sloth_page_));
+
+	/* == Facility extension words ======================= */
+
 	sloth_code(x, "TIME&DATE", sloth_primitive(x, &sloth_time_and_date_));
 	sloth_code(x, "MS", sloth_primitive(x, &sloth_ms_));
 	sloth_code(x, "EKEY", sloth_primitive(x, &sloth_e_key_));
 	sloth_code(x, "EKEY>CHAR", sloth_primitive(x, &sloth_e_key_to_char_));
 	sloth_code(x, "EKEY?", sloth_primitive(x, &sloth_e_key_question_));
 	sloth_code(x, "EMIT?", sloth_primitive(x, &sloth_emit_question_));
-	sloth_code(x, "KEY?", sloth_primitive(x, &sloth_key_question_));
-	sloth_code(x, "PAGE", sloth_primitive(x, &sloth_page_));
-	sloth_code(x, "AT-XY", sloth_primitive(x, &sloth_at_x_y_));
 }
