@@ -124,8 +124,75 @@ void sloth_field_colon_(X* x) {
 
 /* -- Keyboard input ----------------------------------- */
 
+#define SLOTH_KB_ESC 27
+
+#define SLOTH_KB_F1 1001
+#define SLOTH_KB_F2 1002
+#define SLOTH_KB_F3 1003
+#define SLOTH_KB_F4 1004
+#define SLOTH_KB_F5 1005
+#define SLOTH_KB_F6 1006
+#define SLOTH_KB_F7 1007
+#define SLOTH_KB_F8 1008
+#define SLOTH_KB_F9 1009
+#define SLOTH_KB_F10 1010
+#define SLOTH_KB_F11 1011
+#define SLOTH_KB_F12 1012
+
+#define SLOTH_KB_UP 2001
+#define SLOTH_KB_DOWN 2002
+#define SLOTH_KB_RIGHT 2003
+#define SLOTH_KB_LEFT 2004
+
+/* TODO: I need to think (or adapt) keycodes */
 void sloth_e_key_(X* x) {
-	/* TODO */
+	int e;
+	switch (e = getch()) {
+	case 27: 
+		if (kbhit()) {
+			/* ANSI escape sequence (Linux only) */
+			switch (e = getch()) {
+			case 'O': 
+				switch (e = getch()) {
+				case 'P': e = SLOTH_KB_F1; break;
+				case 'Q': e = SLOTH_KB_F2; break;
+				case 'R': e = SLOTH_KB_F3; break;
+				case 'S': e = SLOTH_KB_F4; break;
+				}
+				break;
+			case '[':
+				switch (e = getch()) {
+				case 'A': e = SLOTH_KB_UP; break;
+				case 'B': e = SLOTH_KB_DOWN; break;
+				case 'C': e = SLOTH_KB_RIGHT; break;
+				case 'D': e = SLOTH_KB_LEFT; break;
+				case '1':
+					switch (e = getch()) {
+					case '1': getch(); e = SLOTH_KB_F1; break;
+					case '2': getch(); e = SLOTH_KB_F2; break;
+					case '3': getch(); e = SLOTH_KB_F3; break;
+					case '4': getch(); e = SLOTH_KB_F4; break;
+					case '5': getch(); e = SLOTH_KB_F5; break;
+					case '7': getch(); e = SLOTH_KB_F6; break;
+					case '8': getch(); e = SLOTH_KB_F7; break;
+					case '9': getch(); e = SLOTH_KB_F8; break;
+					}
+					break;
+				case '2':
+					switch (e = getch()) {
+					case '0': getch(); e = SLOTH_KB_F9; break;
+					case '1': getch(); e = SLOTH_KB_F10; break;
+					case '3': getch(); e = SLOTH_KB_F11; break;
+					case '4': getch(); e = SLOTH_KB_F12; break;
+					}
+					break;
+				}
+				break;
+			}
+		}
+		break;
+	}
+	sloth_push(x, e);
 }
 
 void sloth_e_key_to_char_(X* x) {
