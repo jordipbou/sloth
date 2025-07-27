@@ -144,7 +144,13 @@ void sloth_field_colon_(X* x) {
 #define SLOTH_KB_RIGHT 2003
 #define SLOTH_KB_LEFT 2004
 
-/* TODO: I need to think (or adapt) keycodes */
+#define SLOTH_KB_INSERT 3001
+#define SLOTH_KB_DELETE 3002
+#define SLOTH_KB_HOME 3003
+#define SLOTH_KB_END 3004
+#define SLOTH_KB_PAGE_UP 3005
+#define SLOTH_KB_PAGE_DOWN 3006
+
 void sloth_e_key_(X* x) {
 	int e;
 	switch (e = getch()) {
@@ -166,8 +172,11 @@ void sloth_e_key_(X* x) {
 				case 'B': e = SLOTH_KB_DOWN; break;
 				case 'C': e = SLOTH_KB_RIGHT; break;
 				case 'D': e = SLOTH_KB_LEFT; break;
+				case 'H': e = SLOTH_KB_HOME; break;
+				case 'F': e = SLOTH_KB_END; break;
 				case '1':
 					switch (e = getch()) {
+					case '~': e = SLOTH_KB_HOME; break;
 					case '1': getch(); e = SLOTH_KB_F1; break;
 					case '2': getch(); e = SLOTH_KB_F2; break;
 					case '3': getch(); e = SLOTH_KB_F3; break;
@@ -180,14 +189,19 @@ void sloth_e_key_(X* x) {
 					break;
 				case '2':
 					switch (e = getch()) {
+					case '~': e = SLOTH_KB_INSERT; break;
 					case '0': getch(); e = SLOTH_KB_F9; break;
 					case '1': getch(); e = SLOTH_KB_F10; break;
 					case '3': getch(); e = SLOTH_KB_F11; break;
 					case '4': getch(); e = SLOTH_KB_F12; break;
 					}
 					break;
-				}
+				case '3': getch(); e = SLOTH_KB_DELETE; break;
+				case '4': getch(); e = SLOTH_KB_END; break;
+				case '5': getch(); e = SLOTH_KB_PAGE_UP; break;
+				case '6': getch(); e = SLOTH_KB_PAGE_DOWN; break;
 				break;
+				}
 			}
 		}
 		break;
