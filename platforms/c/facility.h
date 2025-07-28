@@ -183,7 +183,7 @@ void sloth_e_key_(X* x) {
 					switch (e = getch()) {
 					case '~': key = SLOTH_KB_HOME; break;
 					case ';':
-						mod = getch(); 
+						mod = getch() - '0'; 
 						switch (e = getch()) {
 						case 'A': key = SLOTH_KB_UP; break;
 						case 'B': key = SLOTH_KB_DOWN; break;
@@ -219,7 +219,8 @@ void sloth_e_key_(X* x) {
 					switch (e = getch()) {
 					case '~': key = SLOTH_KB_INSERT; break;
 					case ';':
-						mod = getch(); 
+						key = SLOTH_KB_INSERT;
+						mod = getch() - '0'; 
 						getch(); /* Consume ~ character */
 						break;
 					default: 
@@ -237,6 +238,46 @@ void sloth_e_key_(X* x) {
 							getch();
 							break;
 						}
+						break;
+					}
+					break;
+				case '3':
+					switch (e = getch()) {
+					case '~': key = SLOTH_KB_DELETE; break;
+					case ';':
+						key = SLOTH_KB_DELETE;
+						mod = getch() - '0'; 
+						getch(); /* Consume ~ character */
+						break;
+					}
+					break;
+				case '4':
+					switch (e = getch()) {
+					case '~': key = SLOTH_KB_END; break;
+					case ';':
+						key = SLOTH_KB_END;
+						mod = getch() - '0'; 
+						getch(); /* Consume ~ character */
+						break;
+					}
+					break;
+				case '5':
+					switch (e = getch()) {
+					case '~': key = SLOTH_KB_PAGE_UP; break;
+					case ';':
+						key = SLOTH_KB_PAGE_UP;
+						mod = getch() - '0'; 
+						getch(); /* Consume ~ character */
+						break;
+					}
+					break;
+				case '6':
+					switch (e = getch()) {
+					case '~': key = SLOTH_KB_PAGE_DOWN; break;
+					case ';':
+						key = SLOTH_KB_PAGE_DOWN;
+						mod = getch() - '0'; 
+						getch(); /* Consume ~ character */
 						break;
 					}
 					break;
