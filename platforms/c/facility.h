@@ -126,87 +126,127 @@ void sloth_field_colon_(X* x) {
 
 #define SLOTH_KB_ESC 27
 
-#define SLOTH_KB_F1 1001
-#define SLOTH_KB_F2 1002
-#define SLOTH_KB_F3 1003
-#define SLOTH_KB_F4 1004
-#define SLOTH_KB_F5 1005
-#define SLOTH_KB_F6 1006
-#define SLOTH_KB_F7 1007
-#define SLOTH_KB_F8 1008
-#define SLOTH_KB_F9 1009
-#define SLOTH_KB_F10 1010
-#define SLOTH_KB_F11 1011
-#define SLOTH_KB_F12 1012
+#define SLOTH_KB_F1 1010
+#define SLOTH_KB_F2 1020
+#define SLOTH_KB_F3 1030
+#define SLOTH_KB_F4 1040
+#define SLOTH_KB_F5 1050
+#define SLOTH_KB_F6 1060
+#define SLOTH_KB_F7 1070
+#define SLOTH_KB_F8 1080
+#define SLOTH_KB_F9 1090
+#define SLOTH_KB_F10 1100
+#define SLOTH_KB_F11 1110
+#define SLOTH_KB_F12 1120
 
-#define SLOTH_KB_UP 2001
-#define SLOTH_KB_DOWN 2002
-#define SLOTH_KB_RIGHT 2003
-#define SLOTH_KB_LEFT 2004
+#define SLOTH_KB_UP 2000
+#define SLOTH_KB_DOWN 2010
+#define SLOTH_KB_RIGHT 2020
+#define SLOTH_KB_LEFT 2030
 
-#define SLOTH_KB_INSERT 3001
-#define SLOTH_KB_DELETE 3002
-#define SLOTH_KB_HOME 3003
-#define SLOTH_KB_END 3004
-#define SLOTH_KB_PAGE_UP 3005
-#define SLOTH_KB_PAGE_DOWN 3006
+#define SLOTH_KB_INSERT 3000
+#define SLOTH_KB_DELETE 3010
+#define SLOTH_KB_HOME 3020
+#define SLOTH_KB_END 3030
+#define SLOTH_KB_PAGE_UP 3040
+#define SLOTH_KB_PAGE_DOWN 3050
 
 void sloth_e_key_(X* x) {
-	int e;
-	switch (e = getch()) {
-	case 27: 
-		if (kbhit()) {
-			/* ANSI escape sequence (Linux only) */
+	int e, key, mod = 0;
+	if ((key = e = getch()) == 27 && kbhit()) {
+		/* ANSI escape sequence (Linux only) */
+		switch (e = getch()) {
+		case 'O':
+			/* F1 to F4 without modifiers */
 			switch (e = getch()) {
-			case 'O': 
-				switch (e = getch()) {
-				case 'P': e = SLOTH_KB_F1; break;
-				case 'Q': e = SLOTH_KB_F2; break;
-				case 'R': e = SLOTH_KB_F3; break;
-				case 'S': e = SLOTH_KB_F4; break;
-				}
-				break;
-			case '[':
-				switch (e = getch()) {
-				case 'A': e = SLOTH_KB_UP; break;
-				case 'B': e = SLOTH_KB_DOWN; break;
-				case 'C': e = SLOTH_KB_RIGHT; break;
-				case 'D': e = SLOTH_KB_LEFT; break;
-				case 'H': e = SLOTH_KB_HOME; break;
-				case 'F': e = SLOTH_KB_END; break;
+			case 'P': key = SLOTH_KB_F1; break;
+			case 'Q': key = SLOTH_KB_F2; break;
+			case 'R': key = SLOTH_KB_F3; break;
+			case 'S': key = SLOTH_KB_F4; break;
+			}
+			break;
+		case '[':
+			/* ESC [ control sequence introducer */
+			switch (e = getch()) {
+			/* UP, DOWN, RIGHT, LEFT, HOME, END without modifiers */
+			case 'A': key = SLOTH_KB_UP; break;
+			case 'B': key = SLOTH_KB_DOWN; break;
+			case 'C': key = SLOTH_KB_RIGHT; break;
+			case 'D': key = SLOTH_KB_LEFT; break;
+			case 'H': key = SLOTH_KB_HOME; break;
+			case 'F': key = SLOTH_KB_END; break;
+			default:
+				/* From this point on, the sequence can include */
+				/* modifiers on it. */
+				switch (e) {
 				case '1':
 					switch (e = getch()) {
-					case '~': e = SLOTH_KB_HOME; break;
-					case '1': getch(); e = SLOTH_KB_F1; break;
-					case '2': getch(); e = SLOTH_KB_F2; break;
-					case '3': getch(); e = SLOTH_KB_F3; break;
-					case '4': getch(); e = SLOTH_KB_F4; break;
-					case '5': getch(); e = SLOTH_KB_F5; break;
-					case '7': getch(); e = SLOTH_KB_F6; break;
-					case '8': getch(); e = SLOTH_KB_F7; break;
-					case '9': getch(); e = SLOTH_KB_F8; break;
+					case '~': key = SLOTH_KB_HOME; break;
+					case ';':
+						mod = getch(); 
+						switch (e = getch()) {
+						case 'A': key = SLOTH_KB_UP; break;
+						case 'B': key = SLOTH_KB_DOWN; break;
+						case 'C': key = SLOTH_KB_RIGHT; break;
+						case 'D': key = SLOTH_KB_LEFT; break;
+						case 'H': key = SLOTH_KB_HOME; break;
+						case 'F': key = SLOTH_KB_END; break;
+						}
+						break;
+					default: 
+						/* Number between 11 and 19 */
+						switch (e) {
+						case '1': key = SLOTH_KB_F1; break;
+						case '2': key = SLOTH_KB_F2; break;
+						case '3': key = SLOTH_KB_F3; break;
+						case '4': key = SLOTH_KB_F4; break;
+						case '5': key = SLOTH_KB_F5; break;
+						case '7': key = SLOTH_KB_F6; break;
+						case '8': key = SLOTH_KB_F7; break;
+						case '9': key = SLOTH_KB_F8; break;
+						}
+						switch (e = getch()) {
+						case '~': break;
+						case ';':
+							mod = getch() - '0';
+							getch();
+							break;
+						}
+						break;
 					}
 					break;
 				case '2':
 					switch (e = getch()) {
-					case '~': e = SLOTH_KB_INSERT; break;
-					case '0': getch(); e = SLOTH_KB_F9; break;
-					case '1': getch(); e = SLOTH_KB_F10; break;
-					case '3': getch(); e = SLOTH_KB_F11; break;
-					case '4': getch(); e = SLOTH_KB_F12; break;
+					case '~': key = SLOTH_KB_INSERT; break;
+					case ';':
+						mod = getch(); 
+						getch(); /* Consume ~ character */
+						break;
+					default: 
+						/* Number between 20 and 24 */
+						switch (e) {
+						case '0': key = SLOTH_KB_F9; break;
+						case '1': key = SLOTH_KB_F10; break;
+						case '3': key = SLOTH_KB_F11; break;
+						case '4': key = SLOTH_KB_F12; break;
+						}
+						switch (e = getch()) {
+						case '~': break;
+						case ';':
+							mod = getch() - '0';
+							getch();
+							break;
+						}
+						break;
 					}
 					break;
-				case '3': getch(); e = SLOTH_KB_DELETE; break;
-				case '4': getch(); e = SLOTH_KB_END; break;
-				case '5': getch(); e = SLOTH_KB_PAGE_UP; break;
-				case '6': getch(); e = SLOTH_KB_PAGE_DOWN; break;
-				break;
 				}
+				break;
 			}
+			break;
 		}
-		break;
 	}
-	sloth_push(x, e);
+	sloth_push(x, key + mod);
 }
 
 void sloth_e_key_to_char_(X* x) {
