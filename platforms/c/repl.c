@@ -2,6 +2,7 @@
 #include"fsloth.h"
 #include"facility.h"
 #include"file.h"
+#include"cpnbi.h"
 
 #include"sloth_sqlite.h"
 #include"sloth_raylib.h"
@@ -16,6 +17,8 @@
 #endif
 
 int main(int argc, char**argv) {
+	cpnbi_init();
+
 	X* x = sloth_new();
 
 	sloth_bootstrap(x);
@@ -52,6 +55,8 @@ int main(int argc, char**argv) {
 	}
 
 	sloth_free(x);
+
+	cpnbi_shutdown();
 }
 
 
