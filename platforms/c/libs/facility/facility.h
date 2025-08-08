@@ -17,6 +17,7 @@ void sloth_plus_field_(X* x);
 void sloth_begin_structure_(X* x);
 void sloth_c_field_colon_(X* x);
 void sloth_field_colon_(X* x);
+void sloth_end_structure_(X* x);
 
 /* -- Keyboard input ----------------------------------- */
 

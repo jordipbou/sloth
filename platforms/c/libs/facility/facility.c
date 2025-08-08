@@ -91,6 +91,11 @@ void sloth_field_colon_(X* x) {
 	sloth_plus_field_(x);
 }
 
+void sloth_end_structure_(X* x) {
+	sloth_swap_(x);
+	sloth_store_(x);
+}
+
 /* -- Keyboard input ----------------------------------- */
 
 void sloth_e_key_(X* x) {
@@ -117,8 +122,38 @@ void sloth_e_key_question_(X* x) {
 }
 
 void sloth_emit_question_(X* x) {
-	/* TODO */
+	/* Is there any known case to not set this to 1 here? */
+	sloth_push(x, 1);
 }
+
+void sloth_k_alt_mask_(X* x) { sloth_push(x, CPNBI_MOD_ALT); }
+void sloth_k_ctrl_mask_(X* x) { sloth_push(x, CPNBI_MOD_CTRL); }
+void sloth_k_shift_mask_(X* x) { sloth_push(x, CPNBI_MOD_SHIFT); }
+
+void sloth_k_insert_(X* x) { sloth_push(x, CPNBI_KEY_INSERT); }
+void sloth_k_delete_(X* x) { sloth_push(x, CPNBI_KEY_DELETE); }
+void sloth_k_home_(X* x) { sloth_push(x, CPNBI_KEY_HOME); }
+void sloth_k_prior_(X* x) { sloth_push(x, CPNBI_KEY_PAGE_UP); }
+void sloth_k_next_(X* x) { sloth_push(x, CPNBI_KEY_PAGE_DOWN); }
+void sloth_k_end_(X* x) { sloth_push(x, CPNBI_KEY_END); }
+
+void sloth_k_up_(X* x) { sloth_push(x, CPNBI_KEY_UP); }
+void sloth_k_down_(X* x) { sloth_push(x, CPNBI_KEY_DOWN); }
+void sloth_k_left_(X* x) { sloth_push(x, CPNBI_KEY_LEFT); }
+void sloth_k_right_(X* x) { sloth_push(x, CPNBI_KEY_RIGHT); }
+
+void sloth_k_f1_(X* x) { sloth_push(x, CPNBI_KEY_F1); }
+void sloth_k_f2_(X* x) { sloth_push(x, CPNBI_KEY_F2); }
+void sloth_k_f3_(X* x) { sloth_push(x, CPNBI_KEY_F3); }
+void sloth_k_f4_(X* x) { sloth_push(x, CPNBI_KEY_F4); }
+void sloth_k_f5_(X* x) { sloth_push(x, CPNBI_KEY_F5); }
+void sloth_k_f6_(X* x) { sloth_push(x, CPNBI_KEY_F6); }
+void sloth_k_f7_(X* x) { sloth_push(x, CPNBI_KEY_F7); }
+void sloth_k_f8_(X* x) { sloth_push(x, CPNBI_KEY_F8); }
+void sloth_k_f9_(X* x) { sloth_push(x, CPNBI_KEY_F9); }
+void sloth_k_f10_(X* x) { sloth_push(x, CPNBI_KEY_F10); }
+void sloth_k_f11_(X* x) { sloth_push(x, CPNBI_KEY_F11); }
+void sloth_k_f12_(X* x) { sloth_push(x, CPNBI_KEY_F12); }
 
 /* -- Time and date ------------------------------------ */
 
@@ -157,6 +192,7 @@ void sloth_bootstrap_facility_wordset(X* x) {
 	sloth_code(x, "BEGIN-STRUCTURE", sloth_primitive(x, &sloth_begin_structure_));
 	sloth_code(x, "CFIELD:", sloth_primitive(x, &sloth_c_field_colon_));
 	sloth_code(x, "FIELD:", sloth_primitive(x, &sloth_field_colon_));
+	sloth_code(x, "END-STRUCTURE", sloth_primitive(x, &sloth_end_structure_));
 
 	/* -- Keyboard input --------------------------------- */
 
@@ -165,6 +201,32 @@ void sloth_bootstrap_facility_wordset(X* x) {
 	sloth_code(x, "EKEY>FKEY", sloth_primitive(x, &sloth_e_key_to_f_key_));
 	sloth_code(x, "EKEY?", sloth_primitive(x, &sloth_e_key_question_));
 	sloth_code(x, "EMIT?", sloth_primitive(x, &sloth_emit_question_));
+
+	sloth_code(x, "K-ALT-MASK", sloth_primitive(x, &sloth_k_alt_mask_));
+	sloth_code(x, "K-CTRL-MASK", sloth_primitive(x, &sloth_k_ctrl_mask_));
+	sloth_code(x, "K-SHIFT-MASK", sloth_primitive(x, &sloth_k_shift_mask_));
+	sloth_code(x, "K-INSERT", sloth_primitive(x, &sloth_k_insert_));
+	sloth_code(x, "K-DELETE", sloth_primitive(x, &sloth_k_delete_));
+	sloth_code(x, "K- UP", sloth_primitive(x, &sloth_k_up_));
+	sloth_code(x, "K-DOWN", sloth_primitive(x, &sloth_k_down_));
+	sloth_code(x, "K-LEFT", sloth_primitive(x, &sloth_k_left_));
+	sloth_code(x, "K-RIGHT", sloth_primitive(x, &sloth_k_right_));
+	sloth_code(x, "K-HOME", sloth_primitive(x, &sloth_k_home_));
+	sloth_code(x, "K-PRIOR", sloth_primitive(x, &sloth_k_prior_));
+	sloth_code(x, "K-NEXT", sloth_primitive(x, &sloth_k_next_));
+	sloth_code(x, "K-END", sloth_primitive(x, &sloth_k_end_));
+	sloth_code(x, "K-F1", sloth_primitive(x, &sloth_k_f1_));
+	sloth_code(x, "K-F2", sloth_primitive(x, &sloth_k_f2_));
+	sloth_code(x, "K-F3", sloth_primitive(x, &sloth_k_f3_));
+	sloth_code(x, "K-F4", sloth_primitive(x, &sloth_k_f4_));
+	sloth_code(x, "K-F5", sloth_primitive(x, &sloth_k_f5_));
+	sloth_code(x, "K-F6", sloth_primitive(x, &sloth_k_f6_));
+	sloth_code(x, "K-F7", sloth_primitive(x, &sloth_k_f7_));
+	sloth_code(x, "K-F8", sloth_primitive(x, &sloth_k_f8_));
+	sloth_code(x, "K-F9", sloth_primitive(x, &sloth_k_f9_));
+	sloth_code(x, "K-F10", sloth_primitive(x, &sloth_k_f10_));
+	sloth_code(x, "K-F11", sloth_primitive(x, &sloth_k_f11_));
+	sloth_code(x, "K-F12", sloth_primitive(x, &sloth_k_f12_));
 
 	/* -- Time and date ---------------------------------- */
 
