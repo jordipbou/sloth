@@ -2,6 +2,7 @@
 #include"fsloth.h"
 #include"facility.h"
 #include"file.h"
+#include"locals.h"
 #include"cpnbi.h"
 
 #include"sloth_sqlite.h"
@@ -24,6 +25,7 @@ int main(int argc, char**argv) {
 	sloth_bootstrap(x);
 	sloth_bootstrap_facility_wordset(x);
 	sloth_bootstrap_file_wordset(x);
+	sloth_bootstrap_locals_wordset(x);
 
 	sloth_include(x, ROOT_PATH "4th/ans.4th");
 

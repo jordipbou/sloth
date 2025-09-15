@@ -11,9 +11,6 @@
 #include<stdio.h>
 #include<string.h>
 #include<assert.h>
-
-/* This are used by Claude's SM/REM implementation */
-#include <stddef.h>
 #include <limits.h> /* for CHAR_BIT */
 
 /* -- getch multiplatform definition ------------------- */
@@ -177,34 +174,35 @@ void sloth_throw(X* x, CELL e);
 
 #define SLOTH_CURRENT						0*sCELL
 #define SLOTH_ORDER							1*sCELL
-#define SLOTH_CONTEXT						2*sCELL
+#define SLOTH_LOCALS_WORDLIST		2*sCELL
+#define SLOTH_CONTEXT						3*sCELL
 /* There are 16 CELLS reserved to search order */
-#define SLOTH_BASE							18*sCELL
-#define SLOTH_STATE							19*sCELL
-#define SLOTH_IBUF							20*sCELL
-#define SLOTH_IPOS							21*sCELL
-#define SLOTH_ILEN							22*sCELL
-#define SLOTH_SOURCE_ID					23*sCELL
-#define SLOTH_SOURCE_POS				24*sCELL
-#define SLOTH_LATESTXT					25*sCELL
-#define SLOTH_IX								26*sCELL
-#define SLOTH_JX								27*sCELL
-#define SLOTH_KX								28*sCELL
-#define SLOTH_LX								29*sCELL
-#define SLOTH_INTERPRET					30*sCELL
+#define SLOTH_BASE							19*sCELL
+#define SLOTH_STATE							20*sCELL
+#define SLOTH_IBUF							21*sCELL
+#define SLOTH_IPOS							22*sCELL
+#define SLOTH_ILEN							23*sCELL
+#define SLOTH_SOURCE_ID					24*sCELL
+#define SLOTH_SOURCE_POS				25*sCELL
+#define SLOTH_LATESTXT					26*sCELL
+#define SLOTH_IX								27*sCELL
+#define SLOTH_JX								28*sCELL
+#define SLOTH_KX								29*sCELL
+#define SLOTH_LX								30*sCELL
+#define SLOTH_INTERPRET					31*sCELL
 
-#define SLOTH_ROOT_PATH_LENGTH	31*sCELL
-#define SLOTH_PATH_START				32*sCELL
-#define SLOTH_PATH_END					33*sCELL
+#define SLOTH_ROOT_PATH_LENGTH	32*sCELL
+#define SLOTH_PATH_START				33*sCELL
+#define SLOTH_PATH_END					34*sCELL
 /* Continuous space to store path strings */
-#define SLOTH_PATHS							34*sCELL
+#define SLOTH_PATHS							35*sCELL
 
 /* Space between SLOTH_PATHS and SLOTH_INCLUDED_FILES */
 /* reserved to store paths. */
 
-#define SLOTH_INCLUDED_FILES		98*sCELL
+#define SLOTH_INCLUDED_FILES		99*sCELL
 
-#define SLOTH_LAST_USER_VAR			99*sCELL
+#define SLOTH_LAST_USER_VAR			100*sCELL
 
 /* Word statuses */
 
@@ -1034,17 +1032,19 @@ int sloth__compare_without_case(X* x, CELL a1, uCELL u1, CELL a2, uCELL u2) {
 
 CELL sloth__search_word(X* x, CELL n, int l) {
 	CELL wl, w, i;
-	for (i = 0; i < sloth_user_area_get(x, SLOTH_ORDER); i++) {
+	for (i = -1; i < sloth_user_area_get(x, SLOTH_ORDER); i++) {
 		wl = sloth_user_area_get(x, SLOTH_CONTEXT + i*sCELL);
-		w = sloth_fetch(x, wl);
-		while (w > 0) {
-			if (!sloth_has_flag(x, w, SLOTH_HIDDEN) 
-			 && sloth__compare_without_case(
-						x, 
-						sloth_get_name_addr(x, w), sloth_get_namelen(x, w),
-						n, l)) 
-				return w;
-			w = sloth_get_link(x, w);
+		if (wl != 0) {
+			w = sloth_fetch(x, wl);
+			while (w > 0) {
+				if (!sloth_has_flag(x, w, SLOTH_HIDDEN) 
+				 && sloth__compare_without_case(
+							x, 
+							sloth_get_name_addr(x, w), sloth_get_namelen(x, w),
+							n, l)) 
+					return w;
+				w = sloth_get_link(x, w);
+			}
 		}
 	}
 	return 0;
@@ -1786,10 +1786,11 @@ void sloth_bootstrap_kernel(X* x) {
 
 	*((CELL*)x->u) = sloth_to_abs(x, SLOTH_FORTH_WL); /* CURRENT */
 	*((CELL*)(x->u + 1*sCELL)) = 2; /* #ORDER */
+	*((CELL*)(x->u + 2*sCELL)) = 0; /* LOCALS-WORDLIST */
 	/* CONTEXT 0 */
-	*((CELL*)(x->u + 2*sCELL)) = sloth_to_abs(x, SLOTH_FORTH_WL);
+	*((CELL*)(x->u + 3*sCELL)) = sloth_to_abs(x, SLOTH_FORTH_WL);
 	/* CONTEXT 1 */
-	*((CELL*)(x->u + 3*sCELL)) = sloth_to_abs(x, SLOTH_INTERNAL_WL);
+	*((CELL*)(x->u + 4*sCELL)) = sloth_to_abs(x, SLOTH_INTERNAL_WL);
 	
 	/* Basic primitives */
 
@@ -1804,11 +1805,12 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* User area variables */
 
-	/* TODO Comment why (CURREN) #ORDER and CONTEXT are */
+	/* TODO Comment why (CURRENT) #ORDER and CONTEXT are */
 	/* reinitialized. */
 
 	sloth_user_variable(x, "(CURRENT)", SLOTH_CURRENT, sloth_to_abs(x, SLOTH_FORTH_WL));
 	sloth_user_variable(x, "#ORDER", SLOTH_ORDER, 2);
+	sloth_user_variable(x, "(LOCALS-WORDLIST)", SLOTH_LOCALS_WORDLIST, 0);
 	sloth_user_variable(x, "CONTEXT", SLOTH_CONTEXT, sloth_to_abs(x, SLOTH_FORTH_WL));
 	sloth_user_variable(x, "BASE", SLOTH_BASE, 10);
 	sloth_user_variable(x, "STATE", SLOTH_STATE, 0);
