@@ -442,7 +442,7 @@ FORTH-WORDLIST SET-CURRENT
 \ -- Deferred words ---------------------------------------
 
 \ PLATFORM DEPENDENT
-?: >BODY ( xt -- a-addr ) 4 CELLS + ;
+?: >BODY ( xt -- a-addr ) 5 CELLS + ;
 
 ?: DEFER ( "<spaces>name" -- ) ( EX: i*x -- j*x )
 ?\		CREATE 0 , DOES> @ EXECUTE ;

@@ -1633,14 +1633,18 @@ void sloth_chars_(X* x) { /* Does nothing */ }
 void sloth_compile_comma_(X* x) { sloth_compile(x, sloth_pop(x)); }
 /* CREATE parses the next word in the input buffer, creates */
 /* a new header for it and then compiles some code. */
-/* The compiled code is 4 CELLS long and has a RIP instruction */
-/* a displacement of 4 CELLS and to EXIT instructions. */
-/* The RIP instruction will load the address after the last */
-/* EXIT instruction onto the stack. That's the address used */
+/* The compiled code is 5 CELLS long and has a RIP instruction */
+/* with a displacement of 5 CELLS and three EXIT instructions. */
+/* The RIP instruction will load onto the stack the address */
+/* after the last EXIT instruction. That's the address used */
 /* by created words. */
 /* The first EXIT instruction exists to be replaced with a */
-/* call if CREATE DOES> is used. */
-/* The last EXIT is the real end of the word. */
+/* call to the DOES> part if CREATE DOES> is used and also */
+/* returns after pushing the vlaue address if no DOES> part */
+/* has been called. */
+/* The next EXIT is there to return after calling the DOES> part. */
+/* The last EXIT represents the function to call in case of using */
+/* TO. */
 void sloth_create_(X* x) {
 	CELL tok, tlen;
 	sloth_push(x, 32); sloth_word_(x);
@@ -1648,8 +1652,9 @@ void sloth_create_(X* x) {
 	tlen = sloth_cfetch(x, sloth_pop(x));
 	sloth_header(x, tok, tlen);
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(RIP)"))); 
-	sloth_compile(x, 4*sCELL); 
+	sloth_compile(x, 5*sCELL); 
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT"))); 
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 }
 /* Helper compiled by DOES> that replaces the first EXIT */
