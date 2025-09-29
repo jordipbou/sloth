@@ -1652,9 +1652,8 @@ void sloth_create_(X* x) {
 	tlen = sloth_cfetch(x, sloth_pop(x));
 	sloth_header(x, tok, tlen);
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(RIP)"))); 
-	sloth_compile(x, 5*sCELL); 
+	sloth_compile(x, 4*sCELL); 
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT"))); 
-	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 }
 /* Helper compiled by DOES> that replaces the first EXIT */
