@@ -1,97 +1,34 @@
 \ SLOTH Implementation of Locals wordset
 
-INCLUDE THEFORTH.NET/STACK/1.0.0/STACK.4TH
-REQUIRE TRANSIENT.4TH
+REQUIRE THEFORTH.NET/STACK/1.0.0/STACK.4TH
 
-32 CONSTANT (MAX-LOCALS)
-(MAX-LOCALS) STACK CONSTANT (LOCALS-STACK)
-VARIABLE (LOCALS-USED) 0 (LOCALS-USED) !
-
-\ TODO Is not necessary to take out the safety as
-\ the locals stack will be initialized at first.
+\ The theforth.net stacks library does not include
+\ a word to update any item in the stack, so I define
+\ it here.
 
 : PUT-STACK ( x n stack-id -- )
-   \ 2DUP DEPTH-STACK 0 SWAP WITHIN 0= IF -9 THROW THEN
+   2DUP DEPTH-STACK 0 SWAP WITHIN 0= IF -9 THROW THEN
    CELL+ SWAP CELLS + !
 ;	
 
-: PICK-STACK ( n stack-id -- )
-	CELL+ SWAP CELLS + @
-;
+\ Transient memory is used to compile the code of locals
+\ and free that memory on semicolon.
+
+REQUIRE TRANSIENT.4TH
+
+GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
+
+16 CONSTANT (MAX-LOCALS)
+(MAX-LOCALS) STACK CONSTANT (LOCALS-STACK)
+VARIABLE (LOCALS-USED) 0 (LOCALS-USED) !
 
 : >L ( x -- ) ( L: -- x ) (locals-stack) >stack ;
-
-\ : 1>L ( x -- ) ( L: -- x ) 
-\ 	postpone >l 
-\ 	1 (locals-used) ! 
-\ ; immediate
-\ 
-\ : 2>L ( x1 x2 -- ) ( L: -- x2 x1 ) 
-\ 	postpone >l postpone >l 
-\ 	2 (locals-used) ! 
-\ ; immediate
-\ 
-\ : 3>L ( x1 x2 x3 -- ) ( L: -- x3 x2 x1 ) 
-\ 	postpone >l postpone >l postpone >l 
-\ 	3 (locals-used) ! 
-\ ; immediate
-\ 
-\ : 4>L ( x1 x2 x3 x4 -- ) ( L: -- x4 x3 x2 x1 ) 
-\ 	postpone >l postpone >l postpone >l postpone >l 
-\ 	4 (locals-used) ! 
-\ ; immediate
-
 : L> ( -- ) (locals-stack) stack> drop ;
 
-\ : 1L> ( -- ) l> ;
-\ : 2L> ( -- ) l> l> ;
-\ : 3L> ( -- ) l> l> l> ;
-\ : 4L> ( -- ) l> l> l> l> ;
-
-\ : L1 ( -- x ) 0 (locals-stack) pick-stack ;
-\ : L2 ( -- x ) 1 (locals-stack) pick-stack ;
-\ : L3 ( -- x ) 2 (locals-stack) pick-stack ;
-\ : L4 ( -- x ) 3 (locals-stack) pick-stack ;
-
-\ : :NONAME DOES> and ; have to be rewritten to allow 
-\ the use of locals.
-
-VARIABLE (COLON-TMARKER)
-
-: ALLOT-LOCALS-WL ( -- ) 
-	1 CELLS TALLOT DUP
-	0 SWAP !
-	(LOCALS-WORDLIST) ! 
-;
-: SET-TMARKER ( -- ) TMARK (COLON-TMARKER) ! ;
-
-: : ( -- TADDR ) SET-TMARKER ALLOT-LOCALS-WL : ; 
-: :NONAME ( -- TADDR ) SET-TMARKER ALLOT-LOCALS-WL :NONAME ;
-
-\ TODO I need to compile code to remove locals from local stack !!
-
-: FREE-LOCALS-WL ( -- ) 0 (LOCALS-WORDLIST) ! 0 (LOCALS-USED) ! ;
-: RESET-TMARKER ( -- ) (COLON-TMARKER) @ TFREE ;
-: ; ( TADDR -- ) 
-	(LOCALS-USED) @ 0 ?DO
-		POSTPONE L>
-	LOOP
-	POSTPONE ; 
-	FREE-LOCALS-WL 
-	RESET-TMARKER 
-; IMMEDIATE
-
-\ DOES> acts both as a ; and then a :
-: DOES> ( TADDR1 -- TADDR2 )
-	(LOCALS-USED) @ 0 ?DO POSTPONE L> LOOP
-	FREE-LOCALS-WL
-	RESET-TMARKER
-	POSTPONE DOES> 
-	SET-TMARKER 
-	ALLOT-LOCALS-WL
-; IMMEDIATE
-
-\ Implementation of (LOCAL)
+\ (LOCAL-DOES>) is executed when a local is found without
+\ a TO.
+\ It compiles code to access the local stack at the index
+\ that the defined local points to.
 
 : (LOCAL-DOES>)
 	@ 
@@ -102,9 +39,17 @@ VARIABLE (COLON-TMARKER)
 	POSTPONE PICK-STACK 
 ;
 
-\ I think the local needs to be created differently,
-\ not as a value with create-name but as an immediate word
-\ that compiles itself what it needs.
+SET-CURRENT
+
+\ (LOCAL) creates a new local on transient memory with the
+\ string passed as the name, sets its DOES> to (LOCAL-DOES>)
+\ and sets the flag IMMEDIATE on the new created word to
+\ allow the word to compile itself thru DOES>
+\ The newly created local is added to the locals wordlist.
+
+\ If 0 0 is passed on the stack (no more locals), then
+\ this word compiles code to move from the data stack to
+\ the locals stack.
 
 : (LOCAL) ( c-addr u -- )
 	?DUP 0<> IF
@@ -114,7 +59,7 @@ VARIABLE (COLON-TMARKER)
 		['] (LOCAL-DOES>) (DOES)
 		R> SET-CURRENT
 	ELSE
-		(locals-used) @ 0 ?DO
+		(LOCALS-USED) @ 0 ?DO
 			POSTPONE >L
 		LOOP
 		DROP
@@ -124,6 +69,14 @@ VARIABLE (COLON-TMARKER)
 \ As locals here are implemented as a stack and not as values,
 \ TO needs to be modified to work correctly with the locals
 \ stack.
+
+\ TO now searches for the word in the locals wordlist to 
+\ differentiate locals from non locals. 
+\ If its a local it compiles code to put data on the stack
+\ at the index indicated by the value of the local.
+\ If its not a local just duplicates original TO functionality,
+\ although code is rewritten because now parsing has been done
+\ before to check if the word is in locals wordlist.
 
 : TO ( i*x "<spaces>name" -- )
 	32 WORD DUP COUNT 
@@ -147,7 +100,10 @@ VARIABLE (COLON-TMARKER)
 	THEN
 ; IMMEDIATE
 
-\ ---- Reference implementation of {: --------------------------
+GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
+
+\ This is the reference implementation of {: as seen on:
+\ https://forth-standard.org/standard/locals/bColon
 
 12345 CONSTANT undefined-value
 
@@ -189,13 +145,15 @@ VARIABLE (COLON-TMARKER)
    0 0 (LOCAL) 
 ;
 
+SET-CURRENT
+
 : {: ( -- )
    0 PARSE-NAME
    scan-args scan-locals scan-end
    2DROP define-locals
 ; IMMEDIATE
 
-\ Reimplementation of ENVIRONMENT? adding locals
+\ Implementation of ENVIRONMENT? as required by locals wordset
 
 : ENVIRONMENT? ( c-addr u -- false | i*x true )
 	2DUP S" #LOCALS" COMPARE 0= IF
@@ -204,4 +162,54 @@ VARIABLE (COLON-TMARKER)
 		ENVIRONMENT?
 	THEN
 ;
+
+\ : :NONAME DOES> and ; have to be rewritten to allow 
+\ the use of locals.
+
+\ At start of a compilation with : :NONAME or DOES> ,
+\ transient space is reserved for the locals-wordlist and
+\ also to compile a new word for each local. A transient
+\ marker is set.
+
+\ That transient memory will be freed at the end of the
+\ compilation, on ; or DOES> .
+
+\ (COLON-TMARKER) is used to store the transient marker.
+
+GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
+
+VARIABLE (COLON-TMARKER)
+
+: ALLOT-LOCALS-WL ( -- ) 
+	1 CELLS TALLOT DUP
+	0 SWAP !
+	(LOCALS-WORDLIST) ! 
+;
+: SET-TMARKER ( -- ) TMARK (COLON-TMARKER) ! ;
+
+: FREE-LOCALS-WL ( -- ) 0 (LOCALS-WORDLIST) ! 0 (LOCALS-USED) ! ;
+: RESET-TMARKER ( -- ) (COLON-TMARKER) @ TFREE ;
+
+SET-CURRENT
+
+: : ( -- TADDR ) SET-TMARKER ALLOT-LOCALS-WL : ; 
+: :NONAME ( -- TADDR ) SET-TMARKER ALLOT-LOCALS-WL :NONAME ;
+: ; ( TADDR -- ) 
+	(LOCALS-USED) @ 0 ?DO
+		POSTPONE L>
+	LOOP
+	POSTPONE ; 
+	FREE-LOCALS-WL 
+	RESET-TMARKER 
+; IMMEDIATE
+
+\ DOES> acts both as a ; and then a :
+: DOES> ( TADDR1 -- TADDR2 )
+	(LOCALS-USED) @ 0 ?DO POSTPONE L> LOOP
+	FREE-LOCALS-WL
+	RESET-TMARKER
+	POSTPONE DOES> 
+	SET-TMARKER 
+	ALLOT-LOCALS-WL
+; IMMEDIATE
 
