@@ -390,6 +390,7 @@ void sloth_allot_(X* x);
 void sloth_cells_(X* x);
 void sloth_chars_(X* x);
 void sloth_compile_comma_(X* x);
+void sloth_create_name_(X* x);
 void sloth_create_(X* x);
 void sloth_do_does(X* x, CELL a);
 void sloth_do_does_(X* x);
@@ -1032,6 +1033,9 @@ int sloth__compare_without_case(X* x, CELL a1, uCELL u1, CELL a2, uCELL u2) {
 
 CELL sloth__search_word(X* x, CELL n, int l) {
 	CELL wl, w, i;
+	/* The wordlist iteration starts at -1 to always search */
+	/* on (LOCALS-WORDLIST) first, even if the search order */
+	/* is completely empty. */
 	for (i = -1; i < sloth_user_area_get(x, SLOTH_ORDER); i++) {
 		wl = sloth_user_area_get(x, SLOTH_CONTEXT + i*sCELL);
 		if (wl != 0) {
@@ -1631,6 +1635,15 @@ void sloth_allot_(X* x) { sloth_allot(x, sloth_pop(x)); }
 void sloth_cells_(X* x) { sloth_push(x, sloth_pop(x) * sCELL); }
 void sloth_chars_(X* x) { /* Does nothing */ }
 void sloth_compile_comma_(X* x) { sloth_compile(x, sloth_pop(x)); }
+void sloth_create_name_(X* x) {
+	CELL tlen = sloth_pop(x);
+	CELL tok = sloth_pop(x);
+	sloth_header(x, tok, tlen);
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(RIP)")));
+	sloth_compile(x, 4*sCELL);
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
+}
 /* CREATE parses the next word in the input buffer, creates */
 /* a new header for it and then compiles some code. */
 /* The compiled code is 5 CELLS long and has a RIP instruction */
@@ -1949,6 +1962,7 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "CELLS", sloth_primitive(x, &sloth_cells_));
 	sloth_code(x, "CHARS", sloth_primitive(x, &sloth_chars_));
 	sloth_code(x, "COMPILE,", sloth_primitive(x, &sloth_compile_comma_));
+	sloth_code(x, "CREATE-NAME", sloth_primitive(x, &sloth_create_name_));
 	sloth_code(x, "CREATE", sloth_primitive(x, &sloth_create_));
 	sloth_code(x, "DOES>", sloth_primitive(x, &sloth_does_)); sloth_immediate_(x);
 	sloth_code(x, "EVALUATE", sloth_primitive(x, &sloth_evaluate_));

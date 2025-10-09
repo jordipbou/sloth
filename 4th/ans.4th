@@ -450,10 +450,11 @@ FORTH-WORDLIST SET-CURRENT
 ?: TO
 ?\ ( i*x "<spaces>name" -- )
 ?\ ( C: "<spaces>name" -- )
-?\		STATE @ IF
-?\			POSTPONE ['] POSTPONE >BODY POSTPONE !
-?\		ELSE
-?\			' >BODY !
+?\		' >BODY
+?\		STATE @ IF 
+?\			POSTPONE LITERAL POSTPONE !
+?\		ELSE 
+?\			!
 ?\		THEN
 ?\ ; IMMEDIATE
 
@@ -904,15 +905,19 @@ FORTH-WORDLIST SET-CURRENT
 ?: WORDLIST-LATEST ( wid -- nt ) @ ;
 
 ?: FIND-NAME-IN ( c-addr u wid -- nt | 0 )
-?\		WORDLIST-LATEST >R BEGIN
-?\			R@ WHILE
-?\			R@ NAME>STRING
-?\			2OVER CASE-INSENSITIVE-COMPARE IF
-?\				DROP DROP R> EXIT
-?\			THEN
-?\			R> NAME>LINK >R
-?\		REPEAT
-?\		2DROP R>
+?\		?DUP 0= IF
+?\			DROP DROP 0
+?\		ELSE
+?\			WORDLIST-LATEST >R BEGIN
+?\				R@ WHILE
+?\				R@ NAME>STRING
+?\				2OVER CASE-INSENSITIVE-COMPARE IF
+?\					DROP DROP R> EXIT
+?\				THEN
+?\				R> NAME>LINK >R
+?\			REPEAT
+?\			2DROP R>
+?\		THEN
 ?\ ;
 
 ?: SEARCH-WORDLIST ( c-addr u wid -- 0 | xt 1 | xt -1 )
@@ -1837,3 +1842,7 @@ FORTH-WORDLIST SET-CURRENT
 \	' RECOGNIZERS-BASED-INTERPRET IS INTERPRET
 \	
 \	[THEN]
+
+
+
+INCLUDE LOCALS.4TH

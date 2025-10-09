@@ -128,6 +128,8 @@ end-structure
 \ Words that return a structure and need a memory
 \ buffer for it may use transient memory.
 
+\ TODO All this should use transient.4th instead !!!
+
 [UNDEFINED] THERE [IF]
 here unused + value THERE
 [THEN]
