@@ -1,5 +1,7 @@
 \ SLOTH Implementation of Locals wordset
 
+\ The word LOCALS| has not been implemented as is obsolescent.
+
 REQUIRE THEFORTH.NET/STACK/1.0.0/STACK.4TH
 
 \ The theforth.net stacks library does not include
