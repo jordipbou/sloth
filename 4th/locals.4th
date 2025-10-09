@@ -3,7 +3,8 @@
 INCLUDE THEFORTH.NET/STACK/1.0.0/STACK.4TH
 REQUIRE TRANSIENT.4TH
 
-32 STACK CONSTANT (LOCALS-STACK)
+32 CONSTANT (MAX-LOCALS)
+(MAX-LOCALS) STACK CONSTANT (LOCALS-STACK)
 VARIABLE (LOCALS-USED) 0 (LOCALS-USED) !
 
 \ TODO Is not necessary to take out the safety as
@@ -52,7 +53,8 @@ VARIABLE (LOCALS-USED) 0 (LOCALS-USED) !
 \ : L3 ( -- x ) 2 (locals-stack) pick-stack ;
 \ : L4 ( -- x ) 3 (locals-stack) pick-stack ;
 
-\ : is rewritten to allow use of locals
+\ : :NONAME DOES> and ; have to be rewritten to allow 
+\ the use of locals.
 
 VARIABLE (COLON-TMARKER)
 
@@ -62,11 +64,34 @@ VARIABLE (COLON-TMARKER)
 	(LOCALS-WORDLIST) ! 
 ;
 : SET-TMARKER ( -- ) TMARK (COLON-TMARKER) ! ;
-: : ( -- TADDR ) SET-TMARKER ALLOT-LOCALS-WL : ; 
 
-: FREE-LOCALS ( -- ) 0 (LOCALS-WORDLIST) ! 0 (LOCALS-USED) ! ;
+: : ( -- TADDR ) SET-TMARKER ALLOT-LOCALS-WL : ; 
+: :NONAME ( -- TADDR ) SET-TMARKER ALLOT-LOCALS-WL :NONAME ;
+
+\ TODO I need to compile code to remove locals from local stack !!
+
+: FREE-LOCALS-WL ( -- ) 0 (LOCALS-WORDLIST) ! 0 (LOCALS-USED) ! ;
 : RESET-TMARKER ( -- ) (COLON-TMARKER) @ TFREE ;
-: ; ( TADDR -- ) POSTPONE ; FREE-LOCALS RESET-TMARKER ; IMMEDIATE
+: ; ( TADDR -- ) 
+	(LOCALS-USED) @ 0 ?DO
+		POSTPONE L>
+	LOOP
+	POSTPONE ; 
+	FREE-LOCALS-WL 
+	RESET-TMARKER 
+; IMMEDIATE
+
+\ DOES> acts both as a ; and then a :
+: DOES> ( TADDR1 -- TADDR2 )
+	(LOCALS-USED) @ 0 ?DO POSTPONE L> LOOP
+	FREE-LOCALS-WL
+	RESET-TMARKER
+	POSTPONE DOES> 
+	SET-TMARKER 
+	ALLOT-LOCALS-WL
+; IMMEDIATE
+
+\ Implementation of (LOCAL)
 
 : (LOCAL-DOES>)
 	@ 
@@ -89,7 +114,6 @@ VARIABLE (COLON-TMARKER)
 		['] (LOCAL-DOES>) (DOES)
 		R> SET-CURRENT
 	ELSE
-		\ How can I do locals inverted?
 		(locals-used) @ 0 ?DO
 			POSTPONE >L
 		LOOP
@@ -170,3 +194,14 @@ VARIABLE (COLON-TMARKER)
    scan-args scan-locals scan-end
    2DROP define-locals
 ; IMMEDIATE
+
+\ Reimplementation of ENVIRONMENT? adding locals
+
+: ENVIRONMENT? ( c-addr u -- false | i*x true )
+	2DUP S" #LOCALS" COMPARE 0= IF
+		2DROP (MAX-LOCALS) -1
+	ELSE
+		ENVIRONMENT?
+	THEN
+;
+
