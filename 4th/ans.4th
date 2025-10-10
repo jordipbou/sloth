@@ -256,23 +256,6 @@ FORTH-WORDLIST SET-CURRENT
 ?: NIP ( x1 x2 -- x2 ) SWAP DROP ;
 ?: TUCK ( x1 x2 -- x2 x1 x2 ) >R R@ SWAP R> ;
 
-\ Not ANS
-\ TODO Should this take into account the number of
-\ items on the stack, or just do as told without
-\ checking anything?
-?: DISCARD ( x1 ... xn u -- )
-?\		0 OVER < IF
-?\			BEGIN
-?\				DUP WHILE
-?\				NIP
-?\				1 -
-?\			REPEAT
-?\			DROP
-?\		ELSE
-?\			DROP
-?\		THEN
-?\ ;
-
 ?: ROLL ( xu xu-1 ... x0 u -- xu-1 ... x0 xu ) 
 ?\		DUP IF 
 ?\			SWAP >R 1 - RECURSE R> SWAP EXIT 
@@ -732,7 +715,7 @@ FORTH-WORDLIST SET-CURRENT
 
 ?: SET-ORDER ( wid1 ... widn n -0 )
 ?\		DUP -1 = IF
-?\			DROP FORTH-WORDLIST 1
+?\			DROP INTERNAL-WORDLIST FORTH-WORDLIST 2
 ?\		THEN
 ?\		DUP #order !
 ?\		0 ?DO I CELLS context + ! LOOP
@@ -741,7 +724,8 @@ FORTH-WORDLIST SET-CURRENT
 ?: WORDLIST ( -- wid ) HERE 0 , ;
 
 ?: ALSO ( -- ) GET-ORDER OVER SWAP 1+ SET-ORDER ;
-?: DEFINITIONS ( -- ) GET-ORDER SWAP SET-CURRENT DISCARD ;
+
+?: DEFINITIONS ( -- ) GET-ORDER OVER SET-CURRENT SET-ORDER ;
 ?: FORTH ( -- ) GET-ORDER NIP FORTH-WORDLIST SWAP SET-ORDER ;
 ?: ONLY ( -- ) -1 SET-ORDER ;
 ?: PREVIOUS ( -- ) GET-ORDER NIP 1- SET-ORDER ;
@@ -1206,6 +1190,9 @@ SET-CURRENT
 ?\ ;
 
 \ -- Words 
+
+\ Not ANS, require for WORDS
+?: DISCARD ( x1 ... xn u -- ) 0 ?DO DROP LOOP ;
 
 ?: WORDS ( -- )
 ?\		GET-ORDER SWAP >R 1- DISCARD R>
