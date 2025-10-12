@@ -1268,6 +1268,7 @@ void sloth_restore_input_(X* x) {
 void sloth_included_(X* x) {
 	FILE *f;
 	char linebuf[1024];
+	CELL linenumber;
 	CELL INTERPRET, e, here, i;
 
 	CELL previbuf = sloth_user_area_get(x, SLOTH_IBUF);
@@ -1344,7 +1345,9 @@ void sloth_included_(X* x) {
 		sloth_align(x);
 
 		sloth_user_area_set(x, SLOTH_SOURCE_POS, ftell(f));
+		linenumber = 0;
 		while (fgets(linebuf, 1024, f)) {
+			CELL e;
 			/* printf(">>>> %s\n", linebuf); */
 
 			/* I tried to use _refill from here as the next */
@@ -1361,9 +1364,17 @@ void sloth_included_(X* x) {
 				sloth_user_area_set(x, SLOTH_ILEN, strlen(linebuf));
 			}
 
-			sloth_eval(x, INTERPRET);
+			sloth_catch(x, INTERPRET);
+			e = sloth_pop(x);
+			if (e != 0) {
+				printf("File: %s\n", pathstart);
+				printf("Line (%ld): %s", linenumber, linebuf);	
+				sloth_throw(x, e);
+			}
 
 			sloth_user_area_set(x, SLOTH_SOURCE_POS, ftell(f));
+
+			linenumber++;
 		}
 
 		sloth_user_area_set(x, SLOTH_SOURCE_ID, prevsourceid);

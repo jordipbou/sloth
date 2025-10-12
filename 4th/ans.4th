@@ -344,6 +344,9 @@ FORTH-WORDLIST SET-CURRENT
 ?: MIN ( n1 n2 -- n3 ) 2DUP > IF SWAP THEN DROP ;
 ?: MAX ( n1 n2 -- n3 ) 2DUP < IF SWAP THEN DROP ;
 
+\ Non ANS
+\ ?: UMIN ( u1 u2 -- u3 ) 2DUP U< IF DROP ELSE NIP THEN ;
+
 ?: S>D ( n -- d ) DUP 0< ;
 ?: D>S ( d -- n ) DROP ;
 
@@ -498,7 +501,7 @@ FORTH-WORDLIST SET-CURRENT
 ?\		POSTPONE ;] POSTPONE (DOLOOP)
 ?\ ; IMMEDIATE
 
-\ -- Strings ----------------------------------------------
+\ -- Strings (from CORE wordset) --------------------------
 
 32
 ?CONSTANT BL
@@ -521,21 +524,6 @@ FORTH-WORDLIST SET-CURRENT
 
 ?: PAD ( -- c-addr ) HERE (PAD-DISPLACEMENT) + ;
 
-\ Adapted from Minimal Forth to use CHARS instead of memory
-\ units.
-?: /STRING ( c-addr1 u1 n -- c-addr2 u2 )
-?\		SWAP OVER - >R CHARS + R>
-?\ ;
-
-?: -TRAILING ( c-addr u1 -- c-addr u2 )
-?\		BEGIN   
-?\		    2DUP + CHAR- C@ BL =
-?\		    OVER AND
-?\		WHILE   
-?\		    CHAR-  
-?\		REPEAT  
-?\ ;
-
 ?: FILL ( c-addr u char -- ) 
 ?\		-ROT BEGIN 
 ?\			DUP 0> WHILE 
@@ -547,44 +535,6 @@ FORTH-WORDLIST SET-CURRENT
 ?: ERASE ( c-addr n -- ) 0 FILL ;
 
 ?: BLANK ( c-addr u -- ) BL FILL ;
-
-?: CMOVE> ( c-addr1 c-addr2 u -- ) CHARS MOVE ;
-?: CMOVE ( c-addr1 c-addr2 u -- ) CHARS MOVE ;
-
-\ COMPARE implementation taken from SwapForth
-
-?: COMPARE-SAME? ( c-addr1 c-addr2 u -- -1|0|1 )
-?\		BOUNDS ?DO
-?\			I C@ OVER C@ - ?DUP IF
-?\				0> 2* 1+
-?\				NIP UNLOOP EXIT
-?\			THEN
-?\			1+
-?\		LOOP
-?\		DROP 0
-?\ ;
-
-?: COMPARE ( c-addr1 u1 c-addr2 u2 -- n )
-?\		ROT 2DUP SWAP - >R          \ ca1 ca2 u2 u1  r: u1-u2
-?\		MIN COMPARE-SAME? ?DUP
-?\		IF R> DROP EXIT THEN
-?\		R> DUP IF 0< 2* 1+ THEN 
-?\ ;
-
-\ Implementation taken from lbForth
-
-\ TODO Does not return u3 == u1 when does not find anything
-
-?: SEARCH ( c-addr1 u1 c-addr2 u2 -- c-addr3 u3 flag )   
-?\		2>R BEGIN 
-?\			2DUP R@ MIN 2R@ COMPARE WHILE 
-?\			DUP WHILE
-?\			1 /STRING 
-?\		REPEAT 
-?\		0 ELSE -1 
-?\		THEN 
-?\		2R> 2DROP 
-?\ ;
 
 \ Implementation from ANS Forth standard comment
 ?: TYPE ( c-addr u -- ) 0 ?DO COUNT EMIT LOOP DROP ;
@@ -808,6 +758,14 @@ FORTH-WORDLIST SET-CURRENT
 ?\		THEN
 ?\ ;
 
+\ -- From string wordset (needed for /SOURCE and SLITERAL) -
+
+\ Adapted from Minimal Forth to use CHARS instead of memory
+\ units.
+?: /STRING ( c-addr1 u1 n -- c-addr2 u2 )
+?\		SWAP OVER - >R CHARS + R>
+?\ ;
+
 \ -- Parsing ----------------------------------------------
 
 ?: /SOURCE ( -- c-addr n )
@@ -848,6 +806,10 @@ FORTH-WORDLIST SET-CURRENT
 \ -- Including source code --------------------------------
 
 ?: INCLUDE ( i*x "name" -- j*x ) PARSE-NAME INCLUDED ;
+
+\ -- Full strings wordset ---------------------------------
+
+INCLUDE STRINGS.4TH
 
 \ -- Combinators ------------------------------------------
 
@@ -1829,7 +1791,6 @@ FORTH-WORDLIST SET-CURRENT
 \	' RECOGNIZERS-BASED-INTERPRET IS INTERPRET
 \	
 \	[THEN]
-
 
 
 INCLUDE LOCALS.4TH
