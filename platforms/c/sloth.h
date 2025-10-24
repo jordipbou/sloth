@@ -149,6 +149,10 @@ void sloth__execute(X* x, CELL q);
 void sloth__inner(X* x);
 void sloth_eval(X* x, CELL q);
 
+/* -- Tracing inner interpreter ------------------------ */
+
+void sloth__debug_inner(X* x, CELL debug_xt);
+
 /* -- Exceptions --------------------------------------- */
 
 void sloth_catch(X* x, CELL q);
@@ -397,6 +401,7 @@ void sloth_do_does_(X* x);
 void sloth_does_(X* x);
 void sloth_evaluate_(X* x);
 void sloth_execute_(X* x);
+/* Non ANS */ void sloth_debug_(X* x);
 void sloth_here_(X* x);
 void sloth_immediate_(X* x);
 /* void sloth_to_in_(X* x); */
@@ -565,6 +570,21 @@ void sloth__inner(X* x) {
 void sloth_eval(X* x, CELL q) { 
 	sloth__execute(x, q); 
 	if (q > 0) sloth__inner(x); 
+}
+
+/* Tracing eval */
+
+void sloth__debug(X* x, CELL debug_xt) {
+	sloth_push(x, x->ip);
+	sloth_eval(x, debug_xt);
+}
+
+void sloth__debug_inner(X* x, CELL debug_xt) {
+	CELL t = x->rp;
+	while (t <= x->rp && x->ip >= 0) {
+		sloth__debug(x, debug_xt);
+		sloth__execute(x, sloth_op(x));
+	}
 }
 
 /* -- Exceptions --------------------------------------- */
@@ -1727,6 +1747,17 @@ void sloth_evaluate_(X* x) {
 	}
 }
 void sloth_execute_(X* x) { sloth_eval(x, sloth_pop(x)); }
+/* Non ANS */ void sloth_debug_(X* x) {
+	CELL post_xt = sloth_pop(x); 
+	CELL inner_xt = sloth_pop(x);
+	CELL pre_xt = sloth_pop(x);
+	CELL q = sloth_pop(x);
+	sloth__debug(x, pre_xt);
+	sloth__execute(x, q);
+	if (q > 0) sloth__debug_inner(x, inner_xt);
+	sloth__debug(x, post_xt);
+}
+
 void sloth_here_(X* x) { sloth_push(x, sloth_here(x)); }
 
 void sloth_immediate_(X* x) { 
@@ -1978,6 +2009,7 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "DOES>", sloth_primitive(x, &sloth_does_)); sloth_immediate_(x);
 	sloth_code(x, "EVALUATE", sloth_primitive(x, &sloth_evaluate_));
 	sloth_code(x, "EXECUTE", sloth_primitive(x, &sloth_execute_));
+	/* Non ANS */	sloth_code(x, "DEBUG", sloth_primitive(x, &sloth_debug_));
 	sloth_code(x, "HERE", sloth_primitive(x, &sloth_here_));
 	sloth_code(x, "IMMEDIATE", sloth_primitive(x, &sloth_immediate_));
 	/* sloth_code(x, ">IN", sloth_primitive(x, &sloth_to_in_)); */

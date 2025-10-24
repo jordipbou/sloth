@@ -748,16 +748,6 @@ FORTH-WORDLIST SET-CURRENT
 ?\		THEN
 ?\ ;
 
-\ For debugging, not ANS
-?: .RET ( -- )
-?\		'[' EMIT RDEPTH 0 0 D.R ']' EMIT SPACE
-?\		RDEPTH 0 > IF
-?\			1 RDEPTH 1- DO
-?\				I 1- RPICK .
-?\			-1 +LOOP
-?\		THEN
-?\ ;
-
 \ -- From string wordset (needed for /SOURCE and SLITERAL) -
 
 \ Adapted from Minimal Forth to use CHARS instead of memory
@@ -807,9 +797,20 @@ FORTH-WORDLIST SET-CURRENT
 
 ?: INCLUDE ( i*x "name" -- j*x ) PARSE-NAME INCLUDED ;
 
-\ -- Full strings wordset ---------------------------------
+\ -- CMOVE from strings wordset (required by SLITERAL) ----
 
-INCLUDE STRINGS.4TH
+\ Implementation taken from SwapForth
+?: CMOVE ( c-addr1 c-addr2 u -- )
+?\		BOUNDS ROT >R
+?\		BEGIN
+?\		    2DUP XOR
+?\		WHILE
+?\		    R@ C@ OVER C!
+?\		    R> 1+ >R
+?\		    1+
+?\		REPEAT
+?\		R> DROP 2DROP
+?\ ;
 
 \ -- Combinators ------------------------------------------
 
@@ -886,6 +887,19 @@ INCLUDE STRINGS.4TH
 ?\		2R> 2DROP
 ?\ ;
 
+\ Not ANS
+?: TRAVERSE-ORDER ( i*x xt -- j*x )
+?\		CONTEXT CONTEXT #ORDER @ 1- CELLS + DO
+?\			>R I R@ EXECUTE IF
+\ TODO Add that if quotation returns -1 it continues traversing
+\ else it stops (on 0)
+?\				
+?\			ELSE
+?\			THEN R>
+?\		1 CELLS NEGATE +LOOP
+?\		DROP
+?\ ;
+
 \ Not ANS yet
 ?: FIND-NAME ( c-addr u -- nt | 0 )
 ?\		CONTEXT ( c-addr u addr )
@@ -940,7 +954,9 @@ SET-CURRENT
 
 ?: [IF]		0= IF POSTPONE [ELSE] THEN ; IMMEDIATE \ ( flag -- )
 
-\ -- String literals --------------------------------------
+\ == String literals ======================================
+
+\ -- SLITERAL from strings wordset (required by S") -------
 
 ?: SLITERAL ( c-addr1 u -- ) ( -- c-addr2 u )
 ?\		POSTPONE (STRING) DUP ,
@@ -950,6 +966,10 @@ SET-CURRENT
 ?\		ALIGN
 ?\ ; IMMEDIATE
 
+GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
+
+\ This is the equivalent of SLITERAL but for counted
+\ strings
 ?: CLITERAL ( c-addr1 u -- ) ( -- c-addr2 )
 ?\		POSTPONE (CSTRING) DUP C,
 ?\		HERE OVER CHARS ALLOT
@@ -957,6 +977,8 @@ SET-CURRENT
 ?\		0 C,	\ Zero ended string literal
 ?\		ALIGN
 ?\ ; IMMEDIATE
+
+SET-CURRENT
 
 \ The following definitions will have an end-of-line
 \ comment with a quote to not break syntax highlighting.
@@ -984,7 +1006,7 @@ SET-CURRENT
 ?\		')' PARSE TYPE
 ?\ ; IMMEDIATE
 
-\ -- Number conversion ------------------------------------
+\ == Number conversion ====================================
 
 \ TODO: This number conversion seems to be pretty basic.
 
@@ -1173,6 +1195,33 @@ SET-CURRENT
 ?\		1+ 0 U.R
 ?\		'H' EMIT
 ?\ ;
+
+\ -- COMPARE from strings wordset (require by ENVIRONMENT?)
+
+\ COMPARE implementation taken from SwapForth
+
+GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
+
+?: COMPARE-SAME? ( c-addr1 c-addr2 u -- -1|0|1 )
+?\		BOUNDS ?DO
+?\			I C@ OVER C@ - ?DUP IF
+?\				0> 2* 1+
+?\				NIP UNLOOP EXIT
+?\			THEN
+?\			1+
+?\		LOOP
+?\		DROP 0
+?\ ;
+
+SET-CURRENT
+
+?: COMPARE ( c-addr1 u1 c-addr2 u2 -- n )
+?\		ROT 2DUP SWAP - >R          \ ca1 ca2 u2 u1  r: u1-u2
+?\		MIN COMPARE-SAME? ?DUP
+?\		IF R> DROP EXIT THEN
+?\		R> DUP IF 0< 2* 1+ THEN 
+?\ ;
+
 
 \ -- Environment queries ----------------------------------
 
@@ -1792,5 +1841,5 @@ FORTH-WORDLIST SET-CURRENT
 \	
 \	[THEN]
 
-
+INCLUDE STRINGS.4TH
 INCLUDE LOCALS.4TH

@@ -1,57 +1,30 @@
-?: -TRAILING ( c-addr u1 -- c-addr u2 )
-?\		BEGIN   
-?\		    2DUP + CHAR- C@ BL =
-?\		    OVER AND
-?\		WHILE   
-?\		    CHAR-  
-?\		REPEAT  
-?\ ;
+REQUIRE TRANSIENT.4TH
+
+[UNDEFINED] -TRAILING [IF]
+: -TRAILING ( c-addr u1 -- c-addr u2 )
+	BEGIN   
+	    2DUP + CHAR- C@ BL =
+	    OVER AND
+	WHILE   
+	    CHAR-  
+	REPEAT  
+;
+[THEN]
 
 \ Implementation taken from SwapForth
-?: CMOVE ( c-addr1 c-addr2 u -- )
-?\		BOUNDS ROT >R
-?\		BEGIN
-?\		    2DUP XOR
-?\		WHILE
-?\		    R@ C@ OVER C!
-?\		    R> 1+ >R
-?\		    1+
-?\		REPEAT
-?\		R> DROP 2DROP
-?\ ;
-
-\ Implementation taken from SwapForth
-?: CMOVE> ( ADDR1 ADDR2 U -- )
-?\		BEGIN
-?\			DUP
-?\		WHILE
-?\			1- >R
-?\			OVER R@ + C@
-?\			OVER R@ + C!
-?\			R>
-?\		REPEAT
-?\		DROP 2DROP
-?\ ;
-
-\ COMPARE implementation taken from SwapForth
-
-?: COMPARE-SAME? ( c-addr1 c-addr2 u -- -1|0|1 )
-?\		BOUNDS ?DO
-?\			I C@ OVER C@ - ?DUP IF
-?\				0> 2* 1+
-?\				NIP UNLOOP EXIT
-?\			THEN
-?\			1+
-?\		LOOP
-?\		DROP 0
-?\ ;
-
-?: COMPARE ( c-addr1 u1 c-addr2 u2 -- n )
-?\		ROT 2DUP SWAP - >R          \ ca1 ca2 u2 u1  r: u1-u2
-?\		MIN COMPARE-SAME? ?DUP
-?\		IF R> DROP EXIT THEN
-?\		R> DUP IF 0< 2* 1+ THEN 
-?\ ;
+[UNDEFINED] CMOVE> [IF]
+: CMOVE> ( ADDR1 ADDR2 U -- )
+	BEGIN
+		DUP
+	WHILE
+		1- >R
+		OVER R@ + C@
+		OVER R@ + C!
+		R>
+	REPEAT
+	DROP 2DROP
+;
+[THEN]
 
 \ Implementation from:
 \ https://forth-standard.org/standard/string/SEARCH#reply-1489
@@ -69,14 +42,119 @@
 ?\		2DROP 2DROP FALSE      \ string not found
 ?\ ;
 
-\ Reference ANS Forth implementation from:
-\ https://forth-standard.org/standard/string/UNESCAPE
-?: UNESCAPE ( c-addr1 len1 c-addr2 -- c-addr2 len2 )
-?\		DUP 2SWAP OVER + SWAP ?DO
-?\			I C@ [CHAR] % = IF
-?\				[CHAR] % OVER C! 1+
-?\			THEN
-?\			I C@ OVER C! 1+
-?\		LOOP
-?\		OVER -
-?\ ;
+[UNDEFINED] UNESCAPE [IF]
+	\ Reference ANS Forth implementation from:
+	\ https://forth-standard.org/standard/string/UNESCAPE
+	: UNESCAPE ( c-addr1 len1 c-addr2 -- c-addr2 len2 )
+		DUP 2SWAP OVER + SWAP ?DO
+			I C@ [CHAR] % = IF
+				[CHAR] % OVER C! 1+
+			THEN
+			I C@ OVER C! 1+
+		LOOP
+		OVER -
+	;
+[THEN]
+
+[UNDEFINED] REPLACES [IF]
+	GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
+
+		\ Wordlist used to store replacements
+		WORDLIST CONSTANT REPLACEMENTS-WL
+
+		\ Default size for replacement buffers
+		32 CONSTANT REPLACEMENTS-BUFSIZE
+
+	SET-CURRENT
+
+	: REPLACES ( c-addr1 u1 c-addr2 u2 -- )
+		2DUP REPLACEMENTS-WL SEARCH-WORDLIST IF
+			NIP NIP	
+			EXECUTE
+			2DUP ! \ Store new length
+			CELL+ SWAP CMOVE \ Store the string
+		ELSE
+			\ String replacement word does not exist, create
+			\ a new word for it on replacements-wl
+			GET-CURRENT >R REPLACEMENTS-WL SET-CURRENT 
+				CREATE-NAME
+				DUP , \ Store the length
+				HERE
+				REPLACEMENTS-BUFSIZE ALLOT
+				SWAP CMOVE \ Copy the contents
+			R> SET-CURRENT
+		THEN
+	;
+	
+	\ As REPLACES and SUBSTITUTE are related, I don't check if
+	\ SUBSTITUTE has already been defined.
+
+	GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
+
+		VARIABLE SOURCE-ADDRESS
+		VARIABLE SOURCE-LEN
+		VARIABLE DEST-ADDRESS
+		VARIABLE DEST-REM
+		VARIABLE DEST-LEN
+		VARIABLE SUBSTITUTIONS
+
+		: GET-CHAR ( -- char )
+			SOURCE-LEN 1-!
+			SOURCE-ADDRESS @ DUP CHAR+ SOURCE-ADDRESS !
+			C@
+		;
+
+		: WRITE-CHAR ( char -- )
+			DEST-ADDRESS @ DUP CHAR+ DEST-ADDRESS !
+			C!
+			DEST-REM 1-!
+			DEST-LEN 1+!
+		;
+
+		: WRITE-REPLACEMENT ( c-addr u -- )
+			\ Check if it can be written !!!
+			DEST-REM @ OVER - DEST-REM !
+			DEST-LEN @ OVER + DEST-LEN !
+			SUBSTITUTIONS 1+!
+			DEST-ADDRESS @ SWAP CMOVE
+		;
+
+		: PARSE-SUBSTITUTION ( -- )
+			SOURCE-ADDRESS @ DUP BEGIN
+				SOURCE-LEN @ 0> WHILE
+				GET-CHAR [CHAR] % = IF
+					DUP SOURCE-ADDRESS @ SWAP - 1-
+					2DUP REPLACEMENTS-WL SEARCH-WORDLIST IF
+						2DROP
+						EXECUTE
+						DUP @ SWAP CELL+ SWAP
+						WRITE-REPLACEMENT
+					ELSE
+						\ Not found, just copy string
+					THEN
+				THEN
+			REPEAT
+		;
+
+		: SUBSTITUTE ( -- c-addr u n )
+			BEGIN
+				DEST-REM @ 0> WHILE
+				SOURCE-LEN @ 0> WHILE
+				GET-CHAR DUP [CHAR] % = IF
+					DROP PARSE-SUBSTITUTION
+				ELSE
+					WRITE-CHAR
+				THEN
+			REPEAT THEN
+		;
+
+	SET-CURRENT
+
+	: SUBSTITUTE ( source slen dest rem -- dest elen substs )
+		DEST-REM !
+		DEST-ADDRESS !
+		SOURCE-LEN !
+		SOURCE-ADDRESS !
+		SUBSTITUTE
+	;
+[THEN]
