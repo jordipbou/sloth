@@ -3,6 +3,7 @@
 #include"facility.h"
 #include"file.h"
 #include"locals.h"
+#include"memory.h"
 #include"cpnbi.h"
 
 #include"sloth_sqlite.h"
@@ -26,10 +27,11 @@ int main(int argc, char**argv) {
 	sloth_bootstrap_facility_wordset(x);
 	sloth_bootstrap_file_wordset(x);
 	sloth_bootstrap_locals_wordset(x);
+	sloth_bootstrap_memory_wordset(x);
 
 	sloth_include(x, ROOT_PATH "4th/ans.4th");
 
-/*
+	/*
 	sloth_bootstrap_sqlite(x);
 	sloth_include(x, ROOT_PATH "4th/libs/sloth_sqlite.4th");
 
@@ -37,7 +39,7 @@ int main(int argc, char**argv) {
 	sloth_include(x, ROOT_PATH "4th/libs/sloth_raylib.4th");
 
 	sloth_bootstrap_plibsys(x);
-*/
+	*/
 
 	/* Set ROOT PATH */
 	sloth_set_root_path(x, ROOT_PATH "4th/");
