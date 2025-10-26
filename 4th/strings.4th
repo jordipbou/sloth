@@ -115,46 +115,83 @@ REQUIRE TRANSIENT.4TH
 			\ Check if it can be written !!!
 			DEST-REM @ OVER - DEST-REM !
 			DEST-LEN @ OVER + DEST-LEN !
-			SUBSTITUTIONS 1+!
-			DEST-ADDRESS @ SWAP CMOVE
+			2DUP DEST-ADDRESS @ SWAP CMOVE
+			DEST-ADDRESS @ OVER CHARS + DEST-ADDRESS !
+			2DROP
 		;
 
 		: PARSE-SUBSTITUTION ( -- )
-			SOURCE-ADDRESS @ DUP BEGIN
+			SOURCE-ADDRESS @ BEGIN 
 				SOURCE-LEN @ 0> WHILE
 				GET-CHAR [CHAR] % = IF
 					DUP SOURCE-ADDRESS @ SWAP - 1-
 					2DUP REPLACEMENTS-WL SEARCH-WORDLIST IF
-						2DROP
+						NIP NIP
 						EXECUTE
 						DUP @ SWAP CELL+ SWAP
 						WRITE-REPLACEMENT
+						SUBSTITUTIONS 1+!
 					ELSE
-						\ Not found, just copy string
+						\ Not found, just copy original 
+						\ substitution string, unless
+						\ the string size is 0 in that
+						\ case its just one %
+						DUP 0= IF
+							2DROP
+							'%' WRITE-CHAR
+						ELSE
+							'%' WRITE-CHAR
+							WRITE-REPLACEMENT
+							'%' WRITE-CHAR
+						THEN
 					THEN
+					EXIT
 				THEN
 			REPEAT
+			\ If we arrive here the string ended
+			\ and the closing % was not found.
+			\ Its necessary to write the string as found,
+			\ from the % to the last char.
+			'%' WRITE-CHAR
+			SOURCE-ADDRESS @ OVER -
+			WRITE-REPLACEMENT
 		;
 
 		: SUBSTITUTE ( -- c-addr u n )
 			BEGIN
-				DEST-REM @ 0> WHILE
 				SOURCE-LEN @ 0> WHILE
+				DEST-REM @ 0> WHILE
 				GET-CHAR DUP [CHAR] % = IF
 					DROP PARSE-SUBSTITUTION
 				ELSE
 					WRITE-CHAR
 				THEN
-			REPEAT THEN
+			REPEAT 
+			\ If we are here, there is no more space
+			\ on the destination
+			-78 SUBSTITUTIONS !	EXIT
+			THEN
 		;
 
 	SET-CURRENT
 
 	: SUBSTITUTE ( source slen dest rem -- dest elen substs )
+		0 SUBSTITUTIONS !
+		0 DEST-LEN !
 		DEST-REM !
 		DEST-ADDRESS !
-		SOURCE-LEN !
-		SOURCE-ADDRESS !
+		\ To allow overlapping source and dest buffers,
+		\ as some tests do, source string is copied to 
+		\ transient memory first.
+		DUP SOURCE-LEN !
+		TMARK >R
+		DUP TALLOT
+		SWAP CMOVE
+		THERE @ SOURCE-ADDRESS !
 		SUBSTITUTE
+		DEST-ADDRESS @ DEST-LEN @ CHARS -
+		DEST-LEN @
+		SUBSTITUTIONS @
+		R> TFREE
 	;
 [THEN]

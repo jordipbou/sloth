@@ -494,7 +494,7 @@ X* sloth_create(int psize, int dsize, int usize) {
 	return x;
 }
 
-X* sloth_new() { return sloth_create(512, 262144, 1024); }
+X* sloth_new() { return sloth_create(512, 524288, 1024); }
 
 void sloth_free(X* x) {
 	free((void*)x->d);
@@ -575,6 +575,9 @@ void sloth_eval(X* x, CELL q) {
 /* Tracing eval */
 
 void sloth__debug(X* x, CELL debug_xt) {
+	/* TODO It would be interesting to add a variable to */
+	/* temporarily deactivate debugging to just trace a */
+	/* part of code, for example */
 	sloth_push(x, x->ip);
 	sloth_eval(x, debug_xt);
 }
