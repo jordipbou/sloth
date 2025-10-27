@@ -1,12 +1,16 @@
-# Sloth programming language/framework
+# Sloth - Universal Forth Engine
 
-Sloth is a programming language/framework designed for interactive programming
-across a wide range of platforms.
+Sloth is a portable, multi-language, cross-platform Forth environment.
 
-The language leverages the simplicity and power of the Forth virtual machine to
-provide a versatile and efficient programming environment.
+It provides the minimal foundation needed to bootstrap ANS Forth and test it 
+in any environment — desktop, mobile, or embedded.
 
-Initially Sloth will support C and Java backends.
+It’s built on the idea that Forth itself — simple, extensible, and close to 
+the machine — should be available anywhere.
+
+ANS Forth also serves as a common virtual machine and high level assembler, 
+enabling the creation of higher-level languages that remain portable, 
+lightweight, and consistent.
 
 ## Key Features
 
