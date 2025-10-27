@@ -353,6 +353,7 @@ FORTH-WORDLIST SET-CURRENT
 ?: U+D		DUP ROT + DUP ROT U< NEGATE ;
 
 ?: DNEGATE ( d1 -- d2 ) INVERT SWAP INVERT 1 U+D ROT + ;
+\ DABS is from the DOUBLE wordset, but needed for numeric output.
 ?: DABS ( d -- ud ) DUP 0< IF DNEGATE THEN ;
 
 ?: SM/REM ( d n1 -- n2 n3 )		\ CORE
@@ -581,7 +582,7 @@ FORTH-WORDLIST SET-CURRENT
 
 \ -- Numeric output ---------------------------------------
 
-\ UD/MOD is needed by #, but I don't know what it does.
+\ UD/MOD is needed by #, but I don't really know what it does.
 ?: UD/MOD	>R 0 R@ UM/MOD R> SWAP >R UM/MOD R> ;
 
 \ This should be used with [UNDEFINED]
@@ -1706,3 +1707,4 @@ INCLUDE DEBUG.4TH
 INCLUDE TOOLS.4TH
 INCLUDE STRINGS.4TH
 INCLUDE LOCALS.4TH
+INCLUDE DOUBLE.4TH
