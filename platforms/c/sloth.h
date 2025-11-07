@@ -1317,21 +1317,23 @@ void sloth_included_(X* x) {
 	/* Try to use it as absolute path filename or relative to */
 	/* current directory (as has been copied to the end of */
 	/* previous path). */
-	f = fopen(pathend, "r");
+	/* TODO explain that rb+ is needed for fopen to be */
+	/* compatible both in Linux and on Windows */
+	f = fopen(pathend, "rb+");
 	if (f) {
 		/* Storing path as absolute or relative to cwd */
 		pathstart = pathend;
 		pathend = pathend + l;
 	} else {
 		/* Trying as relative to previous path. */
-		f = fopen(pathstart, "r");
+		f = fopen(pathstart, "rb+");
 		if (f) pathend = pathend + l;
 		else {
 			/* Trying as relative to root path. */
 			strncpy(pathend, (char*)(x->u + SLOTH_PATHS), sloth_user_area_get(x, SLOTH_ROOT_PATH_LENGTH));
 			strncpy(pathend + sloth_user_area_get(x, SLOTH_ROOT_PATH_LENGTH), a, l);
 			*(pathend + sloth_user_area_get(x, SLOTH_ROOT_PATH_LENGTH) + l) = 0;
-			f = fopen(pathend, "r");
+			f = fopen(pathend, "rb+");
 			if (f) {
 				pathstart = pathend;
 				pathend = pathend + sloth_user_area_get(x, SLOTH_ROOT_PATH_LENGTH) + l;

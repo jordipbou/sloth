@@ -142,15 +142,16 @@ void sloth_resize_file_(X* x) {
 	FILE *fptr = (FILE*)sloth_pop(x);
 	uCELL udh = (uCELL)sloth_pop(x);
 	uCELL udl = (uCELL)sloth_pop(x);
-	#if defined(WINDOWS)
-	/* TODO Needs SetFilePointer and SetEndOfFile */
-	#else
-	if (ftruncate(fileno(fptr), udl)) {
+	int fd = fileno(fptr);
+	if (fd < 0) {
 		sloth_push(x, -37);
 	} else {
-		sloth_push(x, 0);
+		#if defined(WINDOWS)
+		sloth_push(x, _chsize(fd, udl) ? -37 : 0);
+		#else
+		sloth_push(x, ftruncate(fd, udl) ? -37 : 0);
+		#endif
 	}
-	#endif
 }
 
 void sloth_delete_file_(X* x) {
