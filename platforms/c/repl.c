@@ -9,6 +9,7 @@
 #include"sloth_sqlite.h"
 #include"sloth_raylib.h"
 #include"sloth_plibsys.h"
+#include"sloth_systray.h"
 
 /* ---------------------------------------------------- */
 /* -- main -------------------------------------------- */
@@ -31,7 +32,6 @@ int main(int argc, char**argv) {
 
 	sloth_include(x, ROOT_PATH "4th/ans.4th");
 
-	/*
 	sloth_bootstrap_sqlite(x);
 	sloth_include(x, ROOT_PATH "4th/libs/sloth_sqlite.4th");
 
@@ -39,16 +39,11 @@ int main(int argc, char**argv) {
 	sloth_include(x, ROOT_PATH "4th/libs/sloth_raylib.4th");
 
 	sloth_bootstrap_plibsys(x);
-	*/
+
+	sloth_bootstrap_systray(x);
 
 	/* Set ROOT PATH */
 	sloth_set_root_path(x, ROOT_PATH "4th/");
-	/*
-	memcpy(x->u + SLOTH_PATHS, ROOT_PATH, strlen(ROOT_PATH));
-	sloth_user_area_set(x, SLOTH_ROOT_PATH_LENGTH, strlen(ROOT_PATH));
-	sloth_user_area_set(x, SLOTH_PATH_START, x->u + SLOTH_PATH + strlen(ROOT_PATH));
-	sloth_user_area_set(x, SLOTH_PATH_END, s->u + SLOTH_PATH + strlen(ROOT_PATH));
-	*/
 
 	if (argc == 1) {
 		sloth_repl(x);
