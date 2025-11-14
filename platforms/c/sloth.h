@@ -1405,8 +1405,6 @@ void sloth_included_(X* x) {
 		sloth_user_area_set(x, SLOTH_SOURCE_ID, prevsourceid);
 
 		fclose(f);
-	} else {
-		printf("ERROR: Can't open file (%.*s)\n", (int)l, (char*)a);
 	}
 
 	/* Restore previous path */
@@ -1417,6 +1415,10 @@ void sloth_included_(X* x) {
 	sloth_user_area_set(x, SLOTH_IBUF, previbuf);
 	sloth_user_area_set(x, SLOTH_IPOS, previpos);
 	sloth_user_area_set(x, SLOTH_ILEN, previlen);
+
+	if (!f) {
+		sloth_throw(x, -38);
+	}
 }
 
 /* String operations */

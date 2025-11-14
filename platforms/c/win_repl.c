@@ -11,66 +11,14 @@
 #include"sloth_plibsys.h"
 #include"sloth_systray.h"
 
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
-#include <stdbool.h>
-
-#define SLOTH_CODE(w, f) sloth_code(x, w, sloth_primitive(x, &sloth_##f##_));
-
-/* -- Keyboard events generation ----------------------- */
-/* TODO To be extracted to an external library */
-void sloth_press_key_(X* x) {
-	WORD vk = (WORD)sloth_pop(x);
-	INPUT ip = {0};
-	ip.type = INPUT_KEYBOARD;
-	ip.ki.wVk = vk;
-	SendInput(1, &ip, sizeof(INPUT));
-}
-
-void sloth_release_key_(X* x) {
-	WORD vk = (WORD)sloth_pop(x);
-	INPUT ip = {0};
-	ip.type = INPUT_KEYBOARD;
-	ip.ki.wVk = vk;
-	ip.ki.dwFlags = KEYEVENTF_KEYUP;
-	SendInput(1, &ip, sizeof(INPUT));
-}
-
-/* ----------------------------------------------------- */
-
-/* TEST Add MessageBox to Forth */
-void sloth_message_box_(X* x) {
-	/* Message boxes need zero ended strings !!!! */
-	CELL tl = sloth_pop(x);
-	char *ta = (char*)sloth_pop(x);
-	CELL ml = sloth_pop(x);
-	char *ma = (char*)sloth_pop(x);
-	MessageBox(0, ma, ta, 0);
-}
-
-/* This function/method of detecting if executing from */
-/* a console was suggested by ChatGPT. It seems to work. */
-int has_parent_console(void) {
-    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
-        return 1;
-    }
-    DWORD err = GetLastError();
-    if (err == ERROR_ACCESS_DENIED) {
-        return 1;
-    }
-    if (err == ERROR_INVALID_HANDLE) {
-        return 0;
-    }
-    return 0;
-}
+#include <stdlib.h>
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdShow)
 {
 	int argc = 0;
-	LPWSTR *argvw = CommandLineToArgvW(GetCommandLineW(), &argc);
-
-	bool script_specified = (argc > 1);
+	LPWSTR *argvw;
 
 	X* x = sloth_new();
 	
@@ -79,10 +27,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmdLine, int nC
 	sloth_bootstrap_file_wordset(x);
 	sloth_bootstrap_locals_wordset(x);
 	sloth_bootstrap_memory_wordset(x);
-
-	SLOTH_CODE("PRESS-KEY", press_key);
-	SLOTH_CODE("RELEASE-KEY", release_key);
-	SLOTH_CODE("MESSAGE-BOX", message_box);
 
 	sloth_include(x, ROOT_PATH "4th/ans.4th");
 
@@ -95,33 +39,77 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmdLine, int nC
 	sloth_bootstrap_plibsys(x);
 
 	sloth_bootstrap_systray(x);
+
+	/* TODO Add press_key and release_key library */
+
 	sloth_set_root_path(x, ROOT_PATH "4th/");
 
-  if (has_parent_console()) {
-		/* Console */
+	// Attach console
+	if (AttachConsole(ATTACH_PARENT_PROCESS)) {
 		FILE *fp;
-		freopen_s(&fp, "CONIN$", "w", stdin);
 		freopen_s(&fp, "CONOUT$", "w", stdout);
 		freopen_s(&fp, "CONOUT$", "w", stderr);
+	}
 	
-		/* Optional: disable buffering so output shows instantly */
-    setvbuf(stdout, NULL, _IONBF, 0);
-    setvbuf(stderr, NULL, _IONBF, 0);
-
-		if (script_specified) {
-			char script_name[500];
-			wcstombs(script_name, argvw[1], 500);
-			sloth_include(x, script_name);
-		} else {
-			sloth_repl(x);
+	argvw = CommandLineToArgvW(GetCommandLineW(), &argc);
+	
+	if (argvw == NULL || argc <= 1) {
+		/* No arguments, try to load a default.4th file */
+		char* default_script = "default.4th";
+		sloth_push(x, default_script);
+		sloth_push(x, strlen(default_script));
+		sloth_catch(x, sloth_get_xt(x, sloth_find_word(x, "INCLUDED")));
+		if (sloth_pop(x)) {
+			/* No default.4th present */
+			printf("No default.4th found\n");
 		}
+	} else {
+	  // --- WideCharToMultiByte SAFE two-step conversion ---
+	  int needed = WideCharToMultiByte(
+	      CP_UTF8,
+	      0,
+	      argvw[1],
+	      -1,
+	      NULL,
+	      0,
+	      NULL,
+	      NULL
+	  );
+	
+	  if (needed == 0) {
+	      printf("WideCharToMultiByte (query) failed. Error: %lu\n", GetLastError());
+	      LocalFree(argvw);
+	      return 1;
+	  }
+	
+	  char *buf = (char*)malloc(needed);
+	  if (buf) {
+		  int result = WideCharToMultiByte(
+	      CP_UTF8,
+	      0,
+	      argvw[1],
+	      -1,
+	      buf,
+	      needed,
+	      NULL,
+	      NULL
+		  );
 
-  } else {
-		/* Non-console (service, GUI, systray) */
-		sloth_include(x, "test.4th");
+		  if (result != 0) {
+				sloth_include(x, buf);
+			} else {
+	      printf("WideCharToMultiByte (convert) failed. Error: %lu\n", GetLastError());
+		  }
+		} else {
+	      printf("malloc failed\n");
+	  }
+	
+	  free(buf);
+	  LocalFree(argvw);
 	}
 
 	sloth_free(x);
 
 	return 0;
 }
+
