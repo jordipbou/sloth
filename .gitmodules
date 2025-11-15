@@ -2,3 +2,6 @@
 [submodule "forth2012-test-suite"]
 	path = forth2012-test-suite
 	url = https://github.com/gerryjackson/forth2012-test-suite.git
+[submodule "platforms/c/libs/osdialog/osdialog"]
+	path = platforms/c/libs/osdialog/osdialog
+	url = https://github.com/AndrewBelt/osdialog.git

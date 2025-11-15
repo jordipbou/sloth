@@ -10,6 +10,7 @@
 #include"sloth_raylib.h"
 #include"sloth_plibsys.h"
 #include"sloth_systray.h"
+#include"sloth_osdialog.h"
 
 #include <windows.h>
 #include <stdio.h>
@@ -39,6 +40,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmdLine, int nC
 	sloth_bootstrap_plibsys(x);
 
 	sloth_bootstrap_systray(x);
+	sloth_bootstrap_osdialog(x);
 
 	/* TODO Add press_key and release_key library */
 
