@@ -41,6 +41,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmdLine, int nC
 
 	sloth_bootstrap_systray(x);
 	sloth_bootstrap_osdialog(x);
+	sloth_bootstrap_geninput(x);
 
 	/* TODO Add press_key and release_key library */
 
