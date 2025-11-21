@@ -431,7 +431,7 @@ void sloth_bootstrap(X* x);
 
 /* Helpers to work with files from C */
 
-void sloth_include(X* x, char* f);
+int sloth_include(X* x, char* f);
 void sloth_evaluate(X* x, char* s);
 
 /* Helper REPL */
@@ -2053,10 +2053,11 @@ void sloth_set_root_path(X* x, char* s) {
 	sloth_user_area_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS + strlen(s));
 }
 
-void sloth_include(X* x, char* f) {
+int sloth_include(X* x, char* f) {
 	sloth_push(x, (CELL)f);
 	sloth_push(x, strlen(f));
-	sloth_included_(x);
+	sloth_catch(x, sloth_get_xt(x, sloth_find_word(x, "INCLUDED")));
+	return sloth_pop(x);
 }
 
 void sloth_evaluate(X* x, char* s) {
