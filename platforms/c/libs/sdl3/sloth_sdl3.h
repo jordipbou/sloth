@@ -1,6 +1,34 @@
-#include <sloth.h>
+#include <fsloth.h>
 #include <SDL3/SDL_init.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_timer.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_video.h>
+#include <SDL3/SDL_pixels.h>
+#include <SDL3/SDL_stdinc.h>
 
+/* SDL_init.h */
+void sloth2SDL3_Init_(X* x);
 void sloth2SDL3_SetAppMetadata_(X* x);
+
+/* SDL_events.h */
+void sloth2SDL3_Event_type_(X* x);
+
+/* SDL_timer.h */
+void sloth2SDL3_GetTicks_(X* x);
+
+/* SDL_render.h */
+void sloth2SDL3_CreateWindowAndRenderer_(X* x);
+void sloth2SDL3_SetRenderLogicalPresentation_(X* x);
+void sloth2SDL3_SetRenderDrawColorFloat_(X* x);
+void sloth2SDL3_RenderClear_(X* x);
+void sloth2SDL3_RenderPresent_(X* x);
+
+/* SDL_video.h */
+
+/* SDL_pixels.h */
+
+/* SDL_stdinc.h */
+void sloth2SDL3_sin_(X* x);
 
 void sloth_bootstrap_SDL3(X* x);

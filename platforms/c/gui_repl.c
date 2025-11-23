@@ -1,5 +1,5 @@
 #define SLOTH_IMPLEMENTATION
-#include"sloth.h"
+#include"fsloth.h"
 #include"facility.h"
 #include"file.h"
 #include"locals.h"
@@ -31,17 +31,20 @@ void defaultAppInit(X* x) {
 	
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
 		SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
-		return SDL_APP_FAILURE;
+		sloth_push(x, SDL_APP_FAILURE);
+		return;
 	}
 	
 	if (!SDL_CreateWindowAndRenderer("examples/renderer/clear", 640, 480, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
 		SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
-		return SDL_APP_FAILURE;
+		sloth_push(x, SDL_APP_FAILURE);
+		return;
 	}
+
 	SDL_SetRenderLogicalPresentation(renderer, 640, 480, SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
-	sloth_user_variable(x, "(WINDOW)", SLOTH_WINDOW, window);
-	sloth_user_variable(x, "(RENDERER)", SLOTH_RENDERER, renderer);
+	sloth_user_area_set(x, SLOTH_WINDOW, (CELL)window);
+	sloth_user_area_set(x, SLOTH_RENDERER, (CELL)renderer);
 
 	sloth_push(x, SDL_APP_CONTINUE);
 }
@@ -65,10 +68,8 @@ void defaultAppIterate(X* x) {
 	const float blue = (float) (0.5 + 0.5 * SDL_sin(now + SDL_PI_D * 4 / 3));
 	SDL_SetRenderDrawColorFloat(renderer, red, green, blue, SDL_ALPHA_OPAQUE_FLOAT);
 	
-	/* clear the window to the draw color. */
 	SDL_RenderClear(renderer);
 	
-	/* put the newly-cleared rendering on the screen. */
 	SDL_RenderPresent(renderer);
 
 	sloth_push(x, SDL_APP_CONTINUE);
@@ -94,6 +95,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
 	/* Define four user variables to default functions for init, */
 	/* event, iterate and quit. */
+	/*
 	sloth_user_variable(
 		ctx, "(APP-INIT)", SLOTH_APP_INIT, 
 		sloth_primitive(ctx, &defaultAppInit));
@@ -106,24 +108,72 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 	sloth_user_variable(
 		ctx, "(APP-QUIT)", SLOTH_APP_QUIT, 
 		sloth_primitive(ctx, &defaultAppQuit));
+	*/
+	sloth_user_variable(ctx, "(APP-INIT)", SLOTH_APP_INIT, 0);
+	sloth_user_variable(ctx, "(APP-EVENT)", SLOTH_APP_EVENT, 0);
+	sloth_user_variable(ctx, "(APP-ITERATE)", SLOTH_APP_ITERATE, 0);
+	sloth_user_variable(ctx, "(APP-QUIT)", SLOTH_APP_QUIT, 0);
+
+	sloth_user_variable(ctx, "(WINDOW)", SLOTH_WINDOW, 0);
+	sloth_user_variable(ctx, "(RENDERER)", SLOTH_RENDERER, 0);
 
 	sloth_include(ctx, ROOT_PATH "4th/ans.4th");
 
 	sloth_bootstrap_SDL3(ctx);
 	sloth_include(ctx, ROOT_PATH "4th/libs/sloth_sdl3.4th");
 
-	/* Execute default forth user code, it can change those */
-	/* default functions to its own code. */
-	sloth_include(ctx, "boot.4th");
+	if (argc > 1) {
+		/* First parameter will be user script to be executed */
+		int err = sloth_include(ctx, argv[1]);
+		if (err) {
+			if (err == -38) {
+				printf("Script %s not found\n", argv[1]);
+			}
 
-	/* Execute the app-init xt */
-	sloth_catch(ctx, sloth_user_area_get(ctx, SLOTH_APP_INIT));
-	err = sloth_pop(ctx);
-	if (err != 0) {
-		/* TODO Manage the exception in some good way !!! */
+			return SDL_APP_FAILURE;
+		}
+	} else {
+		/* No script in parameters, try to launch a generic one */
+		int err = sloth_include(ctx, "main.4th");
+		if (err) {
+			printf("Script not found\n");
+			/* TODO Launch a REPL (console or GUI) */
+		} 
 	}
 
-	return SDL_APP_CONTINUE;  /* carry on with the program! */
+	if (sloth_user_area_get(ctx, SLOTH_APP_INIT) != 0
+	 || sloth_user_area_get(ctx, SLOTH_APP_EVENT) != 0
+	 || sloth_user_area_get(ctx, SLOTH_APP_ITERATE) != 0
+	 || sloth_user_area_get(ctx, SLOTH_APP_QUIT) != 0) {
+		/* Use defaults if not defined */
+		if (sloth_user_area_get(ctx, SLOTH_APP_INIT) == 0) {
+			sloth_user_area_set(ctx, SLOTH_APP_INIT,
+				sloth_primitive(ctx, &defaultAppInit));
+		}
+		if (sloth_user_area_get(ctx, SLOTH_APP_EVENT) == 0) {
+			sloth_user_area_set(ctx, SLOTH_APP_EVENT,
+				sloth_primitive(ctx, &defaultAppEvent));
+		}
+		if (sloth_user_area_get(ctx, SLOTH_APP_ITERATE) == 0) {
+			sloth_user_area_set(ctx, SLOTH_APP_ITERATE,
+				sloth_primitive(ctx, &defaultAppIterate));
+		}
+		if (sloth_user_area_get(ctx, SLOTH_APP_QUIT) == 0) {
+			sloth_user_area_set(ctx, SLOTH_APP_QUIT,
+				sloth_primitive(ctx, &defaultAppQuit));
+		}
+
+		/* Execute the app-init xt */
+		sloth_catch(ctx, sloth_user_area_get(ctx, SLOTH_APP_INIT));
+		err = sloth_pop(ctx);
+		if (err != 0) {
+			/* TODO Manage the exception in some good way !!! */
+		}
+
+		return sloth_pop(ctx);
+	} else {
+		return SDL_APP_SUCCESS;
+	}
 }
 
 /* This function runs when a new event (mouse input, keypresses, etc) occurs. */
@@ -131,7 +181,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
 	CELL err;
 
-	sloth_push(ctx, event);
+	sloth_push(ctx, (CELL)event);
 
 	sloth_catch(ctx, sloth_user_area_get(ctx, SLOTH_APP_EVENT));
 	err = sloth_pop(ctx);
@@ -167,6 +217,4 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 	if (err != 0) {
 		/* TODO Manage the exception in some good way !!! */
 	}
-
-	return sloth_pop(ctx);
 }
