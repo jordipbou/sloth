@@ -5,7 +5,9 @@
 /* SDL_init.h */
 void sloth2SDL3_Init_(X* x) {
 	CELL init_flags = sloth_pop(x);
-	sloth_push(x, SDL_Init(init_flags) ? -1 : 0);
+	sloth_push(x, 
+		SDL_Init(init_flags) 
+		? 0 : -256);
 }
 
 void sloth2SDL3_SetAppMetadata_(X* x) {
@@ -33,13 +35,43 @@ void sloth2SDL3_SetAppMetadata_(X* x) {
 		for (i = 0; i < appnm_len; i++) appnm[i] = appnm_str[i];
 		appnm_str = appnm;
 	}
-	SDL_SetAppMetadata(appnm_str, appvsn_str, appid_str);
+	sloth_push(x, 
+		SDL_SetAppMetadata(appnm_str, appvsn_str, appid_str) 
+		? 0 : -256);
+}
+
+/* SDL_error.h */
+void sloth2SDL3_GetError_(X* x) {
+	const char *msg = SDL_GetError();
+	sloth_push(x, (CELL)msg);
+	sloth_push(x, strlen(msg));
 }
 
 /* SDL_events.h */
 void sloth2SDL3_Event_type_(X* x) {
 	SDL_Event *event = (SDL_Event *)sloth_pop(x);
 	sloth_push(x, event->type);
+}
+
+void sloth2SDL3_Event_jdevice_which_(X* x) {
+	SDL_Event *event = (SDL_Event *)sloth_pop(x);
+	sloth_push(x, event->jdevice.which);
+}
+
+/* SDL_joystick.h */
+void sloth2SDL3_OpenJoystick_(X* x) {
+	SDL_JoystickID id = (SDL_JoystickID)sloth_pop(x);
+	sloth_push(x, (CELL)SDL_OpenJoystick(id));
+}
+
+void sloth2SDL3_CloseJoystick_(X* x) {
+	SDL_Joystick *joystick = (SDL_Joystick *)sloth_pop(x);
+	SDL_CloseJoystick(joystick);
+}
+
+void sloth2SDL3_GetJoystickID_(X* x) {
+	SDL_Joystick *joystick = (SDL_Joystick *)sloth_pop(x);
+	sloth_push(x, (CELL)SDL_GetJoystickID(joystick));
 }
 
 /* SDL_timer.h */
@@ -69,9 +101,9 @@ void sloth2SDL3_CreateWindowAndRenderer_(X* x) {
 	if (SDL_CreateWindowAndRenderer(title_str, width, height, window_flags, &window, &renderer)) {
 		sloth_push(x, (CELL)window);
 		sloth_push(x, (CELL)renderer);
-		sloth_push(x, -1);
-	} else {
 		sloth_push(x, 0);
+	} else {
+		sloth_push(x, -256);
 	}
 }
 
@@ -80,8 +112,9 @@ void sloth2SDL3_SetRenderLogicalPresentation_(X* x) {
 	int h = (int)sloth_pop(x);
 	int w = (int)sloth_pop(x);
 	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
-	int r = SDL_SetRenderLogicalPresentation(renderer, w, h, mode);
-	sloth_push(x, r == 0 ? 0 : -1);
+	sloth_push(x, 
+		SDL_SetRenderLogicalPresentation(renderer, w, h, mode) 
+		? 0 : -256);
 }
 
 void sloth2SDL3_SetRenderDrawColorFloat_(X* x) {
@@ -90,18 +123,29 @@ void sloth2SDL3_SetRenderDrawColorFloat_(X* x) {
 	FCELL g = sloth_fpop(x);
 	FCELL r = sloth_fpop(x);
 	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
-	sloth_push(x, SDL_SetRenderDrawColorFloat(renderer, r, g, b, a));	
+	sloth_push(x, 
+		SDL_SetRenderDrawColorFloat(renderer, r, g, b, a)
+		? 0 : -256);	
 }
 
 void sloth2SDL3_RenderClear_(X* x) {
-	sloth_push(x, SDL_RenderClear((SDL_Renderer *)sloth_pop(x)));
+	sloth_push(x, 
+		SDL_RenderClear((SDL_Renderer *)sloth_pop(x))
+		? 0 : -256);
 }
 
 void sloth2SDL3_RenderPresent_(X* x) {
-	sloth_push(x, SDL_RenderPresent((SDL_Renderer *)sloth_pop(x)));
+	sloth_push(x, 
+		SDL_RenderPresent((SDL_Renderer *)sloth_pop(x))
+		? 0 : -256);
 }
 
 /* SDL_stdinc.h */
+void sloth2SDL3_rand_(X* x) {
+	Sint32 n = (Sint32)sloth_pop(x);
+	sloth_push(x, SDL_rand(n));
+}
+
 void sloth2SDL3_sin_(X* x) {
 	FCELL rad = sloth_fpop(x);
 	sloth_fpush(x, SDL_sin(rad));
@@ -146,10 +190,21 @@ void sloth_bootstrap_SDL3(X* x) {
 	SLOTH2SDL3_CODE("SDL-Init", Init);
 	SLOTH2SDL3_CODE("SDL-SetAppMetadata", SetAppMetadata);
 
+	/* SDL_error.h */
+	SLOTH2SDL3_CODE("SDL-GetError", GetError);
+
 	/* SDL_events.h */
 	sloth_constant(x, SDL_EVENT_QUIT, "SDL-EVENT-QUIT");
+	sloth_constant(x, SDL_EVENT_JOYSTICK_ADDED, "SDL-EVENT-JOYSTICK-ADDED");
+	sloth_constant(x, SDL_EVENT_JOYSTICK_REMOVED, "SDL-EVENT-JOYSTICK-REMOVED");
 
 	SLOTH2SDL3_CODE("SDL-Event.type", Event_type);
+	SLOTH2SDL3_CODE("SDL-Event.jdevice.which", Event_jdevice_which);
+
+	/* SDL_joystick.h */
+	SLOTH2SDL3_CODE("SDL-OpenJoystick", OpenJoystick);
+	SLOTH2SDL3_CODE("SDL-CloseJoystick", CloseJoystick);
+	SLOTH2SDL3_CODE("SDL-GetJoystickID", GetJoystickID);
 
 	/* SDL_timer.h */
 	SLOTH2SDL3_CODE("SDL-GetTicks", GetTicks);
@@ -181,5 +236,6 @@ void sloth_bootstrap_SDL3(X* x) {
 	/* SDL_stdinc.h */
 	sloth_fconstant(x, SDL_PI_D, "SDL-PI-D");
 
+	SLOTH2SDL3_CODE("SDL-rand", rand);
 	SLOTH2SDL3_CODE("SDL-sin", sin);
 }

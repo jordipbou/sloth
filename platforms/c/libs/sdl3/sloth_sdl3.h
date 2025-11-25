@@ -11,8 +11,17 @@
 void sloth2SDL3_Init_(X* x);
 void sloth2SDL3_SetAppMetadata_(X* x);
 
+/* SDL_error.h */
+void sloth2SDL3_GetError_(X* x);
+
 /* SDL_events.h */
 void sloth2SDL3_Event_type_(X* x);
+void sloth2SDL3_Event_jdevice_which_(X* x);
+
+/* SDL_joystick.h */
+void sloth2SDL3_OpenJoystick_(X* x);
+void sloth2SDL3_CloseJoystick_(X* x);
+void sloth2SDL3_GetJoystickID_(X* x);
 
 /* SDL_timer.h */
 void sloth2SDL3_GetTicks_(X* x);
@@ -29,6 +38,7 @@ void sloth2SDL3_RenderPresent_(X* x);
 /* SDL_pixels.h */
 
 /* SDL_stdinc.h */
+void slothSDL3_rand_(X* x);
 void sloth2SDL3_sin_(X* x);
 
 void sloth_bootstrap_SDL3(X* x);

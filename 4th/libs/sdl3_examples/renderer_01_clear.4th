@@ -1,29 +1,25 @@
-: appinit 
+: appinit [:
 	s" Example Renderer Clear" 
 	s" 1.0" 
 	s" com.example.renderer-clear"
-	SDL-SetAppMetadata
+	SDL-SetAppMetadata throw
 
-	SDL-INIT-VIDEO SDL-Init if
-		s" examples/renderer/clear"
-		640 480 SDL-WINDOW-RESIZABLE
-		SDL-CreateWindowAndRenderer if
-			(renderer) !
-			(window) !
+	SDL-INIT-VIDEO SDL-Init throw
 
-			(renderer) @
-			640 480 SDL-LOGICAL-PRESENTATION-LETTERBOX
-			SDL-SetRenderLogicalPresentation
-		else
-			\ Do SDL-CreateWindowAndRenderer error
-			SDL-APP-FAILURE
-		then
-	else
-		\ Do SDL-Init error	
-		SDL-APP-FAILURE
-	then
+	s" examples/renderer/clear"
+	640 480 SDL-WINDOW-RESIZABLE
+	SDL-CreateWindowAndRenderer throw
+	(renderer) !
+	(window) !
 
+	(renderer) @
+	640 480 SDL-LOGICAL-PRESENTATION-LETTERBOX
+	SDL-SetRenderLogicalPresentation throw
+;] catch if
+	SDL-APP-FAILURE
+else
 	SDL-APP-CONTINUE
+then
 ;
 
 : appevent
@@ -35,22 +31,25 @@
 ;
 
 fvariable now
-: appiterate
+: appiterate [:
 	SDL-GetTicks s>f 1000.0 f/ now f!
 	(renderer) @
 	now f@ SDL-sin 0.5 f* 0.5 f+ \ red
 	now f@ SDL-PI-D 2.0 f* 3.0 f/ f+ SDL-sin 0.5 f* 0.5 f+ \ green
 	now f@ SDL-PI-D 4.0 f* 3.0 f/ f+ SDL-sin 0.5 f* 0.5 f+ \ blue
 	SDL-ALPHA-OPAQUE-FLOAT
-	SDL-SetRenderDrawColorFloat drop
+	SDL-SetRenderDrawColorFloat throw
 
 	(renderer) @
-	SDL-RenderClear drop
+	SDL-RenderClear throw
 
 	(renderer) @
-	SDL-RenderPresent drop
-
+	SDL-RenderPresent throw
+;] catch if
+	SDL-APP-FAILURE
+else
 	SDL-APP-CONTINUE
+then
 ;
 
 ' appinit (APP-INIT) !
