@@ -82,6 +82,7 @@ void defaultAppQuit(X* x) {
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
 	CELL err;
+	CELL init, event, iterate, quit;
 
 	/* Bootstrap SLOTH. */
 	ctx = sloth_new();
@@ -141,27 +142,35 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 		} 
 	}
 
-	if (sloth_user_area_get(ctx, SLOTH_APP_INIT) != 0
-	 || sloth_user_area_get(ctx, SLOTH_APP_EVENT) != 0
-	 || sloth_user_area_get(ctx, SLOTH_APP_ITERATE) != 0
-	 || sloth_user_area_get(ctx, SLOTH_APP_QUIT) != 0) {
-		/* Use defaults if not defined */
-		if (sloth_user_area_get(ctx, SLOTH_APP_INIT) == 0) {
-			sloth_user_area_set(ctx, SLOTH_APP_INIT,
-				sloth_primitive(ctx, &defaultAppInit));
-		}
-		if (sloth_user_area_get(ctx, SLOTH_APP_EVENT) == 0) {
-			sloth_user_area_set(ctx, SLOTH_APP_EVENT,
-				sloth_primitive(ctx, &defaultAppEvent));
-		}
-		if (sloth_user_area_get(ctx, SLOTH_APP_ITERATE) == 0) {
-			sloth_user_area_set(ctx, SLOTH_APP_ITERATE,
-				sloth_primitive(ctx, &defaultAppIterate));
-		}
-		if (sloth_user_area_get(ctx, SLOTH_APP_QUIT) == 0) {
-			sloth_user_area_set(ctx, SLOTH_APP_QUIT,
-				sloth_primitive(ctx, &defaultAppQuit));
-		}
+	init = sloth_find_word(ctx, "APPINIT");
+	event = sloth_find_word(ctx, "APPEVENT");
+	iterate = sloth_find_word(ctx, "APPITERATE");
+	quit = sloth_find_word(ctx, "APPQUIT");
+
+	if (init || event || iterate || quit) {
+		sloth_user_area_set(ctx,
+			SLOTH_APP_INIT,
+			init ?
+				sloth_get_xt(ctx, init)
+				: sloth_primitive(ctx, &defaultAppInit));
+
+		sloth_user_area_set(ctx,
+			SLOTH_APP_EVENT,
+			event ?
+				sloth_get_xt(ctx, event)
+				: sloth_primitive(ctx, &defaultAppEvent));
+
+		sloth_user_area_set(ctx,
+			SLOTH_APP_ITERATE,
+			iterate ?
+				sloth_get_xt(ctx, iterate)
+				: sloth_primitive(ctx, &defaultAppIterate));
+
+		sloth_user_area_set(ctx,
+			SLOTH_APP_QUIT,
+			quit ?
+				sloth_get_xt(ctx, quit)
+				: sloth_primitive(ctx, &defaultAppQuit));
 
 		/* Execute the app-init xt */
 		sloth_catch(ctx, sloth_user_area_get(ctx, SLOTH_APP_INIT));

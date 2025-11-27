@@ -31,7 +31,7 @@ target_link_libraries(sloth sloth_plibsys)
 # target_link_libraries(sloth sloth_osdialog)
 # target_link_libraries(sloth sloth_geninput)
 
-add_executable(gui_sloth WIN32 gui_repl.c)
+add_executable(gui_sloth gui_repl.c) # WIN32 gui_repl.c)
 	
 target_include_directories(gui_sloth PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/libs/sdl3/SDL/include/)

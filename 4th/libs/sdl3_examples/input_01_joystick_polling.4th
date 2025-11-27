@@ -1,11 +1,3 @@
-begin-structure SDL-Color
-	\ Using cfield is not correct on non 8 byte/char platforms
-	cfield: SDL-Color.r
-	cfield: SDL-Color.g
-	cfield: SDL-Color.b
-	cfield: SDL-Color.a
-end-structure
-
 \ Creating an array with this word stores the size of the
 \ items in the word itself. 
 : array: ( n sz -- ) ( i -- addr )
@@ -13,7 +5,6 @@ end-structure
 	does> dup @ swap cell+ -rot * +
 ;
 
-variable joystick 0 joystick !
 64 SDL-Color array: colors
 
 : appinit
@@ -44,11 +35,13 @@ variable joystick 0 joystick !
 		255 SDL-rand i colors SDL-Color.r c!
 		255 SDL-rand i colors SDL-Color.g c!
 		255 SDL-rand i colors SDL-Color.b c!
-		255 colors SDL-Color.a c!
+		255 i colors SDL-Color.a c!
 	loop
 
 	SDL-APP-CONTINUE
 ;
+
+variable joystick 0 joystick !
 
 : appevent ( SDL_Event -- SDL_AppResult )
 	>r r@ SDL-Event.type CASE
@@ -78,5 +71,95 @@ variable joystick 0 joystick !
 	r> drop SDL-APP-CONTINUE
 ;
 
+variable winw
+variable winh 
+variable text
+variable text-len
+variable total
+fvariable size
+fvariable x
+fvariable y
+fvariable dx
+
+create dst SDL-FRect allot
+
 : appiterate
+	640 winw !
+	480 winh !
+	s" Plug in a joystick, please." text-len ! text !
+
+	joystick @ if
+		joystick @ SDL-GetJoystickName text-len ! text !
+	then
+
+	(renderer) @ 0 0 0 255 SDL-SetRenderDrawColor throw
+	(renderer) @ SDL-RenderClear throw
+	(window) @ SDL-GetWindowSize throw winh ! winw !
+
+	joystick @ if
+		30.0 size f!
+
+		\ Draw axes as bars going across middle of screen
+		joystick @ SDL-GetNumJoystickAxes total !
+		winh @ s>f size f@ total @ s>f f* f- 2.0 f/ y f!
+		winw @ s>f 2.0 f/ x f!
+		total @ 0 ?do
+			joystick @ i SDL-GetJoystickAxis s>f 32767.0 f/
+			x f@ f* 
+			x f@ f+ 
+			dx f!
+
+			dx f@ dst SDL-FRect.x sf!
+			y f@ dst SDL-FRect.y sf!
+			x f@ dx f@ SDL-fabsf f- dst SDL-FRect.w sf!
+			size f@ dst SDL-FRect.h sf!
+
+			(renderer) @ 
+			i colors SDL-Color.r c@
+			i colors SDL-Color.g c@
+			i colors SDL-Color.b c@
+			i colors SDL-Color.a c@
+			SDL-SetRenderDrawColor throw
+
+			(renderer) @ dst SDL-RenderFillRect throw
+
+			y f@ size f@ f+ y f!
+		loop
+
+	 	joystick @ SDL-GetNumJoystickButtons total !
+	 	winw @ s>f total @ s>f size f@ f* f- 2.0 f/ x f!
+	 	total @ 0 ?do
+	 	 	x f@ dst SDL-FRect.x sf!
+	 	 	0.0 dst SDL-FRect.y sf!
+	 	 	size f@ dst SDL-FRect.w sf!
+	 	 	size f@ dst SDL-FRect.h sf!
+	 	 	joystick @ i SDL-GetJoystickButton if
+	 	 		(renderer) @
+	 	 		i colors SDL-Color.r c@
+	 	 		i colors SDL-Color.g c@
+	 	 		i colors SDL-Color.b c@
+	 	 		i colors SDL-Color.a c@
+	 	 		SDL-SetRenderDrawColor throw
+	 	 	else
+	 	 		(renderer) @ 0 0 0 255
+	 	 		SDL-SetRenderDrawColor throw
+	 	 	then
+	 	 	(renderer) @ dst SDL-RenderFillRect throw
+	 	 	(renderer) @ 255 255 255 i colors SDL-Color.a
+	 	 	SDL-SetRenderDrawColor throw
+	 	 	(renderer) @ dst SDL-RenderRect throw
+	 	 	x f@ size f@ f+ x f!
+	 	loop
+	then
+
+	winw @ text-len @ SDL-DEBUG-TEXT-FONT-CHARACTER-SIZE * - s>f
+	2.0 f/ x f!
+
+	winh @ SDL-DEBUG-TEXT-FONT-CHARACTER-SIZE - s>f 2.0 f/ y f!
+
+	(renderer) @ 255 255 255 255 SDL-SetRenderDrawColor throw
+	(renderer) @ x f@ y f@ text @ text-len @ SDL-RenderDebugText throw
+	(renderer) @ SDL-RenderPresent throw
+
+	SDL-APP-CONTINUE
 ;

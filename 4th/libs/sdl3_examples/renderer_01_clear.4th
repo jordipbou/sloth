@@ -40,11 +40,9 @@ fvariable now
 	SDL-ALPHA-OPAQUE-FLOAT
 	SDL-SetRenderDrawColorFloat throw
 
-	(renderer) @
-	SDL-RenderClear throw
+	(renderer) @ SDL-RenderClear throw
 
-	(renderer) @
-	SDL-RenderPresent throw
+	(renderer) @ SDL-RenderPresent throw
 ;] catch if
 	SDL-APP-FAILURE
 else

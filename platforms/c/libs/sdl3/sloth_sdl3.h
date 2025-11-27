@@ -20,8 +20,13 @@ void sloth2SDL3_Event_jdevice_which_(X* x);
 
 /* SDL_joystick.h */
 void sloth2SDL3_OpenJoystick_(X* x);
-void sloth2SDL3_CloseJoystick_(X* x);
+void sloth2SDL4_GetJoystickName_(X* x);
 void sloth2SDL3_GetJoystickID_(X* x);
+void sloth2SDL3_GetNumJoystickAxes_(X* x);
+void sloth2SDL3_GetNumJoystickButtons_(X* x);
+void sloth2SDL3_GetJoystickAxis_(X* x);
+void sloth2SDL3_GetJoystickButton_(X* x);
+void sloth2SDL3_CloseJoystick_(X* x);
 
 /* SDL_timer.h */
 void sloth2SDL3_GetTicks_(X* x);
@@ -29,16 +34,22 @@ void sloth2SDL3_GetTicks_(X* x);
 /* SDL_render.h */
 void sloth2SDL3_CreateWindowAndRenderer_(X* x);
 void sloth2SDL3_SetRenderLogicalPresentation_(X* x);
+void sloth2SDL3_SetRenderDrawColor_(X* x);
 void sloth2SDL3_SetRenderDrawColorFloat_(X* x);
 void sloth2SDL3_RenderClear_(X* x);
+void sloth2SDL3_RenderRect_(X* x);
+void sloth2SDL3_RenderFillRect_(X* x);
 void sloth2SDL3_RenderPresent_(X* x);
+void sloth2SDL3_RenderDebugText_(X* x);
 
 /* SDL_video.h */
+void sloth2SDL3_GetWindowSize_(X* x);
 
 /* SDL_pixels.h */
 
 /* SDL_stdinc.h */
-void slothSDL3_rand_(X* x);
+void sloth2SDL3_rand_(X* x);
+void sloth2SDL3_fabsf_(X* x);
 void sloth2SDL3_sin_(X* x);
 
 void sloth_bootstrap_SDL3(X* x);
