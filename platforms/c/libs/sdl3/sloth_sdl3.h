@@ -23,8 +23,10 @@ void sloth2SDL3_OpenJoystick_(X* x);
 void sloth2SDL4_GetJoystickName_(X* x);
 void sloth2SDL3_GetJoystickID_(X* x);
 void sloth2SDL3_GetNumJoystickAxes_(X* x);
+void sloth2SDL3_GetNumJoystickHats_(X* x);
 void sloth2SDL3_GetNumJoystickButtons_(X* x);
 void sloth2SDL3_GetJoystickAxis_(X* x);
+void sloth2SDL3_GetJoystickHat_(X* x);
 void sloth2SDL3_GetJoystickButton_(X* x);
 void sloth2SDL3_CloseJoystick_(X* x);
 
@@ -39,6 +41,7 @@ void sloth2SDL3_SetRenderDrawColorFloat_(X* x);
 void sloth2SDL3_RenderClear_(X* x);
 void sloth2SDL3_RenderRect_(X* x);
 void sloth2SDL3_RenderFillRect_(X* x);
+void sloth2SDL3_RenderFillRects_(X* x);
 void sloth2SDL3_RenderPresent_(X* x);
 void sloth2SDL3_RenderDebugText_(X* x);
 

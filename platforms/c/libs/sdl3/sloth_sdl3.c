@@ -81,6 +81,11 @@ void sloth2SDL3_GetNumJoystickAxes_(X* x) {
 	sloth_push(x, SDL_GetNumJoystickAxes(joystick));
 }
 
+void sloth2SDL3_GetNumJoystickHats_(X* x) {
+	SDL_Joystick *joystick = (SDL_Joystick *)sloth_pop(x);
+	sloth_push(x, SDL_GetNumJoystickHats(joystick));
+}
+
 void sloth2SDL3_GetNumJoystickButtons_(X* x) {
 	SDL_Joystick *joystick = (SDL_Joystick *)sloth_pop(x);
 	sloth_push(x, SDL_GetNumJoystickButtons(joystick));
@@ -90,6 +95,12 @@ void sloth2SDL3_GetJoystickAxis_(X* x) {
 	int axis = (int)sloth_pop(x);
 	SDL_Joystick *joystick = (SDL_Joystick *)sloth_pop(x);
 	sloth_push(x, SDL_GetJoystickAxis(joystick, axis));
+}
+
+void sloth2SDL3_GetJoystickHat_(X* x) {
+	int hat = (int)sloth_pop(x);
+	SDL_Joystick *joystick = (SDL_Joystick *)sloth_pop(x);
+	sloth_push(x, SDL_GetJoystickHat(joystick, hat));
 }
 
 void sloth2SDL3_GetJoystickButton_(X* x) {
@@ -187,6 +198,15 @@ void sloth2SDL3_RenderFillRect_(X* x) {
 	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
 	sloth_push(x,
 		SDL_RenderFillRect(renderer, rect)
+		? 0 : -256);
+}
+
+void sloth2SDL3_RenderFillRects_(X* x) {
+	int count = (int)sloth_pop(x);
+	SDL_FRect *rects = (SDL_FRect *)sloth_pop(x);
+	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
+	sloth_push(x,
+		SDL_RenderFillRects(renderer, rects, count)
 		? 0 : -256);
 }
 
@@ -294,12 +314,24 @@ void sloth_bootstrap_SDL3(X* x) {
 	SLOTH2SDL3_CODE("SDL-Event.jdevice.which", Event_jdevice_which);
 
 	/* SDL_joystick.h */
+	sloth_constant(x, SDL_HAT_CENTERED, "SDL-HAT-CENTERED");
+	sloth_constant(x, SDL_HAT_UP, "SDL-HAT-UP");
+	sloth_constant(x, SDL_HAT_RIGHT, "SDL-HAT-RIGHT");
+	sloth_constant(x, SDL_HAT_DOWN, "SDL-HAT-DOWN");
+	sloth_constant(x, SDL_HAT_LEFT, "SDL-HAT-LEFT");
+	sloth_constant(x, SDL_HAT_RIGHTUP, "SDL-HAT-RIGHTUP");
+	sloth_constant(x, SDL_HAT_RIGHTDOWN, "SDL-HAT-RIGHTDOWN");
+	sloth_constant(x, SDL_HAT_LEFTUP, "SDL-HAT-LEFTUP");
+	sloth_constant(x, SDL_HAT_LEFTDOWN, "SDL-HAT-LEFTDOWN");
+
 	SLOTH2SDL3_CODE("SDL-OpenJoystick", OpenJoystick);
 	SLOTH2SDL3_CODE("SDL-GetJoystickName", GetJoystickName);
 	SLOTH2SDL3_CODE("SDL-GetJoystickID", GetJoystickID);
 	SLOTH2SDL3_CODE("SDL-GetNumJoystickAxes", GetNumJoystickAxes);
+	SLOTH2SDL3_CODE("SDL-GetNumJoystickHats", GetNumJoystickHats);
 	SLOTH2SDL3_CODE("SDL-GetNumJoystickButtons", GetNumJoystickButtons);
 	SLOTH2SDL3_CODE("SDL-GetJoystickAxis", GetJoystickAxis);
+	SLOTH2SDL3_CODE("SDL-GetJoystickHat", GetJoystickHat);
 	SLOTH2SDL3_CODE("SDL-GetJoystickButton", GetJoystickButton);
 	SLOTH2SDL3_CODE("SDL-CloseJoystick", CloseJoystick);
 
@@ -322,6 +354,7 @@ void sloth_bootstrap_SDL3(X* x) {
 	SLOTH2SDL3_CODE("SDL-RenderClear", RenderClear);
 	SLOTH2SDL3_CODE("SDL-RenderRect", RenderRect);
 	SLOTH2SDL3_CODE("SDL-RenderFillRect", RenderFillRect);
+	SLOTH2SDL3_CODE("SDL-RenderFillRects", RenderFillRects);
 	SLOTH2SDL3_CODE("SDL-RenderPresent", RenderPresent);
 	SLOTH2SDL3_CODE("SDL-RenderDebugText", RenderDebugText);
 

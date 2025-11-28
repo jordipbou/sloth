@@ -76,12 +76,15 @@ variable winh
 variable text
 variable text-len
 variable total
+variable hat
 fvariable size
+fvariable thirdsize
 fvariable x
 fvariable y
 fvariable dx
 
 create dst SDL-FRect allot
+2 SDL-FRect array: cross
 
 : appiterate
 	640 winw !
@@ -126,6 +129,7 @@ create dst SDL-FRect allot
 			y f@ size f@ f+ y f!
 		loop
 
+		\ Draw buttons as blocks across top of window
 	 	joystick @ SDL-GetNumJoystickButtons total !
 	 	winw @ s>f total @ s>f size f@ f* f- 2.0 f/ x f!
 	 	total @ 0 ?do
@@ -150,6 +154,74 @@ create dst SDL-FRect allot
 	 	 	(renderer) @ dst SDL-RenderRect throw
 	 	 	x f@ size f@ f+ x f!
 	 	loop
+
+		\ Draw hats across the bottom of the screen
+		joystick @ SDL-GetNumJoystickHats total !
+
+		winw @ s>f total @ s>f size f@ 2.0 f* f* f- 2.0 f/
+		size f@ 2.0 f/ f+ x f!
+
+		winh @ s>f size f@ f- y f!
+
+		total @ 0 ?do
+			size f@ 3.0 f/ thirdsize f!
+
+			x f@ 0 cross SDL-FRect.x sf!
+			y f@ thirdsize f@ f+ 0 cross SDL-FRect.y sf!
+			size f@ 0 cross SDL-FRect.w sf!
+			thirdsize f@ 0 cross SDL-FRect.h sf!
+
+			x f@ thirdsize f@ f+ 1 cross SDL-FRect.x sf!
+			y f@ 1 cross SDL-FRect.y sf!
+			thirdsize f@ 1 cross SDL-FRect.w sf!
+			size f@ 1 cross SDL-FRect.h sf!
+
+			joystick @ i SDL-GetJoystickHat hat !
+
+			(renderer) @ 90 90 90 255 SDL-SetRenderDrawColor throw
+			(renderer) @ 0 cross 2 SDL-RenderFillRects throw
+
+			(renderer) @
+			i colors SDL-Color.r c@
+			i colors SDL-Color.g c@
+			i colors SDL-Color.b c@
+			i colors SDL-Color.a c@
+			SDL-SetRenderDrawColor throw
+
+			hat @ SDL-HAT-UP and if
+				x f@ thirdsize f@ f+ dst SDL-FRect.x sf!
+				y f@ dst SDL-FRect.y sf!
+				thirdsize f@ dst SDL-FRect.w sf!
+				thirdsize f@ dst SDL-FRect.h sf!
+				(renderer) @ dst SDL-RenderFillRect throw
+			then
+
+			hat @ SDL-HAT-RIGHT and if
+				x f@ thirdsize f@ 2.0 f* f+ dst SDL-FRect.x sf!
+				y f@ thirdsize f@ f+ dst SDL-FRect.y sf!
+				thirdsize f@ dst SDL-FRect.w sf!
+				thirdsize f@ dst SDL-FRect.h sf!
+				(renderer) @ dst SDL-RenderFillRect throw
+			then
+
+			hat @ SDL-HAT-DOWN and if
+				x f@ thirdsize f@ f+ dst SDL-FRect.x sf!
+				y f@ thirdsize f@ 2.0 f* f+ dst SDL-FRect.y sf!
+				thirdsize f@ dst SDL-FRect.w sf!
+				thirdsize f@ dst SDL-FRect.h sf!
+				(renderer) @ dst SDL-RenderFillRect throw
+			then
+
+			hat @ SDL-HAT-LEFT and if
+				x f@ dst SDL-FRect.x sf!
+				y f@ thirdsize f@ f+ dst SDL-FRect.y sf!
+				thirdsize f@ dst SDL-FRect.w sf!
+				thirdsize f@ dst SDL-FRect.h sf!
+				(renderer) @ dst SDL-RenderFillRect throw
+			then
+
+			size f@ 2.0 f* x f@ f+ x f!
+		loop
 	then
 
 	winw @ text-len @ SDL-DEBUG-TEXT-FONT-CHARACTER-SIZE * - s>f
@@ -162,4 +234,10 @@ create dst SDL-FRect allot
 	(renderer) @ SDL-RenderPresent throw
 
 	SDL-APP-CONTINUE
+;
+
+: appquit
+	joystick @ if
+		joystick @ SDL-CloseJoystick
+	then
 ;
