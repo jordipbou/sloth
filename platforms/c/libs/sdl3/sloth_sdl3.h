@@ -1,8 +1,12 @@
 #include <fsloth.h>
 #include <SDL3/SDL_init.h>
+#include <SDL3/SDL_error.h>
 #include <SDL3/SDL_events.h>
+#include <SDL3/SDL_joystick.h>
+#include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_render.h>
+#include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_video.h>
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_stdinc.h>
@@ -30,6 +34,13 @@ void sloth2SDL3_GetJoystickHat_(X* x);
 void sloth2SDL3_GetJoystickButton_(X* x);
 void sloth2SDL3_CloseJoystick_(X* x);
 
+/* SDL_audio.h */
+void sloth2SDL3_PutAudioStreamData_(X* x);
+void sloth2SDL3_GetAudioStreamQueued_(X* x);
+void sloth2SDL3_ResumeAudioStreamDevice_(X* x);
+void sloth2SDL3_OpenAudioDeviceStream_(X* x);
+void sloth2SDL3_LoadWAV_(X* x);
+
 /* SDL_timer.h */
 void sloth2SDL3_GetTicks_(X* x);
 
@@ -45,12 +56,17 @@ void sloth2SDL3_RenderFillRects_(X* x);
 void sloth2SDL3_RenderPresent_(X* x);
 void sloth2SDL3_RenderDebugText_(X* x);
 
+/* SDL_filesystem.h */
+void sloth2SDL3_GetBasePath_(X* x);
+
 /* SDL_video.h */
 void sloth2SDL3_GetWindowSize_(X* x);
 
 /* SDL_pixels.h */
 
 /* SDL_stdinc.h */
+void sloth2SDL3_free_(X* x);
+void sloth2SDL3_asprintfs_(X* x);
 void sloth2SDL3_rand_(X* x);
 void sloth2SDL3_fabsf_(X* x);
 void sloth2SDL3_sin_(X* x);

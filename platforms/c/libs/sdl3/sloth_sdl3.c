@@ -114,6 +114,71 @@ void sloth2SDL3_CloseJoystick_(X* x) {
 	SDL_CloseJoystick(joystick);
 }
 
+/* SDL_audio.h */
+void sloth2SDL3_PutAudioStreamData_(X* x) {
+	int len = (int)sloth_pop(x);
+	const void *buf = (void *)sloth_pop(x);
+	SDL_AudioStream *stream = (SDL_AudioStream *)sloth_pop(x);
+	sloth_push(x,
+		SDL_PutAudioStreamData(stream, buf, len)
+		? 0 : -255);
+}
+
+void sloth2SDL3_GetAudioStreamQueued_(X* x) {
+	SDL_AudioStream *stream = (SDL_AudioStream *)sloth_pop(x);
+	int nbytes = SDL_GetAudioStreamQueued(stream);
+	if (nbytes == -1) {
+		sloth_push(x, -256);
+	} else {
+		sloth_push(x, nbytes);
+		sloth_push(x, 0);
+	}
+}
+
+void sloth2SDL3_ResumeAudioStreamDevice_(X* x) {
+	SDL_AudioStream *stream = (SDL_AudioStream *)sloth_pop(x);
+	sloth_push(x,
+		SDL_ResumeAudioStreamDevice(stream)
+		? 0 : -256);
+}
+
+void sloth2SDL3_OpenAudioDeviceStream_(X* x) {
+	void *userdata = (void *)sloth_pop(x);
+	SDL_AudioStreamCallback callback = (SDL_AudioStreamCallback)sloth_pop(x);
+	SDL_AudioSpec *spec = (SDL_AudioSpec *)sloth_pop(x);
+	SDL_AudioDeviceID devid = (SDL_AudioDeviceID)sloth_pop(x);
+	SDL_AudioStream *stream;
+	stream = SDL_OpenAudioDeviceStream(devid, spec, callback, userdata);
+	if (stream) {
+		sloth_push(x, stream);
+		sloth_push(x, 0);
+	} else {
+		sloth_push(x, -256);
+	}
+}
+
+void sloth2SDL3_LoadWAV_(X* x) {
+	SDL_AudioSpec *spec = (SDL_AudioSpec *)sloth_pop(x);
+	CELL path_len = sloth_pop(x);
+	char *path = (char *)sloth_pop(x);
+	char path_tmp[255];
+	Uint8 *audio_buf;
+	Uint32 audio_len;
+	if (path[path_len] != 0) {
+		int i;
+		for (i = 0; i < path_len; i++) path_tmp[i] = path[i];
+		path_tmp[path_len] = 0;
+		path = path_tmp;
+	}
+	if (SDL_LoadWAV(path, spec, &audio_buf, &audio_len)) {
+		sloth_push(x, audio_buf);
+		sloth_push(x, audio_len);
+		sloth_push(x, 0);
+	} else {
+		sloth_push(x, -256);
+	}
+}
+
 /* SDL_timer.h */
 void sloth2SDL3_GetTicks_(X* x) {
 	sloth_push(x, SDL_GetTicks());
@@ -234,6 +299,18 @@ void sloth2SDL3_RenderDebugText_(X* x) {
 		? 0 : -256);
 }
 
+/* SDL_filesystem.h */
+void sloth2SDL3_GetBasePath_(X* x) {
+	const char *base_path = SDL_GetBasePath();
+	if (base_path == 0) {
+		sloth_push(x, -256);
+	} else {
+		sloth_push(x, base_path);
+		sloth_push(x, strlen(base_path));
+		sloth_push(x, 0);
+	}
+}
+
 /* SDL_video.h */
 void sloth2SDL3_GetWindowSize_(X* x) {
 	int w, h;
@@ -248,6 +325,41 @@ void sloth2SDL3_GetWindowSize_(X* x) {
 }
 
 /* SDL_stdinc.h */
+void sloth2SDL3_free_(X* x) {
+	void *mem = (void *)sloth_pop(x);
+	SDL_free(mem);
+}
+
+void sloth2SDL3_asprintfs_(X* x) {
+	CELL str_len = sloth_pop(x);
+	char *str = (char *)sloth_pop(x);
+	CELL fmt_len = sloth_pop(x);
+	char *fmt = (char *)sloth_pop(x);
+	char str_temp[255], fmt_temp[255];
+	char *strp;
+	int nbytes;
+	if (str[str_len] != 0) {
+		int i;
+		for (i = 0; i < str_len; i++) str_temp[i] = str[i];
+		str_temp[str_len] = 0;
+		str = str_temp;
+	}
+	if (fmt[fmt_len] != 0) {
+		int i;
+		for (i = 0; i < fmt_len; i++) fmt_temp[i] = fmt[i];
+		fmt_temp[fmt_len] = 0;
+		fmt = fmt_temp;
+	}
+	nbytes = SDL_asprintf(&strp, fmt, str);
+	if (nbytes < 0) {
+		sloth_push(x, -256);	
+	} else {
+		sloth_push(x, strp);
+		sloth_push(x, nbytes);
+		sloth_push(x, 0);
+	}
+}
+
 void sloth2SDL3_rand_(X* x) {
 	Sint32 n = (Sint32)sloth_pop(x);
 	sloth_push(x, SDL_rand(n));
@@ -335,6 +447,22 @@ void sloth_bootstrap_SDL3(X* x) {
 	SLOTH2SDL3_CODE("SDL-GetJoystickButton", GetJoystickButton);
 	SLOTH2SDL3_CODE("SDL-CloseJoystick", CloseJoystick);
 
+	/* SDL_audio.h */
+	sloth_evaluate(x,
+		"BEGIN-STRUCTURE SDL-AudioSpec "
+		"  INTFIELD: SDL-AudioSpec.format "
+		"  INTFIELD: SDL-AudioSpec.channels "
+		"  INTFIELD: SDL-AudioSpec.freq "
+		"END-STRUCTURE ");
+
+	sloth_constant(x, SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, "SDL-AUDIO-DEVICE-DEFAULT-PLAYBACK");
+
+	SLOTH2SDL3_CODE("SDL-PutAudioStreamData", PutAudioStreamData);
+	SLOTH2SDL3_CODE("SDL-GetAudioStreamQueued", GetAudioStreamQueued);
+	SLOTH2SDL3_CODE("SDL-ResumeAudioStreamDevice", ResumeAudioStreamDevice);
+	SLOTH2SDL3_CODE("SDL-OpenAudioDeviceStream", OpenAudioDeviceStream);
+	SLOTH2SDL3_CODE("SDL-LoadWAV", LoadWAV);
+
 	/* SDL_timer.h */
 	SLOTH2SDL3_CODE("SDL-GetTicks", GetTicks);
 
@@ -357,6 +485,9 @@ void sloth_bootstrap_SDL3(X* x) {
 	SLOTH2SDL3_CODE("SDL-RenderFillRects", RenderFillRects);
 	SLOTH2SDL3_CODE("SDL-RenderPresent", RenderPresent);
 	SLOTH2SDL3_CODE("SDL-RenderDebugText", RenderDebugText);
+
+	/* SDL_filesystem.h */
+	SLOTH2SDL3_CODE("SDL-GetBasePath", GetBasePath);
 
 	/* SDL_video.h */
 	sloth_constant(x, SDL_WINDOW_FULLSCREEN, "SDL-WINDOW-FULLSCREEN");
@@ -391,6 +522,8 @@ void sloth_bootstrap_SDL3(X* x) {
 	/* SDL_stdinc.h */
 	sloth_fconstant(x, SDL_PI_D, "SDL-PI-D");
 
+	SLOTH2SDL3_CODE("SDL-free", free);
+	SLOTH2SDL3_CODE("SDL-asprintfs", asprintfs);
 	SLOTH2SDL3_CODE("SDL-rand", rand);
 	SLOTH2SDL3_CODE("SDL-fabsf", fabsf);
 	SLOTH2SDL3_CODE("SDL-sin", sin);
