@@ -50,6 +50,8 @@ void sloth2SDL3_SetRenderLogicalPresentation_(X* x);
 void sloth2SDL3_SetRenderDrawColor_(X* x);
 void sloth2SDL3_SetRenderDrawColorFloat_(X* x);
 void sloth2SDL3_RenderClear_(X* x);
+void sloth2SDL3_RenderPoints_(X* x);
+void sloth2SDL3_RenderLine_(X* x);
 void sloth2SDL3_RenderRect_(X* x);
 void sloth2SDL3_RenderFillRect_(X* x);
 void sloth2SDL3_RenderFillRects_(X* x);
@@ -64,10 +66,13 @@ void sloth2SDL3_GetWindowSize_(X* x);
 
 /* SDL_pixels.h */
 
+/* SDL_rect.h */
+
 /* SDL_stdinc.h */
 void sloth2SDL3_free_(X* x);
 void sloth2SDL3_asprintfs_(X* x);
 void sloth2SDL3_rand_(X* x);
+void sloth2SDL3_randf_(X* x);
 void sloth2SDL3_fabsf_(X* x);
 void sloth2SDL3_sin_(X* x);
 

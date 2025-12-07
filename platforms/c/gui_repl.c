@@ -123,6 +123,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 	sloth_bootstrap_SDL3(ctx);
 	sloth_include(ctx, ROOT_PATH "4th/libs/sloth_sdl3.4th");
 
+	/* Set ROOT PATH */
+	sloth_set_root_path(ctx, ROOT_PATH "4th/");
+
 	if (argc > 1) {
 		/* First parameter will be user script to be executed */
 		int err = sloth_include(ctx, argv[1]);
@@ -176,7 +179,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 		sloth_catch(ctx, sloth_user_area_get(ctx, SLOTH_APP_INIT));
 		err = sloth_pop(ctx);
 		if (err != 0) {
-			/* TODO Manage the exception in some good way !!! */
+			return SDL_APP_FAILURE;
 		}
 
 		return sloth_pop(ctx);
@@ -195,7 +198,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 	sloth_catch(ctx, sloth_user_area_get(ctx, SLOTH_APP_EVENT));
 	err = sloth_pop(ctx);
 	if (err != 0) {
-		/* TODO Manage the exception in some good way !!! */
+		return SDL_APP_FAILURE;
 	}
 
 	return sloth_pop(ctx);
@@ -209,7 +212,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 	sloth_catch(ctx, sloth_user_area_get(ctx, SLOTH_APP_ITERATE));
 	err = sloth_pop(ctx);
 	if (err != 0) {
-		/* TODO Manage the exception in some good way !!! */
+		return SDL_APP_FAILURE;
 	}
 
 	return sloth_pop(ctx);

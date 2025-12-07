@@ -150,7 +150,7 @@ void sloth2SDL3_OpenAudioDeviceStream_(X* x) {
 	SDL_AudioStream *stream;
 	stream = SDL_OpenAudioDeviceStream(devid, spec, callback, userdata);
 	if (stream) {
-		sloth_push(x, stream);
+		sloth_push(x, (CELL)stream);
 		sloth_push(x, 0);
 	} else {
 		sloth_push(x, -256);
@@ -171,7 +171,7 @@ void sloth2SDL3_LoadWAV_(X* x) {
 		path = path_tmp;
 	}
 	if (SDL_LoadWAV(path, spec, &audio_buf, &audio_len)) {
-		sloth_push(x, audio_buf);
+		sloth_push(x, (CELL)audio_buf);
 		sloth_push(x, audio_len);
 		sloth_push(x, 0);
 	} else {
@@ -250,6 +250,26 @@ void sloth2SDL3_RenderClear_(X* x) {
 		? 0 : -256);
 }
 
+void sloth2SDL3_RenderPoints_(X* x) {
+	int count = (int)sloth_pop(x);
+	SDL_FPoint *points = (SDL_FPoint *)sloth_pop(x);
+	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
+	sloth_push(x,
+		SDL_RenderPoints(renderer, points, count)
+		? 0 : -256);
+}
+
+void sloth2SDL3_RenderLine_(X* x) {
+	float y2 = (float)sloth_fpop(x);
+	float x2 = (float)sloth_fpop(x);
+	float y1 = (float)sloth_fpop(x);
+	float x1 = (float)sloth_fpop(x);
+	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
+	sloth_push(x,
+		SDL_RenderLine(renderer, x1, y1, x2, y2)
+		? 0 : -256);
+}
+
 void sloth2SDL3_RenderRect_(X* x) {
 	SDL_FRect *rect = (SDL_FRect *)sloth_pop(x);
 	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
@@ -305,7 +325,7 @@ void sloth2SDL3_GetBasePath_(X* x) {
 	if (base_path == 0) {
 		sloth_push(x, -256);
 	} else {
-		sloth_push(x, base_path);
+		sloth_push(x, (CELL)base_path);
 		sloth_push(x, strlen(base_path));
 		sloth_push(x, 0);
 	}
@@ -354,7 +374,7 @@ void sloth2SDL3_asprintfs_(X* x) {
 	if (nbytes < 0) {
 		sloth_push(x, -256);	
 	} else {
-		sloth_push(x, strp);
+		sloth_push(x, (CELL)strp);
 		sloth_push(x, nbytes);
 		sloth_push(x, 0);
 	}
@@ -363,6 +383,10 @@ void sloth2SDL3_asprintfs_(X* x) {
 void sloth2SDL3_rand_(X* x) {
 	Sint32 n = (Sint32)sloth_pop(x);
 	sloth_push(x, SDL_rand(n));
+}
+
+void sloth2SDL3_randf_(X* x) {
+	sloth_fpush(x, SDL_randf());
 }
 
 void sloth2SDL3_fabsf_(X* x) {
@@ -480,6 +504,8 @@ void sloth_bootstrap_SDL3(X* x) {
 	SLOTH2SDL3_CODE("SDL-SetRenderDrawColor", SetRenderDrawColor);
 	SLOTH2SDL3_CODE("SDL-SetRenderDrawColorFloat", SetRenderDrawColorFloat);
 	SLOTH2SDL3_CODE("SDL-RenderClear", RenderClear);
+	SLOTH2SDL3_CODE("SDL-RenderPoints", RenderPoints);
+	SLOTH2SDL3_CODE("SDL-RenderLine", RenderLine);
 	SLOTH2SDL3_CODE("SDL-RenderRect", RenderRect);
 	SLOTH2SDL3_CODE("SDL-RenderFillRect", RenderFillRect);
 	SLOTH2SDL3_CODE("SDL-RenderFillRects", RenderFillRects);
@@ -508,6 +534,7 @@ void sloth_bootstrap_SDL3(X* x) {
 		"  CFIELD: SDL-Color.a "
 		"END-STRUCTURE");
 
+	sloth_constant(x, SDL_ALPHA_OPAQUE, "SDL-ALPHA-OPAQUE");
 	sloth_fconstant(x, SDL_ALPHA_OPAQUE_FLOAT, "SDL-ALPHA-OPAQUE-FLOAT");
 
 	/* SDL_rect.h */
@@ -519,12 +546,19 @@ void sloth_bootstrap_SDL3(X* x) {
 		"  SFFIELD: SDL-FRect.h "
 		"END-STRUCTURE");
 
+	sloth_evaluate(x,
+		"BEGIN-STRUCTURE SDL-FPoint "
+		" SFFIELD: SDL-FPoint.x "
+		" SFFIELD: SDL-FPoint.y "
+		"END-STRUCTURE");
+
 	/* SDL_stdinc.h */
 	sloth_fconstant(x, SDL_PI_D, "SDL-PI-D");
 
 	SLOTH2SDL3_CODE("SDL-free", free);
 	SLOTH2SDL3_CODE("SDL-asprintfs", asprintfs);
 	SLOTH2SDL3_CODE("SDL-rand", rand);
+	SLOTH2SDL3_CODE("SDL-randf", randf)
 	SLOTH2SDL3_CODE("SDL-fabsf", fabsf);
 	SLOTH2SDL3_CODE("SDL-sin", sin);
 }
