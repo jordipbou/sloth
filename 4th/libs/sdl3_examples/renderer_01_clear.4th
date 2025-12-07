@@ -1,4 +1,4 @@
-: appinit [:
+: appinit
 	s" Example Renderer Clear" 
 	s" 1.0" 
 	s" com.example.renderer-clear"
@@ -15,11 +15,8 @@
 	(renderer) @
 	640 480 SDL-LOGICAL-PRESENTATION-LETTERBOX
 	SDL-SetRenderLogicalPresentation throw
-;] catch if
-	SDL-APP-FAILURE
-else
+
 	SDL-APP-CONTINUE
-then
 ;
 
 : appevent
@@ -31,7 +28,7 @@ then
 ;
 
 fvariable now
-: appiterate [:
+: appiterate 
 	SDL-GetTicks s>f 1000.0 f/ now f!
 	(renderer) @
 	now f@ SDL-sin 0.5 f* 0.5 f+ \ red
@@ -43,13 +40,6 @@ fvariable now
 	(renderer) @ SDL-RenderClear throw
 
 	(renderer) @ SDL-RenderPresent throw
-;] catch if
-	SDL-APP-FAILURE
-else
-	SDL-APP-CONTINUE
-then
-;
 
-' appinit (APP-INIT) !
-' appevent (APP-EVENT) !
-' appiterate (APP-ITERATE) !
+	SDL-APP-CONTINUE
+;

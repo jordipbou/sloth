@@ -222,6 +222,15 @@ void sloth2SDL3_SetRenderLogicalPresentation_(X* x) {
 		? 0 : -256);
 }
 
+void sloth2SDL3_SetRenderScale_(X* x) {
+	float scaleY = (float)sloth_fpop(x);
+	float scaleX = (float)sloth_fpop(x);
+	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
+	sloth_push(x,
+		SDL_SetRenderScale(renderer, scaleY, scaleX)
+		? 0 : -256);
+}
+
 void sloth2SDL3_SetRenderDrawColor_(X* x) {
 	Uint8 a = (Uint8)sloth_pop(x);
 	Uint8 b = (Uint8)sloth_pop(x);
@@ -316,6 +325,25 @@ void sloth2SDL3_RenderDebugText_(X* x) {
 	}
 	sloth_push(x,
 		SDL_RenderDebugText(renderer, fx, fy, str)
+		? 0 : -256);
+}
+
+void sloth2SDL3_RenderDebugTextFormati_(X* x) {
+	CELL arg1 = sloth_pop(x);	
+	CELL fmt_len = sloth_pop(x);
+	char *fmt_str = (char *)sloth_pop(x);
+	float dy = (float)sloth_fpop(x);
+	float dx = (float)sloth_fpop(x);
+	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
+	char fmt[255];
+	if (fmt_str[fmt_len] != 0) {
+		int i;
+		for (i = 0; i < fmt_len; i++) fmt[i] = fmt_str[i];
+		fmt[fmt_len] = 0;
+		fmt_str = fmt;
+	}
+	sloth_push(x,
+		SDL_RenderDebugTextFormat(renderer, dx, dy, fmt_str, arg1)
 		? 0 : -256);
 }
 
@@ -501,6 +529,7 @@ void sloth_bootstrap_SDL3(X* x) {
 
 	SLOTH2SDL3_CODE("SDL-CreateWindowAndRenderer", CreateWindowAndRenderer);
 	SLOTH2SDL3_CODE("SDL-SetRenderLogicalPresentation", SetRenderLogicalPresentation);
+	SLOTH2SDL3_CODE("SDL-SetRenderScale", SetRenderScale);
 	SLOTH2SDL3_CODE("SDL-SetRenderDrawColor", SetRenderDrawColor);
 	SLOTH2SDL3_CODE("SDL-SetRenderDrawColorFloat", SetRenderDrawColorFloat);
 	SLOTH2SDL3_CODE("SDL-RenderClear", RenderClear);
@@ -511,6 +540,7 @@ void sloth_bootstrap_SDL3(X* x) {
 	SLOTH2SDL3_CODE("SDL-RenderFillRects", RenderFillRects);
 	SLOTH2SDL3_CODE("SDL-RenderPresent", RenderPresent);
 	SLOTH2SDL3_CODE("SDL-RenderDebugText", RenderDebugText);
+	SLOTH2SDL3_CODE("SDL-RenderDebugTextFormati", RenderDebugTextFormati);
 
 	/* SDL_filesystem.h */
 	SLOTH2SDL3_CODE("SDL-GetBasePath", GetBasePath);

@@ -47,6 +47,7 @@ void sloth2SDL3_GetTicks_(X* x);
 /* SDL_render.h */
 void sloth2SDL3_CreateWindowAndRenderer_(X* x);
 void sloth2SDL3_SetRenderLogicalPresentation_(X* x);
+void sloth2SDL3_SetRenderScale_(X* x);
 void sloth2SDL3_SetRenderDrawColor_(X* x);
 void sloth2SDL3_SetRenderDrawColorFloat_(X* x);
 void sloth2SDL3_RenderClear_(X* x);
@@ -57,6 +58,7 @@ void sloth2SDL3_RenderFillRect_(X* x);
 void sloth2SDL3_RenderFillRects_(X* x);
 void sloth2SDL3_RenderPresent_(X* x);
 void sloth2SDL3_RenderDebugText_(X* x);
+void sloth2SDL3_RenderDebugTextFormati_(X* x);
 
 /* SDL_filesystem.h */
 void sloth2SDL3_GetBasePath_(X* x);
