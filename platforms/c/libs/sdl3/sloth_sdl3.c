@@ -373,6 +373,17 @@ void sloth2SDL3_GetWindowSize_(X* x) {
 }
 
 /* SDL_stdinc.h */
+void sloth2SDL3_malloc_(X* x) {
+	size_t size = (size_t)sloth_pop(x);
+	void *ptr = SDL_malloc(size);
+	if (ptr) {
+		sloth_push(x, (CELL)ptr);
+		sloth_push(x, 0);
+	} else {
+		sloth_push(x, -256);
+	}
+}
+
 void sloth2SDL3_free_(X* x) {
 	void *mem = (void *)sloth_pop(x);
 	SDL_free(mem);
@@ -453,6 +464,9 @@ void sloth_fconstant(X* x, FCELL v, char* n) {
 
 void sloth_bootstrap_SDL3(X* x) {
 	/* SDL_init.h */
+	sloth_constant(x, SDL_APP_CONTINUE, "SDL-APP-CONTINUE");
+	sloth_constant(x, SDL_APP_FAILURE, "SDL-APP-FAILURE");
+	sloth_constant(x, SDL_APP_SUCCESS, "SDL-APP-SUCCESS");
 
 	sloth_constant(x, SDL_INIT_AUDIO, "SDL-INIT-AUDIO");
 	sloth_constant(x, SDL_INIT_VIDEO, "SDL-INIT-VIDEO");
@@ -506,6 +520,9 @@ void sloth_bootstrap_SDL3(X* x) {
 		"  INTFIELD: SDL-AudioSpec.channels "
 		"  INTFIELD: SDL-AudioSpec.freq "
 		"END-STRUCTURE ");
+
+	sloth_constant(x, SDL_AUDIO_U8, "SDL-AUDIO-U8");
+	sloth_constant(x, SDL_AUDIO_S16LE, "SDL-AUDIO-S16LE");
 
 	sloth_constant(x, SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, "SDL-AUDIO-DEVICE-DEFAULT-PLAYBACK");
 
@@ -585,6 +602,7 @@ void sloth_bootstrap_SDL3(X* x) {
 	/* SDL_stdinc.h */
 	sloth_fconstant(x, SDL_PI_D, "SDL-PI-D");
 
+	SLOTH2SDL3_CODE("SDL-malloc", malloc);
 	SLOTH2SDL3_CODE("SDL-free", free);
 	SLOTH2SDL3_CODE("SDL-asprintfs", asprintfs);
 	SLOTH2SDL3_CODE("SDL-rand", rand);

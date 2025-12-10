@@ -71,6 +71,7 @@ void sloth2SDL3_GetWindowSize_(X* x);
 /* SDL_rect.h */
 
 /* SDL_stdinc.h */
+void sloth2SDL3_malloc_(X* x);
 void sloth2SDL3_free_(X* x);
 void sloth2SDL3_asprintfs_(X* x);
 void sloth2SDL3_rand_(X* x);

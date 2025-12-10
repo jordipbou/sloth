@@ -42,27 +42,33 @@ int getch();
 /* virtual machine.                                      */
 /* ----------------------------------------------------- */
 
+typedef int8_t BYTE;
 typedef uint8_t uCHAR; /* CHARs are always unsigned */
 typedef int16_t WYDE;
 typedef int32_t LONG;
+typedef int64_t EXTENDED;
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
 
-#define sCELL sizeof(CELL)
 #define suCHAR sizeof(uCHAR)
-#define CELL_BITS sCELL*8
 
 #define ALIGNED(a, t) (((a) + ((t) - 1)) & ~((t) - 1))
 
 #if UINTPTR_MAX == UINT64_MAX
+	#define sCELL 8 
+	#define CELL_BITS 64
 	#define hCELL_MASK 0xFFFFFFFF
 	#define hCELL_BITS 32
 #endif
 #if UINTPTR_MAX == UINT32_MAX
+	#define sCELL 4
+	#define CELL_BITS 32
 	#define hCELL_MASK 0xFFFF
 	#define hCELL_BITS 16 
 #endif
 #if UINTPTR_MAX == UINT16_MAX
+	#define sCELL 2
+	#define CELL_BITS 16
 	#define hCELL_MASK 0xFF
 	#define hCELL_BITS 8
 #endif
@@ -132,10 +138,18 @@ CELL sloth_rpick(X* x, CELL a);
 
 /* -- Memory ------------------------------------------- */
 
-void sloth_store(X* x, CELL a, CELL v);
-CELL sloth_fetch(X* x, CELL a);
+void sloth_bstore(X* x, CELL a, BYTE v);
+BYTE sloth_bfetch(X* x, CELL a);
 void sloth_cstore(X* x, CELL a, uCHAR v);
 uCHAR sloth_cfetch(X* x, CELL a);
+void sloth_wstore(X* x, CELL a, WYDE v);
+WYDE sloth_wfetch(X* x, CELL a);
+void sloth_lstore(X* x, CELL a, LONG v);
+LONG sloth_lfetch(X* x, CELL a);
+void sloth_xstore(X* x, CELL a, EXTENDED v);
+EXTENDED sloth_xfetch(X* x, CELL a);
+void sloth_store(X* x, CELL a, CELL v);
+CELL sloth_fetch(X* x, CELL a);
 
 CELL sloth_to_abs(X* x, CELL a);
 CELL sloth_to_rel(X* x, CELL a);
@@ -359,8 +373,16 @@ void sloth_u_m_slash_mod_(X* x);
 
 /* Memory-stack transfer operations */
 
+void sloth_b_fetch_(X* x);
+void sloth_b_store_(X* x);
 void sloth_c_fetch_(X* x);
 void sloth_c_store_(X* x);
+void sloth_w_fetch_(X* x);
+void sloth_w_store_(X* x);
+void sloth_l_fetch_(X* x);
+void sloth_l_store_(X* x);
+void sloth_x_fetch_(X* x);
+void sloth_x_store_(X* x);
 void sloth_fetch_(X* x);
 void sloth_store_(X* x);
 
@@ -521,14 +543,26 @@ CELL sloth_rpick(X* x, CELL a) { return x->r[x->rp - a - 1]; }
 STORE/FETCH/CSTORE/cfetch work on absolute address units,
 not just inside SLOTH dictionary (memory block).
 */
+void sloth_bstore(X* x, CELL a, BYTE v) { *((BYTE*)a) = v; }
+BYTE sloth_bfetch(X* x, CELL a) { return *((BYTE*)a); }
 void sloth_cstore(X* x, CELL a, uCHAR v) { *((uCHAR*)a) = v; }
 uCHAR sloth_cfetch(X* x, CELL a) { return *((uCHAR*)a); }
 void sloth_wstore(X* x, CELL a, WYDE v) { *((WYDE*)a) = v; }
 WYDE sloth_wfetch(X* x, CELL a) { return *((WYDE*)a); }
 void sloth_lstore(X* x, CELL a, LONG v) { *((LONG*)a) = v; }
 LONG sloth_lfetch(X* x, CELL a) { return *((LONG*)a); }
-void sloth_store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
-CELL sloth_fetch(X* x, CELL a) { return *((CELL*)a); }
+void sloth_xstore(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
+CELL sloth_xfetch(X* x, CELL a) { return *((CELL*)a); }
+#if sCELL == 2
+CELL sloth_fetch(X* x, CELL a) { return sloth_wfetch(x, a); }
+void sloth_store(X* x, CELL a, CELL v) { sloth_wstore(x, a, v); }
+#elif sCELL == 4
+CELL sloth_fetch(X* x, CELL a) { return sloth_lfetch(x, a); }
+void sloth_store(X* x, CELL a, CELL v) { sloth_lstore(x, a, v); }
+#elif sCELL == 8
+CELL sloth_fetch(X* x, CELL a) { return sloth_xfetch(x, a); }
+void sloth_store(X* x, CELL a, CELL v) { sloth_xstore(x, a, v); }
+#endif
 
 /*
 The next two functions allow transforming from relative to
@@ -1592,19 +1626,31 @@ void sloth_u_m_slash_mod_(X* x) {
 
 /* Memory-stack transfer operations */
 
+void sloth_b_fetch_(X* x) { sloth_push(x, sloth_bfetch(x, sloth_pop(x))); }
+void sloth_b_store_(X* x) { CELL a = sloth_pop(x); sloth_bstore(x, a, sloth_pop(x)); }
 void sloth_c_fetch_(X* x) { sloth_push(x, sloth_cfetch(x, sloth_pop(x))); }
 void sloth_c_store_(X* x) { CELL a = sloth_pop(x); sloth_cstore(x, a, sloth_pop(x)); }
 void sloth_w_fetch_(X* x) { sloth_push(x, sloth_wfetch(x, sloth_pop(x))); }
 void sloth_w_store_(X* x) { CELL a = sloth_pop(x); sloth_wstore(x, a, sloth_pop(x)); }
 void sloth_l_fetch_(X* x) { sloth_push(x, sloth_lfetch(x, sloth_pop(x))); }
 void sloth_l_store_(X* x) { CELL a = sloth_pop(x); sloth_lstore(x, a, sloth_pop(x)); }
-void sloth_fetch_(X* x) { 
-	sloth_push(x, sloth_fetch(x, sloth_pop(x))); 
-}
-void sloth_store_(X* x) { 
-	CELL a = sloth_pop(x); 
-	sloth_store(x, a, sloth_pop(x)); 
-}
+void sloth_x_fetch_(X* x) { sloth_push(x, sloth_xfetch(x, sloth_pop(x))); }
+void sloth_x_store_(X* x) { CELL a = sloth_pop(x); sloth_xstore(x, a, sloth_pop(x)); }
+#if sCELL == 2
+void sloth_fetch_(X* x) { sloth_w_fetch_(x); }
+#elif sCELL == 4
+void sloth_fetch_(X* x) { sloth_l_fetch_(x); }
+#elif sCELL == 8
+void sloth_fetch_(X* x) { sloth_x_fetch_(x); }
+#endif
+
+#if sCELL == 2
+void sloth_store_(X* x) { sloth_w_store_(x); }
+#elif sCELL == 4
+void sloth_store_(X* x) { sloth_l_store_(x); }
+#elif sCELL == 8
+void sloth_store_(X* x) { sloth_x_store_(x); }
+#endif
 
 /* Comparison operations */
 
@@ -1962,18 +2008,29 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* Memory-stack transfer operations */
 
-	/* sloth_code(x, "B@", sloth_primitive(x, &sloth_b_fetch_)); */
-	/* sloth_code(x, "B!", sloth_primitive(x, &sloth_b_store_)); */
+	sloth_code(x, "B@", sloth_primitive(x, &sloth_b_fetch_));
+	sloth_code(x, "B!", sloth_primitive(x, &sloth_b_store_));
 	sloth_code(x, "C@", sloth_primitive(x, &sloth_c_fetch_));
 	sloth_code(x, "C!", sloth_primitive(x, &sloth_c_store_));
 	sloth_code(x, "W@", sloth_primitive(x, &sloth_w_fetch_));
 	sloth_code(x, "W!", sloth_primitive(x, &sloth_w_store_));
 	sloth_code(x, "L@", sloth_primitive(x, &sloth_l_fetch_));
 	sloth_code(x, "L!", sloth_primitive(x, &sloth_l_store_));
-	/* sloth_code(x, "X@", sloth_primitive(x, &sloth_x_fetch_)); */
-	/* sloth_code(x, "X!", sloth_primitive(x, &sloth_x_store_)); */
+	sloth_code(x, "X@", sloth_primitive(x, &sloth_x_fetch_));
+	sloth_code(x, "X!", sloth_primitive(x, &sloth_x_store_));
 	sloth_code(x, "@", sloth_primitive(x, &sloth_fetch_));
 	sloth_code(x, "!", sloth_primitive(x, &sloth_store_));
+
+	if (sizeof(int) == 2) {
+		sloth_code(x, "INT@", sloth_primitive(x, &sloth_w_fetch_));
+		sloth_code(x, "INT!", sloth_primitive(x, &sloth_w_store_));
+	} else if (sizeof(int) == 4) {
+		sloth_code(x, "INT@", sloth_primitive(x, &sloth_l_fetch_));
+		sloth_code(x, "INT!", sloth_primitive(x, &sloth_l_store_));
+	} else if (sizeof(int) == 8) {
+		sloth_code(x, "INT@", sloth_primitive(x, &sloth_x_fetch_));
+		sloth_code(x, "INT!", sloth_primitive(x, &sloth_x_store_));
+	}
 
 	/* Comparison operations */
 

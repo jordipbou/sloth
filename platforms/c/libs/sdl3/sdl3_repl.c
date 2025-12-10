@@ -1,9 +1,11 @@
 #define SLOTH_IMPLEMENTATION
 #include"fsloth.h"
-#include"facility.h"
 #include"file.h"
+/*
+#include"facility.h"
 #include"locals.h"
 #include"memory.h"
+*/
 #include"sloth_sdl3.h"
 
 #define SLOTH_APP_INIT			SLOTH_LAST_USER_VAR+sCELL
@@ -89,27 +91,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
 	sloth_bootstrap(ctx);
 
-	sloth_bootstrap_facility_wordset(ctx);
 	sloth_bootstrap_file_wordset(ctx);
+
+/*
+	sloth_bootstrap_facility_wordset(ctx);
 	sloth_bootstrap_locals_wordset(ctx);
 	sloth_bootstrap_memory_wordset(ctx);
+*/
 
-	/* Define four user variables to default functions for init, */
-	/* event, iterate and quit. */
-	/*
-	sloth_user_variable(
-		ctx, "(APP-INIT)", SLOTH_APP_INIT, 
-		sloth_primitive(ctx, &defaultAppInit));
-	sloth_user_variable(
-		ctx, "(APP-EVENT)", SLOTH_APP_EVENT, 
-		sloth_primitive(ctx, &defaultAppEvent));
-	sloth_user_variable(
-		ctx, "(APP-ITERATE)", SLOTH_APP_ITERATE, 
-		sloth_primitive(ctx, &defaultAppIterate));
-	sloth_user_variable(
-		ctx, "(APP-QUIT)", SLOTH_APP_QUIT, 
-		sloth_primitive(ctx, &defaultAppQuit));
-	*/
 	sloth_user_variable(ctx, "(APP-INIT)", SLOTH_APP_INIT, 0);
 	sloth_user_variable(ctx, "(APP-EVENT)", SLOTH_APP_EVENT, 0);
 	sloth_user_variable(ctx, "(APP-ITERATE)", SLOTH_APP_ITERATE, 0);
@@ -121,7 +110,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 	sloth_include(ctx, ROOT_PATH "4th/ans.4th");
 
 	sloth_bootstrap_SDL3(ctx);
+	/*
 	sloth_include(ctx, ROOT_PATH "4th/libs/sloth_sdl3.4th");
+	*/
 
 	/* Set ROOT PATH */
 	sloth_set_root_path(ctx, ROOT_PATH "4th/");

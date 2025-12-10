@@ -8,9 +8,9 @@
 [submodule "platforms/c/libs/sdl3/SDL"]
 	path = platforms/c/libs/sdl3/SDL
 	url = https://github.com/libsdl-org/SDL.git
-[submodule "platforms/c/libs/sdl3/SDL3_gfx"]
-	path = platforms/c/libs/sdl3/SDL3_gfx
-	url = https://github.com/sabdul-khabir/SDL3_gfx.git
 [submodule "platforms/c/libs/midi/portmidi"]
 	path = platforms/c/libs/midi/portmidi
 	url = https://github.com/PortMidi/portmidi.git
+[submodule "platforms/c/libs/nuklear/Nuklear"]
+	path = platforms/c/libs/nuklear/Nuklear
+	url = https://github.com/Immediate-Mode-UI/Nuklear.git
