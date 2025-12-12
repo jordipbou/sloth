@@ -9,6 +9,8 @@
 #include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_video.h>
 #include <SDL3/SDL_pixels.h>
+#include <SDL3/SDL_rect.h>
+#include <SDL3/SDL_tray.h>
 #include <SDL3/SDL_stdinc.h>
 
 /* SDL_init.h */
@@ -69,6 +71,11 @@ void sloth2SDL3_GetWindowSize_(X* x);
 /* SDL_pixels.h */
 
 /* SDL_rect.h */
+
+/* SDL_tray.h */
+void sloth2SDL3_CreateTray_(X* x);
+void sloth2SDL3_CreateTrayMenu_(X* x);
+void sloth2SDL3_InsertTrayEntryAt_(X* x);
 
 /* SDL_stdinc.h */
 void sloth2SDL3_malloc_(X* x);

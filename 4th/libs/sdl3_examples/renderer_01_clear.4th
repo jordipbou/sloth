@@ -20,7 +20,7 @@
 ;
 
 : appevent
-	SDL-Event.type SDL-EVENT-QUIT = if
+	SDL-Event.type l@ SDL-EVENT-QUIT = if
 		SDL-APP-SUCCESS
 	else
 		SDL-APP-CONTINUE

@@ -39,23 +39,23 @@ include ../../arrays.4th
 variable joystick 0 joystick !
 
 : appevent ( SDL_Event -- SDL_AppResult )
-	>r r@ SDL-Event.type CASE
+	>r r@ SDL-Event.type l@ CASE
 	SDL-EVENT-QUIT OF r> drop SDL-APP-SUCCESS exit ENDOF
 	SDL-EVENT-JOYSTICK-ADDED OF 
 		joystick @ 0= if
-			r@ SDL-Event.jdevice.which SDL-OpenJoystick
+			r@ SDL-JoyDeviceEvent.which l@ SDL-OpenJoystick
 			?dup if
 				joystick !	
 			else
 				s" Failed to open joystick ID %u: %s"
-				r@ SDL-Event.jdevice.which
+				r@ SDL-JoyDeviceEvent.which l@ 
 				SDL-GetError
 			then
 		then
 	ENDOF
 	SDL-EVENT-JOYSTICK-REMOVED OF 
 		joystick @ if
-			r@ SDL-Event.jdevice.which
+			r@ SDL-JoyDeviceEvent.which l@
 			joystick @ SDL-GetJoystickID = if
 				joystick @ SDL-CloseJoystick
 				0 joystick !

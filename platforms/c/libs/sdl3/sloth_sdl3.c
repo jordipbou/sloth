@@ -2,6 +2,8 @@
 
 #define SLOTH2SDL3_CODE(w, f) sloth_code(x, w, sloth_primitive(x, &sloth2SDL3_##f##_));
 
+#define STR_BUF_LEN 255
+
 /* SDL_init.h */
 void sloth2SDL3_Init_(X* x) {
 	CELL init_flags = sloth_pop(x);
@@ -48,14 +50,20 @@ void sloth2SDL3_GetError_(X* x) {
 }
 
 /* SDL_events.h */
-void sloth2SDL3_Event_type_(X* x) {
-	SDL_Event *event = (SDL_Event *)sloth_pop(x);
-	sloth_push(x, event->type);
+void sloth2SDL3_Event_type_(X* x) { /* NOOP */ }
+void sloth2SDL3_Event_event_(X* x) { 
+	sloth_push(x, sizeof(Uint32) + sloth_pop(x));
 }
 
-void sloth2SDL3_Event_jdevice_which_(X* x) {
-	SDL_Event *event = (SDL_Event *)sloth_pop(x);
-	sloth_push(x, event->jdevice.which);
+void sloth2SDL3_JoyDeviceEvent_timestamp_(X* x) {
+	sloth_push(x, 
+		sizeof(SDL_EventType) + sizeof(Uint32) + sloth_pop(x));
+}
+
+void sloth2SDL3_JoyDeviceEvent_which_(X* x) {
+	sloth_push(x, 
+		sizeof(SDL_EventType) + sizeof(Uint32) + sizeof(Uint64) 
+		+ sloth_pop(x));
 }
 
 /* SDL_joystick.h */
@@ -121,7 +129,7 @@ void sloth2SDL3_PutAudioStreamData_(X* x) {
 	SDL_AudioStream *stream = (SDL_AudioStream *)sloth_pop(x);
 	sloth_push(x,
 		SDL_PutAudioStreamData(stream, buf, len)
-		? 0 : -255);
+		? 0 : -256);
 }
 
 void sloth2SDL3_GetAudioStreamQueued_(X* x) {
@@ -161,7 +169,7 @@ void sloth2SDL3_LoadWAV_(X* x) {
 	SDL_AudioSpec *spec = (SDL_AudioSpec *)sloth_pop(x);
 	CELL path_len = sloth_pop(x);
 	char *path = (char *)sloth_pop(x);
-	char path_tmp[255];
+	char path_tmp[STR_BUF_LEN];
 	Uint8 *audio_buf;
 	Uint32 audio_len;
 	if (path[path_len] != 0) {
@@ -316,7 +324,7 @@ void sloth2SDL3_RenderDebugText_(X* x) {
 	float fy = sloth_fpop(x);
 	float fx = sloth_fpop(x);
 	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
-	char text[255];
+	char text[STR_BUF_LEN];
 	if (str[str_len] != 0) {
 		int i;
 		for (i = 0; i < str_len; i++) text[i] = str[i];
@@ -335,7 +343,7 @@ void sloth2SDL3_RenderDebugTextFormati_(X* x) {
 	float dy = (float)sloth_fpop(x);
 	float dx = (float)sloth_fpop(x);
 	SDL_Renderer *renderer = (SDL_Renderer *)sloth_pop(x);
-	char fmt[255];
+	char fmt[STR_BUF_LEN];
 	if (fmt_str[fmt_len] != 0) {
 		int i;
 		for (i = 0; i < fmt_len; i++) fmt[i] = fmt_str[i];
@@ -372,6 +380,43 @@ void sloth2SDL3_GetWindowSize_(X* x) {
 	}
 }
 
+/* SDL_tray.h */
+void sloth2SDL3_CreateTray_(X* x) {
+	CELL tooltip_len = sloth_pop(x);
+	char *tooltip_str = (char *)sloth_pop(x);
+	char tooltip[STR_BUF_LEN];
+	SDL_Surface *icon = (SDL_Surface *)sloth_pop(x);
+	if (tooltip_str[tooltip_len] != 0) {
+		int i;
+		for (i = 0; i < tooltip_len; i++) tooltip[i] = tooltip_str[i];
+		tooltip[tooltip_len] = 0;
+		tooltip_str = tooltip;
+	}
+	sloth_push(x, (CELL)SDL_CreateTray(icon, tooltip_str));
+}
+
+void sloth2SDL3_CreateTrayMenu_(X* x) {
+	SDL_Tray *tray = (SDL_Tray *)sloth_pop(x);
+	sloth_push(x, (CELL)SDL_CreateTrayMenu(tray));
+}
+
+void sloth2SDL3_InsertTrayEntryAt_(X* x) {
+	SDL_TrayEntryFlags flags = (SDL_TrayEntryFlags)sloth_pop(x);
+	CELL label_len = sloth_pop(x);
+	char *label_str = (char *)sloth_pop(x);
+	char label[STR_BUF_LEN];
+	int pos = (int)sloth_pop(x);
+	SDL_TrayMenu *menu = (SDL_TrayMenu *)sloth_pop(x);
+	if (label_str[label_len] != 0) {
+		int i;
+		for (i = 0; i < label_len; i++) label[i] = label_str[i];
+		label[label_len] = 0;
+		label_str = label;
+	}
+	sloth_push(x, 
+		(CELL)SDL_InsertTrayEntryAt(menu, pos, label_str, flags));
+}
+
 /* SDL_stdinc.h */
 void sloth2SDL3_malloc_(X* x) {
 	size_t size = (size_t)sloth_pop(x);
@@ -394,7 +439,7 @@ void sloth2SDL3_asprintfs_(X* x) {
 	char *str = (char *)sloth_pop(x);
 	CELL fmt_len = sloth_pop(x);
 	char *fmt = (char *)sloth_pop(x);
-	char str_temp[255], fmt_temp[255];
+	char str_temp[STR_BUF_LEN], fmt_temp[STR_BUF_LEN];
 	char *strp;
 	int nbytes;
 	if (str[str_len] != 0) {
@@ -488,8 +533,14 @@ void sloth_bootstrap_SDL3(X* x) {
 	sloth_constant(x, SDL_EVENT_JOYSTICK_ADDED, "SDL-EVENT-JOYSTICK-ADDED");
 	sloth_constant(x, SDL_EVENT_JOYSTICK_REMOVED, "SDL-EVENT-JOYSTICK-REMOVED");
 
+	sloth_constant(x, sizeof(SDL_Event), "SDL-Event"); 
 	SLOTH2SDL3_CODE("SDL-Event.type", Event_type);
-	SLOTH2SDL3_CODE("SDL-Event.jdevice.which", Event_jdevice_which);
+	SLOTH2SDL3_CODE("SDL-Event.event", Event_event);
+
+	sloth_constant(x, sizeof(SDL_JoyDeviceEvent), "SDL-JoyDeviceEvent");
+	SLOTH2SDL3_CODE("SDL-JoyDeviceEvent.type", Event_type);
+	SLOTH2SDL3_CODE("SDL-JoyDeviceEvent.timestamp", JoyDeviceEvent_timestamp);
+	SLOTH2SDL3_CODE("SDL-JoyDeviceEvent.which", JoyDeviceEvent_which);
 
 	/* SDL_joystick.h */
 	sloth_constant(x, SDL_HAT_CENTERED, "SDL-HAT-CENTERED");
@@ -583,6 +634,11 @@ void sloth_bootstrap_SDL3(X* x) {
 
 	sloth_constant(x, SDL_ALPHA_OPAQUE, "SDL-ALPHA-OPAQUE");
 	sloth_fconstant(x, SDL_ALPHA_OPAQUE_FLOAT, "SDL-ALPHA-OPAQUE-FLOAT");
+
+	/* SDL_tray.h */
+	SLOTH2SDL3_CODE("SDL-CreateTray", CreateTray);
+	SLOTH2SDL3_CODE("SDL-CreateTrayMenu", CreateTrayMenu);
+	SLOTH2SDL3_CODE("SDL-InsertTrayEntryAt", InsertTrayEntryAt);
 
 	/* SDL_rect.h */
 	sloth_evaluate(x,
