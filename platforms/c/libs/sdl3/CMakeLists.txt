@@ -24,7 +24,8 @@ if(UNIX)
 	add_executable(sdl3_sloth sdl3_repl.c)
 	target_link_libraries(sdl3_sloth m pthread)
 else()
-	add_executable(sdl3_sloth WIN32 sdl3_repl.c)
+	# add_executable(sdl3_sloth WIN32 sdl3_repl.c)
+	add_executable(sdl3_sloth sdl3_repl.c)
 endif()
 	
 add_compile_definitions(

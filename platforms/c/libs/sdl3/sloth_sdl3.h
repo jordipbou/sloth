@@ -16,6 +16,7 @@
 
 /* SDL_init.h */
 void sloth2SDL3_Init_(X* x);
+void sloth2SDL3_WasInit_(X* x);
 void sloth2SDL3_SetAppMetadata_(X* x);
 
 /* SDL_error.h */

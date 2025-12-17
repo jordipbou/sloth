@@ -12,6 +12,11 @@ void sloth2SDL3_Init_(X* x) {
 		? 0 : -256);
 }
 
+void sloth2SDL3_WasInit_(X* x) {
+	SDL_InitFlags flags = (SDL_InitFlags)sloth_pop(x);
+	sloth_push(x, SDL_WasInit(flags));
+}
+
 void sloth2SDL3_SetAppMetadata_(X* x) {
 	CELL appid_len = sloth_pop(x);
 	char *appid_str = (char*)sloth_pop(x);
@@ -412,7 +417,9 @@ void sloth2SDL3_InsertTrayEntryAt_(X* x) {
 	char label[STR_BUF_LEN];
 	int pos = (int)sloth_pop(x);
 	SDL_TrayMenu *menu = (SDL_TrayMenu *)sloth_pop(x);
-	if (label_str[label_len] != 0) {
+	if (label_len == 0) {
+		label_str = 0;
+	} else if (label_str[label_len] != 0) {
 		int i;
 		for (i = 0; i < label_len; i++) label[i] = label_str[i];
 		label[label_len] = 0;
@@ -578,6 +585,7 @@ void sloth_bootstrap_SDL3(X* x) {
 	sloth_constant(x, SDL_INIT_CAMERA, "SDL-INIT-CAMERA");
 
 	SLOTH2SDL3_CODE("SDL-Init", Init);
+	SLOTH2SDL3_CODE("SDL-WasInit", WasInit);
 	SLOTH2SDL3_CODE("SDL-SetAppMetadata", SetAppMetadata);
 
 	/* SDL_error.h */
