@@ -76,6 +76,7 @@ void sloth2SDL3_GetWindowSize_(X* x);
 /* SDL_tray.h */
 void sloth2SDL3_CreateTray_(X* x);
 void sloth2SDL3_CreateTrayMenu_(X* x);
+void sloth2SDL3_CreateTraySubmenu_(X* x);
 void sloth2SDL3_InsertTrayEntryAt_(X* x);
 void sloth2SDL3_SetTrayEntryCallback_(X* x);
 void sloth2SDL3_DestroyTray_(X* x);

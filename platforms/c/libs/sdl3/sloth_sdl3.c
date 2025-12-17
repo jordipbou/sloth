@@ -410,6 +410,11 @@ void sloth2SDL3_CreateTrayMenu_(X* x) {
 	sloth_push(x, (CELL)SDL_CreateTrayMenu(tray));
 }
 
+void sloth2SDL3_CreateTraySubmenu_(X* x) {
+	SDL_TrayEntry *entry = (SDL_TrayEntry *)sloth_pop(x);
+	sloth_push(x, (CELL)SDL_CreateTraySubmenu(entry));
+}
+
 void sloth2SDL3_InsertTrayEntryAt_(X* x) {
 	SDL_TrayEntryFlags flags = (SDL_TrayEntryFlags)sloth_pop(x);
 	CELL label_len = sloth_pop(x);
@@ -702,9 +707,14 @@ void sloth_bootstrap_SDL3(X* x) {
 
 	/* SDL_tray.h */
 	sloth_constant(x, SDL_TRAYENTRY_BUTTON, "SDL-TRAYENTRY-BUTTON");
+	sloth_constant(x, SDL_TRAYENTRY_CHECKBOX, "SDL-TRAYENTRY-CHECKBOX");
+	sloth_constant(x, SDL_TRAYENTRY_SUBMENU, "SDL-TRAYENTRY-SUBMENU");
+	sloth_constant(x, SDL_TRAYENTRY_DISABLED, "SDL-TRAYENTRY-DISABLED");
+	sloth_constant(x, SDL_TRAYENTRY_CHECKED, "SDL-TRAYENTRY-CHECKED");
 
 	SLOTH2SDL3_CODE("SDL-CreateTray", CreateTray);
 	SLOTH2SDL3_CODE("SDL-CreateTrayMenu", CreateTrayMenu);
+	SLOTH2SDL3_CODE("SDL-CreateTraySubmenu", CreateTraySubmenu);
 	SLOTH2SDL3_CODE("SDL-InsertTrayEntryAt", InsertTrayEntryAt);
 	SLOTH2SDL3_CODE("SDL-SetTrayEntryCallback", SetTrayEntryCallback);
 	SLOTH2SDL3_CODE("SDL-DestroyTray", DestroyTray);
