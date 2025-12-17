@@ -1881,6 +1881,10 @@ void sloth_empty_rs_(X* x) { x->rp = 0; }
 
 void sloth_ints_(X* x) { sloth_push(x, sloth_pop(x)*sizeof(int)); }
 
+/* Helper to push the address of the context structure */
+
+void sloth_self_(X* x) { sloth_push(x, (CELL)x); }
+
 /* -- Bootstrapping ------------------------------------ */
 
 void sloth_bootstrap_kernel(X* x) {
@@ -2091,6 +2095,8 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "(EMPTY-RETURN-STACK)", sloth_primitive(x, &sloth_empty_rs_));
 
 	sloth_code(x, "INTS", sloth_primitive(x, &sloth_ints_));
+
+	sloth_code(x, "(SELF)", sloth_primitive(x, &sloth_self_));
 }
 
 #ifndef SLOTH_FLOATING_POINT_WORD_SET_HEADER

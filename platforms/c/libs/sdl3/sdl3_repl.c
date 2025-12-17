@@ -24,6 +24,28 @@
 
 static X* ctx;
 
+void show_exception(X* x, int err, char *msg) {
+	if (err) {
+		char *text;
+		if (err == -38) {
+			SDL_asprintf(&text, "Script (%s) not found.", msg);
+		} else if (err == -13) {
+			CELL ibuf = *((CELL*)(x->u+20*sCELL));
+			CELL ipos = *((CELL*)(x->u+21*sCELL));
+			CELL ilen = *((CELL*)(x->u+22*sCELL));
+			SDL_asprintf(&text, "Word (%.*s) not found.", (int)(ilen - ipos), (char *)(ibuf + ipos));
+		} else {
+			SDL_asprintf(&text, "Exception %d.", err);
+		}
+
+		SDL_ShowSimpleMessageBox(
+			SDL_MESSAGEBOX_ERROR,
+			"Sloth exception",
+			text,
+			NULL);
+	}
+}
+
 /* The four default functions for init, event, iterate and quit. */
 void defaultAppInit(X* x) {
 	SDL_Window *window = NULL;
@@ -121,17 +143,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 		/* First parameter will be user script to be executed */
 		int err = sloth_include(ctx, argv[1]);
 		if (err) {
-			if (err == -38) {
-				printf("Script %s not found\n", argv[1]);
-			}
-
+			show_exception(ctx, err, argv[1]);
 			return SDL_APP_FAILURE;
 		}
 	} else {
 		/* No script in parameters, try to launch a generic one */
 		int err = sloth_include(ctx, "main.4th");
 		if (err) {
-			printf("Script not found\n");
+			show_exception(ctx, err, NULL);
 			/* TODO Launch a REPL (console or GUI) */
 		} 
 	}
@@ -170,6 +189,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 		sloth_catch(ctx, sloth_user_area_get(ctx, SLOTH_APP_INIT));
 		err = sloth_pop(ctx);
 		if (err != 0) {
+			SDL_ShowSimpleMessageBox(
+				SDL_MESSAGEBOX_INFORMATION,
+				"Sloth",
+				"Error on AppInit when evaluating script.",
+				NULL);
 			return SDL_APP_FAILURE;
 		}
 

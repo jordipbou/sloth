@@ -66,6 +66,11 @@ void sloth2SDL3_JoyDeviceEvent_which_(X* x) {
 		+ sloth_pop(x));
 }
 
+void sloth2SDL3_PushEvent_(X* x) {
+	SDL_Event *event = (SDL_Event *)sloth_pop(x);
+	sloth_push(x, SDL_PushEvent(event) ? 0 : -256);
+}
+
 /* SDL_joystick.h */
 void sloth2SDL3_OpenJoystick_(X* x) {
 	SDL_JoystickID id = (SDL_JoystickID)sloth_pop(x);
@@ -417,6 +422,56 @@ void sloth2SDL3_InsertTrayEntryAt_(X* x) {
 		(CELL)SDL_InsertTrayEntryAt(menu, pos, label_str, flags));
 }
 
+void sloth2SDL3__tray_callback(void *data, SDL_TrayEntry *entry) {
+	/* Its expected to have CTX in userdata address and */
+	/* XT in userdata cell+ address */
+	X *x = *((X **)data);
+	CELL xt = *(((CELL*)data) + 1);
+	sloth_push(x, (CELL)entry);
+	sloth_eval(x, xt);
+}
+
+void sloth2SDL3_SetTrayEntryCallback_(X* x) {
+	void *userdata = (void *)sloth_pop(x);
+	SDL_TrayEntry *entry = (SDL_TrayEntry *)sloth_pop(x);
+	SDL_SetTrayEntryCallback(
+		entry, 
+		&sloth2SDL3__tray_callback,
+		userdata);
+}
+
+void sloth2SDL3_DestroyTray_(X* x) {
+	SDL_Tray *tray = (SDL_Tray *)sloth_pop(x);
+	SDL_DestroyTray(tray);
+}
+
+/* SDL_messagebox.h */
+void sloth2SDL3_ShowSimpleMessageBox_(X* x) {
+	SDL_Window *window = (SDL_Window *)sloth_pop(x);
+	CELL message_len = sloth_pop(x);
+	char *message_str = (char *)sloth_pop(x);
+	char message[255];
+	CELL title_len = sloth_pop(x);
+	char *title_str = (char *)sloth_pop(x);
+	char title[255];
+	SDL_MessageBoxFlags flags = (SDL_MessageBoxFlags)sloth_pop(x);
+	if (message_str[message_len] != 0) {
+		int i;
+		for (i = 0; i < message_len; i++) message[i] = message_str[i];
+		message[message_len] = 0;
+		message_str = message;
+	}
+	if (title_str[title_len] != 0) {
+		int i;
+		for (i = 0; i < title_len; i++) title[i] = title_str[i];
+		title[title_len] = 0;
+		title_str = title;
+	}
+	sloth_push(x,
+		SDL_ShowSimpleMessageBox(flags, title_str, message_str, window)
+		? 0 : -256);
+}
+
 /* SDL_stdinc.h */
 void sloth2SDL3_malloc_(X* x) {
 	size_t size = (size_t)sloth_pop(x);
@@ -542,6 +597,8 @@ void sloth_bootstrap_SDL3(X* x) {
 	SLOTH2SDL3_CODE("SDL-JoyDeviceEvent.timestamp", JoyDeviceEvent_timestamp);
 	SLOTH2SDL3_CODE("SDL-JoyDeviceEvent.which", JoyDeviceEvent_which);
 
+	SLOTH2SDL3_CODE("SDL-PushEvent", PushEvent);
+
 	/* SDL_joystick.h */
 	sloth_constant(x, SDL_HAT_CENTERED, "SDL-HAT-CENTERED");
 	sloth_constant(x, SDL_HAT_UP, "SDL-HAT-UP");
@@ -636,9 +693,22 @@ void sloth_bootstrap_SDL3(X* x) {
 	sloth_fconstant(x, SDL_ALPHA_OPAQUE_FLOAT, "SDL-ALPHA-OPAQUE-FLOAT");
 
 	/* SDL_tray.h */
+	sloth_constant(x, SDL_TRAYENTRY_BUTTON, "SDL-TRAYENTRY-BUTTON");
+
 	SLOTH2SDL3_CODE("SDL-CreateTray", CreateTray);
 	SLOTH2SDL3_CODE("SDL-CreateTrayMenu", CreateTrayMenu);
 	SLOTH2SDL3_CODE("SDL-InsertTrayEntryAt", InsertTrayEntryAt);
+	SLOTH2SDL3_CODE("SDL-SetTrayEntryCallback", SetTrayEntryCallback);
+	SLOTH2SDL3_CODE("SDL-DestroyTray", DestroyTray);
+
+	/* SDL_messagebox.h */
+	sloth_constant(x, SDL_MESSAGEBOX_ERROR, "SDL-MESSAGEBOX-ERROR");
+	sloth_constant(x, SDL_MESSAGEBOX_WARNING, "SDL-MESSAGEBOX-WARNING");
+	sloth_constant(x, SDL_MESSAGEBOX_INFORMATION, "SDL-MESSAGEBOX-INFORMATION");
+	sloth_constant(x, SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT, "SDL-MESSAGEBOX-BUTTONS-LEFT-TO-RIGHT");
+	sloth_constant(x, SDL_MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT, "SDL-MESSAGEBOX-BUTTONS-RIGHT-TO-LEFT");
+
+	SLOTH2SDL3_CODE("SDL-ShowSimpleMessageBox", ShowSimpleMessageBox);
 
 	/* SDL_rect.h */
 	sloth_evaluate(x,

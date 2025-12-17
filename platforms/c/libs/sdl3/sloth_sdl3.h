@@ -11,6 +11,7 @@
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_tray.h>
+#include <SDL3/SDL_messagebox.h>
 #include <SDL3/SDL_stdinc.h>
 
 /* SDL_init.h */
@@ -21,8 +22,7 @@ void sloth2SDL3_SetAppMetadata_(X* x);
 void sloth2SDL3_GetError_(X* x);
 
 /* SDL_events.h */
-void sloth2SDL3_Event_type_(X* x);
-void sloth2SDL3_Event_jdevice_which_(X* x);
+void sloth2SDL3_PushEvent_(X* x);
 
 /* SDL_joystick.h */
 void sloth2SDL3_OpenJoystick_(X* x);
@@ -76,6 +76,11 @@ void sloth2SDL3_GetWindowSize_(X* x);
 void sloth2SDL3_CreateTray_(X* x);
 void sloth2SDL3_CreateTrayMenu_(X* x);
 void sloth2SDL3_InsertTrayEntryAt_(X* x);
+void sloth2SDL3_SetTrayEntryCallback_(X* x);
+void sloth2SDL3_DestroyTray_(X* x);
+
+/* SDL_messagebox.h */
+void sloth2SDL3_ShowSimpleMessageBox_(X* x);
 
 /* SDL_stdinc.h */
 void sloth2SDL3_malloc_(X* x);

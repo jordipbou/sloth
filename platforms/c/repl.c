@@ -6,8 +6,8 @@
 #include"memory.h"
 #include"cpnbi.h"
 
-#include"sloth_sqlite.h"
-#include"sloth_plibsys.h"
+/* #include"sloth_sqlite.h" */
+/* #include"sloth_plibsys.h" */
 /* #include"sloth_systray.h" */
 /* #include"sloth_osdialog.h" */
 /* #include"sloth_geninput.h" */
@@ -33,10 +33,12 @@ int main(int argc, char**argv) {
 
 	sloth_include(x, ROOT_PATH "4th/ans.4th");
 
+	/*
 	sloth_bootstrap_sqlite(x);
 	sloth_include(x, ROOT_PATH "4th/libs/sloth_sqlite.4th");
 
 	sloth_bootstrap_plibsys(x);
+	*/
 
 	/*
 	sloth_bootstrap_systray(x);
