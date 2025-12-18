@@ -47,6 +47,8 @@ void show_exception(X* x, int err, char *msg) {
 }
 
 /* The four default functions for init, event, iterate and quit. */
+
+/* TODO This makes no sense to exist */
 void defaultAppInit(X* x) {
 	SDL_Window *window = NULL;
 	SDL_Renderer *renderer = NULL;
@@ -83,6 +85,7 @@ void defaultAppEvent(X* x) {
 	}
 }
 
+/* TODO This makes no sense to exist */
 void defaultAppIterate(X* x) {
 	SDL_Renderer *renderer = (SDL_Renderer *)sloth_user_area_get(x, SLOTH_RENDERER);
 
@@ -99,6 +102,7 @@ void defaultAppIterate(X* x) {
 	sloth_push(x, SDL_APP_CONTINUE);
 }
 
+/* TODO This makes no sense to exist */
 void defaultAppQuit(X* x) {
 }
 
@@ -155,17 +159,19 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 		} 
 	}
 
-	init = sloth_find_word(ctx, "APPINIT");
+	/* init = sloth_find_word(ctx, "APPINIT"); */
 	event = sloth_find_word(ctx, "APPEVENT");
 	iterate = sloth_find_word(ctx, "APPITERATE");
 	quit = sloth_find_word(ctx, "APPQUIT");
 
-	if (init || event || iterate || quit) {
+	if (/* init || */ event || iterate || quit) {
+		/*
 		sloth_user_area_set(ctx,
 			SLOTH_APP_INIT,
 			init ?
 				sloth_get_xt(ctx, init)
 				: sloth_primitive(ctx, &defaultAppInit));
+		*/
 
 		sloth_user_area_set(ctx,
 			SLOTH_APP_EVENT,
@@ -186,6 +192,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 				: sloth_primitive(ctx, &defaultAppQuit));
 
 		/* Execute the app-init xt */
+		/* There is no need to execute appinit as the user script */
+		/* 
 		sloth_catch(ctx, sloth_user_area_get(ctx, SLOTH_APP_INIT));
 		err = sloth_pop(ctx);
 		if (err != 0) {
@@ -196,8 +204,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 				NULL);
 			return SDL_APP_FAILURE;
 		}
+		*/
 
-		return sloth_pop(ctx);
+		/* Having the option to throw an exception from the script */
+		/* there is no reason to need to specify SDL_APP_CONTINUE */
+		/* in the script. */
+		/* return sloth_pop(ctx); */
+		return SDL_APP_CONTINUE;
 	} else {
 		return SDL_APP_SUCCESS;
 	}

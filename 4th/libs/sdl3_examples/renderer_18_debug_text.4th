@@ -1,28 +1,24 @@
 640 constant WINDOW-WIDTH
 480 constant WINDOW-HEIGHT
 
-: appinit
-	s" Example Renderer Debug Texture"
-	s" 1.0"
-	s" com.example.renderer-debug-text"
-	SDL-SetAppMetadata
+s" Example Renderer Debug Texture"
+s" 1.0"
+s" com.example.renderer-debug-text"
+SDL-SetAppMetadata
 
-	SDL-INIT-VIDEO SDL-Init throw
+SDL-INIT-VIDEO SDL-Init throw
 
-	s" examples/renderer/debug-text"
-	WINDOW-WIDTH WINDOW-HEIGHT
-	SDL-WINDOW-RESIZABLE
-	SDL-CreateWindowAndRenderer throw
-	(renderer) !
-	(window) !
+s" examples/renderer/debug-text"
+WINDOW-WIDTH WINDOW-HEIGHT
+SDL-WINDOW-RESIZABLE
+SDL-CreateWindowAndRenderer throw
+(renderer) !
+(window) !
 
-	(renderer) @
-	WINDOW-WIDTH WINDOW-HEIGHT
-	SDL-LOGICAL-PRESENTATION-LETTERBOX
-	SDL-SetRenderLogicalPresentation throw
-
-	SDL-APP-CONTINUE
-;
+(renderer) @
+WINDOW-WIDTH WINDOW-HEIGHT
+SDL-LOGICAL-PRESENTATION-LETTERBOX
+SDL-SetRenderLogicalPresentation throw
 
 : appevent
 	SDL-Event.type l@ SDL-EVENT-QUIT = if

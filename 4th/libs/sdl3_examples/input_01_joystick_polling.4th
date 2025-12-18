@@ -2,39 +2,28 @@ include ../../arrays.4th
 
 64 SDL-Color array: colors
 
-: appinit
-	s" Example Input Joystick Polling"
-	s" 1.0"
-	s" com.example.input-joystick-polling"
-	SDL-SetAppMetadata drop
+s" Example Input Joystick Polling"
+s" 1.0"
+s" com.example.input-joystick-polling"
+SDL-SetAppMetadata throw
 
-	SDL-INIT-VIDEO SDL-INIT-JOYSTICK or
-	SDL-Init if
-		." Couldn't initialize SDL:" SDL-GetError type cr
-		SDL-APP-FAILURE
-	then
+SDL-INIT-VIDEO SDL-INIT-JOYSTICK or
+SDL-Init throw 
 
-	s" examples/input/joystick-polling"
-	640 480
-	SDL-WINDOW-RESIZABLE
-	SDL-CreateWindowAndRenderer if
-		." Couldn't create window/renderer: " SDL-GetError type cr
-		SDL-APP-FAILURE
-	else
-		(renderer) !
-		(window) !
-	then
+s" examples/input/joystick-polling"
+640 480
+SDL-WINDOW-RESIZABLE
+SDL-CreateWindowAndRenderer throw 
+(renderer) !
+(window) !
 
-	\ Initialize arrays
-	64 0 do
-		255 SDL-rand i colors SDL-Color.r c!
-		255 SDL-rand i colors SDL-Color.g c!
-		255 SDL-rand i colors SDL-Color.b c!
-		255 i colors SDL-Color.a c!
-	loop
-
-	SDL-APP-CONTINUE
-;
+\ Initialize arrays
+[: 64 0 do
+	255 SDL-rand i colors SDL-Color.r c!
+	255 SDL-rand i colors SDL-Color.g c!
+	255 SDL-rand i colors SDL-Color.b c!
+	255 i colors SDL-Color.a c!
+loop ;] execute
 
 variable joystick 0 joystick !
 

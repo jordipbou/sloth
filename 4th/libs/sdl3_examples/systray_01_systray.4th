@@ -15,20 +15,16 @@ create event SDL-Event allot
 
 ' callback-quit callback cell+ !
 
-: appinit
-	SDL-INIT-VIDEO SDL-Init throw
+SDL-INIT-VIDEO SDL-Init throw
 
-	0 s" My Tray" SDL-CreateTray tray !
+0 s" My Tray" SDL-CreateTray tray !
 
-	tray @ SDL-CreateTrayMenu menu !
+tray @ SDL-CreateTrayMenu menu !
 
-	menu @ -1 s" Quit" SDL-TRAYENTRY-BUTTON
-	SDL-InsertTrayEntryAt entry !
+menu @ -1 s" Quit" SDL-TRAYENTRY-BUTTON
+SDL-InsertTrayEntryAt entry !
 
-	entry @	callback SDL-SetTrayEntryCallback
-
-	SDL-APP-CONTINUE
-;
+entry @	callback SDL-SetTrayEntryCallback
 
 : appevent
 	SDL-Event.type l@ SDL-EVENT-QUIT = if

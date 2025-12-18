@@ -13,17 +13,23 @@ create event SDL-Event allot
 	." Ernie, my man!" cr
 ;] tray-callback: write-callback
 
-: appinit
-	s" Hello, world!" tray-create
-	tray-submenu
-	write-callback s" An entry" tray-entry
-	tray-end-submenu
-	s" Just testing" tray-disabled
-	tray-separator
-	quit-callback s" Quit" tray-entry
+s" Hello, world!" 
+tray-create
 
-	SDL-APP-CONTINUE
-;
+tray-submenu
+	write-callback 
+	s" An entry" 
+	tray-entry
+tray-end-submenu
+
+s" Just testing" 
+tray-disabled
+
+tray-separator
+
+quit-callback 
+s" Quit" 
+tray-entry
 
 : appquit
 	tray-destroy

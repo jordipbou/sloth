@@ -2,41 +2,31 @@ require arrays.4th
 
 500 SDL-FPoint array: points
 
-: appinit
-	s" Example Renderer Primitives"
-	s" 1.0"
-	s" com.example.renderer-primitives"
-	SDL-SetAppMetadata
+s" Example Renderer Primitives"
+s" 1.0"
+s" com.example.renderer-primitives"
+SDL-SetAppMetadata
 
-	SDL-INIT-VIDEO SDL-Init throw
+SDL-INIT-VIDEO SDL-Init throw
 
-	s" examples/renderer/primitive"
-	640 480
-	SDL-WINDOW-RESIZABLE
-	SDL-CreateWindowAndRenderer throw
-	(renderer) !
-	(window) !
+s" examples/renderer/primitive"
+640 480
+SDL-WINDOW-RESIZABLE
+SDL-CreateWindowAndRenderer throw
+(renderer) !
+(window) !
 
-	(renderer) @
-	640 480
-	SDL-LOGICAL-PRESENTATION-LETTERBOX
-	SDL-SetRenderLogicalPresentation throw
+(renderer) @
+640 480
+SDL-LOGICAL-PRESENTATION-LETTERBOX
+SDL-SetRenderLogicalPresentation throw
 
-	500 0 do
-		SDL-randf 440.0 f* 100.0 f+ i points SDL-FPoint.x sf!
-		SDL-randf 280.0 f* 100.0 f+ i points SDL-FPoint.y sf!
-	loop
-
-	SDL-APP-CONTINUE
-;
-
-: appevent
-	SDL-Event.type l@ SDL-EVENT-QUIT = if
-		SDL-APP-SUCCESS
-	else
-		SDL-APP-CONTINUE
-	then
-;
+[:
+500 0 do
+	SDL-randf 440.0 f* 100.0 f+ i points SDL-FPoint.x sf!
+	SDL-randf 280.0 f* 100.0 f+ i points SDL-FPoint.y sf!
+loop
+;] execute
 
 create rect SDL-FRect allot
 

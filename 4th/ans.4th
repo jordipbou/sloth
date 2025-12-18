@@ -195,14 +195,20 @@ FORTH-WORDLIST SET-CURRENT
 
 INTERNAL-WORDLIST SET-CURRENT
 
+\ Displacement for Buffers allocated after HERE. 
+\ If HERE moves the buffers addresses are not longer valid.
+
 64
 ?CONSTANT (CBUF-DISPLACEMENT)	\ Counted string buffer
 
 128
-?CONSTANT (SBUF1-DISPLACEMENT)	\ String buffer 1
+?CONSTANT (SBUF-DISPLACEMENT)	\ String buffer
 
+?VARIABLE (SBUF-POS) \ String buffer cursor position
+0 (SBUF-POS) !
+ 
 256
-?CONSTANT (SBUF2-DISPLACEMENT)	\ String buffer 2
+?CONSTANT (SBUF-MAX-LENGTH) \ String buffer max length
 
 384
 ?CONSTANT (NBUF-DISPLACEMENT)	\ Numeric output buffer
@@ -987,6 +993,21 @@ SET-CURRENT
 ?: S" ( "ccc<quote>" -- ) ( -- c-addr u )	\ "
 ?\		34 PARSE STATE @ IF 
 ?\			POSTPONE SLITERAL 
+?\		ELSE
+\ Copy the string to the end of the string buffer it it
+\ fits, if not copy to the beginning overwriting the content.
+\ The buffer has enough space for two 80 characters strings, 
+\ as required by the standard.
+?\			HERE (SBUF-DISPLACEMENT) +
+?\			OVER (SBUF-MAX-LENGTH) (SBUF-POS) @ - < IF
+?\				(SBUF-POS) @ +
+?\				OVER (SBUF-POS) @ + (SBUF-POS) !
+?\			ELSE
+?\				0 (SBUF-POS) !
+?\			THEN
+?\			OVER >R >R
+?\			R@ SWAP CMOVE
+?\			R> R>
 ?\		THEN 
 ?\ ; IMMEDIATE 
 

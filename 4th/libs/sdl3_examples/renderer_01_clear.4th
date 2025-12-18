@@ -1,31 +1,21 @@
-: appinit
-	s" Example Renderer Clear" 
-	s" 1.0" 
-	s" com.example.renderer-clear"
-	SDL-SetAppMetadata throw
+\ App initialization
 
-	SDL-INIT-VIDEO SDL-Init throw
+s" Example Renderer Clear" 
+s" 1.0" 
+s" com.example.renderer-clear"
+SDL-SetAppMetadata throw
 
-	s" examples/renderer/clear"
-	640 480 SDL-WINDOW-RESIZABLE
-	SDL-CreateWindowAndRenderer throw
-	(renderer) !
-	(window) !
+SDL-INIT-VIDEO SDL-Init throw
 
-	(renderer) @
-	640 480 SDL-LOGICAL-PRESENTATION-LETTERBOX
-	SDL-SetRenderLogicalPresentation throw
+s" examples/renderer/clear"
+640 480 SDL-WINDOW-RESIZABLE
+SDL-CreateWindowAndRenderer throw
+(renderer) !
+(window) !
 
-	SDL-APP-CONTINUE
-;
-
-: appevent
-	SDL-Event.type l@ SDL-EVENT-QUIT = if
-		SDL-APP-SUCCESS
-	else
-		SDL-APP-CONTINUE
-	then
-;
+(renderer) @
+640 480 SDL-LOGICAL-PRESENTATION-LETTERBOX
+SDL-SetRenderLogicalPresentation throw
 
 fvariable now
 : appiterate 
