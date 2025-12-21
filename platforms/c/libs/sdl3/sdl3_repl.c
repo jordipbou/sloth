@@ -48,33 +48,6 @@ void show_exception(X* x, int err, char *msg) {
 
 /* The four default functions for init, event, iterate and quit. */
 
-/* TODO This makes no sense to exist */
-void defaultAppInit(X* x) {
-	SDL_Window *window = NULL;
-	SDL_Renderer *renderer = NULL;
-
-	SDL_SetAppMetadata("Example Renderer Clear Modified", "1.0", "com.example.renderer-clear");
-	
-	if (!SDL_Init(SDL_INIT_VIDEO)) {
-		SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
-		sloth_push(x, SDL_APP_FAILURE);
-		return;
-	}
-	
-	if (!SDL_CreateWindowAndRenderer("examples/renderer/clear", 640, 480, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
-		SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
-		sloth_push(x, SDL_APP_FAILURE);
-		return;
-	}
-
-	SDL_SetRenderLogicalPresentation(renderer, 640, 480, SDL_LOGICAL_PRESENTATION_LETTERBOX);
-
-	sloth_user_area_set(x, SLOTH_WINDOW, (CELL)window);
-	sloth_user_area_set(x, SLOTH_RENDERER, (CELL)renderer);
-
-	sloth_push(x, SDL_APP_CONTINUE);
-}
-
 void defaultAppEvent(X* x) {
 	SDL_Event *event = (SDL_Event *)sloth_pop(x);
 

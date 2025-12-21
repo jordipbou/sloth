@@ -142,6 +142,17 @@ void sloth2SDL3_PutAudioStreamData_(X* x) {
 		? 0 : -256);
 }
 
+void sloth2SDL3_GetAudioStreamAvailable_(X* x) {
+	SDL_AudioStream *stream = (SDL_AudioStream *)sloth_pop(x);
+	int nbytes = SDL_GetAudioStreamAvailable(stream);
+	if (nbytes == -1) {
+		sloth_push(x, -256);
+	} else {
+		sloth_push(x, nbytes);
+		sloth_push(x, 0);
+	}
+}
+
 void sloth2SDL3_GetAudioStreamQueued_(X* x) {
 	SDL_AudioStream *stream = (SDL_AudioStream *)sloth_pop(x);
 	int nbytes = SDL_GetAudioStreamQueued(stream);
@@ -648,6 +659,7 @@ void sloth_bootstrap_SDL3(X* x) {
 	sloth_constant(x, SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, "SDL-AUDIO-DEVICE-DEFAULT-PLAYBACK");
 
 	SLOTH2SDL3_CODE("SDL-PutAudioStreamData", PutAudioStreamData);
+	SLOTH2SDL3_CODE("SDL-GetAudioStreamAvailable", GetAudioStreamAvailable);
 	SLOTH2SDL3_CODE("SDL-GetAudioStreamQueued", GetAudioStreamQueued);
 	SLOTH2SDL3_CODE("SDL-ResumeAudioStreamDevice", ResumeAudioStreamDevice);
 	SLOTH2SDL3_CODE("SDL-OpenAudioDeviceStream", OpenAudioDeviceStream);

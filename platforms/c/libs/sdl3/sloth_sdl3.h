@@ -39,6 +39,7 @@ void sloth2SDL3_CloseJoystick_(X* x);
 
 /* SDL_audio.h */
 void sloth2SDL3_PutAudioStreamData_(X* x);
+void sloth2SDL3_GetAudioStreamAvailable_(X* x);
 void sloth2SDL3_GetAudioStreamQueued_(X* x);
 void sloth2SDL3_ResumeAudioStreamDevice_(X* x);
 void sloth2SDL3_OpenAudioDeviceStream_(X* x);
