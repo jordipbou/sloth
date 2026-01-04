@@ -1121,6 +1121,9 @@ GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
 
 SET-CURRENT
 
+\ TODO Add fast compare for the exact same string,
+\ being c-addr1 = c-addr2 and u1 = u2
+
 ?: COMPARE ( c-addr1 u1 c-addr2 u2 -- n )
 ?\		ROT 2DUP SWAP - >R          \ ca1 ca2 u2 u1  r: u1-u2
 ?\		MIN COMPARE-SAME? ?DUP

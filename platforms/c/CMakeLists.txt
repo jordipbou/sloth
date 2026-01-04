@@ -11,7 +11,11 @@ add_subdirectory(libs/memory)
 # add_subdirectory(libs/geninput)
 # add_subdirectory(libs/sdl3)
 
-add_compile_definitions(ROOT_PATH="${PROJECT_SOURCE_DIR}/../../")
+if(DISTRIBUTION_BUILD)
+	add_compile_definitions(ROOT_PATH="${PROJECT_BINARY_DIR}/")
+else()
+	add_compile_definitions(ROOT_PATH="${PROJECT_SOURCE_DIR}/../../")
+endif()
 
 add_executable(sloth repl.c)
 

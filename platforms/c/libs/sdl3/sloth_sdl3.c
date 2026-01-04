@@ -40,11 +40,25 @@ void sloth2SDL3_SetAppMetadata_(X* x) {
 	}
 	if (appnm_str[appnm_len] != 0) {
 		for (i = 0; i < appnm_len; i++) appnm[i] = appnm_str[i];
+		appnm[appnm_len] = 0;
 		appnm_str = appnm;
 	}
 	sloth_push(x, 
 		SDL_SetAppMetadata(appnm_str, appvsn_str, appid_str) 
 		? 0 : -256);
+}
+
+void sloth2SDL3_GetAppMetadataProperty_(X* x) {
+	char *name = (char *)sloth_pop(x);
+	const char *value;
+	value = SDL_GetAppMetadataProperty(name);
+	if (!value) {
+		sloth_push(x, 0);
+		sloth_push(x, 0);
+	} else {
+		sloth_push(x, (CELL)value);
+		sloth_push(x, strlen(value));
+	}
 }
 
 /* SDL_error.h */
@@ -71,12 +85,48 @@ void sloth2SDL3_JoyDeviceEvent_which_(X* x) {
 		+ sloth_pop(x));
 }
 
+void sloth2SDL3_JoyHatEvent_hat_(X* x) {
+	sloth_push(x, 
+		sizeof(SDL_EventType) + sizeof(Uint32) + sizeof(Uint64) 
+		+ sizeof(SDL_JoystickID) + sloth_pop(x));
+}
+
+void sloth2SDL3_JoyHatEvent_value_(X* x) {
+	sloth_push(x, 
+		sizeof(SDL_EventType) + sizeof(Uint32) + sizeof(Uint64) 
+		+ sizeof(SDL_JoystickID) + sizeof(Uint8) + sloth_pop(x));
+}
+
+void sloth2SDL3_JoyButtonEvent_button_(X* x) {
+	sloth_push(x, 
+		sizeof(SDL_EventType) + sizeof(Uint32) + sizeof(Uint64) 
+		+ sizeof(SDL_JoystickID) + sloth_pop(x));
+}
+
+void sloth2SDL3_JoyButtonEvent_down_(X* x) {
+	sloth_push(x, 
+		sizeof(SDL_EventType) + sizeof(Uint32) + sizeof(Uint64) 
+		+ sizeof(SDL_JoystickID) + sizeof(Uint8) + sloth_pop(x));
+}
+
+void sloth2SDL3_WaitEvent_(X* x) {
+	SDL_Event *event = (SDL_Event *)sloth_pop(x);
+	sloth_push(x, SDL_WaitEvent(event) ? 0 : -256);
+}
+
 void sloth2SDL3_PushEvent_(X* x) {
 	SDL_Event *event = (SDL_Event *)sloth_pop(x);
 	sloth_push(x, SDL_PushEvent(event) ? 0 : -256);
 }
 
 /* SDL_joystick.h */
+void sloth2SDL3_GetJoystickNameForID_(X* x) {
+	SDL_JoystickID joystick = (SDL_JoystickID)sloth_pop(x);
+	const char *name = SDL_GetJoystickNameForID(joystick);
+	sloth_push(x, (CELL)name);
+	sloth_push(x, strlen(name));
+}
+
 void sloth2SDL3_OpenJoystick_(X* x) {
 	SDL_JoystickID id = (SDL_JoystickID)sloth_pop(x);
 	sloth_push(x, (CELL)SDL_OpenJoystick(id));
@@ -133,6 +183,43 @@ void sloth2SDL3_CloseJoystick_(X* x) {
 }
 
 /* SDL_audio.h */
+void sloth2SDL3_OpenAudioDevice_(X* x) {
+	SDL_AudioSpec *spec = (SDL_AudioSpec *)sloth_pop(x);
+	SDL_AudioDeviceID devid = (SDL_AudioDeviceID)sloth_pop(x);
+	SDL_AudioDeviceID res = SDL_OpenAudioDevice(devid, spec);
+	if (res == 0) {
+		sloth_push(x, -256);
+	} else {
+		sloth_push(x, res);
+		sloth_push(x, 0);
+	}
+}
+
+void sloth2SDL3_CloseAudioDevice_(X* x) {
+	SDL_AudioDeviceID devid = (SDL_AudioDeviceID)sloth_pop(x);
+	SDL_CloseAudioDevice(devid);
+}
+
+void sloth2SDL3_BindAudioStream_(X* x) {
+	SDL_AudioStream *stream = (SDL_AudioStream *)sloth_pop(x);
+	SDL_AudioDeviceID devid = (SDL_AudioDeviceID)sloth_pop(x);
+	sloth_push(x,
+		SDL_BindAudioStream(devid, stream)
+		? 0 : -256);
+}
+
+void sloth2SDL3_CreateAudioStream_(X* x) {
+	SDL_AudioSpec *dst_spec = (SDL_AudioSpec *)sloth_pop(x);
+	SDL_AudioSpec *src_spec = (SDL_AudioSpec *)sloth_pop(x);
+	SDL_AudioStream *stream = SDL_CreateAudioStream(src_spec, dst_spec);
+	if (!stream) {
+		sloth_push(x, -256);
+	} else {
+		sloth_push(x, (CELL)stream);
+		sloth_push(x, 0);
+	}
+}
+
 void sloth2SDL3_PutAudioStreamData_(X* x) {
 	int len = (int)sloth_pop(x);
 	const void *buf = (void *)sloth_pop(x);
@@ -169,6 +256,11 @@ void sloth2SDL3_ResumeAudioStreamDevice_(X* x) {
 	sloth_push(x,
 		SDL_ResumeAudioStreamDevice(stream)
 		? 0 : -256);
+}
+
+void sloth2SDL3_DestroyAudioStream_(X* x) {
+	SDL_AudioStream *stream = (SDL_AudioStream *)sloth_pop(x);
+	SDL_DestroyAudioStream(stream);
 }
 
 void sloth2SDL3_OpenAudioDeviceStream_(X* x) {
@@ -211,6 +303,10 @@ void sloth2SDL3_LoadWAV_(X* x) {
 /* SDL_timer.h */
 void sloth2SDL3_GetTicks_(X* x) {
 	sloth_push(x, SDL_GetTicks());
+}
+
+void sloth2SDL3_Delay_(X* x) {
+	SDL_Delay((Uint32)sloth_pop(x));
 }
 
 /* SDL_render.h */
@@ -600,17 +696,28 @@ void sloth_bootstrap_SDL3(X* x) {
 	sloth_constant(x, SDL_INIT_SENSOR, "SDL-INIT-SENSOR");
 	sloth_constant(x, SDL_INIT_CAMERA, "SDL-INIT-CAMERA");
 
+	sloth_constant(x, (CELL)SDL_PROP_APP_METADATA_NAME_STRING, "SDL-PROP-APP-METADATA-NAME-STRING");
+
 	SLOTH2SDL3_CODE("SDL-Init", Init);
 	SLOTH2SDL3_CODE("SDL-WasInit", WasInit);
 	SLOTH2SDL3_CODE("SDL-SetAppMetadata", SetAppMetadata);
+	SLOTH2SDL3_CODE("SDL-GetAppMetadataProperty", GetAppMetadataProperty);
 
 	/* SDL_error.h */
 	SLOTH2SDL3_CODE("SDL-GetError", GetError);
 
 	/* SDL_events.h */
 	sloth_constant(x, SDL_EVENT_QUIT, "SDL-EVENT-QUIT");
+
 	sloth_constant(x, SDL_EVENT_JOYSTICK_ADDED, "SDL-EVENT-JOYSTICK-ADDED");
 	sloth_constant(x, SDL_EVENT_JOYSTICK_REMOVED, "SDL-EVENT-JOYSTICK-REMOVED");
+	sloth_constant(x, SDL_EVENT_JOYSTICK_UPDATE_COMPLETE, "SDL-EVENT-JOYSTICK-UPDATE-COMPLETE");
+	sloth_constant(x, SDL_EVENT_JOYSTICK_AXIS_MOTION, "SDL-EVENT-JOYSTICK-AXIS-MOTION");
+	sloth_constant(x, SDL_EVENT_JOYSTICK_BALL_MOTION, "SDL-EVENT-JOYSTICK-BALL-MOTION");
+	sloth_constant(x, SDL_EVENT_JOYSTICK_HAT_MOTION, "SDL-EVENT-JOYSTICK-HAT-MOTION");
+	sloth_constant(x, SDL_EVENT_JOYSTICK_BATTERY_UPDATED, "SDL-EVENT-JOYSTICK-BATTERY-UPDATED");
+	sloth_constant(x, SDL_EVENT_JOYSTICK_BUTTON_DOWN, "SDL-EVENT-JOYSTICK-BUTTON-DOWN");
+	sloth_constant(x, SDL_EVENT_JOYSTICK_BUTTON_UP, "SDL-EVENT-JOYSTICK-BUTTON-UP");
 
 	sloth_constant(x, sizeof(SDL_Event), "SDL-Event"); 
 	SLOTH2SDL3_CODE("SDL-Event.type", Event_type);
@@ -621,7 +728,22 @@ void sloth_bootstrap_SDL3(X* x) {
 	SLOTH2SDL3_CODE("SDL-JoyDeviceEvent.timestamp", JoyDeviceEvent_timestamp);
 	SLOTH2SDL3_CODE("SDL-JoyDeviceEvent.which", JoyDeviceEvent_which);
 
+	SLOTH2SDL3_CODE("SDL-WaitEvent", WaitEvent);
 	SLOTH2SDL3_CODE("SDL-PushEvent", PushEvent);
+
+	sloth_constant(x, sizeof(SDL_JoyHatEvent), "SDL-JoyHatEvent");
+	SLOTH2SDL3_CODE("SDL-JoyHatEvent.type", Event_type);
+	SLOTH2SDL3_CODE("SDL-JoyHatEvent.timestamp", JoyDeviceEvent_timestamp);
+	SLOTH2SDL3_CODE("SDL-JoyHatEvent.which", JoyDeviceEvent_which);
+	SLOTH2SDL3_CODE("SDL-JoyHatEvent.hat", JoyHatEvent_hat);
+	SLOTH2SDL3_CODE("SDL-JoyHatEvent.value", JoyHatEvent_value);
+
+	sloth_constant(x, sizeof(SDL_JoyButtonEvent), "SDL-JoyButtonEvent");
+	SLOTH2SDL3_CODE("SDL-JoyButtonEvent.type", Event_type);
+	SLOTH2SDL3_CODE("SDL-JoyButtonEvent.timestamp", JoyDeviceEvent_timestamp);
+	SLOTH2SDL3_CODE("SDL-JoyButtonEvent.which", JoyDeviceEvent_which);
+	SLOTH2SDL3_CODE("SDL-JoyButtonEvent.button", JoyButtonEvent_button);
+	SLOTH2SDL3_CODE("SDL-JoyButtonEvent.down", JoyButtonEvent_down);
 
 	/* SDL_joystick.h */
 	sloth_constant(x, SDL_HAT_CENTERED, "SDL-HAT-CENTERED");
@@ -634,6 +756,7 @@ void sloth_bootstrap_SDL3(X* x) {
 	sloth_constant(x, SDL_HAT_LEFTUP, "SDL-HAT-LEFTUP");
 	sloth_constant(x, SDL_HAT_LEFTDOWN, "SDL-HAT-LEFTDOWN");
 
+	SLOTH2SDL3_CODE("SDL-GetJoystickNameForID", GetJoystickNameForID);
 	SLOTH2SDL3_CODE("SDL-OpenJoystick", OpenJoystick);
 	SLOTH2SDL3_CODE("SDL-GetJoystickName", GetJoystickName);
 	SLOTH2SDL3_CODE("SDL-GetJoystickID", GetJoystickID);
@@ -653,20 +776,28 @@ void sloth_bootstrap_SDL3(X* x) {
 		"  INTFIELD: SDL-AudioSpec.freq "
 		"END-STRUCTURE ");
 
+	sloth_constant(x, SDL_AUDIO_UNKNOWN, "SDL-AUDIO-UNKNOWN");
 	sloth_constant(x, SDL_AUDIO_U8, "SDL-AUDIO-U8");
 	sloth_constant(x, SDL_AUDIO_S16LE, "SDL-AUDIO-S16LE");
+	sloth_constant(x, SDL_AUDIO_F32, "SDL-AUDIO-F32");
 
 	sloth_constant(x, SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, "SDL-AUDIO-DEVICE-DEFAULT-PLAYBACK");
 
+	SLOTH2SDL3_CODE("SDL-OpenAudioDevice", OpenAudioDevice);
+	SLOTH2SDL3_CODE("SDL-CloseAudioDevice", CloseAudioDevice);
+	SLOTH2SDL3_CODE("SDL-BindAudioStream", BindAudioStream);
+	SLOTH2SDL3_CODE("SDL-CreateAudioStream", CreateAudioStream);
 	SLOTH2SDL3_CODE("SDL-PutAudioStreamData", PutAudioStreamData);
 	SLOTH2SDL3_CODE("SDL-GetAudioStreamAvailable", GetAudioStreamAvailable);
 	SLOTH2SDL3_CODE("SDL-GetAudioStreamQueued", GetAudioStreamQueued);
 	SLOTH2SDL3_CODE("SDL-ResumeAudioStreamDevice", ResumeAudioStreamDevice);
+	SLOTH2SDL3_CODE("SDL-DestroyAudioStream", DestroyAudioStream);
 	SLOTH2SDL3_CODE("SDL-OpenAudioDeviceStream", OpenAudioDeviceStream);
 	SLOTH2SDL3_CODE("SDL-LoadWAV", LoadWAV);
 
 	/* SDL_timer.h */
 	SLOTH2SDL3_CODE("SDL-GetTicks", GetTicks);
+	SLOTH2SDL3_CODE("SDL-Delay", Delay);
 
 	/* SDL_render.h */
 	sloth_constant(x, SDL_LOGICAL_PRESENTATION_DISABLED, "SDL-LOGICAL-PRESENTATION-DISABLED");

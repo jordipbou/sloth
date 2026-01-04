@@ -18,16 +18,19 @@
 void sloth2SDL3_Init_(X* x);
 void sloth2SDL3_WasInit_(X* x);
 void sloth2SDL3_SetAppMetadata_(X* x);
+void sloth2SDL3_GetAppMetadataProperty_(X* x);
 
 /* SDL_error.h */
 void sloth2SDL3_GetError_(X* x);
 
 /* SDL_events.h */
+void sloth2SDL3_WaitEvent_(X* x);
 void sloth2SDL3_PushEvent_(X* x);
 
 /* SDL_joystick.h */
+void sloth2SDL3_GetJoystickNameForID_(X* x);
 void sloth2SDL3_OpenJoystick_(X* x);
-void sloth2SDL4_GetJoystickName_(X* x);
+void sloth2SDL3_GetJoystickName_(X* x);
 void sloth2SDL3_GetJoystickID_(X* x);
 void sloth2SDL3_GetNumJoystickAxes_(X* x);
 void sloth2SDL3_GetNumJoystickHats_(X* x);
@@ -38,15 +41,21 @@ void sloth2SDL3_GetJoystickButton_(X* x);
 void sloth2SDL3_CloseJoystick_(X* x);
 
 /* SDL_audio.h */
+void sloth2SDL3_OpenAudioDevice_(X* x);
+void sloth2SDL3_CloseAudioDevice_(X* x);
+void sloth2SDL3_BindAudioStream_(X* x);
+void sloth2SDL3_CreateAudioStream_(X* x);
 void sloth2SDL3_PutAudioStreamData_(X* x);
 void sloth2SDL3_GetAudioStreamAvailable_(X* x);
 void sloth2SDL3_GetAudioStreamQueued_(X* x);
 void sloth2SDL3_ResumeAudioStreamDevice_(X* x);
+void sloth2SDL3_DestroyAudioStream_(X* x);
 void sloth2SDL3_OpenAudioDeviceStream_(X* x);
 void sloth2SDL3_LoadWAV_(X* x);
 
 /* SDL_timer.h */
 void sloth2SDL3_GetTicks_(X* x);
+void sloth2SDL3_Delay_(X* x);
 
 /* SDL_render.h */
 void sloth2SDL3_CreateWindowAndRenderer_(X* x);
