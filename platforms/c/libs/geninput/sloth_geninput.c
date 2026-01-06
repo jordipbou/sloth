@@ -2,7 +2,7 @@
 
 #define SLOTH_GENINPUT_CODE(w, f) sloth_code(x, w, sloth_primitive(x, &sloth_geninput_##f##_));
 
-/* TODO This code will work only on Windows right now */
+#ifdef WINDOWS
 #include <windows.h>
 #include <stdio.h>
 
@@ -34,3 +34,4 @@ void sloth_bootstrap_geninput(X* x) {
 	SLOTH_GENINPUT_CODE("PRESS-KEY", press_key);
 	SLOTH_GENINPUT_CODE("RELEASE-KEY", release_key);
 }
+#endif

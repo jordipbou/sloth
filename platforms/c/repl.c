@@ -27,7 +27,7 @@ int main(int argc, char**argv) {
 
 	sloth_bootstrap(x);
 	sloth_bootstrap_facility_wordset(x);
-	sloth_bootstrap_file_access_wordset(x);
+	sloth_bootstrap_file_wordset(x);
 	sloth_bootstrap_locals_wordset(x);
 	sloth_bootstrap_memory_wordset(x);
 

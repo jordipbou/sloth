@@ -300,7 +300,7 @@ void sloth_require_(X* x) {
 
 /* == Bootstrapping ==================================== */
 
-void sloth_bootstrap_file_access_wordset(X* x) {
+void sloth_bootstrap_file_wordset(X* x) {
 	
 	/* -- File access methods ---------------------------- */
 

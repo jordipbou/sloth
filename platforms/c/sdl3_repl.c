@@ -1,11 +1,9 @@
 #define SLOTH_IMPLEMENTATION
 #include"fsloth.h"
-#include"file.h"
-/*
 #include"facility.h"
+#include"file.h"
 #include"locals.h"
 #include"memory.h"
-*/
 #include"sloth_sdl3.h"
 
 #define SLOTH_APP_INIT			SLOTH_LAST_USER_VAR+sCELL
@@ -90,13 +88,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
 	sloth_bootstrap(ctx);
 
-	sloth_bootstrap_file_wordset(ctx);
-
-/*
 	sloth_bootstrap_facility_wordset(ctx);
+	sloth_bootstrap_file_wordset(ctx);
 	sloth_bootstrap_locals_wordset(ctx);
 	sloth_bootstrap_memory_wordset(ctx);
-*/
 
 	sloth_user_variable(ctx, "(APP-INIT)", SLOTH_APP_INIT, 0);
 	sloth_user_variable(ctx, "(APP-EVENT)", SLOTH_APP_EVENT, 0);
