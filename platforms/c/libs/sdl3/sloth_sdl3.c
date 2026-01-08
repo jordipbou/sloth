@@ -119,6 +119,8 @@ void sloth2SDL3_PushEvent_(X* x) {
 	sloth_push(x, SDL_PushEvent(event) ? 0 : -256);
 }
 
+/* SDL_keyboard.h */
+
 /* SDL_joystick.h */
 void sloth2SDL3_GetJoystickNameForID_(X* x) {
 	SDL_JoystickID joystick = (SDL_JoystickID)sloth_pop(x);
@@ -744,6 +746,128 @@ void sloth_bootstrap_SDL3(X* x) {
 	SLOTH2SDL3_CODE("SDL-JoyButtonEvent.which", JoyDeviceEvent_which);
 	SLOTH2SDL3_CODE("SDL-JoyButtonEvent.button", JoyButtonEvent_button);
 	SLOTH2SDL3_CODE("SDL-JoyButtonEvent.down", JoyButtonEvent_down);
+
+	/* SDL_keyboard.h */
+	sloth_constant(x, SDL_SCANCODE_A, "SDL-SCANCODE-A");
+	sloth_constant(x, SDL_SCANCODE_B, "SDL-SCANCODE-B");
+	sloth_constant(x, SDL_SCANCODE_C, "SDL-SCANCODE-C");
+	sloth_constant(x, SDL_SCANCODE_D, "SDL-SCANCODE-D");
+	sloth_constant(x, SDL_SCANCODE_E, "SDL-SCANCODE-E");
+	sloth_constant(x, SDL_SCANCODE_F, "SDL-SCANCODE-F");
+	sloth_constant(x, SDL_SCANCODE_G, "SDL-SCANCODE-G");
+	sloth_constant(x, SDL_SCANCODE_H, "SDL-SCANCODE-H");
+	sloth_constant(x, SDL_SCANCODE_I, "SDL-SCANCODE-I");
+	sloth_constant(x, SDL_SCANCODE_J, "SDL-SCANCODE-J");
+	sloth_constant(x, SDL_SCANCODE_K, "SDL-SCANCODE-K");
+	sloth_constant(x, SDL_SCANCODE_L, "SDL-SCANCODE-L");
+	sloth_constant(x, SDL_SCANCODE_M, "SDL-SCANCODE-M");
+	sloth_constant(x, SDL_SCANCODE_N, "SDL-SCANCODE-N");
+	sloth_constant(x, SDL_SCANCODE_O, "SDL-SCANCODE-O");
+	sloth_constant(x, SDL_SCANCODE_P, "SDL-SCANCODE-P");
+	sloth_constant(x, SDL_SCANCODE_Q, "SDL-SCANCODE-Q");
+	sloth_constant(x, SDL_SCANCODE_R, "SDL-SCANCODE-R");
+	sloth_constant(x, SDL_SCANCODE_S, "SDL-SCANCODE-S");
+	sloth_constant(x, SDL_SCANCODE_T, "SDL-SCANCODE-T");
+	sloth_constant(x, SDL_SCANCODE_U, "SDL-SCANCODE-U");
+	sloth_constant(x, SDL_SCANCODE_V, "SDL-SCANCODE-V");
+	sloth_constant(x, SDL_SCANCODE_W, "SDL-SCANCODE-W");
+	sloth_constant(x, SDL_SCANCODE_X, "SDL-SCANCODE-X");
+	sloth_constant(x, SDL_SCANCODE_Y, "SDL-SCANCODE-Y");
+	sloth_constant(x, SDL_SCANCODE_Z, "SDL-SCANCODE-Z");
+
+	sloth_constant(x, SDL_SCANCODE_1, "SDL-SCANCODE-1");
+	sloth_constant(x, SDL_SCANCODE_2, "SDL-SCANCODE-2");
+	sloth_constant(x, SDL_SCANCODE_3, "SDL-SCANCODE-3");
+	sloth_constant(x, SDL_SCANCODE_4, "SDL-SCANCODE-4");
+	sloth_constant(x, SDL_SCANCODE_5, "SDL-SCANCODE-5");
+	sloth_constant(x, SDL_SCANCODE_6, "SDL-SCANCODE-6");
+	sloth_constant(x, SDL_SCANCODE_7, "SDL-SCANCODE-7");
+	sloth_constant(x, SDL_SCANCODE_8, "SDL-SCANCODE-8");
+	sloth_constant(x, SDL_SCANCODE_9, "SDL-SCANCODE-9");
+	sloth_constant(x, SDL_SCANCODE_0, "SDL-SCANCODE-0");
+
+	sloth_constant(x, SDL_SCANCODE_RETURN, "SDL-SCANCODE-RETURN");
+	sloth_constant(x, SDL_SCANCODE_ESCAPE, "SDL-SCANCODE-ESCAPE");
+	sloth_constant(x, SDL_SCANCODE_BACKSPACE, "SDL-SCANCODE-BACKSPACE");
+	sloth_constant(x, SDL_SCANCODE_TAB, "SDL-SCANCODE-TAB");
+	sloth_constant(x, SDL_SCANCODE_SPACE, "SDL-SCANCODE-SPACE");
+
+	sloth_constant(x, SDL_SCANCODE_MINUS, "SDL-SCANCODE-MINUS");
+	sloth_constant(x, SDL_SCANCODE_EQUALS, "SDL-SCANCODE-EQUALS");
+	sloth_constant(x, SDL_SCANCODE_LEFTBRACKET, "SDL-SCANCODE-LEFTBRACKET");
+	sloth_constant(x, SDL_SCANCODE_RIGHTBRACKET, "SDL-SCANCODE-RIGHTBRACKET");
+	sloth_constant(x, SDL_SCANCODE_BACKSLASH, "SDL-SCANCODE-BACKSLASH");
+	sloth_constant(x, SDL_SCANCODE_NONUSHASH, "SDL-SCANCODE-NONUSHASH");
+	sloth_constant(x, SDL_SCANCODE_SEMICOLON, "SDL-SCANCODE-SEMICOLON");
+	sloth_constant(x, SDL_SCANCODE_APOSTROPHE, "SDL-SCANCODE-APOSTROPHE");
+	sloth_constant(x, SDL_SCANCODE_GRAVE, "SDL-SCANCODE-GRAVE");
+	sloth_constant(x, SDL_SCANCODE_COMMA, "SDL-SCANCODE-COMMA");
+	sloth_constant(x, SDL_SCANCODE_PERIOD, "SDL-SCANCODE-PERIOD");
+	sloth_constant(x, SDL_SCANCODE_SLASH, "SDL-SCANCODE-SLASH");
+
+	sloth_constant(x, SDL_SCANCODE_CAPSLOCK, "SDL-SCANCODE-CAPSLOCK");
+
+	sloth_constant(x, SDL_SCANCODE_F1, "SDL-SCANCODE-F1");
+	sloth_constant(x, SDL_SCANCODE_F2, "SDL-SCANCODE-F2");
+	sloth_constant(x, SDL_SCANCODE_F3, "SDL-SCANCODE-F3");
+	sloth_constant(x, SDL_SCANCODE_F4, "SDL-SCANCODE-F4");
+	sloth_constant(x, SDL_SCANCODE_F5, "SDL-SCANCODE-F5");
+	sloth_constant(x, SDL_SCANCODE_F6, "SDL-SCANCODE-F6");
+	sloth_constant(x, SDL_SCANCODE_F7, "SDL-SCANCODE-F7");
+	sloth_constant(x, SDL_SCANCODE_F8, "SDL-SCANCODE-F8");
+	sloth_constant(x, SDL_SCANCODE_F9, "SDL-SCANCODE-F9");
+	sloth_constant(x, SDL_SCANCODE_F10, "SDL-SCANCODE-F10");
+	sloth_constant(x, SDL_SCANCODE_F11, "SDL-SCANCODE-F11");
+	sloth_constant(x, SDL_SCANCODE_F12, "SDL-SCANCODE-F12");
+
+	sloth_constant(x, SDL_SCANCODE_PRINTSCREEN, "SDL-SCANCODE-PRINTSCREEN");
+	sloth_constant(x, SDL_SCANCODE_SCROLLLOCK, "SDL-SCANCODE-SCROLLLOCK");
+	sloth_constant(x, SDL_SCANCODE_PAUSE, "SDL-SCANCODE-PAUSE");
+	sloth_constant(x, SDL_SCANCODE_INSERT, "SDL-SCANCODE-INSERT");
+
+	sloth_constant(x, SDL_SCANCODE_HOME, "SDL-SCANCODE-HOME");
+	sloth_constant(x, SDL_SCANCODE_PAGEUP, "SDL-SCANCODE-PAGEUP");
+	sloth_constant(x, SDL_SCANCODE_DELETE, "SDL-SCANCODE-DELETE");
+	sloth_constant(x, SDL_SCANCODE_END, "SDL-SCANCODE-END");
+	sloth_constant(x, SDL_SCANCODE_PAGEDOWN, "SDL-SCANCODE-PAGEDOWN");
+	sloth_constant(x, SDL_SCANCODE_RIGHT, "SDL-SCANCODE-RIGHT");
+	sloth_constant(x, SDL_SCANCODE_LEFT, "SDL-SCANCODE-LEFT");
+	sloth_constant(x, SDL_SCANCODE_DOWN, "SDL-SCANCODE-DOWN");
+	sloth_constant(x, SDL_SCANCODE_UP, "SDL-SCANCODE-UP");
+
+	sloth_constant(x, SDL_SCANCODE_NUMLOCKCLEAR, "SDL-SCANCODE-NUMLOCKCLEAR");
+
+	sloth_constant(x, SDL_SCANCODE_KP_DIVIDE, "SDL-SCANCODE-KP-DIVIDE");
+	sloth_constant(x, SDL_SCANCODE_KP_MULTIPLY, "SDL-SCANCODE-KP-MULTIPLY");
+	sloth_constant(x, SDL_SCANCODE_KP_MINUS, "SDL-SCANCODE-KP-MINUS");
+	sloth_constant(x, SDL_SCANCODE_KP_PLUS, "SDL-SCANCODE-KP-PLUS");
+	sloth_constant(x, SDL_SCANCODE_KP_ENTER, "SDL-SCANCODE-KP-ENTER");
+	sloth_constant(x, SDL_SCANCODE_KP_1, "SDL-SCANCODE-KP-1");
+	sloth_constant(x, SDL_SCANCODE_KP_2, "SDL-SCANCODE-KP-2");
+	sloth_constant(x, SDL_SCANCODE_KP_3, "SDL-SCANCODE-KP-3");
+	sloth_constant(x, SDL_SCANCODE_KP_4, "SDL-SCANCODE-KP-4");
+	sloth_constant(x, SDL_SCANCODE_KP_5, "SDL-SCANCODE-KP-5");
+	sloth_constant(x, SDL_SCANCODE_KP_6, "SDL-SCANCODE-KP-6");
+	sloth_constant(x, SDL_SCANCODE_KP_7, "SDL-SCANCODE-KP-7");
+	sloth_constant(x, SDL_SCANCODE_KP_8, "SDL-SCANCODE-KP-8");
+	sloth_constant(x, SDL_SCANCODE_KP_9, "SDL-SCANCODE-KP-9");
+	sloth_constant(x, SDL_SCANCODE_KP_0, "SDL-SCANCODE-KP-0");
+	sloth_constant(x, SDL_SCANCODE_KP_PERIOD, "SDL-SCANCODE-KP-PERIOD");
+
+	sloth_constant(x, SDL_SCANCODE_NONUSBACKSLASH, "SDL-SCANCODE-NONUSBACKSLASH");
+	sloth_constant(x, SDL_SCANCODE_APPLICATION, "SDL-SCANCODE-APPLICATION");
+
+	/* There are more "strange" scancodes defined that I */
+	/* will not copy here right now. */
+
+	sloth_constant(x, SDL_SCANCODE_LCTRL, "SDL-SCANCODE-LCTRL");
+	sloth_constant(x, SDL_SCANCODE_LSHIFT, "SDL-SCANCODE-LSHIFT");
+	sloth_constant(x, SDL_SCANCODE_LALT, "SDL-SCANCODE-LALT");
+	sloth_constant(x, SDL_SCANCODE_LGUI, "SDL-SCANCODE-LGUI");
+	sloth_constant(x, SDL_SCANCODE_RCTRL, "SDL-SCANCODE-RCTRL");
+	sloth_constant(x, SDL_SCANCODE_RSHIFT, "SDL-SCANCODE-RSHIFT");
+	sloth_constant(x, SDL_SCANCODE_RALT, "SDL-SCANCODE-RALT");
+	sloth_constant(x, SDL_SCANCODE_RGUI, "SDL-SCANCODE-RGUI");
 
 	/* SDL_joystick.h */
 	sloth_constant(x, SDL_HAT_CENTERED, "SDL-HAT-CENTERED");

@@ -2,6 +2,7 @@
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_events.h>
+#include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_joystick.h>
 #include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_timer.h>
@@ -26,6 +27,8 @@ void sloth2SDL3_GetError_(X* x);
 /* SDL_events.h */
 void sloth2SDL3_WaitEvent_(X* x);
 void sloth2SDL3_PushEvent_(X* x);
+
+/* SDL_keyboard.h */
 
 /* SDL_joystick.h */
 void sloth2SDL3_GetJoystickNameForID_(X* x);
