@@ -1,7 +1,7 @@
 # Sloth — Universal Forth Engine
 
-**Portable, multi-language ANS Forth for desktops, mobile,
-embedded, and scripting.**
+**Portable, multi-language virtual machine and ANS Forth 
+implementation for desktops, mobile, embedded and scripting.**
 
 ---
 
@@ -66,3 +66,11 @@ These are interesting properties of some programming languages:
 
 Forth is the only language that fulfills all four.
 
+---
+
+## Memory Model
+
+Continuous address space in all the implementations. C uses 
+real native pointers and direct memory access. Java implementation
+uses memory "blocks" and addresses have two parts, one to 
+index the block and another as the address inside the block.

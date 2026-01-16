@@ -762,6 +762,8 @@ CELL sloth_header(X* x, CELL n, CELL l) {
 	sloth_comma(x, 0); /* Reserve space for XT */
 	sloth_ccomma(x, 0); /* Flags (default flags: 0) */
 	sloth_ccomma(x, l); /* Name length */
+	/* TODO Shouldn't the next function use sloth_cfetch */
+	/* instead of sloth_fetch ??? */
 	for (i = 0; i < l; i++) sloth_ccomma(x, sloth_fetch(x, n + i)); /* Name */
 	sloth_align(x); /* Align XT address */
 	sloth_store(x, w + sCELL, sloth_here(x));
@@ -884,6 +886,7 @@ void sloth__ipop(X* x) {
 
 void sloth_unloop_(X* x) { 
 	sloth_user_area_set(x, SLOTH_LX, sloth_user_area_get(x, SLOTH_LX) - 1);
+	// TODO This has two repeated lines
 	if (sloth_user_area_get(x, SLOTH_LX) == -1) {
 		sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
 		sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
@@ -1028,6 +1031,8 @@ void sloth_environment_(X* x) {
 /* I would prefer using PARSE-NAME but its not yet */
 /* standarized and there's no need to implement two */
 /* words with almost the same functionality. */
+
+// TODO Adapt from the Java version to correctly use CHARs !!!
 void sloth_word_(X* x) {
 	/* The region to store WORD counted strings starts */
 	/* at here + CBUF. */
@@ -1054,6 +1059,8 @@ void sloth_word_(X* x) {
 	}
 	end = ibuf + ipos;	
 	/* Now, copy it to the counted string buffer */
+	/* TODO Here, end-start must be divided by sCHAR to ensure */
+	/* implementations with char != 1 work well */
 	sloth_cstore(x, sloth_here(x) + SLOTH_CBUF, end - start);
 
 	for (i = 0; i < (end - start); i++) {
@@ -1161,11 +1168,14 @@ void sloth_interpret_(X* x) {
 			CELL temp_base;
 			temp_base = sloth_user_area_get(x, SLOTH_BASE);
 			sloth_pop(x);
+			// TODO This should do *(tok + 2*sCHAR)
 			if (tlen == 3 && *tok == '\'' && (*(tok + 2)) == '\'') {
 				/* Character literal */
 				if (sloth_user_area_get(x, SLOTH_STATE) == 0)	
+					// TODO This should do *(tok + sCHAR)
 					sloth_push(x, *(tok + 1));
 				else 
+					// TODO This should do *(tok + sCHAR)
 					sloth_literal(x, *(tok + 1));
 			} else {
 				is_double = 0;
