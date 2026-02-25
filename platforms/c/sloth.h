@@ -2080,6 +2080,13 @@ void sloth_bootstrap_kernel(X* x) {
 
 	sloth_code(x, "ALLOT", sloth_primitive(x, &sloth_allot_));
 	sloth_code(x, "CELLS", sloth_primitive(x, &sloth_cells_));
+
+	/* Although char = byte on most implementation (in fact, its defined */
+	/* like that in the ANS Forth specification), I know that my Java */
+	/* implementation will have 16-bit chars and as such, all my code will */
+	/* not use the equality char = byte. */
+	/* That's why CHARS is defined here although in this implementation */
+	/* : CHARS ; is a valid Forth implementation for CHARS. */
 	sloth_code(x, "CHARS", sloth_primitive(x, &sloth_chars_));
 	sloth_code(x, "COMPILE,", sloth_primitive(x, &sloth_compile_comma_));
 	sloth_code(x, "CREATE-NAME", sloth_primitive(x, &sloth_create_name_));

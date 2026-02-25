@@ -47,7 +47,7 @@ These functions are the bedrock of the Sloth Virtual Machine, managing its inter
 *   **Platform-dependent I/O:**
     *   `int getch()`: Reads a single character from standard input without waiting for Enter (platform-dependent implementation).
 
-### 2. Primitive Forth Words
+### 2. Primitive Forth Words (82)
 
 These are the C functions registered as Forth words during the `sloth_bootstrap_kernel` process, forming the initial vocabulary available to the Forth interpreter.
 
@@ -193,3 +193,148 @@ These functions are critical for the C-level implementation of the Forth VM, par
     *   `int sloth_include(X* x, char* f)`: Includes and interprets a Forth source file from C.
     *   `void sloth_evaluate(X* x, char* s)`: Evaluates a C string as Forth code.
     *   `void sloth_repl(X* x)`: Starts a basic Read-Eval-Print Loop (REPL).
+
+### 4. Possible Reimplementations of Memory Access Primitives (freeing 10 primitives, leaving just B@ and B!)
+
+This section explores how several C-defined memory access primitives (`W@`, `W!`, `L@`, `L!`, `X@`, `X!`, `@`, `!`) could be reimplemented in Forth using more fundamental byte-level access primitives (`B@`, `B!`). This strategy aims to reduce the C codebase size, trading off some performance for greater minimality in the C core.
+
+**Core Primitives Required to Remain in C:**
+
+To support these Forth implementations, the following primitives must remain in C:
+
+*   **Byte-level memory access:** `B@` (addr -- byte), `B!` (byte addr --)
+*   **Arithmetic:** `+`, `8` (as a literal or primitive), `LSHIFT`, `RSHIFT`.
+*   **Stack manipulation:** `DUP`, `SWAP`, `OVER`, `>R`, `R>`.
+
+**Assumptions:**
+
+1.  **`sCELL` Constant:** The size of a native `CELL` (`sCELL`) must be exposed to Forth as a constant during bootstrap. This is a value, not a new primitive *function*, and is crucial for proper `CELL`-sized operations.
+2.  **Little-Endian:** The implementations below assume a Little-Endian memory layout (least significant byte at the lowest address). Big-Endian systems would require reversing the byte order.
+3.  **Signed/Unsigned:** `B@` fetches an unsigned byte (0-255). Composition logic handles this for larger numbers.
+
+**Proposed Forth Implementations (Little-Endian):**
+
+First, the `sCELL` constant would be defined in a core Forth bootstrap file (e.g., `4th/ans.4th`), with its value selected based on the C build environment.
+
+(NOTE FROM ME: There is no need to create the sCELL based on the C build environment, just do : sCELL 1 CELLS ; if its required, or 1 CELLS CONSTANT sCELL)
+
+```forth
+\ In bootstrap code (e.g., ans.4th)
+\ This value would be set by the C code during initialization,
+\ or the build system would select the correct file based on sCELL.
+4 CONSTANT sCELL  \ Example for a 32-bit system
+\ 8 CONSTANT sCELL  \ Example for a 64-bit system
+```
+
+---
+
+**1. 16-bit Words (`W@` / `W!`)**
+
+These words fetch and store 16-bit values.
+
+```forth
+: W@ ( addr -- w )  \ Fetches a 16-bit word.
+  DUP B@          \ ( addr byte0 )  \ Fetch byte 0
+  SWAP 1+ B@      \ ( byte0 addr+1 byte1 ) \ Fetch byte 1
+  8 LSHIFT +      \ ( word )        \ Combine bytes (byte1 << 8) | byte0
+;
+
+: W! ( w addr -- )  \ Stores a 16-bit word.
+  >R              \ ( w ) R:( addr ) \ Save address on return stack
+  DUP R@ B!       \ ( w ) Store low byte (byte0)
+  8 RSHIFT        \ ( w' )  \ Shift to get high byte (byte1)
+  R> 1+ B!        \ ( )     \ Store high byte at addr+1
+;
+```
+
+---
+
+**2. 32-bit Words (`L@` / `L!`)**
+
+These words fetch and store 32-bit values.
+
+```forth
+: L@ ( addr -- l )  \ Fetches a 32-bit long word.
+  DUP B@          \ ( addr byte0 )
+  OVER 1+ B@      \ ( addr byte0 byte1 )
+  OVER 2+ B@      \ ( addr byte0 byte1 byte2 )
+  SWAP 3+ B@      \ ( byte0 byte1 byte2 addr byte3 )
+  ROT ROT ROT     \ ( byte3 byte2 byte1 byte0 )
+  8 LSHIFT +      \ ( byte3 byte2 byte1_0 )
+  8 LSHIFT +      \ ( byte3 byte2_1_0 )
+  8 LSHIFT +      \ ( long_word )
+;
+
+: L! ( l addr -- )  \ Stores a 32-bit long word.
+  >R                \ ( l ) R:( addr )
+  DUP R@ B!         \ ( l ) Store byte 0
+  8 RSHIFT          \ ( l' )
+  DUP R@ 1+ B!      \ ( l' ) Store byte 1
+  8 RSHIFT          \ ( l'' )
+  DUP R@ 2+ B!      \ ( l'' ) Store byte 2
+  8 RSHIFT          \ ( l''' )
+  R> 3+ B!          \ ( ) Store byte 3
+;
+```
+
+---
+
+**3. Cell-sized Words (`@` / `!`)**
+
+These words handle memory access for a native `CELL`. Their definitions depend on the size of `sCELL`. The build system would typically include the correct definition based on `sCELL`.
+
+**For a 32-bit system (where `sCELL` is 4 bytes):**
+
+```forth
+\ In a file for 32-bit Sloth (or conditionally compiled)
+4 CONSTANT sCELL
+
+: @ ( addr -- cell ) L@ ; \ @ is an alias for L@
+: ! ( cell addr -- ) L! ; \ ! is an alias for L!
+```
+
+(NOTE FROM ME: This should be something like: 1 CELLS 4 = [IF] : @ L@ ; [ELSE] : @ X@ ; [THEN])
+
+**For a 64-bit system (where `sCELL` is 8 bytes):**
+
+First, the 64-bit fetch/store (`X@` / `X!`) primitives would be defined:
+
+```forth
+: X@ ( addr -- x )  \ Fetches a 64-bit extended word.
+  DUP B@
+  OVER 1+ B@
+  OVER 2+ B@
+  OVER 3+ B@
+  OVER 4+ B@
+  OVER 5+ B@
+  OVER 6+ B@
+  SWAP 7+ B@      \ ( b0 b1 b2 b3 b4 b5 b6 b7 )
+
+  \ Now combine them (byte7 << 56) | ... | byte0
+  8 LSHIFT +
+  8 LSHIFT +
+  8 LSHIFT +
+  8 LSHIFT +
+  8 LSHIFT +
+  8 LSHIFT +
+  8 LSHIFT +
+;
+
+: X! ( x addr -- )  \ Stores a 64-bit extended word.
+  >R
+  DUP R@ B!           \ Store byte 0
+  8 RSHIFT DUP R@ 1+ B! \ Store byte 1
+  8 RSHIFT DUP R@ 2+ B! \ Store byte 2
+  8 RSHIFT DUP R@ 3+ B! \ Store byte 3
+  8 RSHIFT DUP R@ 4+ B! \ Store byte 4
+  8 RSHIFT DUP R@ 5+ B! \ Store byte 5
+  8 RSHIFT DUP R@ 6+ B! \ Store byte 6
+  8 RSHIFT R> 7+ B!     \ Store byte 7
+;
+
+\ In a file for 64-bit Sloth (or conditionally compiled)
+8 CONSTANT sCELL
+
+: @ ( addr -- cell ) X@ ;
+: ! ( cell addr -- ) X! ;
+```
