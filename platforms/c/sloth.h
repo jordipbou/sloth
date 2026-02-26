@@ -401,9 +401,8 @@ void sloth_throw_(X* x);
 /* Manipulating stack items */
 
 void sloth_drop_(X* x);
+void sloth_dup_(X* x);
 void sloth_over_(X* x);
-void sloth_pick_(X* x);
-void sloth_r_pick_(X* x);
 void sloth_to_r_(X* x);
 void sloth_r_from_(X* x);
 void sloth_swap_(X* x);
@@ -1706,15 +1705,16 @@ void sloth_throw_(X* x) {
 
 /* Manipulating stack items */
 
-void sloth_drop_(X* x) { 
+void sloth_drop_(X* x) { sloth_pop(x); }
+/*
 	if (x->sp <= 0) 
 		sloth_throw(x, -4); 
 	else 
 		sloth_pop(x); 
 }
+*/
+void sloth_dup_(X* x) { sloth_push(x, sloth_pick(x, 0)); }
 void sloth_over_(X* x) { sloth_push(x, sloth_pick(x, 1)); }
-void sloth_pick_(X* x) {  sloth_push(x, sloth_pick(x, sloth_pop(x))); }
-void sloth_r_pick_(X* x) { sloth_push(x, sloth_rpick(x, sloth_pop(x))); }
 void sloth_to_r_(X* x) { sloth_rpush(x, sloth_pop(x)); }
 void sloth_r_from_(X* x) { sloth_push(x, sloth_rpop(x)); }
 void sloth_swap_(X* x) { CELL a = sloth_pop(x); CELL b = sloth_pop(x);sloth_push(x, a); sloth_push(x, b); }
@@ -2062,9 +2062,8 @@ void sloth_bootstrap_kernel(X* x) {
 	/* Manipulating stack items */
 
 	sloth_code(x, "DROP", sloth_primitive(x, &sloth_drop_));
+	sloth_code(x, "DUP", sloth_primitive(x, &sloth_dup_));
 	sloth_code(x, "OVER", sloth_primitive(x, &sloth_over_));
-	sloth_code(x, "PICK", sloth_primitive(x, &sloth_pick_));
-	sloth_code(x, "RPICK", sloth_primitive(x, &sloth_r_pick_));
 	sloth_code(x, ">R", sloth_primitive(x, &sloth_to_r_));
 	sloth_code(x, "R>", sloth_primitive(x, &sloth_r_from_));
 	sloth_code(x, "SWAP", sloth_primitive(x, &sloth_swap_));

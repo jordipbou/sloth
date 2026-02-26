@@ -75,9 +75,8 @@ These are the C functions registered as Forth words during the `sloth_bootstrap_
 
 *   **Stack Manipulation:**
     *   `DROP` (`sloth_drop_`): Removes the top item from the data stack.
+    *   `DUP` (`sloth_dup_`): Duplicates the top item from the data stack.
     *   `OVER` (`sloth_over_`): Copies the second item on the data stack to the top.
-    *   `PICK` (`sloth_pick_`): Copies an arbitrary item from the data stack to the top.
-    *   `RPICK` (`sloth_r_pick_`): Copies an arbitrary item from the return stack to the data stack.
     *   `>R` (`sloth_to_r_`): Moves the top item from the data stack to the return stack.
     *   `R>` (`sloth_r_from_`): Moves the top item from the return stack to the data stack.
     *   `SWAP` (`sloth_swap_`): Exchanges the top two items on the data stack.

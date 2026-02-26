@@ -11,7 +11,7 @@ DROP DROP
 	32 WORD FIND 
 	SWAP DROP 
 	0 = 
-	0 PICK	
+	DUP
 	1 +
 	SOURCE SWAP DROP 
 	OVER * SWAP 1 SWAP - + 
@@ -42,7 +42,7 @@ DROP DROP
 \ 32 WORD FIND -- parse and find ( -- c-addr|xt 1|0|-1 )
 \ SWAP DROP -- ( -- 1|0|-1)
 \ 0 = 1 + -- ( -- 0|1 ) 0 if word exists, 1 if not
-\ 0 PICK -- ( -- 0|1 0|1 )
+\ DUP -- ( -- 0|1 0|1 )
 \ SOURCE SWAP DROP -- ( -- 0|1 0|1 ILEN )
 \ Now the formula f(x, y) = (x * y) + (1 - x) is applied,
 \ where x is 0|1 (existence of a word) and y is the input
@@ -169,7 +169,7 @@ FORTH-WORDLIST SET-CURRENT
 ?\		BEGIN
 ?\			BEGIN
 ?\				SOURCE >IN @ SWAP < WHILE
-?\				>IN @ 0 PICK 1 + >IN !
+?\				>IN @ DUP 1 + >IN !
 ?\				CHARS + C@ ')' = IF EXIT THEN
 ?\			REPEAT 
 ?\		DROP REFILL 0 = UNTIL
@@ -243,8 +243,14 @@ FORTH-WORDLIST SET-CURRENT
 
 \ -- Stack shuffling --------------------------------------
 
-?: DUP ( x -- x x ) 0 PICK ;
 ?: ?DUP	( x -- 0 | x x ) DUP IF DUP THEN ;
+?: PICK ( u -- x)
+?\		?DUP IF
+?\			SWAP >R 1 - RECURSE R> SWAP
+?\		ELSE
+?\			DUP
+?\		THEN
+?\ ;
 
 ?: R@ ( -- x ) ( R: x -- x ) 
 ?\		POSTPONE R> POSTPONE DUP POSTPONE >R 
@@ -271,7 +277,8 @@ FORTH-WORDLIST SET-CURRENT
 ?: 2DROP ( x1 x2 -- ) DROP DROP ;
 ?: 2DUP ( x1 x2 -- x1 x2 x1 x2 ) OVER OVER ;
 ?: 2SWAP ( x1 x2 x3 x4 -- x3 x4 x1 x2 ) >R -ROT R> -ROT ;
-?: 2OVER ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 ) 3 PICK 3 PICK ;
+?: 2OVER ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 ) 
+?\		>R >R 2DUP R> -ROT R> -ROT ;
 \ Not ANS
 ?: 2NIP ( x1 x2 x3 x4 -- x3 x4 ) ROT DROP ROT DROP ;
 

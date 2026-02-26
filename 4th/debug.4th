@@ -46,14 +46,17 @@ GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
 		THEN
 	;
 
-	: .RET ( -- )
-	  	'[' EMIT RDEPTH 0 0 D.R ']' EMIT SPACE
-	  	RDEPTH 0 > IF
-	  		1 RDEPTH 1- DO
-	  			I 1- RPICK .
-	  		-1 +LOOP
-	  	THEN
-	;
+	\ TODO This has been commented because I want to get
+	\ rid of RPICK (and PICK) as primitives. Try to find
+	\ another way to define this or define RPICK before.
+	\ : .RET ( -- )
+	\   	'[' EMIT RDEPTH 0 0 D.R ']' EMIT SPACE
+	\   	RDEPTH 0 > IF
+	\   		1 RDEPTH 1- DO
+	\   			I 1- RPICK .
+	\   		-1 +LOOP
+	\   	THEN
+	\ ;
 	
 	: TRACING-FUNCTION ( ip -- )
 		>R
