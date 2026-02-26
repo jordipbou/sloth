@@ -10,7 +10,7 @@ add_subdirectory(libs/memory)
 # add_subdirectory(libs/systray)
 # add_subdirectory(libs/osdialog)
 add_subdirectory(libs/geninput)
-add_subdirectory(libs/sdl3)
+# add_subdirectory(libs/sdl3)
 
 add_library(sloth_lib INTERFACE)
 
@@ -23,7 +23,7 @@ target_include_directories(sloth_lib INTERFACE
 add_executable(sloth repl.c)
 
 target_compile_definitions(sloth PRIVATE
-	ROOT_PATH="${PROJECT_BINARY_DIR}/../../"
+	ROOT_PATH="${PROJECT_BINARY_DIR}/../../../../"
 )
 
 if(UNIX)
@@ -43,21 +43,21 @@ target_link_libraries(sloth sloth_memory_wordset)
 
 # SDL3 based SLOTH executable
 
-if(UNIX)
-	add_executable(sdl3_sloth sdl3_repl.c)
-	target_link_libraries(sdl3_sloth m pthread)
-else()
-	# add_executable(sdl3_sloth WIN32 sdl3_repl.c)
-	add_executable(sdl3_sloth sdl3_repl.c)
-endif()
-	
-target_compile_definitions(sdl3_sloth PRIVATE
-	ROOT_PATH="${PROJECT_BINARY_DIR}/../../"
-)
-
-target_link_libraries(sdl3_sloth sloth_sdl3)
-target_link_libraries(sdl3_sloth sloth_facility_wordset)
-target_link_libraries(sdl3_sloth sloth_file_wordset)
-target_link_libraries(sdl3_sloth sloth_locals_wordset)
-target_link_libraries(sdl3_sloth sloth_memory_wordset)
-
+# if(UNIX)
+# 	add_executable(sdl3_sloth sdl3_repl.c)
+# 	target_link_libraries(sdl3_sloth m pthread)
+# else()
+# 	# add_executable(sdl3_sloth WIN32 sdl3_repl.c)
+# 	add_executable(sdl3_sloth sdl3_repl.c)
+# endif()
+# 	
+# target_compile_definitions(sdl3_sloth PRIVATE
+# 	ROOT_PATH="${PROJECT_BINARY_DIR}/../../"
+# )
+# 
+# target_link_libraries(sdl3_sloth sloth_sdl3)
+# target_link_libraries(sdl3_sloth sloth_facility_wordset)
+# target_link_libraries(sdl3_sloth sloth_file_wordset)
+# target_link_libraries(sdl3_sloth sloth_locals_wordset)
+# target_link_libraries(sdl3_sloth sloth_memory_wordset)
+# 

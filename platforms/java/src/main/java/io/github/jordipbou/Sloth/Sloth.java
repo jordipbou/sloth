@@ -329,7 +329,6 @@ public class Sloth {
 	void _exit_() { ip = (rp > 0) ? rpop() : -1; }
 	void _lit_() { push(op()); }
 	void _rip_() { int tip = ip; int o = op(); push(ip + o - sCELL); }
-	void _compile_() { compile(pop()); }
 	void _branch_() { ip += op() - sCELL; }
 	void _zbranch_() { ip += pop() == 0 ? (op() - sCELL) : sCELL; }
 	void _string_() { 
@@ -831,7 +830,7 @@ public class Sloth {
 			return;
 		} else if (i == -1) {
 			literal(xt);
-			compile(get_xt(find_word("(COMPILE)")));
+			compile(get_xt(find_word("COMPILE,")));
 		} else {
 			compile(xt);
 		}
@@ -917,7 +916,6 @@ public class Sloth {
 
 		// Primitives
 		code("(RIP)", primitive((vm) -> _rip_()));
-		code("(COMPILE)", primitive((vm) -> _compile_()));
 		code("(BRANCH)", primitive((vm) -> _branch_()));
 		code("(?BRANCH)", primitive((vm) -> _zbranch_()));
 		code("(STRING)", primitive((vm) -> _string_()));

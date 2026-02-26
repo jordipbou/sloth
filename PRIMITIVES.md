@@ -61,7 +61,6 @@ These are the C functions registered as Forth words during the `sloth_bootstrap_
     *   `(DOLOOP)` (`sloth_doloop_`): Implements the core logic for Forth's `DO ... LOOP` and `DO ... +LOOP` structures.
 
 *   **Compilation & Definition:**
-    *   `(COMPILE)` (`sloth_compile_`): Compiles the XT on top of the data stack into the dictionary.
     *   `:` (`sloth_colon_`): Enters compilation mode, creates a new word header, and makes it hidden.
     *   `:NONAME` (`sloth_colon_no_name_`): Similar to `:`, but creates an anonymous word.
     *   `;` (`sloth_semicolon_`): Exits compilation mode, compiles `EXIT`, and unhides the last defined word. (Immediate)
@@ -69,7 +68,7 @@ These are the C functions registered as Forth words during the `sloth_bootstrap_
     *   `ALLOT` (`sloth_allot_`): Reserves a specified number of bytes in the dictionary.
     *   `CELLS` (`sloth_cells_`): Converts a count of cells to a count of bytes (multiplies by `sCELL`).
     *   `CHARS` (`sloth_chars_`): (No operation) Designed for compatibility; `CHAR` size is `1`.
-    *   `COMPILE,` (`sloth_compile_comma_`): Compiles the XT on top of the stack into the dictionary (alias for `(COMPILE)`).
+    *   `COMPILE,` (`sloth_compile_comma_`): Compiles the XT on top of the stack into the dictionary.
     *   `CREATE-NAME` (`sloth_create_name_`): Creates a header for a word given its name and length on the stack.
     *   `CREATE` (`sloth_create_`): Parses a name, creates a new word header, and compiles a standard code sequence to push its parameter field address.
     *   `DOES>` (`sloth_does_`): Modifies the most recently `CREATE`d word so that when it's executed, it first pushes its parameter field address, then executes the code following `DOES>`. (Immediate)

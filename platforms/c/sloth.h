@@ -11,7 +11,7 @@
 #include<stdio.h>
 #include<string.h>
 #include<assert.h>
-#include <limits.h> /* for CHAR_BIT */
+#include<limits.h> /* for CHAR_BIT */
 
 /* -- getch multiplatform definition ------------------- */
 
@@ -288,8 +288,6 @@ void sloth_exit_(X* x);
 void sloth_lit_(X* x);
 void sloth_rip_(X* x);
 
-void sloth_compile_(X* x);
-
 void sloth_branch_(X* x);
 void sloth_zbranch_(X* x);
 
@@ -551,8 +549,8 @@ void sloth_wstore(X* x, CELL a, WYDE v) { *((WYDE*)a) = v; }
 WYDE sloth_wfetch(X* x, CELL a) { return *((WYDE*)a); }
 void sloth_lstore(X* x, CELL a, LONG v) { *((LONG*)a) = v; }
 LONG sloth_lfetch(X* x, CELL a) { return *((LONG*)a); }
-void sloth_xstore(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
-CELL sloth_xfetch(X* x, CELL a) { return *((CELL*)a); }
+void sloth_xstore(X* x, CELL a, EXTENDED v) { *((EXTENDED*)a) = v; }
+EXTENDED sloth_xfetch(X* x, CELL a) { return *((EXTENDED*)a); }
 #if sCELL == 2
 CELL sloth_fetch(X* x, CELL a) { return sloth_wfetch(x, a); }
 void sloth_store(X* x, CELL a, CELL v) { sloth_wstore(x, a, v); }
@@ -819,8 +817,6 @@ void sloth_rip_(X* x) {
 	CELL o = sloth_op(x);
 	sloth_push(x, ip + o - sCELL);
 }
-
-void sloth_compile_(X* x) { sloth_compile(x, sloth_pop(x)); }
 
 void sloth_branch_(X* x) { x->ip += sloth_op(x) - sCELL; }
 void sloth_zbranch_(X* x) { 
@@ -1841,7 +1837,7 @@ void sloth_postpone_(X* x) {
 	} else if (i == -1) {
 		/* Compile the compilation of the normal word */
 		sloth_literal(x, xt);
-		sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(COMPILE)")));
+		sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "COMPILE,")));
 	} else if (i == 1) {
 		/* Compile the immediate word */
 
@@ -1964,7 +1960,6 @@ void sloth_bootstrap_kernel(X* x) {
 	/* -- Primitives */
 
 	sloth_code(x, "(RIP)", sloth_primitive(x, &sloth_rip_));
-	sloth_code(x, "(COMPILE)", sloth_primitive(x, &sloth_compile_));
 	sloth_code(x, "(BRANCH)", sloth_primitive(x, &sloth_branch_));
 	sloth_code(x, "(?BRANCH)", sloth_primitive(x, &sloth_zbranch_));
 	sloth_code(x, "(STRING)", sloth_primitive(x, &sloth_string_));
