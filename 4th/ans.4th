@@ -485,10 +485,11 @@ FORTH-WORDLIST SET-CURRENT
 
 \ -- Forming definite loops -----------------------------
 
-\ ?: IX ( -- addr ) 11 CELLS TO-ABS ;
-\ ?: JX ( -- addr ) 12 CELLS TO-ABS ;
-\ ?: KX ( -- addr ) 13 CELLS TO-ABS ;
-\ ?: LX ( -- addr ) 14 CELLS TO-ABS ;
+\ TODO There's a very interesting way of implementing ?DO
+\ based on DO/LOOP/+LOOP in:
+\ https://stackoverflow.com/a/78927304
+\ That could be a way to remove the need to a 1 or 0 saved
+\ before the [:
 
 ?: DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
 ?\		1 POSTPONE LITERAL POSTPONE [:

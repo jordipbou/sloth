@@ -866,12 +866,15 @@ void sloth_end_quotation_(X* x) {
 
 /* Loop helpers */
 
+/* TODO These two are only used once, maybe it should be a */
+/* part of doloop. */
 void sloth__ipush(X* x) { 
 	sloth_rpush(x, sloth_user_area_get(x, SLOTH_KX));
 	sloth_user_area_set(x, SLOTH_KX, sloth_user_area_get(x, SLOTH_JX));
 	sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_IX));
 	sloth_user_area_set(x, SLOTH_LX, 0);
 }
+
 void sloth__ipop(X* x) { 
 	sloth_user_area_set(x, SLOTH_LX, 0);
 	sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
@@ -881,14 +884,11 @@ void sloth__ipop(X* x) {
 
 void sloth_unloop_(X* x) { 
 	sloth_user_area_set(x, SLOTH_LX, sloth_user_area_get(x, SLOTH_LX) - 1);
-	// TODO This has two repeated lines
+	sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
+	sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
 	if (sloth_user_area_get(x, SLOTH_LX) == -1) {
-		sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
-		sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
 		sloth_user_area_set(x, SLOTH_KX, sloth_rpick(x, 1));
 	} else if (sloth_user_area_get(x, SLOTH_LX) == -2) {
-		sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
-		sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
 		sloth_user_area_set(x, SLOTH_KX, sloth_rpick(x, 3));
 	}
 }
@@ -1917,7 +1917,9 @@ void sloth_bootstrap_kernel(X* x) {
 	/* Basic primitives */
 
 	/* EXIT and (LIT) must be defined before using */
-	/* user_area_variable. */
+	/* sloth_user_variable function because sloth_user_variable. */
+	/* calls sloth_literal that searches for (LIT) and also */
+	/* compiles EXIT. */
 
 	sloth_code(x, "EXIT", sloth_primitive(x, &sloth_exit_));
 

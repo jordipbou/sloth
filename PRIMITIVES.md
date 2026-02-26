@@ -57,7 +57,8 @@ These are the C functions registered as Forth words during the `sloth_bootstrap_
     *   `(RIP)` (`sloth_rip_`): Pushes a calculated address (relative to current IP) onto the data stack. Used for relative addressing.
     *   `(BRANCH)` (`sloth_branch_`): Unconditional jump; advances IP by an offset.
     *   `(?BRANCH)` (`sloth_zbranch_`): Conditional jump; advances IP by an offset if the top of stack is zero, otherwise skips the offset.
-    *   `UNLOOP` (`sloth_unloop_`): Adjusts loop parameters on the return stack, used to prematurely exit loops.
+    *   `(STRING)` (`sloth_string_`): Processes a string literal, pushing its address and length.
+    *   `(CSTRING)` (`sloth_c_string_`): Processes a C-style string literal, pushing its address.
     *   `(DOLOOP)` (`sloth_doloop_`): Implements the core logic for Forth's `DO ... LOOP` and `DO ... +LOOP` structures.
 
 *   **Compilation & Definition:**
@@ -111,9 +112,11 @@ These are the C functions registered as Forth words during the `sloth_bootstrap_
     *   `=` (`sloth_equals_`): Checks if two numbers are equal.
     *   `<` (`sloth_less_than_`): Checks if the second number is less than the first.
 
+
+*   **Definite loops**
+   *   `UNLOOP` (`sloth_unloop_`): Adjusts loop parameters on the return stack, used to prematurely exit loops.
+
 *   **String & I/O:**
-    *   `(STRING)` (`sloth_string_`): Processes a string literal, pushing its address and length.
-    *   `(CSTRING)` (`sloth_c_string_`): Processes a C-style string literal, pushing its address.
     *   `MOVE` (`sloth_move_`): Copies a block of memory.
     *   `EMIT` (`sloth_emit_`): Outputs a character.
     *   `KEY` (`sloth_key_`): Reads a single character.
