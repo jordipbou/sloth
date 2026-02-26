@@ -485,35 +485,40 @@ FORTH-WORDLIST SET-CURRENT
 
 \ -- Forming definite loops -----------------------------
 
-\ TODO There's a very interesting way of implementing ?DO
-\ based on DO/LOOP/+LOOP in:
-\ https://stackoverflow.com/a/78927304
-\ That could be a way to remove the need to a 1 or 0 saved
-\ before the [:
-
-?: DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
-?\		1 POSTPONE LITERAL POSTPONE [:
-?\ ; IMMEDIATE
-
-?: ?DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
-?\		0 POSTPONE LITERAL POSTPONE [:
-?\ ; IMMEDIATE
-
 ?: I ( -- n ) (IX) @ ;
 ?: J ( -- n ) (JX) @ ;
 \ Not ANS Forth
 ?: K ( -- n ) (KX) @ ;
+
+?: NOOP ;
+?: THEN, POSTPONE THEN ;
+
+?: DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
+?\		POSTPONE [: ['] NOOP
+?\ ; IMMEDIATE
+
+\ ?DO has been implemented following the next implementation:
+\ https://stackoverflow.com/a/78927304
+?: ?DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
+?\		POSTPONE 2DUP POSTPONE =
+?\		POSTPONE IF POSTPONE 2DROP POSTPONE ELSE
+?\		POSTPONE [: ['] THEN,
+?\ ; IMMEDIATE
 
 ?: LEAVE ( -- ) ( R: loop-sys -- )
 ?\		POSTPONE (LX) POSTPONE 1! POSTPONE EXIT
 ?\ ; IMMEDIATE
 
 ?: LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
+?\		>R
 ?\		1 POSTPONE LITERAL POSTPONE ;] POSTPONE (DOLOOP)
+?\		R> EXECUTE
 ?\ ; IMMEDIATE
 
 ?: +LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
+?\		>R
 ?\		POSTPONE ;] POSTPONE (DOLOOP)
+?\		R> EXECUTE
 ?\ ; IMMEDIATE
 
 \ -- Strings (from CORE wordset) --------------------------

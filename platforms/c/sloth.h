@@ -302,8 +302,6 @@ void sloth_end_quotation_(X* x);
 
 /* Loop helpers */
 
-void sloth__ipush(X* x);
-void sloth__ipop(X* x);
 void sloth_unloop_(X* x);
 void sloth_doloop_(X* x);
 
@@ -866,71 +864,66 @@ void sloth_end_quotation_(X* x) {
 
 /* Loop helpers */
 
-/* TODO These two are only used once, maybe it should be a */
-/* part of doloop. */
-void sloth__ipush(X* x) { 
-	sloth_rpush(x, sloth_user_area_get(x, SLOTH_KX));
-	sloth_user_area_set(x, SLOTH_KX, sloth_user_area_get(x, SLOTH_JX));
-	sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_IX));
-	sloth_user_area_set(x, SLOTH_LX, 0);
-}
+/* IX, JX and KX are the loop index registers. */
+/* They allow three nested loops with indexes to be */
+/* used simultaneously. That means accessing the last 3 nested */
+/* loops indexes at the same time. */
 
-void sloth__ipop(X* x) { 
-	sloth_user_area_set(x, SLOTH_LX, 0);
-	sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
-	sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
-	sloth_user_area_set(x, SLOTH_KX, sloth_rpop(x));
-}
+/* LX represents the leave register. */
 
-void sloth_unloop_(X* x) { 
-	sloth_user_area_set(x, SLOTH_LX, sloth_user_area_get(x, SLOTH_LX) - 1);
-	sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
-	sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
-	if (sloth_user_area_get(x, SLOTH_LX) == -1) {
-		sloth_user_area_set(x, SLOTH_KX, sloth_rpick(x, 1));
-	} else if (sloth_user_area_get(x, SLOTH_LX) == -2) {
-		sloth_user_area_set(x, SLOTH_KX, sloth_rpick(x, 3));
-	}
+void sloth_unloop_(X* x) {
+	CELL lx = sloth_user_area_get(x, SLOTH_LX) - 1;
+		sloth_user_area_set(x, SLOTH_LX, lx);
+		
+		// Shift registers down
+		sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
+		sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
+		
+		// General restoration of KX from the return stack spill
+		// Formula: rpick((depth * 2) - 1) because each level has 
+		// [Saved KX Register from fourth outer loop, return address]
+		if (lx < 0) {
+			sloth_user_area_set(x, 
+				SLOTH_KX, 
+				sloth_rpick(x, (-lx * 2) - 1));
+		}
 }
 
 /* Algorithm for doloop taken from pForth */
 /* (pf_inner.c case ID_PLUS_LOOP) */
 void sloth_doloop_(X* x) {
-	CELL q, do_first_loop, l, o, d;
-	sloth__ipush(x);
+	CELL q, l, o, d;
+
+	sloth_rpush(x, sloth_user_area_get(x, SLOTH_KX));
+	sloth_user_area_set(x, SLOTH_KX, sloth_user_area_get(x, SLOTH_JX));
+	sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_IX));
+	sloth_user_area_set(x, SLOTH_LX, 0);
+
 	q = sloth_pop(x);
-	do_first_loop = sloth_pop(x);
 	sloth_user_area_set(x, SLOTH_IX, sloth_pop(x));
 	l = sloth_pop(x);
-
 	o = sloth_user_area_get(x, SLOTH_IX) - l;
 	d = 0;
 
-	/* First iteration is executed always on a DO */
-	if (do_first_loop == 1) {
-		sloth_eval(x, q);
-		if (sloth_user_area_get(x, SLOTH_LX) == 0) {
-			d = sloth_pop(x);
-			o = sloth_user_area_get(x, SLOTH_IX) - l;
-			sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_IX) + d);
-			/* printf("LX == 0 l %ld o %ld d %ld\n", l, o, d); */
-		}
-	}
-
-	if (!(do_first_loop == 0 && o == 0)) {
-		while (((o ^ (o + d)) & (o ^ d)) >= 0 && sloth_user_area_get(x, SLOTH_LX) == 0) {
+	if (o != 0) {
+    do {
 			sloth_eval(x, q);
-			if (sloth_user_area_get(x, SLOTH_LX) == 0) { /* Avoid pop if we're leaving */
+			if (sloth_user_area_get(x, SLOTH_LX) == 0) {
 				d = sloth_pop(x);
 				o = sloth_user_area_get(x, SLOTH_IX) - l;
-				sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_IX) + d);
+				sloth_user_area_set(
+					x, SLOTH_IX, sloth_user_area_get(x, SLOTH_IX) + d);
 			}
-		}
+    } while (((o ^ (o + d)) & (o ^ d)) >= 0 
+		      && sloth_user_area_get(x, SLOTH_LX) == 0);
 	}
 
 	if (sloth_user_area_get(x, SLOTH_LX) == 0 || sloth_user_area_get(x, SLOTH_LX) == 1) { 
 		/* Leave case */
-		sloth__ipop(x);
+		sloth_user_area_set(x, SLOTH_LX, 0);
+		sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
+		sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
+		sloth_user_area_set(x, SLOTH_KX, sloth_rpop(x));
 	} else if (sloth_user_area_get(x, SLOTH_LX) < 0) {
 		/* Unloop case */
 		sloth_user_area_set(x, SLOTH_LX, sloth_user_area_get(x, SLOTH_LX) + 1);
