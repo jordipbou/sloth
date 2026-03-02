@@ -262,6 +262,11 @@ FORTH-WORDLIST SET-CURRENT
 
 ?: ROT ( x1 x2 x3 -- x2 x3 x1 ) >R SWAP R> SWAP ;	
 
+\ ?: RPICK ( n -- x ) ( R: xn ... x0 -- xn ... x0 )
+\ ?\		DUP 0= IF DROP R> R@ SWAP >R EXIT THEN
+\ ?\		>R R> ROT >R SWAP 1- RECURSE R> ROT >R 
+\ ?\ ;
+
 \ Not ANS
 ?: -ROT ( x1 x2 x3 -- x3 x1 x2 ) ROT ROT ;
 
@@ -485,41 +490,114 @@ FORTH-WORDLIST SET-CURRENT
 
 \ -- Forming definite loops -----------------------------
 
-?: I ( -- n ) (IX) @ ;
-?: J ( -- n ) (JX) @ ;
-\ Not ANS Forth
-?: K ( -- n ) (KX) @ ;
+\ TODO Failing in test TST9 of prelimtest.fth
+
+\ DO/?DO/I/J/LEAVE/UNLOOP/LOOP/+LOOP implemented in ANS
+\ Forth (except for the required [: ;] quotation words)
+
+\ Here a trick with the basic conditional compilation
+\ is used. ?: sets a flag indicating if the word DO
+\ has been defined previously or not. If it has been
+\ defined, the rest of the line is discarded and all
+\ the following ?\ words also discard the rest of their
+\ own line.
+\ But if DO has not been previously defined, ?: is
+\ transformed to : and the following ?\ evaluate the
+\ rest of their lines, until another ?: is found.
 
 ?: NOOP ;
-?: THEN, POSTPONE THEN ;
 
-?: DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
-?\		POSTPONE [: ['] NOOP
-?\ ; IMMEDIATE
+?: DO POSTPONE [: ['] NOOP ; IMMEDIATE
+\ If DO was not defined as a primitive, the next lines
+\ that start with ?\ will be executed, something like
+\ [DEFINED] DO [IF] ... [THEN]
+
+\ Use a indexable stack to store INDEX, LIMIT and LEAVE
+
+?\ INTERNAL-WORDLIST SET-CURRENT
+
+?\ CREATE (LOOP-STACK) 100 CELLS ALLOT
+?\ VARIABLE (LSP)						\ LOOP-STACK-POINTER
+?\ 0 (LSP) !
+
+?\ VARIABLE (LEAVE)
+
+?\ : (IX) (LOOP-STACK) (LSP) @ + ;
+?\ : (OX) (LOOP-STACK) (LSP) @ + 1 CELLS + ;
+?\ : (LX) (LOOP-STACK) (LSP) @ + 2 CELLS + ;
+?\ : (QX) (LOOP-STACK) (LSP) @ + 3 CELLS + ;
+
+?\ : (JX) (LOOP-STACK) (LSP) @ + 4 CELLS - ;
+?\ : (KX) (LOOP-STACK) (LSP) @ + 8 CELLS - ;
+
+?\ : (LOOP-STACK-PUSH) ( -- ) (LSP) @ 4 CELLS + (LSP) ! ;
+?\ : (LOOP-STACK-POP) ( -- ) (LSP) @ 4 CELLS - (LSP) ! ;
+
+?\ : THEN, POSTPONE THEN ;
+
+?\ : (LOOPCHECK) ( o d -- flag )
+?\		OVER OVER XOR >R    \ compute o^d, save it  | o d
+?\		OVER + XOR          \ o^(o+d)               | r: (o^d)
+?\ 		R> AND              \ (o^(o+d)) & (o^d)
+?\ 		0 >=				\ ((o^(o+d))&(o^d)) >= 0
+?\ 		(LEAVE) @ 0= AND	\ ((o^(o+d))&(o^d)) >= 0 && LEAVE == 0
+?\ ;
+
+?\ : (DOLOOP) ( limit index quotation -- )
+?\		(LOOP-STACK-PUSH)
+?\		(QX) ! (IX) ! (LX) !
+?\		(IX) @ (LX) @ - (OX) !
+?\		(OX) 0 <> IF
+?\			BEGIN
+?\				(QX) @ EXECUTE
+?\				(LEAVE) @ 0= WHILE
+?\				(IX) @ (LX) @ - (OX) !
+?\				DUP (IX) @ + (IX) !
+?\				(OX) @ SWAP (LOOPCHECK) WHILE
+?\			REPEAT THEN
+?\		THEN
+?\		(LOOP-STACK-POP)
+?\		(LEAVE) @ 0< IF		\ If UNLOOPing
+?\			(LEAVE) 1+!
+?\			R> DROP			\ Exit not from this word, but
+?\			EXIT			\ from caller
+?\		THEN
+?\ ;
+
+?\ FORTH-WORDLIST SET-CURRENT
+
+?\ : I ( -- n ) (IX) @ ;
+?\ : J ( -- n ) (JX) @ ;
+?\ : K ( -- n ) (KX) @ ;
 
 \ ?DO has been implemented following the next implementation:
 \ https://stackoverflow.com/a/78927304
-?: ?DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
-?\		POSTPONE 2DUP POSTPONE =
-?\		POSTPONE IF POSTPONE 2DROP POSTPONE ELSE
-?\		POSTPONE [: ['] THEN,
+
+?\ : ?DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
+?\ 		POSTPONE 2DUP POSTPONE =
+?\ 		POSTPONE IF POSTPONE 2DROP POSTPONE ELSE
+?\ 		POSTPONE [: ['] THEN,
 ?\ ; IMMEDIATE
 
-?: LEAVE ( -- ) ( R: loop-sys -- )
-?\		POSTPONE (LX) POSTPONE 1! POSTPONE EXIT
+?\ : LEAVE ( -- )
+?\ 		POSTPONE (LEAVE) POSTPONE 1! POSTPONE EXIT
 ?\ ; IMMEDIATE
-
-?: LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
+ 
+?\ : LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
 ?\		>R
 ?\		1 POSTPONE LITERAL POSTPONE ;] POSTPONE (DOLOOP)
 ?\		R> EXECUTE
 ?\ ; IMMEDIATE
 
-?: +LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
+?\ : +LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
 ?\		>R
 ?\		POSTPONE ;] POSTPONE (DOLOOP)
 ?\		R> EXECUTE
 ?\ ; IMMEDIATE
+
+?\ : UNLOOP
+?\		(LEAVE) @ 1- (LEAVE) !
+?\ ;
 
 \ -- Strings (from CORE wordset) --------------------------
 
@@ -920,7 +998,7 @@ FORTH-WORDLIST SET-CURRENT
 ?\		DROP
 ?\ ;
 
-\ Not ANS yet
+\ Not ANS yet - and not used anywhere right now !!!
 ?: FIND-NAME ( c-addr u -- nt | 0 )
 ?\		CONTEXT ( c-addr u addr )
 ?\		#ORDER @ 0 DO ( c-addr u addr )
@@ -1215,7 +1293,6 @@ SET-CURRENT
 ?\ ;
 
 S" FLOATING-STACK" ENVIRONMENT? [IF] DROP
-
 
 \ Floating point fields
 ?: FFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )

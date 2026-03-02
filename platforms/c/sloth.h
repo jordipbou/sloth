@@ -892,6 +892,9 @@ void sloth_unloop_(X* x) {
 /* Algorithm for doloop taken from pForth */
 /* (pf_inner.c case ID_PLUS_LOOP) */
 void sloth_doloop_(X* x) {
+	/* TEMPORAL */
+	CELL cres, fres, loopcheck;
+
 	CELL q, l, o, d;
 
 	sloth_rpush(x, sloth_user_area_get(x, SLOTH_KX));
@@ -914,7 +917,7 @@ void sloth_doloop_(X* x) {
 				sloth_user_area_set(
 					x, SLOTH_IX, sloth_user_area_get(x, SLOTH_IX) + d);
 			}
-    } while (((o ^ (o + d)) & (o ^ d)) >= 0 
+		} while (((o ^ (o + d)) & (o ^ d)) >= 0 
 		      && sloth_user_area_get(x, SLOTH_LX) == 0);
 	}
 
@@ -1961,7 +1964,7 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "(CSTRING)", sloth_primitive(x, &sloth_c_string_));
 	sloth_code(x, "(QUOTATION)", sloth_primitive(x, &sloth_quotation_));
 	sloth_code(x, "(DOES)", sloth_primitive(x, &sloth_do_does_));
-	sloth_code(x, "(DOLOOP)", sloth_primitive(x, &sloth_doloop_));
+	/* sloth_code(x, "(DOLOOP)", sloth_primitive(x, &sloth_doloop_)); */
 	sloth_code(x, "(ENVIRONMENT)", sloth_primitive(x, &sloth_environment_));
 
 	/* Quotations */
@@ -2043,7 +2046,7 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* Forming definite loops */
 
-	sloth_code(x, "UNLOOP", sloth_primitive(x, &sloth_unloop_));
+	/* sloth_code(x, "UNLOOP", sloth_primitive(x, &sloth_unloop_)); */
 
 	/* More facilities for defining routines (compiling-mode only) */
 
