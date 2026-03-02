@@ -68,6 +68,10 @@ DROP DROP
 \ them. Change it to be a word and create it if it does
 \ not exist. (It can point to a variable the same way)
 
+\ -- No operation -----------------------------------------
+
+?: NOOP ;
+
 \ -- Compilation wordlist ---------------------------------
 
 \ Defining GET-CURRENT and SET-CURRENT here allows changing
@@ -490,12 +494,14 @@ FORTH-WORDLIST SET-CURRENT
 
 \ -- Forming definite loops -----------------------------
 
-\ TODO Failing in test TST9 of prelimtest.fth
+\ This is a complete an ANS compatible implementation of
+\ DO/?DO/I/J/LEAVE/UNLOOP/LOOP/+LOOP using just ANS
+\ words without specific looping primitives, and just 
+\ requiring quotations outside ANS Forth (that I
+\ consider more important as primitives than a lot of
+\ other words).
 
-\ DO/?DO/I/J/LEAVE/UNLOOP/LOOP/+LOOP implemented in ANS
-\ Forth (except for the required [: ;] quotation words)
-
-\ Here a trick with the basic conditional compilation
+\ Here, a trick with the basic conditional compilation
 \ is used. ?: sets a flag indicating if the word DO
 \ has been defined previously or not. If it has been
 \ defined, the rest of the line is discarded and all
@@ -505,62 +511,66 @@ FORTH-WORDLIST SET-CURRENT
 \ transformed to : and the following ?\ evaluate the
 \ rest of their lines, until another ?: is found.
 
-?: NOOP ;
+\ This allows conditional compilation in the style of
+\ [DEFINED] DO [IF] ... [THEN]
+\ with the limited amount of words that we have.
 
 ?: DO POSTPONE [: ['] NOOP ; IMMEDIATE
-\ If DO was not defined as a primitive, the next lines
-\ that start with ?\ will be executed, something like
-\ [DEFINED] DO [IF] ... [THEN]
-
-\ Use a indexable stack to store INDEX, LIMIT and LEAVE
 
 ?\ INTERNAL-WORDLIST SET-CURRENT
 
-?\ CREATE (LOOP-STACK) 100 CELLS ALLOT
+\ Create an indexable stack to store INDEX, LIMIT and QUOT
+
+?\ CREATE (LOOP-STACK) 90 CELLS ALLOT
 ?\ VARIABLE (LSP)						\ LOOP-STACK-POINTER
 ?\ 0 (LSP) !
 
 ?\ VARIABLE (LEAVE)
 
-?\ : (IX) (LOOP-STACK) (LSP) @ + ;
-?\ : (OX) (LOOP-STACK) (LSP) @ + 1 CELLS + ;
-?\ : (LX) (LOOP-STACK) (LSP) @ + 2 CELLS + ;
-?\ : (QX) (LOOP-STACK) (LSP) @ + 3 CELLS + ;
+?\ : (IX)		(LOOP-STACK) (LSP) @ + 3 CELLS - ;
+?\ : (LX) 		(LOOP-STACK) (LSP) @ + 2 CELLS - ;
+?\ : (QX) 		(LOOP-STACK) (LSP) @ + 1 CELLS - ;
 
-?\ : (JX) (LOOP-STACK) (LSP) @ + 4 CELLS - ;
-?\ : (KX) (LOOP-STACK) (LSP) @ + 8 CELLS - ;
+?\ : (JX)		(LOOP-STACK) (LSP) @ + 6 CELLS - ;
+?\ : (KX) 		(LOOP-STACK) (LSP) @ + 9 CELLS - ;
 
-?\ : (LOOP-STACK-PUSH) ( -- ) (LSP) @ 4 CELLS + (LSP) ! ;
-?\ : (LOOP-STACK-POP) ( -- ) (LSP) @ 4 CELLS - (LSP) ! ;
+?\ : (LOOP-STACK-PUSH) (LSP) @ 3 CELLS + (LSP) ! ;
+?\ : (LOOP-STACK-POP) ( -- ) (LSP) @ 3 CELLS - (LSP) ! ;
 
 ?\ : THEN, POSTPONE THEN ;
 
-?\ : (LOOPCHECK) ( o d -- flag )
-?\		OVER OVER XOR >R    \ compute o^d, save it  | o d
-?\		OVER + XOR          \ o^(o+d)               | r: (o^d)
-?\ 		R> AND              \ (o^(o+d)) & (o^d)
-?\ 		0 >=				\ ((o^(o+d))&(o^d)) >= 0
-?\ 		(LEAVE) @ 0= AND	\ ((o^(o+d))&(o^d)) >= 0 && LEAVE == 0
+\ Algorithm for (LOOPCHECK) taken from pForth
+\ (pf_inner.c case ID_PLUS_LOOP)
+
+\ d = delta, o = oldDiff
+?\ : (LOOPCHECK) ( d o -- flag )
+?\		OVER OVER +	 \ ( d o (d+o) )
+?\		OVER XOR	 \ ( d o (d+o)^o )
+?\		-ROT XOR AND \ ( ((d+o)^o)&(d^o) )
+?\		0 >=
 ?\ ;
 
 ?\ : (DOLOOP) ( limit index quotation -- )
 ?\		(LOOP-STACK-PUSH)
 ?\		(QX) ! (IX) ! (LX) !
-?\		(IX) @ (LX) @ - (OX) !
-?\		(OX) 0 <> IF
+?\		0 (LEAVE) !
+?\		(IX) @ (LX) @ - 0 <> IF
 ?\			BEGIN
-?\				(QX) @ EXECUTE
-?\				(LEAVE) @ 0= WHILE
-?\				(IX) @ (LX) @ - (OX) !
-?\				DUP (IX) @ + (IX) !
-?\				(OX) @ SWAP (LOOPCHECK) WHILE
+?\				(QX) @ EXECUTE			( delta )
+?\				(LEAVE) @ 0= WHILE		( delta )
+?\				(IX) @ (LX) @ -			( delta oldDiff )
+?\				OVER (IX) @ + (IX) !	( delta oldDiff ) 
+?\				(LOOPCHECK) WHILE
 ?\			REPEAT THEN
 ?\		THEN
-?\		(LOOP-STACK-POP)
-?\		(LEAVE) @ 0< IF		\ If UNLOOPing
-?\			(LEAVE) 1+!
-?\			R> DROP			\ Exit not from this word, but
-?\			EXIT			\ from caller
+?\		(LEAVE) @ 0< IF
+?\			(LEAVE) @ 1+ (LEAVE) !
+?\			R> DROP
+?\			EXIT
+?\		ELSE (LEAVE) @ 2 < IF
+?\				(LOOP-STACK-POP)	
+?\				0 (LEAVE) !
+?\			THEN
 ?\		THEN
 ?\ ;
 
@@ -580,7 +590,7 @@ FORTH-WORDLIST SET-CURRENT
 ?\ ; IMMEDIATE
 
 ?\ : LEAVE ( -- )
-?\ 		POSTPONE (LEAVE) POSTPONE 1! POSTPONE EXIT
+?\		1 POSTPONE LITERAL POSTPONE (LEAVE) POSTPONE ! POSTPONE EXIT
 ?\ ; IMMEDIATE
  
 ?\ : LOOP ( C: do-sys -- ) ( -- ) ( R: loop-sys1 -- | loop-sys2 )
@@ -597,6 +607,7 @@ FORTH-WORDLIST SET-CURRENT
 
 ?\ : UNLOOP
 ?\		(LEAVE) @ 1- (LEAVE) !
+?\		(LOOP-STACK-POP)
 ?\ ;
 
 \ -- Strings (from CORE wordset) --------------------------

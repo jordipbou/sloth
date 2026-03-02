@@ -47,7 +47,7 @@ These functions are the bedrock of the Sloth Virtual Machine, managing its inter
 *   **Platform-dependent I/O:**
     *   `int getch()`: Reads a single character from standard input without waiting for Enter (platform-dependent implementation).
 
-### 2. Primitive Forth Words (82)
+### 2. Primitive Forth Words (80)
 
 These are the C functions registered as Forth words during the `sloth_bootstrap_kernel` process, forming the initial vocabulary available to the Forth interpreter.
 
@@ -59,7 +59,6 @@ These are the C functions registered as Forth words during the `sloth_bootstrap_
     *   `(?BRANCH)` (`sloth_zbranch_`): Conditional jump; advances IP by an offset if the top of stack is zero, otherwise skips the offset.
     *   `(STRING)` (`sloth_string_`): Processes a string literal, pushing its address and length.
     *   `(CSTRING)` (`sloth_c_string_`): Processes a C-style string literal, pushing its address.
-    *   `(DOLOOP)` (`sloth_doloop_`): Implements the core logic for Forth's `DO ... LOOP` and `DO ... +LOOP` structures.
 
 *   **Compilation & Definition:**
     *   `:` (`sloth_colon_`): Enters compilation mode, creates a new word header, and makes it hidden.
@@ -111,10 +110,6 @@ These are the C functions registered as Forth words during the `sloth_bootstrap_
 *   **Comparison:**
     *   `=` (`sloth_equals_`): Checks if two numbers are equal.
     *   `<` (`sloth_less_than_`): Checks if the second number is less than the first.
-
-
-*   **Definite loops**
-   *   `UNLOOP` (`sloth_unloop_`): Adjusts loop parameters on the return stack, used to prematurely exit loops.
 
 *   **String & I/O:**
     *   `MOVE` (`sloth_move_`): Copies a block of memory.

@@ -203,24 +203,20 @@ void sloth_throw(X* x, CELL e);
 #define SLOTH_SOURCE_ID					24*sCELL
 #define SLOTH_SOURCE_POS				25*sCELL
 #define SLOTH_LATESTXT					26*sCELL
-#define SLOTH_IX								27*sCELL
-#define SLOTH_JX								28*sCELL
-#define SLOTH_KX								29*sCELL
-#define SLOTH_LX								30*sCELL
-#define SLOTH_INTERPRET					31*sCELL
+#define SLOTH_INTERPRET					27*sCELL
 
-#define SLOTH_ROOT_PATH_LENGTH	32*sCELL
-#define SLOTH_PATH_START				33*sCELL
-#define SLOTH_PATH_END					34*sCELL
+#define SLOTH_ROOT_PATH_LENGTH	28*sCELL
+#define SLOTH_PATH_START				29*sCELL
+#define SLOTH_PATH_END					30*sCELL
 /* Continuous space to store path strings */
-#define SLOTH_PATHS							35*sCELL
+#define SLOTH_PATHS							31*sCELL
 
 /* Space between SLOTH_PATHS and SLOTH_INCLUDED_FILES */
 /* reserved to store paths. */
 
-#define SLOTH_INCLUDED_FILES		99*sCELL
+#define SLOTH_INCLUDED_FILES		95*sCELL
 
-#define SLOTH_LAST_USER_VAR			100*sCELL
+#define SLOTH_LAST_USER_VAR			96*sCELL
 
 /* Word statuses */
 
@@ -860,79 +856,6 @@ void sloth_end_quotation_(X* x) {
 	sloth_store(x, a, sloth_here(x) - a - sCELL);
 	sloth_user_area_set(x, SLOTH_LATESTXT, sloth_pop(x));
 	sloth_user_area_set(x, SLOTH_STATE, s < 0 ? s + 1 : s - 1);
-}
-
-/* Loop helpers */
-
-/* IX, JX and KX are the loop index registers. */
-/* They allow three nested loops with indexes to be */
-/* used simultaneously. That means accessing the last 3 nested */
-/* loops indexes at the same time. */
-
-/* LX represents the leave register. */
-
-void sloth_unloop_(X* x) {
-	CELL lx = sloth_user_area_get(x, SLOTH_LX) - 1;
-		sloth_user_area_set(x, SLOTH_LX, lx);
-		
-		// Shift registers down
-		sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
-		sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
-		
-		// General restoration of KX from the return stack spill
-		// Formula: rpick((depth * 2) - 1) because each level has 
-		// [Saved KX Register from fourth outer loop, return address]
-		if (lx < 0) {
-			sloth_user_area_set(x, 
-				SLOTH_KX, 
-				sloth_rpick(x, (-lx * 2) - 1));
-		}
-}
-
-/* Algorithm for doloop taken from pForth */
-/* (pf_inner.c case ID_PLUS_LOOP) */
-void sloth_doloop_(X* x) {
-	/* TEMPORAL */
-	CELL cres, fres, loopcheck;
-
-	CELL q, l, o, d;
-
-	sloth_rpush(x, sloth_user_area_get(x, SLOTH_KX));
-	sloth_user_area_set(x, SLOTH_KX, sloth_user_area_get(x, SLOTH_JX));
-	sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_IX));
-	sloth_user_area_set(x, SLOTH_LX, 0);
-
-	q = sloth_pop(x);
-	sloth_user_area_set(x, SLOTH_IX, sloth_pop(x));
-	l = sloth_pop(x);
-	o = sloth_user_area_get(x, SLOTH_IX) - l;
-	d = 0;
-
-	if (o != 0) {
-    do {
-			sloth_eval(x, q);
-			if (sloth_user_area_get(x, SLOTH_LX) == 0) {
-				d = sloth_pop(x);
-				o = sloth_user_area_get(x, SLOTH_IX) - l;
-				sloth_user_area_set(
-					x, SLOTH_IX, sloth_user_area_get(x, SLOTH_IX) + d);
-			}
-		} while (((o ^ (o + d)) & (o ^ d)) >= 0 
-		      && sloth_user_area_get(x, SLOTH_LX) == 0);
-	}
-
-	if (sloth_user_area_get(x, SLOTH_LX) == 0 || sloth_user_area_get(x, SLOTH_LX) == 1) { 
-		/* Leave case */
-		sloth_user_area_set(x, SLOTH_LX, 0);
-		sloth_user_area_set(x, SLOTH_IX, sloth_user_area_get(x, SLOTH_JX));
-		sloth_user_area_set(x, SLOTH_JX, sloth_user_area_get(x, SLOTH_KX));
-		sloth_user_area_set(x, SLOTH_KX, sloth_rpop(x));
-	} else if (sloth_user_area_get(x, SLOTH_LX) < 0) {
-		/* Unloop case */
-		sloth_user_area_set(x, SLOTH_LX, sloth_user_area_get(x, SLOTH_LX) + 1);
-		sloth_rpop(x);
-		sloth_exit_(x);
-	}
 }
 
 /* Environment queries */
@@ -1887,6 +1810,8 @@ void sloth_ints_(X* x) { sloth_push(x, sloth_pop(x)*sizeof(int)); }
 
 void sloth_self_(X* x) { sloth_push(x, (CELL)x); }
 
+/* TODO Remove this */
+void sloth_point_(X* x) { printf("%ld ", sloth_pop(x)); }
 /* -- Bootstrapping ------------------------------------ */
 
 void sloth_bootstrap_kernel(X* x) {
@@ -1940,12 +1865,6 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_user_variable(x, "(SOURCE-ID)", SLOTH_SOURCE_ID, 0);
 	sloth_user_variable(x, "(SOURCE-POS)", SLOTH_SOURCE_POS, 0);
 	sloth_user_variable(x, "(LATESTXT)", SLOTH_LATESTXT, 0);
-	/* TODO IX, JX, KX, LX could be registers of the context */
-	/* and I, J the words used. Think about it. */
-	sloth_user_variable(x, "(IX)", SLOTH_IX, 0);
-	sloth_user_variable(x, "(JX)", SLOTH_JX, 0);
-	sloth_user_variable(x, "(KX)", SLOTH_KX, 0);
-	sloth_user_variable(x, "(LX)", SLOTH_LX, 0);
 	sloth_user_variable(x, "(INTERPRET)", SLOTH_INTERPRET, 0);
 
 	sloth_user_variable(x, "(SLOTH_ROOT_PATH_LENGTH)", SLOTH_ROOT_PATH_LENGTH, 0);
@@ -1964,7 +1883,6 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "(CSTRING)", sloth_primitive(x, &sloth_c_string_));
 	sloth_code(x, "(QUOTATION)", sloth_primitive(x, &sloth_quotation_));
 	sloth_code(x, "(DOES)", sloth_primitive(x, &sloth_do_does_));
-	/* sloth_code(x, "(DOLOOP)", sloth_primitive(x, &sloth_doloop_)); */
 	sloth_code(x, "(ENVIRONMENT)", sloth_primitive(x, &sloth_environment_));
 
 	/* Quotations */
@@ -2044,10 +1962,6 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "=", sloth_primitive(x, &sloth_equals_));
 	sloth_code(x, "<", sloth_primitive(x, &sloth_less_than_));
 
-	/* Forming definite loops */
-
-	/* sloth_code(x, "UNLOOP", sloth_primitive(x, &sloth_unloop_)); */
-
 	/* More facilities for defining routines (compiling-mode only) */
 
 	sloth_code(x, ":", sloth_primitive(x, &sloth_colon_));
@@ -2106,6 +2020,9 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "INTS", sloth_primitive(x, &sloth_ints_));
 
 	sloth_code(x, "(SELF)", sloth_primitive(x, &sloth_self_));
+
+	/* TODO Remove this */
+	sloth_code(x, ".", sloth_primitive(x, &sloth_point_));
 }
 
 #ifndef SLOTH_FLOATING_POINT_WORD_SET_HEADER
