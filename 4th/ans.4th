@@ -19,9 +19,8 @@ DROP DROP
 	(?DEFFOUND) !
 ;
 
-REFILL ?\ allows multiline definitions with 
-REFILL simple conditional compilation.
-DROP DROP
+REFILL ?\ allows multiline conditional compilation.
+DROP
 
 : ?\ (?DEFFOUND) @ INVERT 2 + >IN ! ; IMMEDIATE
 
@@ -63,6 +62,9 @@ DROP DROP
 \ FIXME Right now, this file contains non ANS words that
 \ make it impossible to correctly load on an ANS forth
 \ like Gforth.
+\ ADDENDUM This file is not meant to be used in other 
+\ Forths that are not SLOTH. Another different Forth file
+\ should be done for that.
 
 \ INTERNAL-WORDLIST being based on a variable is one of
 \ them. Change it to be a word and create it if it does
@@ -846,17 +848,6 @@ FORTH-WORDLIST SET-CURRENT
     REPEAT DROP
 ; IMMEDIATE
 
-\ -- Stack visualization ----------------------------------
-
-?: .S ( -- ) 
-?\		'<' EMIT DEPTH 0 0 D.R '>' EMIT SPACE
-?\		DEPTH 0 > IF
-?\			1 DEPTH 1- DO
-?\				I 1- PICK .
-?\			-1 +LOOP
-?\		THEN
-?\ ;
-
 \ -- From string wordset (needed for /SOURCE and SLITERAL) -
 
 \ Adapted from Minimal Forth to use CHARS instead of memory
@@ -1062,6 +1053,35 @@ SET-CURRENT
 ?: [THEN]	; IMMEDIATE \ ( -- )
 
 ?: [IF]		0= IF POSTPONE [ELSE] THEN ; IMMEDIATE \ ( flag -- )
+
+\ -- Stack visualization ----------------------------------
+
+[UNDEFINED] DEPTH [IF]
+\ This implementation of DEPTH requires that SWAP throws an
+\ exception if there are less than 2 items on the stack.
+: DEPTH ( -- +n )
+	0 BEGIN
+		['] SWAP CATCH 0= WHILE
+		>R 1+
+	REPEAT
+	DUP 0= IF EXIT THEN
+	DUP BEGIN
+		?DUP WHILE
+		1- R> -ROT
+	REPEAT
+;
+[THEN]
+
+[UNDEFINED] .S [IF]
+: .S ( -- )
+	'<' EMIT DEPTH 0 0 D.R '>' EMIT SPACE
+	DEPTH 0 > IF
+		DEPTH 0 DO
+			DEPTH 1- I - PICK .
+		LOOP
+	THEN
+;
+[THEN]
 
 \ == String literals ======================================
 

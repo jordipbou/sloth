@@ -1,7 +1,8 @@
 # Sloth — Universal Forth Engine
 
 **Portable, multi-language virtual machine and ANS Forth 
-implementation for desktops, mobile, embedded and scripting.**
+implementation for that virtual machine for desktops, 
+mobile, embedded and scripting.**
 
 ---
 

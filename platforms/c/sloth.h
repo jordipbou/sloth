@@ -134,7 +134,6 @@ CELL sloth_pick(X* x, CELL a);
 
 void sloth_rpush(X* x, CELL v);
 CELL sloth_rpop(X* x);
-CELL sloth_rpick(X* x, CELL a);
 
 /* -- Memory ------------------------------------------- */
 
@@ -175,8 +174,21 @@ void sloth_throw(X* x, CELL e);
 /* ---------------------------------------------------- */
 /* -- Forth Kernel ------------------------------------ */
 /* ---------------------------------------------------- */
+/* All words that can fail throw exceptions. Although   */
+/* the virtual machine will run faster without that,    */
+/* easier to add unsafe words later that will be used   */
+/* by a custom compiler/interpreter than to create safe */
+/* words from unsafe words in the Forth layer, as words */
+/* exposing the internals will be needed.               */
+/* ---------------------------------------------------- */
 
 /* -- Constants --------------------------------------- */
+
+/* Exceptions */
+#define SLOTH_STACK_OVERFLOW					-3
+#define SLOTH_STACK_UNDERFLOW					-4
+#define SLOTH_RETURN_STACK_OVERFLOW		-5
+#define SLOTH_RETURN_STACK_UNDERFLOW	-6
 
 /* Displacement of counted string buffer from here */
 #define SLOTH_CBUF				64	/* Counted string buffer */
@@ -328,8 +340,6 @@ void sloth_bye_(X* x);
 
 /* Commands to inspect memory, debug & view code */
 
-void sloth_depth_(X* x);
-void sloth_r_depth_(X* x);
 void sloth_unused_(X* x);
 
 /* Source code preprocessing, interpreting & auditing commands */
@@ -526,7 +536,6 @@ CELL sloth_pick(X* x, CELL a) { return x->s[x->sp - a - 1]; }
 
 void sloth_rpush(X* x, CELL v) { x->r[x->rp] = v; x->rp++; }
 CELL sloth_rpop(X* x) { x->rp--; return x->r[x->rp]; }
-CELL sloth_rpick(X* x, CELL a) { return x->r[x->rp - a - 1]; }
 
 /* -- Memory ------------------------------------------- */
 
@@ -1167,8 +1176,6 @@ void sloth_bye_(X* x) { printf("\n"); exit(0); }
 
 /* Commands to inspect memory, debug & view code */
 
-void sloth_depth_(X* x) { sloth_push(x, x->sp); }
-void sloth_r_depth_(X* x) { sloth_push(x, x->rp); }
 void sloth_unused_(X* x) {
 	sloth_push(x, x->d + x->sz - sloth_get(x, SLOTH_HERE)); 
 }
@@ -1624,19 +1631,59 @@ void sloth_throw_(X* x) {
 
 /* Manipulating stack items */
 
-void sloth_drop_(X* x) { sloth_pop(x); }
-/*
-	if (x->sp <= 0) 
-		sloth_throw(x, -4); 
-	else 
-		sloth_pop(x); 
+void sloth_drop_(X* x) { 
+	if (x->sp == 0) {
+		sloth_throw(x, SLOTH_STACK_UNDERFLOW);
+	} else {
+		sloth_pop(x);
+	}
 }
-*/
-void sloth_dup_(X* x) { sloth_push(x, sloth_pick(x, 0)); }
-void sloth_over_(X* x) { sloth_push(x, sloth_pick(x, 1)); }
-void sloth_to_r_(X* x) { sloth_rpush(x, sloth_pop(x)); }
-void sloth_r_from_(X* x) { sloth_push(x, sloth_rpop(x)); }
-void sloth_swap_(X* x) { CELL a = sloth_pop(x); CELL b = sloth_pop(x);sloth_push(x, a); sloth_push(x, b); }
+void sloth_dup_(X* x) {
+	if (x->sp == 0) {
+		sloth_throw(x, SLOTH_STACK_UNDERFLOW);
+	} else if (x->sp == SLOTH_STACK_SIZE) {
+		sloth_throw(x, SLOTH_STACK_OVERFLOW);
+	} else {
+		sloth_push(x, sloth_pick(x, 0));
+	}
+}
+void sloth_over_(X* x) { 
+	if (x->sp < 2) {
+		sloth_throw(x, SLOTH_STACK_UNDERFLOW);
+	} else if (x->sp == SLOTH_STACK_SIZE) {
+		sloth_throw(x, SLOTH_STACK_OVERFLOW);
+	} else {
+		sloth_push(x, sloth_pick(x, 1)); 
+	}
+}
+void sloth_to_r_(X* x) { 
+	if (x->sp == 0) {
+		sloth_throw(x, SLOTH_STACK_UNDERFLOW);
+	} else if (x->rp == SLOTH_RETURN_STACK_SIZE) {
+		sloth_throw(x, SLOTH_RETURN_STACK_OVERFLOW);
+	} else {
+		sloth_rpush(x, sloth_pop(x)); 
+	}
+}
+void sloth_r_from_(X* x) { 
+	if (x->rp == 0) {
+		sloth_throw(x, SLOTH_RETURN_STACK_UNDERFLOW);
+	} else if (x->sp == SLOTH_STACK_SIZE) {
+		sloth_throw(x, SLOTH_STACK_OVERFLOW);
+	} else {
+		sloth_push(x, sloth_rpop(x)); 
+	}
+}
+void sloth_swap_(X* x) { 
+	if (x->sp < 2) {
+		sloth_throw(x, SLOTH_STACK_UNDERFLOW);
+	} else {
+		CELL a = sloth_pop(x); 
+		CELL b = sloth_pop(x);
+		sloth_push(x, a);
+		sloth_push(x, b);
+	}
+}
 
 /* Constructing compiler and interpreter system extensions */
 
@@ -1810,8 +1857,6 @@ void sloth_ints_(X* x) { sloth_push(x, sloth_pop(x)*sizeof(int)); }
 
 void sloth_self_(X* x) { sloth_push(x, (CELL)x); }
 
-/* TODO Remove this */
-void sloth_point_(X* x) { printf("%ld ", sloth_pop(x)); }
 /* -- Bootstrapping ------------------------------------ */
 
 void sloth_bootstrap_kernel(X* x) {
@@ -1876,7 +1921,17 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* -- Primitives */
 
+	/* (RIP) is not used at all in the Forth layer. Do I need */
+	/* to define it here or just create the primitive? */
+	/* It's not used in Forth but searched two times in C, */
+	/* for CREATE and CREATE_NAME, but maybe it could be just */
+	/* a constant as its not an ANS Forth and it will not be */
+	/* rewritten in Forth. */
 	sloth_code(x, "(RIP)", sloth_primitive(x, &sloth_rip_));
+	/* TODO I don't really like exposing this to the Forth */
+	/* layer, as it non ANS and are only used one or twice. */
+	/* I think its better to expose the words that need them, */
+	/* like AHEAD and AGAIN for BRANCH, for example. */
 	sloth_code(x, "(BRANCH)", sloth_primitive(x, &sloth_branch_));
 	sloth_code(x, "(?BRANCH)", sloth_primitive(x, &sloth_zbranch_));
 	sloth_code(x, "(STRING)", sloth_primitive(x, &sloth_string_));
@@ -1887,18 +1942,21 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* Quotations */
 
+	/* This are not ANS but will be eventually, and I think */
+	/* Forth loses too much without them. */
+	/* Having quotations opens the door to combinators and */
+	/* to Joy, Factor and RetroForth. */
+
 	sloth_code(x, "[:", sloth_primitive(x, &sloth_start_quotation_)); sloth_immediate_(x);
 	sloth_code(x, ";]", sloth_primitive(x, &sloth_end_quotation_)); sloth_immediate_(x);
 
 	/* Commands that can help you start or end work sessions */
 
-	sloth_code(x, "UNUSED", sloth_primitive(x, &sloth_unused_));
 	sloth_code(x, "BYE", sloth_primitive(x, &sloth_bye_));
 
 	/* Commands to inspect memory, debug & view code */
 
-	sloth_code(x, "DEPTH", sloth_primitive(x, &sloth_depth_));
-	sloth_code(x, "RDEPTH", sloth_primitive(x, &sloth_r_depth_));
+	sloth_code(x, "UNUSED", sloth_primitive(x, &sloth_unused_));
 
 	/* Source code preprocessing, interpreting & auditing commands */
 
@@ -1909,6 +1967,7 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* String operations */
 
+	/* TODO MOVE could be defined in ANS Forth by using B@/B! */
 	sloth_code(x, "MOVE", sloth_primitive(x, &sloth_move_));
 	
 	/* More input/output operations */
@@ -2020,9 +2079,6 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "INTS", sloth_primitive(x, &sloth_ints_));
 
 	sloth_code(x, "(SELF)", sloth_primitive(x, &sloth_self_));
-
-	/* TODO Remove this */
-	sloth_code(x, ".", sloth_primitive(x, &sloth_point_));
 }
 
 #ifndef SLOTH_FLOATING_POINT_WORD_SET_HEADER
