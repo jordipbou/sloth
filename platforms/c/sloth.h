@@ -91,6 +91,10 @@ typedef struct sloth_PRIMITIVES {
 } sloth_P;
 
 typedef struct sloth_VM { 
+	CELL d, sz;	/* Dict base address, dict size */
+	CELL u, uz; /* User area base address and size */
+	CELL ip;
+
 	CELL s[SLOTH_STACK_SIZE], sp;
 	CELL r[SLOTH_RETURN_STACK_SIZE], rp;
 
@@ -101,9 +105,6 @@ typedef struct sloth_VM {
 
 	#endif
 
-	CELL ip;
-	CELL d, sz;	/* Dict base address, dict size */
-	CELL u, uz; /* User area base address and size */
 
 	/* Jump buffers used for exceptions */
 	jmp_buf jmpbuf[8];
@@ -298,11 +299,6 @@ void sloth_quotation_(X* x);
 void sloth_start_quotation_(X* x);
 void sloth_end_quotation_(X* x);
 
-/* Loop helpers */
-
-void sloth_unloop_(X* x);
-void sloth_doloop_(X* x);
-
 /* Environment queries */
 
 void sloth_environment_(X* x);
@@ -363,16 +359,8 @@ void sloth_u_m_slash_mod_(X* x);
 
 /* Memory-stack transfer operations */
 
-void sloth_b_fetch_(X* x);
-void sloth_b_store_(X* x);
 void sloth_c_fetch_(X* x);
 void sloth_c_store_(X* x);
-void sloth_w_fetch_(X* x);
-void sloth_w_store_(X* x);
-void sloth_l_fetch_(X* x);
-void sloth_l_store_(X* x);
-void sloth_x_fetch_(X* x);
-void sloth_x_store_(X* x);
 void sloth_fetch_(X* x);
 void sloth_store_(X* x);
 
@@ -415,7 +403,6 @@ void sloth_execute_(X* x);
 /* Non ANS */ void sloth_debug_(X* x);
 void sloth_here_(X* x);
 void sloth_immediate_(X* x);
-/* void sloth_to_in_(X* x); */
 void sloth_postpone_(X* x);
 void sloth_source_(X* x);
 
@@ -426,10 +413,11 @@ void sloth_source_(X* x);
 CELL sloth_primitive(X* x, F f);
 CELL sloth_code(X* x, char* name, CELL xt);
 
-/* Helper to work with absolute/relative memory addresses */
+/* Helpers to access the base address of the dicionary */
+/* and the user area. */
 
-void sloth_to_abs_(X* x);
-void sloth_to_rel_(X* x);
+void sloth_dict_(X* x);
+void sloth_user_(X* x);
 
 /* Helper to empty the return stack */
 
@@ -487,7 +475,7 @@ void sloth_init(X* x, CELL d, CELL sz, CELL u, CELL uz) {
 	x->jmpbuf_idx = -1;
 }
 
-/* TODO Allot the ability to not use malloc at all in */
+/* TODO Allow the ability to not use malloc at all in */
 /* this file. */
 X* sloth_create(int psize, int dsize, int usize) {
 	X* x;
@@ -652,15 +640,6 @@ CELL sloth_get(X* x, CELL a) {
 	return sloth_fetch(x, sloth_to_abs(x, a)); 
 }
 
-/*
-void sloth_cset(X* x, CELL a, uCHAR v) { 
-	sloth_cstore(x, sloth_to_abs(x, a), v); 
-}
-uCHAR sloth_cget(X* x, CELL a) { 
-	return sloth_cfetch(x, sloth_to_abs(x, a)); 
-}
-*/
-
 void sloth_user_area_set(X* x, CELL a, CELL v) {
 	sloth_store(x, x->u + a, v);
 }
@@ -682,7 +661,6 @@ void sloth_align(X* x) {
 	sloth_set(
 		x, 
 		SLOTH_HERE, 
-/*		(sloth_get(x, SLOTH_HERE) + (sCELL - 1)) & ~(sCELL - 1));  */
 		ALIGNED(sloth_here(x), sCELL));
 }
 
@@ -707,15 +685,9 @@ void sloth_literal(X* x, CELL n) {
 /* Headers */
 
 CELL sloth_get_latest(X* x) { 
-	/*
-	return sloth_fetch(x, sloth_get(x, SLOTH_CURRENT)); 
-	*/
 	return sloth_fetch(x, sloth_user_area_get(x, SLOTH_CURRENT));
 }
 void sloth_set_latest(X* x, CELL w) { 
-	/*
-	sloth_store(x, sloth_get(x, SLOTH_CURRENT), w); 
-	*/
 	sloth_store(x, sloth_user_area_get(x, SLOTH_CURRENT), w);
 }
 
@@ -736,9 +708,7 @@ CELL sloth_header(X* x, CELL n, CELL l) {
 	sloth_comma(x, 0); /* Reserve space for XT */
 	sloth_ccomma(x, 0); /* Flags (default flags: 0) */
 	sloth_ccomma(x, l); /* Name length */
-	/* TODO Shouldn't the next function use sloth_cfetch */
-	/* instead of sloth_fetch ??? */
-	for (i = 0; i < l; i++) sloth_ccomma(x, sloth_fetch(x, n + i)); /* Name */
+	for (i = 0; i < l; i++) sloth_ccomma(x, sloth_cfetch(x, n + i)); /* Name */
 	sloth_align(x); /* Align XT address */
 	sloth_store(x, w + sCELL, sloth_here(x));
 	return w;
@@ -845,34 +815,20 @@ void sloth_end_quotation_(X* x) {
 
 void sloth_environment_(X* x) {
 	switch (sloth_pop(x)) {
-	case 0: /* /COUNTED-STRING */
-		sloth_push(x, 64); 
-		break;
-	case 1: /* /HOLD */
-		/* TODO */ 
-		break;
-	case 2: /* /PAD */
-		/* TODO */ 
-		break;
-	case 3: /* ADDRESS-UNIT-BITS */
- 		sloth_push(x, CHAR_BIT); 
-		break;
+	case 0: /* /COUNTED-STRING */ sloth_push(x, 64); break;
+	case 1: /* /HOLD */	/* TODO */ break;
+	case 2: /* /PAD */ /* TODO */ break;
+	case 3: /* ADDRESS-UNIT-BITS */	sloth_push(x, CHAR_BIT); break;
 	case 4: /* FLOORED */
 		/* Good explanation about floored/symmetric division: */
 		/* https://www.nimblemachines.com/symmetric-division-considered-harmful/ */
 		sloth_push(x, (-3 / 2 == -2) ? -1 : 0);
 		break;
-	case 5: /* MAX-CHAR */
-		sloth_push(x, UCHAR_MAX); 
-		break;
-	case 6: /* MAX-D */
-		/* TODO */ break;
-	case 7: /* MAX-N */
-		/* TODO */ break;
-	case 8: /* MAX-U */
-		/* TODO */ break;
-	case 9: /* MAX-UD */
-		/* TODO */ break;
+	case 5: /* MAX-CHAR */ sloth_push(x, UCHAR_MAX); break;
+	case 6: /* MAX-D */ /* TODO */ break;
+	case 7: /* MAX-N */ /* TODO */ break;
+	case 8: /* MAX-U */	/* TODO */ break;
+	case 9: /* MAX-UD */ /* TODO */ break;
 	case 10: /* RETURN-STACK-CELLS */
 		sloth_push(x, SLOTH_RETURN_STACK_SIZE);
 		break;
@@ -881,25 +837,17 @@ void sloth_environment_(X* x) {
 		break;
 	case 12: /* FLOATING-STACK */
 		#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
-
 			sloth_push(x, SLOTH_FLOAT_STACK_SIZE);
-
 		#else
-
 			sloth_push(x, -1);
-
 		#endif
 		break;
 	/* Obsolescent queries (but required for tests) */
 	case 100:
 		#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
-
 			sloth_push(x, -1);
-
 		#else
-
 			sloth_push(x, 0);
-
 		#endif
 		break;
 	/* Non standard queries */
@@ -1740,18 +1688,20 @@ void sloth_user_variable(X* x, char*name, CELL d, CELL v) {
 	sloth_store(x, x->u + d, v);
 }
 
-/* Helper to work with absolute/relative memory addresses */
+/* Helpers to have the base address of the dictionary */
+/* and user area. */
 
-void sloth_to_abs_(X* x) { sloth_push(x, sloth_pop(x) + x->d); }
-void sloth_to_rel_(X* x) { sloth_push(x, sloth_pop(x) - x->d); }
+void sloth_dict_(X* x) { sloth_push(x, x->d); }
+void sloth_user_(X* x) { sloth_push(x, x->u); }
 
-/* Helper to empty the return stack */
+/* Helper to empty the return stack (for QUIT) */
 
 void sloth_empty_rs_(X* x) { x->rp = 0; }
 
 /* Helper to push the address of the context structure */
-
+/*
 void sloth_self_(X* x) { sloth_push(x, (CELL)x); }
+*/
 
 /* -- Bootstrapping ------------------------------------ */
 
@@ -1936,7 +1886,6 @@ void sloth_bootstrap_kernel(X* x) {
 	/* Non ANS */	sloth_code(x, "DEBUG", sloth_primitive(x, &sloth_debug_));
 	sloth_code(x, "HERE", sloth_primitive(x, &sloth_here_));
 	sloth_code(x, "IMMEDIATE", sloth_primitive(x, &sloth_immediate_));
-	/* sloth_code(x, ">IN", sloth_primitive(x, &sloth_to_in_)); */
 	sloth_code(x, "POSTPONE", sloth_primitive(x, &sloth_postpone_)); sloth_immediate_(x);
 	sloth_code(x, "SOURCE", sloth_primitive(x, &sloth_source_));
 	sloth_code(x, "WORD", sloth_primitive(x, &sloth_word_));
@@ -1945,12 +1894,10 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* == Helpers ======================================== */
 
-	sloth_code(x, "TO-ABS", sloth_primitive(x, &sloth_to_abs_));
-	sloth_code(x, "TO-REL", sloth_primitive(x, &sloth_to_rel_));
+	sloth_code(x, "DICT", sloth_primitive(x, &sloth_dict_));
+	sloth_code(x, "USER", sloth_primitive(x, &sloth_user_));
 	sloth_user_area_set(x, SLOTH_INTERPRET, sloth_primitive(x, &sloth_interpret_));
 	sloth_code(x, "(EMPTY-RETURN-STACK)", sloth_primitive(x, &sloth_empty_rs_));
-
-	sloth_code(x, "(SELF)", sloth_primitive(x, &sloth_self_));
 }
 
 #ifndef SLOTH_FLOATING_POINT_WORD_SET_HEADER

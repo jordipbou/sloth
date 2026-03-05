@@ -85,9 +85,9 @@ DROP
 
 \ -- Variables shared with the host -----------------------
 
-\ HERE is defined in 0 CELLS TO-ABS
-?: INTERNAL-WORDLIST	1 CELLS TO-ABS ; 	\ ( -- addr )
-?: FORTH-WORDLIST		2 CELLS TO-ABS ; 	\ ( -- addr )
+\ HERE is defined in address 0 in the dictionary
+?: INTERNAL-WORDLIST	DICT 1 CELLS + ;
+?: FORTH-WORDLIST		DICT 2 CELLS + ;
 
 FORTH-WORDLIST SET-CURRENT
 
@@ -1362,30 +1362,30 @@ S" FLOATING-STACK" ENVIRONMENT? [IF] DROP
 ?\		SWAP !           \ set len 
 ?\ ;
 
-\ -- THROW/CATCH ------------------------------------------
-
-\ Although THROW and CATCH are primitive words, they only
-\ store the stack pointer, the return stack pointer and
-\ the instruction pointer.
-
-\ All the buffer pointers and information depend on the
-\ implementation (not as much on the low level context) so
-\ here CATCH is rewritten reusing original CATCH but also
-\ saving buffer information.
-
-\ No optional definition (?:) used here.
-: CATCH ( i*x xt -- j*x 0 | i*x n )
-	(IBUF) @ >R	>IN @ >R (ILEN) @ >R
-	(SOURCE-ID) @ >R (SOURCE-POS) @ >R
-	CATCH DUP IF
-		\ An exception has been thrown, restore input
-		R> (SOURCE-POS) ! R> (SOURCE-ID) !
-		R> (ILEN) ! R> >IN ! R> (IBUF) ! 
-	ELSE
-		\ No exception, just remove items from return stack
-		R> DROP R> DROP R> DROP R> DROP R> DROP
-	THEN
-;
+\ \ -- THROW/CATCH ------------------------------------------
+\ 
+\ \ Although THROW and CATCH are primitive words, they only
+\ \ store the stack pointer, the return stack pointer and
+\ \ the instruction pointer.
+\ 
+\ \ All the buffer pointers and information depend on the
+\ \ implementation (not as much on the low level context) so
+\ \ here CATCH is rewritten reusing original CATCH but also
+\ \ saving buffer information.
+\ 
+\ \ No optional definition (?:) used here.
+\ : CATCH ( i*x xt -- j*x 0 | i*x n )
+\ 	(IBUF) @ >R	>IN @ >R (ILEN) @ >R
+\ 	(SOURCE-ID) @ >R (SOURCE-POS) @ >R
+\ 	CATCH DUP IF
+\ 		\ An exception has been thrown, restore input
+\ 		R> (SOURCE-POS) ! R> (SOURCE-ID) !
+\ 		R> (ILEN) ! R> >IN ! R> (IBUF) ! 
+\ 	ELSE
+\ 		\ No exception, just remove items from return stack
+\ 		R> DROP R> DROP R> DROP R> DROP R> DROP
+\ 	THEN
+\ ;
 
 \ -- QUIT -------------------------------------------------
 
@@ -1415,19 +1415,21 @@ FORTH-WORDLIST SET-CURRENT
 		WHILE
 			['] INTERPRET CATCH
 			CASE
-			0 OF STATE @ 0= IF 
-				."  OK" 
-				DEPTH 0 > IF SPACE DEPTH . THEN
-				PRINT-FDEPTH
-			ELSE
-				." Compiling"
-			THEN CR ENDOF
-			POSTPONE [
-			-1 OF ( TODO Aborted )  ENDOF
-			-2 OF ( TODO display message from ABORT" ) ENDOF
-			( default ) DUP ." Exception # " . CR
-		ENDCASE
-	REPEAT BYE
+				0 OF STATE @ 0= IF 
+						."  OK" 
+						DEPTH 0 > IF SPACE DEPTH . THEN
+						PRINT-FDEPTH
+					ELSE
+						." Compiling"
+					THEN CR 
+				ENDOF
+				POSTPONE [
+				-1 OF ( TODO Aborted )  ENDOF
+				-2 OF ( TODO display message from ABORT" ) ENDOF
+				( default ) DUP ." Exception # " . CR
+			ENDCASE
+		REPEAT 
+		BYE
 ;
 
 [THEN]
