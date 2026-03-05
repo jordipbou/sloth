@@ -374,11 +374,19 @@ FORTH-WORDLIST SET-CURRENT
 ?: S>D ( n -- d ) DUP 0< ;
 ?: D>S ( d -- n ) DROP ;
 
-?: U+D		DUP ROT + DUP ROT U< NEGATE ;
-
-?: DNEGATE ( d1 -- d2 ) INVERT SWAP INVERT 1 U+D ROT + ;
-\ DABS is from the DOUBLE wordset, but needed for numeric output.
+\ D+, D-, DNEGATE and DABS belong to the DOUBLE wordset,
+\ but they are somehow needed for numeric output of the
+\ core wordset.
+?: D+ ( d1|ud1 d2|ud2 -- d3|ud3 )
+?\		>R >R SWAP R> DUP >R + DUP R> U< ROT + R> + 
+?\ ;
+?: D- ( d1 d2 -- d3 ) NEGATE D+ ;
+?: DNEGATE ( d1 -- d2 ) 
+?\		INVERT SWAP INVERT 1 DUP ROT + DUP ROT U< NEGATE ROT + 
+?\ ;
 ?: DABS ( d -- ud ) DUP 0< IF DNEGATE THEN ;
+
+?: M+ ( d1|ud1 n -- d2|ud2 ) S>D D+ ;
 
 ?: SM/REM ( d n1 -- n2 n3 )		\ CORE
 \ Symmetric divide of double by single. Return remainder n2
@@ -405,6 +413,12 @@ FORTH-WORDLIST SET-CURRENT
 ?\		ELSE
 ?\			RDROP
 ?\		THEN
+?\ ;
+
+?: M* ( n1 n2 -- sign )
+?\		2DUP XOR >R
+?\		ABS SWAP ABS UM*
+?\		R> 0< IF DNEGATE THEN 
 ?\ ;
 
 \ The set of division operators can be defined

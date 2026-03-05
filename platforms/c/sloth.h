@@ -357,10 +357,8 @@ void sloth_key_(X* x);
 void sloth_and_(X* x);
 void sloth_invert_(X* x);
 void sloth_l_shift_(X* x);
-void sloth_m_star_(X* x);
 void sloth_minus_(X* x);
 void sloth_plus_(X* x);
-void sloth_d_plus_(X* x);
 void sloth_r_shift_(X* x);
 void sloth_star_(X* x);
 void sloth_two_slash_(X* x);
@@ -1402,62 +1400,9 @@ void sloth_and_(X* x) { CELL v = sloth_pop(x); sloth_push(x, sloth_pop(x) & v); 
 void sloth_invert_(X* x) { sloth_push(x, ~sloth_pop(x)); }
 void sloth_l_shift_(X* x) { CELL n = sloth_pop(x); sloth_push(x, sloth_pop(x) << n); }
 
-/* Code for _m_star has been created by claude.ai */
-void sloth_m_star_(X* x) {
-	CELL b = sloth_pop(x), a = sloth_pop(x), high, low;
-
-	/* Convert the signed 64-bit integers to unsigned */
-	/* for bit manipulation */
-	uCELL ua = (uCELL)a;
-	uCELL ub = (uCELL)b;
-
-	/* Compute the full 128-bit product using 32 bit pieces */
-	uCELL a_low = ua & hCELL_MASK;
-	uCELL a_high = ua >> hCELL_BITS;
-	uCELL b_low = ub & hCELL_MASK;
-	uCELL b_high = ub >> hCELL_BITS;
-
-	/* Multiply the components */
-	uCELL low_low = a_low * b_low;
-	uCELL low_high = a_low * b_high;
-	uCELL high_low = a_high * b_low;
-	uCELL high_high = a_high * b_high;
-
-	/* Combine the partial product */
-	uCELL carry = ((low_low >> hCELL_BITS) + (low_high & hCELL_MASK) + (high_low & hCELL_MASK)) >> hCELL_BITS;
-
-	/* Calculate the low 64 bits of the result */
-	low = (uCELL)(low_low + (low_high << hCELL_BITS) + (high_low << hCELL_BITS));
-
-	/* Calculate the high 64 bits of the result */
-	high = (uCELL)(high_high + (low_high >> hCELL_BITS) + (high_low >> hCELL_BITS) + carry);
-
-	/* Adjust for sign */
-	if (a < 0) high -= b;
-	if (b < 0) high -= a;
-
-	sloth_push(x, low);
-	sloth_push(x, high);
-}
-
 void sloth_minus_(X* x) { CELL a = sloth_pop(x); sloth_push(x, sloth_pop(x) - a); }
 
 void sloth_plus_(X* x) { CELL a = sloth_pop(x); sloth_push(x, sloth_pop(x) + a); }
-
-/* Code adapted from pForth */
-void sloth_d_plus_(X* x) { 
-	uCELL ah, al, bl, bh, sh, sl;
-	bh = (uCELL)sloth_pop(x);
-	bl = (uCELL)sloth_pop(x);
-	ah = (uCELL)sloth_pop(x);
-	al = (uCELL)sloth_pop(x);
-	sh = 0;
-	sl = al + bl;
-	if (sl < bl) sh = 1;	/* carry */
-	sh += ah + bh;
-	sloth_push(x, sl);
-	sloth_push(x, sh);
-}
 
 void sloth_r_shift_(X* x) { 
 	CELL n = sloth_pop(x); 
@@ -1934,10 +1879,8 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));
 	sloth_code(x, "INVERT", sloth_primitive(x, &sloth_invert_));
 	sloth_code(x, "LSHIFT", sloth_primitive(x, &sloth_l_shift_));
-	sloth_code(x, "M*", sloth_primitive(x, &sloth_m_star_));
 	sloth_code(x, "-", sloth_primitive(x, &sloth_minus_));
 	sloth_code(x, "+", sloth_primitive(x, &sloth_plus_));
-	sloth_code(x, "D+", sloth_primitive(x, &sloth_d_plus_));
 	sloth_code(x, "RSHIFT", sloth_primitive(x, &sloth_r_shift_));
 	sloth_code(x, "*", sloth_primitive(x, &sloth_star_));
 	sloth_code(x, "2/", sloth_primitive(x, &sloth_two_slash_));
