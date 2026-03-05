@@ -98,6 +98,28 @@ FORTH-WORDLIST SET-CURRENT
 ?: DECIMAL	10 BASE ! ; \ ( -- )
 ?: HEX		16 BASE ! ; \ ( -- )
 
+\ -- Basic stack shuffling --------------------------------
+
+?: ROT		>R SWAP R> SWAP ; \ ( x1 x2 x3 -- x2 x3 x1 )
+
+?: R@		R> R> DUP SWAP >R SWAP >R ; \ ( -- x ) ( R: x -- x )
+
+\ -- Basic arithmetic -------------------------------------------
+
+?: 1+		1 + ; \ ( n1 | u1 -- n2 | u2 )
+?: 1-		1 - ; \ ( n1 | u1 -- n2 | u2 )
+
+?: 2*		2 * ; \ ( x1 -- x2 )
+
+\ -- Bit\Logic --------------------------------------------
+
+?: NEGATE	INVERT 1+ ; \ ( n1 -- n2 )
+
+?: OR		INVERT SWAP INVERT AND INVERT ; \ ( x1 x2 -- x3 )
+?: XOR \ ( x1 x2 -- x3 ) 
+?\		OVER OVER INVERT AND >R SWAP INVERT AND R> OR 
+?\ ;
+
 \ -- Compilation ------------------------------------------
 
 ?: ,	HERE ! 1 CELLS ALLOT ; \ ( x -- )
@@ -175,7 +197,7 @@ FORTH-WORDLIST SET-CURRENT
 ?\		BEGIN
 ?\			BEGIN
 ?\				SOURCE >IN @ SWAP < WHILE
-?\				>IN @ DUP 1 + >IN !
+?\				>IN @ DUP 1+ >IN !
 ?\				CHARS + C@ ')' = IF EXIT THEN
 ?\			REPEAT 
 ?\		DROP REFILL 0 = UNTIL
@@ -258,15 +280,9 @@ FORTH-WORDLIST SET-CURRENT
 ?\		THEN
 ?\ ;
 
-?: R@ ( -- x ) ( R: x -- x ) 
-?\		POSTPONE R> POSTPONE DUP POSTPONE >R 
-?\ ; IMMEDIATE
-
 ?: RDROP ( -- ) ( R: x -- ) 
 ?\		POSTPONE R> POSTPONE DROP 
 ?\ ; IMMEDIATE
-
-?: ROT ( x1 x2 x3 -- x2 x3 x1 ) >R SWAP R> SWAP ;	
 
 \ ?: RPICK ( n -- x ) ( R: xn ... x0 -- xn ... x0 )
 \ ?\		DUP 0= IF DROP R> R@ SWAP >R EXIT THEN
@@ -313,24 +329,6 @@ FORTH-WORDLIST SET-CURRENT
 ?\		POSTPONE DROP POSTPONE DROP 
 ?\ ; IMMEDIATE
 
-\ -- Arithmetic -------------------------------------------
-
-?: 1+ ( n1 | u1 -- n2 | u2 ) 1 + ;
-?: 1- ( n1 | u1 -- n2 | u2 ) 1 - ;
-
-?: 2* ( x1 -- x2 ) 2 * ;
-
-?: ABS ( n -- u ) DUP 0 < IF INVERT 1+ THEN ;
-
-\ -- Bit\Logic --------------------------------------------
-
-?: NEGATE ( n1 -- n2 ) INVERT 1+ ;
-
-?: OR ( x1 x2 -- x3 ) INVERT SWAP INVERT AND INVERT ;
-?: XOR ( x1 x2 -- x3 ) 
-?\		OVER OVER INVERT AND >R SWAP INVERT AND R> OR 
-?\ ;
-
 \ -- Comparisons ------------------------------------------
 
 ?: > ( n1 n2 -- flag ) SWAP < ;
@@ -364,6 +362,8 @@ FORTH-WORDLIST SET-CURRENT
 ?: LINUX? ( -- flag ) -1 (ENVIRONMENT) 4 = ;
 
 \ -- More arithmetic operations ---------------------------
+
+?: ABS ( n -- u ) DUP 0 < IF INVERT 1+ THEN ;
 
 ?: MIN ( n1 n2 -- n3 ) 2DUP > IF SWAP THEN DROP ;
 ?: MAX ( n1 n2 -- n3 ) 2DUP < IF SWAP THEN DROP ;
@@ -443,7 +443,7 @@ FORTH-WORDLIST SET-CURRENT
 ?: 1! ( a-addr -- ) 1 SWAP ! ;
 ?: +! ( n | u a-addr -- ) SWAP OVER @ + SWAP ! ;
 \ Not ANS
-?: 1+! ( a-addr -- ) DUP @ 1 + SWAP ! ;
+?: 1+! ( a-addr -- ) DUP @ 1+ SWAP ! ;
 \ Not ANS
 ?: 1-! ( a-addr -- ) DUP @ 1 - SWAP ! ;
 
@@ -1338,11 +1338,11 @@ S" FLOATING-STACK" ENVIRONMENT? [IF] DROP
 
 [THEN]
 
-\ Fields with exact C datatype sizes
-?: INTFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-?\		1 INTS + 1- 1 INTS 1- INVERT AND \ int based align
-?\		1 INTS +FIELD
-?\ ;
+\ \ Fields with exact C datatype sizes
+\ ?: INTFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
+\ ?\		1 INTS + 1- 1 INTS 1- INVERT AND \ int based align
+\ ?\		1 INTS +FIELD
+\ ?\ ;
 
 ?: END-STRUCTURE ( addr n -- )
 ?\		SWAP !           \ set len 

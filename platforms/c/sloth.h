@@ -137,16 +137,8 @@ CELL sloth_rpop(X* x);
 
 /* -- Memory ------------------------------------------- */
 
-void sloth_bstore(X* x, CELL a, BYTE v);
-BYTE sloth_bfetch(X* x, CELL a);
 void sloth_cstore(X* x, CELL a, uCHAR v);
 uCHAR sloth_cfetch(X* x, CELL a);
-void sloth_wstore(X* x, CELL a, WYDE v);
-WYDE sloth_wfetch(X* x, CELL a);
-void sloth_lstore(X* x, CELL a, LONG v);
-LONG sloth_lfetch(X* x, CELL a);
-void sloth_xstore(X* x, CELL a, EXTENDED v);
-EXTENDED sloth_xfetch(X* x, CELL a);
 void sloth_store(X* x, CELL a, CELL v);
 CELL sloth_fetch(X* x, CELL a);
 
@@ -242,8 +234,10 @@ void sloth_throw(X* x, CELL e);
 void sloth_set(X* x, CELL a, CELL v);
 CELL sloth_get(X* x, CELL a);
 
+/*
 void sloth_cset(X* x, CELL a, uCHAR v);
 uCHAR sloth_cget(X* x, CELL a);
+*/
 
 void sloth_user_area_set(X* x, CELL a, CELL v);
 CELL sloth_user_area_get(X* x, CELL a);
@@ -543,26 +537,10 @@ CELL sloth_rpop(X* x) { x->rp--; return x->r[x->rp]; }
 STORE/FETCH/CSTORE/cfetch work on absolute address units,
 not just inside SLOTH dictionary (memory block).
 */
-void sloth_bstore(X* x, CELL a, BYTE v) { *((BYTE*)a) = v; }
-BYTE sloth_bfetch(X* x, CELL a) { return *((BYTE*)a); }
 void sloth_cstore(X* x, CELL a, uCHAR v) { *((uCHAR*)a) = v; }
 uCHAR sloth_cfetch(X* x, CELL a) { return *((uCHAR*)a); }
-void sloth_wstore(X* x, CELL a, WYDE v) { *((WYDE*)a) = v; }
-WYDE sloth_wfetch(X* x, CELL a) { return *((WYDE*)a); }
-void sloth_lstore(X* x, CELL a, LONG v) { *((LONG*)a) = v; }
-LONG sloth_lfetch(X* x, CELL a) { return *((LONG*)a); }
-void sloth_xstore(X* x, CELL a, EXTENDED v) { *((EXTENDED*)a) = v; }
-EXTENDED sloth_xfetch(X* x, CELL a) { return *((EXTENDED*)a); }
-#if sCELL == 2
-CELL sloth_fetch(X* x, CELL a) { return sloth_wfetch(x, a); }
-void sloth_store(X* x, CELL a, CELL v) { sloth_wstore(x, a, v); }
-#elif sCELL == 4
-CELL sloth_fetch(X* x, CELL a) { return sloth_lfetch(x, a); }
-void sloth_store(X* x, CELL a, CELL v) { sloth_lstore(x, a, v); }
-#elif sCELL == 8
-CELL sloth_fetch(X* x, CELL a) { return sloth_xfetch(x, a); }
-void sloth_store(X* x, CELL a, CELL v) { sloth_xstore(x, a, v); }
-#endif
+void sloth_store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
+CELL sloth_fetch(X* x, CELL a) { return *((CELL*)a); }
 
 /*
 The next two functions allow transforming from relative to
@@ -680,12 +658,14 @@ CELL sloth_get(X* x, CELL a) {
 	return sloth_fetch(x, sloth_to_abs(x, a)); 
 }
 
+/*
 void sloth_cset(X* x, CELL a, uCHAR v) { 
 	sloth_cstore(x, sloth_to_abs(x, a), v); 
 }
 uCHAR sloth_cget(X* x, CELL a) { 
 	return sloth_cfetch(x, sloth_to_abs(x, a)); 
 }
+*/
 
 void sloth_user_area_set(X* x, CELL a, CELL v) {
 	sloth_store(x, x->u + a, v);
@@ -1557,31 +1537,10 @@ void sloth_u_m_slash_mod_(X* x) {
 
 /* Memory-stack transfer operations */
 
-void sloth_b_fetch_(X* x) { sloth_push(x, sloth_bfetch(x, sloth_pop(x))); }
-void sloth_b_store_(X* x) { CELL a = sloth_pop(x); sloth_bstore(x, a, sloth_pop(x)); }
 void sloth_c_fetch_(X* x) { sloth_push(x, sloth_cfetch(x, sloth_pop(x))); }
 void sloth_c_store_(X* x) { CELL a = sloth_pop(x); sloth_cstore(x, a, sloth_pop(x)); }
-void sloth_w_fetch_(X* x) { sloth_push(x, sloth_wfetch(x, sloth_pop(x))); }
-void sloth_w_store_(X* x) { CELL a = sloth_pop(x); sloth_wstore(x, a, sloth_pop(x)); }
-void sloth_l_fetch_(X* x) { sloth_push(x, sloth_lfetch(x, sloth_pop(x))); }
-void sloth_l_store_(X* x) { CELL a = sloth_pop(x); sloth_lstore(x, a, sloth_pop(x)); }
-void sloth_x_fetch_(X* x) { sloth_push(x, sloth_xfetch(x, sloth_pop(x))); }
-void sloth_x_store_(X* x) { CELL a = sloth_pop(x); sloth_xstore(x, a, sloth_pop(x)); }
-#if sCELL == 2
-void sloth_fetch_(X* x) { sloth_w_fetch_(x); }
-#elif sCELL == 4
-void sloth_fetch_(X* x) { sloth_l_fetch_(x); }
-#elif sCELL == 8
-void sloth_fetch_(X* x) { sloth_x_fetch_(x); }
-#endif
-
-#if sCELL == 2
-void sloth_store_(X* x) { sloth_w_store_(x); }
-#elif sCELL == 4
-void sloth_store_(X* x) { sloth_l_store_(x); }
-#elif sCELL == 8
-void sloth_store_(X* x) { sloth_x_store_(x); }
-#endif
+void sloth_fetch_(X* x) { sloth_push(x, sloth_fetch(x, sloth_pop(x))); }
+void sloth_store_(X* x) { CELL a = sloth_pop(x); sloth_store(x, a, sloth_pop(x)); }
 
 /* Comparison operations */
 
@@ -1849,10 +1808,6 @@ void sloth_to_rel_(X* x) { sloth_push(x, sloth_pop(x) - x->d); }
 
 void sloth_empty_rs_(X* x) { x->rp = 0; }
 
-/* Helper to work with structs with C data sizes */
-
-void sloth_ints_(X* x) { sloth_push(x, sloth_pop(x)*sizeof(int)); }
-
 /* Helper to push the address of the context structure */
 
 void sloth_self_(X* x) { sloth_push(x, (CELL)x); }
@@ -1967,7 +1922,6 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* String operations */
 
-	/* TODO MOVE could be defined in ANS Forth by using B@/B! */
 	sloth_code(x, "MOVE", sloth_primitive(x, &sloth_move_));
 	
 	/* More input/output operations */
@@ -1992,29 +1946,10 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* Memory-stack transfer operations */
 
-	sloth_code(x, "B@", sloth_primitive(x, &sloth_b_fetch_));
-	sloth_code(x, "B!", sloth_primitive(x, &sloth_b_store_));
 	sloth_code(x, "C@", sloth_primitive(x, &sloth_c_fetch_));
 	sloth_code(x, "C!", sloth_primitive(x, &sloth_c_store_));
-	sloth_code(x, "W@", sloth_primitive(x, &sloth_w_fetch_));
-	sloth_code(x, "W!", sloth_primitive(x, &sloth_w_store_));
-	sloth_code(x, "L@", sloth_primitive(x, &sloth_l_fetch_));
-	sloth_code(x, "L!", sloth_primitive(x, &sloth_l_store_));
-	sloth_code(x, "X@", sloth_primitive(x, &sloth_x_fetch_));
-	sloth_code(x, "X!", sloth_primitive(x, &sloth_x_store_));
 	sloth_code(x, "@", sloth_primitive(x, &sloth_fetch_));
 	sloth_code(x, "!", sloth_primitive(x, &sloth_store_));
-
-	if (sizeof(int) == 2) {
-		sloth_code(x, "INT@", sloth_primitive(x, &sloth_w_fetch_));
-		sloth_code(x, "INT!", sloth_primitive(x, &sloth_w_store_));
-	} else if (sizeof(int) == 4) {
-		sloth_code(x, "INT@", sloth_primitive(x, &sloth_l_fetch_));
-		sloth_code(x, "INT!", sloth_primitive(x, &sloth_l_store_));
-	} else if (sizeof(int) == 8) {
-		sloth_code(x, "INT@", sloth_primitive(x, &sloth_x_fetch_));
-		sloth_code(x, "INT!", sloth_primitive(x, &sloth_x_store_));
-	}
 
 	/* Comparison operations */
 
@@ -2075,8 +2010,6 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "TO-REL", sloth_primitive(x, &sloth_to_rel_));
 	sloth_user_area_set(x, SLOTH_INTERPRET, sloth_primitive(x, &sloth_interpret_));
 	sloth_code(x, "(EMPTY-RETURN-STACK)", sloth_primitive(x, &sloth_empty_rs_));
-
-	sloth_code(x, "INTS", sloth_primitive(x, &sloth_ints_));
 
 	sloth_code(x, "(SELF)", sloth_primitive(x, &sloth_self_));
 }
