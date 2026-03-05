@@ -42,11 +42,7 @@ int getch();
 /* virtual machine.                                      */
 /* ----------------------------------------------------- */
 
-typedef int8_t BYTE;
 typedef uint8_t uCHAR; /* CHARs are always unsigned */
-typedef int16_t WYDE;
-typedef int32_t LONG;
-typedef int64_t EXTENDED;
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
 
