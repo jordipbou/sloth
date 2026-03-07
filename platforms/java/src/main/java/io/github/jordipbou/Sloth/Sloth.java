@@ -10,10 +10,14 @@ public class Sloth {
 	private static final int RETURN_STACK_SIZE = 64;
 	private static final int FLOAT_STACK_SIZE = 64;
 
-	public static final int sBYTE = 1;
 	public static final int sCHAR = 2;
 	public static final int sCELL = 4;
 	public static final int sFCELL = 4;
+
+	public static final int STACK_OVERFLOW = -3;
+	public static final int STACK_UNDERFLOW = -4;
+	public static final int RETURN_STACK_OVERFLOW = -5;
+	public static final int RETURN_STACK_UNDERFLOW = -6;
 
 	private int s[];
 	private int sp;
@@ -33,9 +37,9 @@ public class Sloth {
 	ArrayList<Consumer<Sloth>> p;
 
 	public Sloth(int dsize, int usize) {
-		s = new int[64];
-		r = new int[64];
-		f = new float[64];
+		s = new int[STACK_SIZE];
+		r = new int[RETURN_STACK_SIZE];
+		f = new float[FLOAT_STACK_SIZE];
 		ip = -1;
 		p = new ArrayList<Consumer<Sloth>>();
 		m = new ArrayList<ByteBuffer>();
@@ -86,20 +90,8 @@ public class Sloth {
 	int to_rel(int a) { return a & 0x00FFFFFF; }
 	ByteBuffer block(int a) { return m.get(a >> 24); }
 
-	void bstore(int a, byte v) { block(a).put(to_rel(a), v); }
-	byte bfetch(int a) { return block(a).get(to_rel(a)); }
-
 	void cstore(int a, char v) { block(a).putChar(to_rel(a), v); }
 	char cfetch(int a) { return block(a).getChar(to_rel(a)); }
-
-	void wstore(int a, short v) { block(a).putShort(to_rel(a), v); }
-	short wfetch(int a) { return block(a).getShort(to_rel(a)); }
-
-	void lstore(int a, int v) { block(a).putInt(to_rel(a), v); }
-	int lfetch(int a) { return block(a).getInt(to_rel(a)); }
-
-	void xstore(int a, long v) { block(a).putLong(to_rel(a), v); }
-	long xfetch(int a) { return block(a).getLong(to_rel(a)); }
 
 	void store(int a, int v) { block(a).putInt(to_rel(a), v); }
 	int fetch(int a) { return block(a).getInt(to_rel(a)); }
@@ -226,24 +218,20 @@ public class Sloth {
 	private static final int SOURCE_ID = 24*sCELL;
 	private static final int SOURCE_POS = 25*sCELL;
 	private static final int LATESTXT = 26*sCELL;
-	private static final int IX = 27*sCELL;
-	private static final int JX = 28*sCELL;
-	private static final int KX = 29*sCELL;
-	private static final int LX = 30*sCELL;
-	private static final int INTERPRET = 31*sCELL;
+	private static final int INTERPRET = 27*sCELL;
 
-	private static final int ROOT_PATH_LENGTH = 32*sCELL;
-	private static final int PATH_START = 33*sCELL;
-	private static final int PATH_END = 34*sCELL;
+	private static final int ROOT_PATH_LENGTH = 28*sCELL;
+	private static final int PATH_START = 29*sCELL;
+	private static final int PATH_END = 30*sCELL;
 	// Continuous space to store path strings
-	private static final int PATHS = 35*sCELL;
+	private static final int PATHS = 31*sCELL;
 	
 	// Space between SLOTH_PATHS and SLOTH_INCLUDED_FILES
 	// reserved to store path strings.
 	
-	private static final int INCLUDED_FILES = 99*sCELL;
+	private static final int INCLUDED_FILES = 95*sCELL;
 	
-	private static final int LAST_USER_VAR = 100*sCELL;
+	private static final int LAST_USER_VAR = 96*sCELL;
 	
 	// Word statuses
 	
@@ -361,74 +349,6 @@ public class Sloth {
 		store(a, here() - a - sCELL);
 		ua_set(LATESTXT, pop());
 		ua_set(STATE, s < 0 ? s + 1 : s - 1);
-	}
-
-	// Loop helpers
-	void ipush() {
-		rpush(ua_get(KX));
-		ua_set(KX, ua_get(JX));
-		ua_set(JX, ua_get(IX));
-		ua_set(LX, 0);
-	}
-	void ipop() {
-		ua_set(LX, 0);
-		ua_set(IX, ua_get(JX));
-		ua_set(JX, ua_get(KX));
-		ua_set(KX, rpop());
-	}
-	void _unloop_() {
-		ua_set(LX, ua_get(LX) - 1);
-		ua_set(IX, ua_get(JX));
-		ua_set(JX, ua_get(KX));
-		if (ua_get(LX) == -1) {
-			ua_set(KX, rpick(1));
-		} else {
-			ua_set(KX, rpick(3));
-		}
-	}
-	// Algorithm for doloop taken from pForth
-	// (pf_inner.c case ID_PLUS_LOOP)
-	void _doloop_() {
-		ipush();
-		int q = pop();
-		int do_first_loop = pop();
-		ua_set(IX, pop());
-		int l = pop();
-
-		int o = ua_get(IX) - l;
-		int d = 0;
-
-		// First iteration is executed always on a DO word
-		if (do_first_loop == 1) {
-			eval(q);
-			if (ua_get(LX) == 0) {
-				d = pop();
-				o = ua_get(IX) - l;
-				ua_set(IX, ua_get(IX) + d);
-			}
-		}
-
-		if (!(do_first_loop == 0 && o == 0)) {
-			while (((o ^(o + d)) & (o ^ d)) >= 0 && ua_get(LX) == 0) {
-				// TODO All this block is exact as in the previous if
-				eval(q);
-				if (ua_get(LX) == 0) { // Avoid popping if we are leaving
-					d = pop();
-					o = ua_get(IX) - l;
-					ua_set(IX, ua_get(IX) + d);
-				}
-			}
-		}
-
-		if (ua_get(LX) == 0 || ua_get(LX) == 1) {
-			// Leave case
-			ipop(); 
-		} else if (ua_get(LX) < 0) {
-			// Unloop case
-			ua_set(LX, ua_get(LX) + 1);
-			rpop();
-			_exit_();
-		}
 	}
 
 	// Environment queries
@@ -595,7 +515,7 @@ public class Sloth {
 					for (int i = 0; i < tlen; i++) 
 						buf.append(cfetch(tok +i*sCHAR));
 					try {
-						int n = Integer.parseInt(buf.toString());
+						int n = Integer.parseInt(buf.toString(), temp_base);
 						if (ua_get(STATE) == 0) {
 							push(n);
 							if (is_double) push(n < 0 ? -1 : 0);
@@ -622,8 +542,6 @@ public class Sloth {
 
 	// -- Require words to bootstrap
 	void _bye_() { System.out.println(); System.exit(0); }
-	void _depth_() { push(sp); }
-	void _r_depth_() { push(rp); }
 	void _unused_() { push(m.get(d).remaining()); }
 	void _refill_() {
 		// TODO
@@ -673,10 +591,8 @@ public class Sloth {
 	void _and_() { int v = pop(); push(pop() & v); }
 	void _invert_() { push(~pop()); }
 	void _l_shift_() { int n = pop(); push(pop() << n); }
-	void _m_star_() { long d = lpop() * lpop(); dpush(d); }
 	void _minus_() { int n = pop(); push(pop() - n); }
 	void _plus_() { int n = pop(); push(pop() + n); }
-	void _d_plus_() { long n = dpop(); dpush(dpop() + n); }
 	void _r_shift_() { int n = pop(); push(pop() >> n); }
 	void _star_() { int n = pop(); push(pop() * n); }
 	void _two_slash_() { push(pop() >> 1); }
@@ -688,18 +604,10 @@ public class Sloth {
 		push((int)Long.divideUnsigned(d, u));
 	}
 
-	void _b_fetch_() { push(bfetch(pop())); }
-	void _b_store_() { int a = pop(); bstore(a, (byte)pop()); }
 	void _c_fetch_() { push(cfetch(pop())); }
 	void _c_store_() { int a = pop(); cstore(a, (char)pop()); }
-	void _w_fetch_() { push(wfetch(pop())); }
-	void _w_store_() { int a = pop(); wstore(a, (short)pop()); }
-	void _l_fetch_() { push(lfetch(pop())); }
-	void _l_store_() { int a = pop(); lstore(a, (int)pop()); }
-	void _x_fetch_() { dpush(xfetch(pop())); }
-	void _x_store_() { int a = pop(); xstore(a, lpop()); }
-	void _fetch_() { _l_fetch_(); }
-	void _store_() { _l_store_(); }
+	void _fetch_() { push(fetch(pop())); }
+	void _store_() { int a = pop(); store(a, pop()); }
 
 	void _equals_() { int n = pop(); push(pop() == n ? -1 : 0); }
 	void _less_than_() { int n = pop(); push(pop() < n ? -1 : 0); }
@@ -745,10 +653,15 @@ public class Sloth {
 	}
 
 	// Manipulating stack items
-	void _drop_() { if (sp <= 0) _throw(-4); else pop(); }
+	void _drop_() { 
+		if (sp <= 0) _throw(STACK_UNDERFLOW); 
+		else pop(); }
+	void _dup_() { 
+		if (sp == 0) _throw(STACK_UNDERFLOW);
+		else if (sp == STACK_SIZE) _throw(STACK_OVERFLOW);
+		else push(pick(0));
+	}
 	void _over_() { push(pick(1)); }
-	void _pick_() { push(pick(pop())); }
-	void _r_pick_() { push(rpick(pop())); }
 	void _to_r_() { rpush(pop()); }
 	void _r_from_() { push(rpop()); }
 	void _swap_() { int a = pop(); int b = pop(); push(a); push(b); }
@@ -855,8 +768,6 @@ public class Sloth {
 		compile(get_xt(find_word("EXIT")));
 		store(to_abs(0, u) + d, v);
 	}
-	void _to_abs_() { push(to_abs(pop(), d)); }
-	void _to_rel_() { push(to_rel(pop())); }
 	void _empty_rs_() { rp = 0; }
 	// In C there is _ints_ and _self_, but I don't need it here.
 
@@ -903,10 +814,6 @@ public class Sloth {
 		ua_variable("(SOURCE-ID)", SOURCE_ID, 0);
 		ua_variable("(SOURCE-POS)", SOURCE_POS, 0);
 		ua_variable("(LATESTXT)", LATESTXT, 0);
-		ua_variable("(IX)", IX, 0);
-		ua_variable("(JX)", JX, 0);
-		ua_variable("(KX)", KX, 0);
-		ua_variable("(LX)", LX, 0);
 		ua_variable("(INTERPRET)", INTERPRET, 0);
 		ua_variable("(SLOTH_ROOT_PATH_LENGTH)", ROOT_PATH_LENGTH, 0);
 		ua_variable("(SLOTH_PATH_START)", PATH_START, to_abs(PATHS, u));
@@ -922,7 +829,6 @@ public class Sloth {
 		code("(CSTRING)", primitive((vm) -> _c_string_()));
 		code("(QUOTATION)", primitive((vm) -> _quotation_()));
 		code("(DOES)", primitive((vm) -> _do_does_()));
-		code("(DOLOOP)", primitive((vm) -> _doloop_()));
 		code("(ENVIRONMENT)", primitive((vm) -> _environment_()));
 
 		ua_set(CURRENT, to_abs(FORTH_WL, d));
@@ -932,9 +838,6 @@ public class Sloth {
 
 		code("UNUSED", primitive((vm) -> _unused_()));
 		code("BYE", primitive((vm) -> _bye_()));
-
-		code("DEPTH", primitive((vm) -> _depth_()));
-		code("RDEPTH", primitive((vm) -> _r_depth_()));
 
 		code("REFILL", primitive((vm) -> _refill_()));
 		code("SAVE-INPUT", primitive((vm) -> _save_input_()));
@@ -949,28 +852,16 @@ public class Sloth {
 		code("AND", primitive((vm) -> _and_()));
 		code("INVERT", primitive((vm) -> _invert_()));
 		code("LSHIFT", primitive((vm) -> _l_shift_()));
-		code("M*", primitive((vm) -> _m_star_()));
 		code("-", primitive((vm) -> _minus_()));
 		code("+", primitive((vm) -> _plus_()));
-		code("D+", primitive((vm) -> _d_plus_()));
 		code("RSHIFT", primitive((vm) -> _r_shift_()));
 		code("*", primitive((vm) -> _star_()));
 		code("2/", primitive((vm) -> _two_slash_()));
 		code("UM*", primitive((vm) -> _u_m_star_()));
 		code("UM/MOD", primitive((vm) -> _u_m_slash_mod_()));
 
-		// This don't make too much sense here, they're in C
-		// mainly to access C struct data from libraries.
-		code("B@", primitive((vm) -> _b_fetch_()));
-		code("B!", primitive((vm) -> _b_store_()));
 		code("C@", primitive((vm) -> _c_fetch_()));
 		code("C!", primitive((vm) -> _c_store_()));
-		code("W@", primitive((vm) -> _w_fetch_()));
-		code("W!", primitive((vm) -> _w_store_()));
-		code("L@", primitive((vm) -> _l_fetch_()));
-		code("L!", primitive((vm) -> _l_store_()));
-		code("X@", primitive((vm) -> _x_fetch_()));
-		code("X!", primitive((vm) -> _x_store_()));
 		code("@", primitive((vm) -> _fetch_()));
 		code("!", primitive((vm) -> _store_()));
 
@@ -978,8 +869,6 @@ public class Sloth {
 
 		code("=", primitive((vm) -> _equals_()));
 		code("<", primitive((vm) -> _less_than_()));
-
-		code("UNLOOP", primitive((vm) -> _unloop_()));
 
 		code(":", primitive((vm) -> _colon_()));
 		code(":NONAME", primitive((vm) -> _colon_no_name_()));
@@ -989,9 +878,8 @@ public class Sloth {
 		code("THROW", primitive((vm) -> _throw_()));
 
 		code("DROP", primitive((vm) -> _drop_()));
+		code("DUP", primitive((vm) -> _dup_()));
 		code("OVER", primitive((vm) -> _over_()));
-		code("PICK", primitive((vm) -> _pick_()));
-		code("RPICK", primitive((vm) -> _r_pick_()));
 		code(">R", primitive((vm) -> _to_r_()));
 		code("R>", primitive((vm) -> _r_from_()));
 		code("SWAP", primitive((vm) -> _swap_()));
@@ -1015,8 +903,8 @@ public class Sloth {
 		code("WORD", primitive((vm) -> _word_()));
 		code("FIND", primitive((vm) -> _find_()));
 
-		code("TO-ABS", primitive((vm) -> _to_abs_()));
-		code("TO-REL", primitive((vm) -> _to_rel_()));
+		code("DICT", primitive((vm) -> push(to_abs(d, 0))));
+		code("USER", primitive((vm) -> push(to_abs(u, 0))));
 		ua_set(INTERPRET, primitive((vm) -> _interpret_()));
 		code("(EMPTY-RETURN-STACK)", primitive((vm) -> _empty_rs_()));
 	}
