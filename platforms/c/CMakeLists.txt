@@ -61,3 +61,10 @@ target_link_libraries(sloth sloth_memory_wordset)
 # target_link_libraries(sdl3_sloth sloth_locals_wordset)
 # target_link_libraries(sdl3_sloth sloth_memory_wordset)
 # 
+
+# Unit tests
+
+add_library(unity STATIC tests/unity.c)
+target_include_directories(unity PUBLIC . tests/)
+add_executable(test_sloth tests/test_sloth.c)
+target_link_libraries(test_sloth unity)
