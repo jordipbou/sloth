@@ -9,6 +9,8 @@ void setUp() {
 		/* 1024 bytes of dictionary, and 256 bytes of */
 		/* user area */
     x = sloth_create(64, 1024, 256);
+    memset((void*)x->d, 0, 1024);
+    memset((void*)x->u, 0, 256);
 }
 
 void tearDown() {
@@ -218,6 +220,132 @@ void test_sloth_new() {
     sloth_free(x2);
 }
 
+/* Forth Kernel Tests */
+
+void test_kernel_helpers() {
+    /* Test sloth_set/get (dictionary) */
+    sloth_set(x, 100, 0x12345678);
+    TEST_ASSERT_EQUAL(0x12345678, sloth_get(x, 100));
+
+    /* Test sloth_user_area_set/get */
+    sloth_user_area_set(x, 20, 0x87654321);
+    TEST_ASSERT_EQUAL(0x87654321, sloth_user_area_get(x, 20));
+}
+
+void test_kernel_memory_management() {
+    /* Initialize HERE to point to some offset */
+    sloth_set(x, SLOTH_HERE, sloth_to_abs(x, 64));
+    TEST_ASSERT_EQUAL(sloth_to_abs(x, 64), sloth_here(x));
+
+    /* Test allot */
+    sloth_allot(x, 32);
+    TEST_ASSERT_EQUAL(sloth_to_abs(x, 96), sloth_here(x));
+
+    /* Test aligned/align */
+    TEST_ASSERT_EQUAL(0, sloth_aligned(0));
+    TEST_ASSERT_EQUAL(sCELL, sloth_aligned(1));
+    TEST_ASSERT_EQUAL(sCELL, sloth_aligned(sCELL));
+    
+    sloth_set(x, SLOTH_HERE, sloth_to_abs(x, 97));
+    sloth_align(x);
+    TEST_ASSERT_EQUAL(ALIGNED(sloth_to_abs(x, 97), sCELL), sloth_here(x));
+}
+
+void test_kernel_compilation() {
+    sloth_set(x, SLOTH_HERE, sloth_to_abs(x, 128));
+    
+    /* Test comma */
+    sloth_comma(x, 0xAAAA);
+    TEST_ASSERT_EQUAL(0xAAAA, sloth_fetch(x, sloth_to_abs(x, 128)));
+    TEST_ASSERT_EQUAL(sloth_to_abs(x, 128 + sCELL), sloth_here(x));
+
+    /* Test ccomma */
+    CELL h = sloth_here(x);
+    sloth_ccomma(x, 0x55);
+    TEST_ASSERT_EQUAL(0x55, sloth_cfetch(x, h));
+    TEST_ASSERT_EQUAL(h + suCHAR, sloth_here(x));
+
+    /* Test compile */
+    h = sloth_here(x);
+    sloth_compile(x, 0xBBBB);
+    TEST_ASSERT_EQUAL(0xBBBB, sloth_fetch(x, h));
+    TEST_ASSERT_EQUAL(h + sCELL, sloth_here(x));
+}
+
+void test_kernel_headers_and_flags() {
+    /* We need to set up CURRENT and wordlists for header tests */
+    /* CURRENT points to a variable that holds the latest word NT */
+    CELL latest_var_abs_addr = x->d + 256; /* Use some space in dict */
+    sloth_user_area_set(x, SLOTH_CURRENT, latest_var_abs_addr);
+    sloth_store(x, latest_var_abs_addr, 0); /* No latest word yet */
+
+    /* Set up a word name in memory */
+    char* name = "TESTWORD";
+    CELL name_addr = sloth_to_abs(x, 500);
+    memcpy((void*)name_addr, name, strlen(name));
+
+    /* Initialize HERE */
+    sloth_set(x, SLOTH_HERE, sloth_to_abs(x, 600));
+
+    /* Create header */
+    CELL w = sloth_header(x, name_addr, strlen(name));
+
+    TEST_ASSERT_EQUAL(w, sloth_get_latest(x));
+    TEST_ASSERT_EQUAL(0, sloth_get_link(x, w)); /* First word, link is 0 */
+    TEST_ASSERT_EQUAL(strlen(name), sloth_get_namelen(x, w));
+    
+    /* Check XT is set correctly (after flags and name) */
+    CELL xt = sloth_get_xt(x, w);
+    TEST_ASSERT_NOT_EQUAL(0, xt);
+    TEST_ASSERT_TRUE(xt > w);
+
+    /* Test flags */
+    TEST_ASSERT_EQUAL(0, sloth_get_flags(x, w));
+    sloth_set_flag(x, w, SLOTH_IMMEDIATE);
+    TEST_ASSERT_TRUE(sloth_has_flag(x, w, SLOTH_IMMEDIATE));
+    TEST_ASSERT_FALSE(sloth_has_flag(x, w, SLOTH_HIDDEN));
+
+    sloth_set_flag(x, w, SLOTH_HIDDEN);
+    TEST_ASSERT_TRUE(sloth_has_flag(x, w, SLOTH_HIDDEN));
+
+    sloth_unset_flag(x, w, SLOTH_IMMEDIATE);
+    TEST_ASSERT_FALSE(sloth_has_flag(x, w, SLOTH_IMMEDIATE));
+    TEST_ASSERT_TRUE(sloth_has_flag(x, w, SLOTH_HIDDEN));
+
+    /* Test XT setter */
+    sloth_set_xt(x, w, 0xDEAD);
+    TEST_ASSERT_EQUAL(0xDEAD, sloth_get_xt(x, w));
+}
+
+void test_kernel_literal() {
+    /* Setup for sloth_literal: it needs to find "(LIT)" */
+    CELL latest_var_abs_addr = x->d + 256;
+    sloth_user_area_set(x, SLOTH_CURRENT, latest_var_abs_addr);
+    sloth_store(x, latest_var_abs_addr, 0);
+
+    /* We need search order to find words */
+    sloth_user_area_set(x, SLOTH_ORDER, 1);
+    /* CONTEXT 0 points to the variable holding the latest word */
+    sloth_user_area_set(x, SLOTH_CONTEXT, latest_var_abs_addr);
+
+    /* Create (LIT) word */
+    char* lit_name = "(LIT)";
+    CELL name_addr = sloth_to_abs(x, 500);
+    memcpy((void*)name_addr, lit_name, strlen(lit_name));
+    sloth_set(x, SLOTH_HERE, sloth_to_abs(x, 600));
+    CELL w = sloth_header(x, name_addr, strlen(lit_name));
+    sloth_set_xt(x, w, 0x1111);
+
+    /* Now test sloth_literal */
+    sloth_set(x, SLOTH_HERE, sloth_to_abs(x, 800));
+    sloth_literal(x, 0x2222);
+
+    /* It should have compiled 0x1111 (XT of (LIT)) and then 0x2222 */
+    TEST_ASSERT_EQUAL(0x1111, sloth_fetch(x, sloth_to_abs(x, 800)));
+    TEST_ASSERT_EQUAL(0x2222, sloth_fetch(x, sloth_to_abs(x, 800 + sCELL)));
+    TEST_ASSERT_EQUAL(sloth_to_abs(x, 800 + 2 * sCELL), sloth_here(x));
+}
+
 int main() {
 	UNITY_BEGIN();
 	/* Sloth VM tests */
@@ -237,5 +365,13 @@ int main() {
     RUN_TEST(test_sloth_op);
     RUN_TEST(test_debug_inner);
     RUN_TEST(test_sloth_new);
+    
+    /* Forth Kernel tests */
+    RUN_TEST(test_kernel_helpers);
+    RUN_TEST(test_kernel_memory_management);
+    RUN_TEST(test_kernel_compilation);
+    RUN_TEST(test_kernel_headers_and_flags);
+    RUN_TEST(test_kernel_literal);
+
 	return UNITY_END();
 }
