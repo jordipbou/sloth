@@ -6,35 +6,48 @@ import java.io.IOException;
 import java.util.function.Consumer;
 
 public class Sloth {
+
+	/* -- Virtual Machine constants ------------------------ */
+
+	public static final int sCHAR = 2;
+	public static final int sCELL = 4;
+	public static final int CELL_BITS = 32;
+	public static final int hCELL_MASK = 0xFFFF;
+	public static final int hCELL_BITS = 16;
+	public static final int sFCELL = 4;
+
 	private static final int STACK_SIZE = 64;
 	private static final int RETURN_STACK_SIZE = 64;
 	private static final int FLOAT_STACK_SIZE = 64;
 
-	public static final int sCHAR = 2;
-	public static final int sCELL = 4;
-	public static final int sFCELL = 4;
+	/* -- Virtual Machine context definition --------------- */
+
+	private int d; // Index of the dictionary in m
+	private int u; // Index of the user area in m
+
+	private int s[]; // Data stack
+	private int sp; // Data stack pointer
+	private int r[]; // Return stack
+	private int rp; // Return stack pointer
+	private float f[]; // Floating point stack
+	private int fp; // Floating point stack pointer
+
+	private int ip; // Instruction pointer
+
+	private ArrayList<ByteBuffer> m; // Array of memory blocks
+
+	ArrayList<Consumer<Sloth>> p; // Array of primitives
+
+	/* This array was created by Gemini for the included */
+	/* implementation, I must re-check it. */
+	private ArrayList<java.io.RandomAccessFile> openFiles = new ArrayList<>();
 
 	public static final int STACK_OVERFLOW = -3;
 	public static final int STACK_UNDERFLOW = -4;
 	public static final int RETURN_STACK_OVERFLOW = -5;
 	public static final int RETURN_STACK_UNDERFLOW = -6;
 
-	private int s[];
-	private int sp;
-	private int r[];
-	private int rp;
-	private float f[];
-	private int fp;
-
-	private int ip;
-
-	// Memories
-	private ArrayList<ByteBuffer> m;
-
-	private int d; // Index of the dictionary in m
-	private int u; // Index of the user area in m
-
-	ArrayList<Consumer<Sloth>> p;
+	/* -- Context initialization -------------------------- */
 
 	public Sloth(int dsize, int usize) {
 		s = new int[STACK_SIZE];
@@ -47,7 +60,9 @@ public class Sloth {
 		d = 0;
 		m.add(ByteBuffer.allocate(usize));
 		u = 1;
-		m.add(ByteBuffer.allocate(1024));
+		// Circular buffer for storing Java strings
+		// that need to be converted to Forth strings
+		m.add(ByteBuffer.allocate(2048));
 	}
 
 	// -- Data stack
@@ -59,8 +74,16 @@ public class Sloth {
 	// Helpers for double numbers
 	long msp(long v) { return (v & 0xFFFFFFFF00000000L); }
 	long lsp(long v) { return (v & 0x00000000FFFFFFFFL); }
+	/* Long pop -- takes a 32 bit CELL as a 64 bit value; */
+	/* TODO: Remove it, its just (long)pop(); */
 	long lpop() { return (long)s[--sp]; }
+	/* Unsigned long pop -- takes a signed 32 bit CELL as */
+	/* an unsigned 64 bit value. */
 	long upop() { return Integer.toUnsignedLong(s[--sp]); }
+	/* Unsigned double pop -- takes two 32 bit CELLs as */
+	/* a unsigned 64 bit value. */
+	/* TODO: Seems to be of no use, check and remove if */
+	/* necessary, or maintain it to be used by other classes. */
 	long udpop() { long v = upop(); return msp(v << 32) + lsp(upop()); }
 	void dpush(long v) { push((int)lsp(v)); push((int)(v >> 32)); }
 	long dpop() { 
@@ -68,19 +91,23 @@ public class Sloth {
 		return msp(v << 32) + lsp(lpop());
 	}
 
-	// -- Float stack
-	void fpush(float v) { f[fp++] = v; }
-	float fpop() { return f[--fp]; }
-
 	// -- Return stack
 
 	void rpush(int v) { r[rp++] = v; }
 	int rpop() { return r[--rp]; }
 	int rpick(int a) { return r[rp - a - 1]; }
 
+	// -- Float stack
+
+	void fpush(float v) { f[fp++] = v; }
+	float fpop() { return f[--fp]; }
+
 	// -- Memory
 
-	// Memory addresses consist of two parts:
+	// The C implementation of SLOTH uses absolute addresses
+	// that allow access to all the memory. That also allows
+	// the use of several memory blocks (dictionaries).
+	// To do that in Java, memory addresses consist of two parts:
 	// <block index> - 8 bits
 	// <byte address> - 24 bits
 
@@ -92,11 +119,10 @@ public class Sloth {
 
 	void cstore(int a, char v) { block(a).putChar(to_rel(a), v); }
 	char cfetch(int a) { return block(a).getChar(to_rel(a)); }
-
 	void store(int a, int v) { block(a).putInt(to_rel(a), v); }
 	int fetch(int a) { return block(a).getInt(to_rel(a)); }
-
 	void fstore(int a, float v) { block(a).putFloat(to_rel(a), v); }
+	float ffetch(int a) { return block(a).getFloat(to_rel(a)); }
 
 	// Helpers to use Java Strings with Sloth API
 
@@ -123,16 +149,16 @@ public class Sloth {
 	// -- Inner interpreter
 
 	int op() { int o = fetch(ip); ip += sCELL; return o; }
-	void do_prim(int q) { p.get(-1 - q).accept(this); }
-	void call(int q) { if (ip >= 0) rpush(ip); ip = q; }
-	void execute(int q) { if (q < 0) do_prim(q); else call(q); }
-	void inner() { int t = rp; while (t <= rp && ip >= 0) execute(op()); }
+	private void do_prim(int q) { p.get(-1 - q).accept(this); }
+	private void call(int q) { if (ip >= 0) rpush(ip); ip = q; }
+	private void execute(int q) { if (q < 0) do_prim(q); else call(q); }
+	private void inner() { int t = rp; while (t <= rp && ip >= 0) execute(op()); }
 	void eval(int q) { execute(q); if (q > 0) inner(); }
 
 	// -- Tracing interpreter
 
-	void debug(int debug_xt) { push(ip); eval(debug_xt); }
-	void debug_inner(int debug_xt) {
+	private void debug(int debug_xt) { push(ip); eval(debug_xt); }
+	private void debug_inner(int debug_xt) {
 		int t = rp;
 		while (t <= rp && ip >= 0) {
 			debug(debug_xt);
@@ -152,15 +178,6 @@ public class Sloth {
 		public int value;
 
 		public SlothException(int v) { value = v; }
-	}
-
-	public void _throw(int v) {
-		// TODO Remove	
-		System.out.printf("EXCEPTION: %d\n", v);
-		System.out.printf("BUFFER: %s\n", ToString(ua_get(IBUF), ua_get(ILEN)));
-		System.out.printf("TOKEN: %s\n", ToString(ua_get(IBUF) + (ua_get(IPOS)*sCHAR), ua_get(ILEN) - ua_get(IPOS)));
-		// --
-		if (v != 0) throw new SlothException(v); 
 	}
 
 	public void _catch(int q) {
@@ -184,6 +201,15 @@ public class Sloth {
 			sp = tsp;
 			rp = trp;
 			push(-1000);
+		}
+	}
+
+	public void _throw(int v) {
+		if (v != 0) {
+			System.out.printf("EXCEPTION: %d\n", v);
+			System.out.printf("BUFFER: %s\n", ToString(ua_get(IBUF), ua_get(ILEN)));
+			System.out.printf("TOKEN: %s\n", ToString(ua_get(IBUF) + (ua_get(IPOS)*sCHAR), ua_get(ILEN) - ua_get(IPOS)));
+			throw new SlothException(v); 
 		}
 	}
 
@@ -316,19 +342,19 @@ public class Sloth {
 	// -- Primitives ----------------------------------------
 	void _exit_() { ip = (rp > 0) ? rpop() : -1; }
 	void _lit_() { push(op()); }
-	void _rip_() { int tip = ip; int o = op(); push(ip + o - sCELL); }
+	void _rip_() { int tip = ip; int o = op(); push(tip + o - sCELL); }
 	void _branch_() { ip += op() - sCELL; }
 	void _zbranch_() { ip += pop() == 0 ? (op() - sCELL) : sCELL; }
 	void _string_() { 
 		int l = op(); 
 		push(ip); 
 		push(l); 
-		ip = aligned(ip + l + 1); 
+		ip = aligned(ip + (l + 1) * sCHAR); 
 	}
 	void _c_string_() {
 		char l = cfetch(ip);
 		push(ip);
-		ip = aligned(ip + l + 2);
+		ip = aligned(ip + (l + 1) * sCHAR + sCHAR);
 	}
 	// Quotations (not in ANS Forth yet)
 	void _quotation_() { int d = op(); push(ip); ip += d; }
@@ -498,15 +524,15 @@ public class Sloth {
 					if (cfetch(tok) == '#') {
 						temp_base = 10;
 						tlen--;
-						tok++;
+						tok += sCHAR;
 					} else if (cfetch(tok) == '$') {
 						temp_base = 16;
 						tlen--;
-						tok++;
+						tok += sCHAR;
 					} else if (cfetch(tok) == '%') {
 						temp_base = 2;
 						tlen--;
-						tok++;
+						tok += sCHAR;
 					} else if (cfetch(tok + tlen*sCHAR - sCHAR) == '.') {
 						tlen--;
 						is_double = true;
@@ -515,13 +541,13 @@ public class Sloth {
 					for (int i = 0; i < tlen; i++) 
 						buf.append(cfetch(tok +i*sCHAR));
 					try {
-						int n = Integer.parseInt(buf.toString(), temp_base);
+						long n = Long.parseLong(buf.toString(), temp_base);
 						if (ua_get(STATE) == 0) {
-							push(n);
+							push((int)n);
 							if (is_double) push(n < 0 ? -1 : 0);
 						} else {
-							literal(n);
-							literal(n < 0 ? -1 : 0);
+							literal((int)n);
+							if (is_double) literal(n < 0 ? -1 : 0);
 						}
 					} catch(NumberFormatException e1) {
 						try {
@@ -544,8 +570,54 @@ public class Sloth {
 	void _bye_() { System.out.println(); System.exit(0); }
 	void _unused_() { push(m.get(d).remaining()); }
 	void _refill_() {
-		// TODO
+		switch (ua_get(SOURCE_ID)) {
+			case -1:
+				push(0);
+				break;
+			case 0:
+				push(ua_get(IBUF));
+				push(80);
+				eval(get_xt(find_word("ACCEPT")));
+				ua_set(ILEN, pop());
+				ua_set(IPOS, 0);
+				push(-1);
+				break;
+			default:
+				// TODO This was made automatically by Gemini, revise.
+				int sourceId = ua_get(SOURCE_ID);
+				if (sourceId > 0 && sourceId <= openFiles.size()) {
+					java.io.RandomAccessFile raf = openFiles.get(sourceId - 1);
+					try {
+						ua_set(SOURCE_POS, (int)raf.getFilePointer());
+						String line = raf.readLine();
+						if (line != null) {
+							ByteBuffer b = m.get(2);
+							if (b.capacity() / sCHAR < line.length() + 1) {
+								// TODO I don't think I need to allocate here...
+								b = ByteBuffer.allocate(Math.max(1024, line.length() + 1) * sCHAR);
+								m.set(2, b);
+							}
+							b.rewind();
+							for (int i = 0; i < line.length(); i++) {
+								b.putChar(line.charAt(i));
+							}
+							ua_set(IBUF, to_abs(0, 2));
+							ua_set(IPOS, 0);
+							ua_set(ILEN, line.length());
+							push(-1);
+						} else {
+							push(0);
+						}
+					} catch (java.io.IOException e) {
+						push(0);
+					}
+				} else {
+					push(0);
+				}
+				break;
+		}
 	}
+
 	void _save_input_() {
 		push(ua_get(SOURCE_POS));
 		push(ua_get(SOURCE_ID));
@@ -562,13 +634,168 @@ public class Sloth {
 		ua_set(SOURCE_ID, pop());
 		ua_set(SOURCE_POS, pop());
 		if (ua_get(SOURCE_ID) > 0) {
-			// TODO Move file cursor and fill buffer
+			int sourceId = ua_get(SOURCE_ID);
+			if (sourceId <= openFiles.size()) {
+				java.io.RandomAccessFile raf = openFiles.get(sourceId - 1);
+				try {
+					raf.seek(ua_get(SOURCE_POS));
+					String line = raf.readLine();
+					if (line != null) {
+						int ibuf = ua_get(IBUF);
+						ByteBuffer b = block(ibuf);
+						int rel = to_rel(ibuf);
+						for (int i = 0; i < line.length(); i++) {
+							b.putChar(rel + (i * sCHAR), line.charAt(i));
+						}
+					}
+				} catch (java.io.IOException e) {}
+			}
 		}
 		push(0);
 	}
 	void _included_() {
-		// TODO 
+		int l = pop();
+		int a = pop();
+
+		int previbuf = ua_get(IBUF);
+		int previpos = ua_get(IPOS);
+		int previlen = ua_get(ILEN);
+
+		int prevsourceid = ua_get(SOURCE_ID);
+
+		int prevstart = ua_get(PATH_START);
+		int prevend = ua_get(PATH_END);
+
+		int pathstart = prevstart;
+		int pathend = prevend;
+
+		String filename = ToString(a, l);
+
+		// Copy filename to pathend
+		for (int i = 0; i < l; i++) {
+			cset(pathend + i*sCHAR, cget(a + i*sCHAR));
+		}
+		cset(pathend + l*sCHAR, (char)0);
+
+		java.io.RandomAccessFile f = null;
+		String fullPathString = "";
+
+		try {
+			fullPathString = filename;
+			f = new java.io.RandomAccessFile(fullPathString, "r");
+			pathstart = pathend;
+			pathend = pathend + l*sCHAR;
+		} catch (Exception e1) {
+			try {
+				int totalLen = (pathend + l*sCHAR - pathstart)/sCHAR;
+				fullPathString = ToString(pathstart, totalLen);
+				f = new java.io.RandomAccessFile(fullPathString, "r");
+				pathend = pathend + l*sCHAR;
+			} catch (Exception e2) {
+				try {
+					int rootLen = ua_get(ROOT_PATH_LENGTH);
+					int paths_addr = to_abs(PATHS, u);
+					// Copy root path to pathend
+					for (int i = 0; i < rootLen; i++) {
+						cset(pathend + i*sCHAR, cget(paths_addr + i*sCHAR));
+					}
+					// Copy filename after root path
+					for (int i = 0; i < l; i++) {
+						cset(pathend + rootLen*sCHAR + i*sCHAR, cget(a + i*sCHAR));
+					}
+					cset(pathend + (rootLen + l)*sCHAR, (char)0);
+					fullPathString = ToString(pathend, rootLen + l);
+					f = new java.io.RandomAccessFile(fullPathString, "r");
+					pathstart = pathend;
+					pathend = pathend + (rootLen + l)*sCHAR;
+				} catch (Exception e3) {
+					// Failed to open file
+				}
+			}
+		}
+
+		if (f != null) {
+			// Remove filename from path...
+			while (pathend > pathstart) {
+				char c = cget(pathend - sCHAR);
+				if (c == '/' || c == '\\') {
+					break;
+				}
+				pathend -= sCHAR;
+			}
+			// ...and store for nested includes.
+			ua_set(PATH_START, pathstart);
+			ua_set(PATH_END, pathend);
+
+			int interpret_xt = ua_get(INTERPRET);
+
+			openFiles.add(f);
+			int source_id = openFiles.size();
+			ua_set(SOURCE_ID, source_id);
+
+			// Add path+filename to INCLUDED FILES
+			int h = here();
+			comma(ua_get(INCLUDED_FILES));
+			ua_set(INCLUDED_FILES, h);
+			comma(l);
+			for (int i = 0; i < l; i++) {
+				ccomma(cget(a + i*sCHAR));
+			}
+			align();
+
+			try {
+				ua_set(SOURCE_POS, (int)f.getFilePointer());
+				int linenumber = 0;
+				String line;
+				while ((line = f.readLine()) != null) {
+					// Create temporary block for line
+					ByteBuffer b = ByteBuffer.allocate(Math.max(1024, line.length() + 1) * sCHAR);
+					for (int i = 0; i < line.length(); i++) {
+						b.putChar(line.charAt(i));
+					}
+					m.add(b);
+					int block_idx = m.size() - 1;
+
+					ua_set(IBUF, to_abs(0, block_idx));
+					ua_set(IPOS, 0);
+					ua_set(ILEN, line.length());
+
+					_catch(interpret_xt);
+					int e = pop();
+					if (e != 0) {
+						System.out.println("File: " + fullPathString);
+						System.out.printf("Line (%d): %s\n", linenumber, line);
+						_throw(e);
+					}
+					ua_set(SOURCE_POS, (int)f.getFilePointer());
+					linenumber++;
+					m.remove(m.size() - 1);
+				}
+			} catch (java.io.IOException e) {
+				// Handle IO error if needed
+			} finally {
+				ua_set(SOURCE_ID, prevsourceid);
+				try {
+					f.close();
+				} catch (java.io.IOException e) {}
+				openFiles.remove(openFiles.size() - 1);
+			}
+		}
+
+		// Restore previous path
+		ua_set(PATH_START, prevstart);
+		ua_set(PATH_END, prevend);
+
+		// Restore previous input buffer
+		ua_set(IBUF, previbuf);
+		ua_set(IPOS, previpos);
+		ua_set(ILEN, previlen);
+
+		if (f == null) {
+			_throw(-38);
+		}
 	}
+
 	void _move_() {
 		int u = pop();
 		int addr2 = pop();
@@ -593,7 +820,7 @@ public class Sloth {
 	void _l_shift_() { int n = pop(); push(pop() << n); }
 	void _minus_() { int n = pop(); push(pop() - n); }
 	void _plus_() { int n = pop(); push(pop() + n); }
-	void _r_shift_() { int n = pop(); push(pop() >> n); }
+	void _r_shift_() { int n = pop(); push(pop() >>> n); }
 	void _star_() { int n = pop(); push(pop() * n); }
 	void _two_slash_() { push(pop() >> 1); }
 	void _u_m_star_() { long u = upop() * upop(); dpush(u); }
@@ -674,7 +901,7 @@ public class Sloth {
 	void _create_name_() {
 		int tlen = pop();
 		header(pop(), tlen);
-		compile(get_xt(find_word("(RIP")));
+		compile(get_xt(find_word("(RIP)")));
 		compile(4*sCELL);
 		compile(get_xt(find_word("EXIT")));
 		compile(get_xt(find_word("EXIT")));
@@ -713,6 +940,7 @@ public class Sloth {
 		ua_set(SOURCE_ID, prevsourceid);
 		ua_set(IBUF, previbuf);
 		ua_set(IPOS, previpos);
+		ua_set(ILEN, previlen);
 
 		int e = pop();
 		if (e != 0) _throw(e);
@@ -798,18 +1026,14 @@ public class Sloth {
 		// User Area Variables
 		// NOTE What is stored in (CURRENT) here will affect later
 		// use of hedader
-		ua_variable("(CURRENT)", CURRENT, to_abs(INTERNAL_WL, d));
+		ua_variable("(CURRENT)", CURRENT, to_abs(FORTH_WL, d));
 		ua_variable("#ORDER", ORDER, 2);
 		ua_variable("(LOCALS-WORDLIST)", LOCALS_WORDLIST, 0);
 		ua_variable("CONTEXT", CONTEXT, to_abs(FORTH_WL, d));
-		ua_set(CURRENT, to_abs(FORTH_WL, d));
 		ua_variable("BASE", BASE, 10);
 		ua_variable("STATE", STATE, 0);
-		ua_set(CURRENT, to_abs(INTERNAL_WL, d));
 		ua_variable("(IBUF)", IBUF, 0);
-		ua_set(CURRENT, to_abs(FORTH_WL, d));
 		ua_variable(">IN", IPOS, 0);
-		ua_set(CURRENT, to_abs(INTERNAL_WL, d));
 		ua_variable("(ILEN)", ILEN, 0);
 		ua_variable("(SOURCE-ID)", SOURCE_ID, 0);
 		ua_variable("(SOURCE-POS)", SOURCE_POS, 0);
@@ -872,7 +1096,7 @@ public class Sloth {
 
 		code(":", primitive((vm) -> _colon_()));
 		code(":NONAME", primitive((vm) -> _colon_no_name_()));
-		code(";", primitive((vm) -> _semicolon_()));
+		code(";", primitive((vm) -> _semicolon_())); _immediate_();
 
 		code("CATCH", primitive((vm) -> _catch_()));
 		code("THROW", primitive((vm) -> _throw_()));
@@ -927,5 +1151,12 @@ public class Sloth {
 		push(to_abs(0, m.size() - 1));
 		push(c.length());
 		_evaluate_();
+	}
+
+	int include(String f) {
+		push(FromString(f));
+		push(f.length());
+		_catch(get_xt(find_word("INCLUDED")));
+		return pop();
 	}
 } 

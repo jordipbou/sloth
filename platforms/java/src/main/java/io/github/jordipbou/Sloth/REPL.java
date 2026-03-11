@@ -6,7 +6,6 @@ public class REPL {
 
 		x.bootstrap_kernel();
 
-		x.evaluate("12 11 +");
-		System.out.printf("%d", x.pop());
+		x.include("../../4th/ans.4th");
 	}
 }
