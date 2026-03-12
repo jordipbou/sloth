@@ -94,11 +94,13 @@ typedef struct sloth_VM {
 } X;
 
 #ifdef SLOTH_IMPLEMENTATION
-#define PUBLIC(ret, name, params, ...) ret sloth_##name params { __VA_ARGS__ }
 #define PRIVATE(ret, name, params, ...) static ret sloth_##name params { __VA_ARGS__ }
+#define API(ret, name, params, ...) ret sloth_##name params { __VA_ARGS__ }
+#define PRIM(name, ...) void sloth_##name##_(X* x) { __VA_ARGS__ }
 #else
-#define PUBLIC(ret, name, params, ...) ret sloth_##name params;
 #define PRIVATE(ret, name, params, ...) 
+#define API(ret, name, params, ...) ret sloth_##name params;
+#define PRIM(name, ...) void sloth_##name##_(X* x);
 #endif
 
 /* -- Context initialization and destruction ----------- */
@@ -113,9 +115,19 @@ PRIVATE(void, init, (X* x, CELL d, CELL dz, CELL u, CELL uz), {
 	x->uz = uz;
 
 	x->jmpbuf_idx = -1;
+
+	/* Initialize HERE */
+	*((CELL*)(x->d + 0*sCELL)) = x->d + 3*sCELL;
+	/* Initialize FORTH-WORDLIST (the default wordlist) */
+	*((CELL*)(x->d + 1*sCELL)) = 0;
+	/* Initialize INTERNAL-WORDLIST */
+	*((CELL*)(x->d + 2*sCELL)) = 0;
+
+	/* Initialize CURRENT to point to FORTH-WORDLIST */
+	*((CELL*)(x->u + 0*sCELL)) = x->d + 1*sCELL;
 })
 
-PUBLIC(X*, create, (int psize, int dsize, int usize), {
+API(X*, create, (int psize, int dsize, int usize), {
 	X* x;
 
 	x = malloc(sizeof(X));
@@ -131,9 +143,9 @@ PUBLIC(X*, create, (int psize, int dsize, int usize), {
 	return x;
 })
 
-PUBLIC(X*, new, (), { return sloth_create(512, 524288, 1024); })
+API(X*, new, (), { return sloth_create(512, 524288, 1024); })
 
-PUBLIC(void, free, (X* x), {
+API(void, free, (X* x), {
 	free((void*)x->d);
 	free(x->p->p);
 	free(x->p);
@@ -142,49 +154,84 @@ PUBLIC(void, free, (X* x), {
 
 /* -- Data and return stack ---------------------------- */
 
-PUBLIC(void, push, (X* x, CELL v), { x->s[x->sp] = v; x->sp++; })
-PUBLIC(CELL, pop, (X* x), { x->sp--; return x->s[x->sp]; })
-PUBLIC(void, rpush, (X* x, CELL v), { x->r[x->rp] = v; x->rp++; })
-PUBLIC(CELL, rpop, (X* x), { x->rp--; return x->r[x->rp]; })
+API(void, push, (X* x, CELL v), { x->s[x->sp] = v; x->sp++; })
+API(CELL, pop, (X* x), { x->sp--; return x->s[x->sp]; })
+API(void, rpush, (X* x, CELL v), { x->r[x->rp] = v; x->rp++; })
+API(CELL, rpop, (X* x), { x->rp--; return x->r[x->rp]; })
+
+PRIM(dup, { CELL a = sloth_pop(x); sloth_push(x, a); sloth_push(x, a); })
+PRIM(drop, { sloth_pop(x); })
+PRIM(over, { CELL b = sloth_pop(x); CELL a = sloth_pop(x); sloth_push(x, a); sloth_push(x, b); sloth_push(x, a); })
+PRIM(swap, { CELL b = sloth_pop(x); CELL a = sloth_pop(x); sloth_push(x, b); sloth_push(x, a); })
+PRIM(to_r, { CELL a = sloth_pop(x); sloth_rpush(x, a); })
+PRIM(r_from, { CELL a = sloth_rpop(x); sloth_push(x, a); })
 
 /* -- Memory management -------------------------------- */
 
-#define SLOTH_HERE x->d
+#define SLOTH_HERE 0*sCELL
 
 /* Transform from relative to absolute addresses. */
-PUBLIC(CELL, to_abs, (X* x, CELL a), { return (CELL)(x->d + a); })
-PUBLIC(CELL, to_rel, (X* x, CELL a), { return a - x->d; })
+API(CELL, to_abs, (X* x, CELL a), { return (CELL)(x->d + a); })
+API(CELL, to_rel, (X* x, CELL a), { return a - x->d; })
 
-PUBLIC(void, cstore, (X* x, CELL a, uCHAR v), { *((uCHAR*)a) = v; })
-PUBLIC(uCHAR, cfetch, (X* x, CELL a), { return *((uCHAR*)a); })
-PUBLIC(void, store, (X* x, CELL a, CELL v), { *((CELL*)a) = v; })
-PUBLIC(CELL, fetch, (X* x, CELL a), { return *((CELL*)a); })
+/* STORE/FETCH/CSTORE/cfetch work on absolute address units, */
+/* not just inside SLOTH dictionary (memory block). */
+API(void, c_store, (X* x, CELL a, uCHAR v), { *((uCHAR*)a) = v; })
+API(uCHAR, c_fetch, (X* x, CELL a), { return *((uCHAR*)a); })
+API(void, store, (X* x, CELL a, CELL v), { *((CELL*)a) = v; })
+API(CELL, fetch, (X* x, CELL a), { return *((CELL*)a); })
 
-/* Setting and getting variables (cell and char sized) */
+/* Setting and getting cells in memory */
 
-PUBLIC(void, set, (X* x, CELL a, CELL v), {	sloth_store(x, sloth_to_abs(x, a), v); })
-PUBLIC(CELL, get, (X* x, CELL a), { return sloth_fetch(x, sloth_to_abs(x, a)); })
+API(void, set, (X* x, CELL a, CELL v), {	sloth_store(x, sloth_to_abs(x, a), v); })
+API(CELL, get, (X* x, CELL a), { return sloth_fetch(x, sloth_to_abs(x, a)); })
 
-PUBLIC(void, user_set, (X* x, CELL a, CELL v), { sloth_store(x, x->u + a, v); })
-PUBLIC(CELL, user_get, (X* x, CELL a), { return sloth_fetch(x, x->u + a); })
+API(void, user_set, (X* x, CELL a, CELL v), { sloth_store(x, x->u + a, v); })
+API(CELL, user_get, (X* x, CELL a), { return sloth_fetch(x, x->u + a); })
 
-PUBLIC(CELL, here, (X* x), { sloth_push(x, sloth_get(x, SLOTH_HERE)); })
-PUBLIC(void, allot, (X* x, CELL v), { sloth_set(x, SLOTH_HERE, sloth_here(x) + v); })
-PUBLIC(CELL, aligned, (CELL a), { return ALIGNED(a, sCELL); })
-PUBLIC(void, align, (X* x), { sloth_set(x, SLOTH_HERE, ALIGNED(sloth_here(x), sCELL)); })
+/* Working with the HERE pointer */
+
+API(CELL, here, (X* x), { return sloth_get(x, SLOTH_HERE); })
+API(void, allot, (X* x, CELL v), { sloth_set(x, SLOTH_HERE, sloth_here(x) + v); })
+API(CELL, aligned, (CELL a), { return ALIGNED(a, sCELL); })
+
+PRIM(align, { sloth_set(x, SLOTH_HERE, ALIGNED(sloth_here(x), sCELL)); })
+
+/* Moving data from stack to dictionary and viceversa */
+
+PRIM(c_fetch, { sloth_push(x, sloth_c_fetch(x, sloth_pop(x))); })
+PRIM(c_store, { CELL a = sloth_pop(x); sloth_c_store(x, a, sloth_pop(x)); })
+PRIM(fetch, { sloth_push(x, sloth_fetch(x, sloth_pop(x))); })
+PRIM(store, { CELL a = sloth_pop(x); sloth_store(x, a, sloth_pop(x)); })
+
+PRIM(cells, { sloth_push(x, sloth_pop(x)*sCELL); })
+PRIM(chars, { /* Does nothing */ })
 
 /* -- Compilation -------------------------------------- */
 
-PUBLIC(void, comma, (X* x, CELL v), { 
+API(void, comma, (X* x, CELL v), { 
 	sloth_store(x, sloth_here(x), v);
 	sloth_store(x, x->d, sloth_here(x) + sCELL);
 })
-PUBLIC(void, ccomma, (X* x, uCHAR v), { 
-	sloth_cstore(x, sloth_here(x), v);
+API(void, c_comma, (X* x, uCHAR v), { 
+	sloth_c_store(x, sloth_here(x), v);
 	sloth_store(x, x->d, sloth_here(x) + suCHAR);
 })
 
 /* -- Headers ------------------------------------------ */
+
+#define SLOTH_CURRENT						0*sCELL
+
+API(CELL, get_latest, (X* x), { 
+	return sloth_fetch(x, sloth_user_get(x, SLOTH_CURRENT));
+})
+API(void, set_latest, (X* x, CELL w), { 
+	sloth_store(x, sloth_user_get(x, SLOTH_CURRENT), w);
+})
+
+API(void, set_xt, (X* x, CELL w, CELL xt), { 
+	sloth_store(x, w + sCELL, xt); 
+})
 
 /* Header structure: */
 /* Link CELL					@ NT */
@@ -194,68 +241,38 @@ PUBLIC(void, ccomma, (X* x, uCHAR v), {
 /* Namelen uCHAR				@ NT + 3*sCELL + suCHAR */
 /* Name uCHAR*namelen	@ NT + 3*sCELL + 2*suCHAR */
 
-PUBLIC(CELL, header, (X* x, CELL n, CELL l), {
+API(CELL, header, (X* x, CELL n, CELL l), {
 	CELL w, i;
-	sloth_align(x);
+	sloth_align_(x);
 	w = sloth_here(x); /* NT address */
-	/* Latest is stored at x->d + sCELL */
-	sloth_comma(x, sloth_fetch(x, x->d + sCELL)); /* Compile latest */
-	sloth_store(x, x->d + sCELL, w); /* Set new latest to this word */
+	sloth_comma(x, sloth_get_latest(x));
+	sloth_set_latest(x, w);
 	sloth_comma(x, 0); /* Reserve space for XT */
-	sloth_ccomma(x, 0); /* Flags (default flags: 0) */
-	sloth_ccomma(x, l); /* Name length */
-	for (i = 0; i < l; i++) sloth_ccomma(x, sloth_cfetch(x, n + i)); /* Name */
-	sloth_align(x); /* Align XT address */
-	sloth_store(x, w + sCELL, sloth_here(x));
+	sloth_c_comma(x, 0); /* Flags (default flags: 0) */
+	sloth_c_comma(x, l); /* Name length */
+	for (i = 0; i < l; i++) sloth_c_comma(x, sloth_c_fetch(x, n + i)); /* Name */
+	sloth_align_(x); /* Align XT address */
+	sloth_set_xt(x, w, sloth_here(x));
 	return w;
-})
-
-PUBLIC(void, set_xt, (X* x, CELL w, CELL xt), { 
-	sloth_store(x, w + sCELL, xt); 
 })
 
 /* -- Primitive and word creation ---------------------- */
 
-PUBLIC(CELL, primitive, (X* x, F f), { 
+API(CELL, primitive, (X* x, F f), { 
 	assert(x->p->last < x->p->pz);
 	x->p->p[x->p->last++] = f; 
 	return 0 - x->p->last; 
 })
 
-PUBLIC(CELL, code, (X* x, char* name, CELL xt), {
+API(CELL, code, (X* x, char* name, CELL xt), {
 	CELL w = sloth_header(x, (CELL)name, strlen(name));
 	sloth_set_xt(x, w, xt);
 	return xt; 
 })
 
-/* -- Basic primitives --------------------------------- */
-
-PUBLIC(void, context_, (X* x), { sloth_push(x, (CELL)x); })
-
-PUBLIC(void, drop_, (X* x), { sloth_pop(x); })
-PUBLIC(void, dup_, (X* x), { CELL a = sloth_pop(x); sloth_push(x, a); sloth_push(x, a); })
-PUBLIC(void, over_, (X* x), { CELL b = sloth_pop(x); CELL a = sloth_pop(x); sloth_push(x, a); sloth_push(x, b); sloth_push(x, a); })
-PUBLIC(void, to_r_, (X* x), { CELL a = sloth_pop(x); sloth_rpush(x, a); })
-PUBLIC(void, r_from_, (X* x), { CELL a = sloth_rpop(x); sloth_push(x, a); })
-PUBLIC(void, swap_, (X* x), { CELL b = sloth_pop(x); CELL a = sloth_pop(x); sloth_push(x, b); sloth_push(x, a); })
-
-/* -- Memory-stack transfer operations */
-
-PUBLIC(void, c_fetch_, (X* x), { sloth_push(x, sloth_cfetch(x, sloth_pop(x))); })
-PUBLIC(void, c_store_, (X* x), { CELL a = sloth_pop(x); sloth_cstore(x, a, sloth_pop(x)); })
-PUBLIC(void, fetch_, (X* x), { sloth_push(x, sloth_fetch(x, sloth_pop(x))); })
-PUBLIC(void, store_, (X* x), { CELL a = sloth_pop(x); sloth_store(x, a, sloth_pop(x)); })
-
-PUBLIC(void, cells_, (X* x), { sloth_push(x, sloth_pop(x)*sCELL); })
-PUBLIC(void, chars_, (X* x), { /* Does nothing */ })
-
 /* -- Bootstrapping ------------------------------------ */
 
-PUBLIC(void, bootstrap, (X* x), {
-	/* Initializes the required primitives to bootstrap from */
-	/* Forth code. */
-	sloth_code(x, "CONTEXT", sloth_primitive(x, &sloth_context_));
-
+API(void, bootstrap, (X* x), {
 	sloth_code(x, "DROP", sloth_primitive(x, &sloth_drop_));
 	sloth_code(x, "DUP", sloth_primitive(x, &sloth_dup_));
 	sloth_code(x, "OVER", sloth_primitive(x, &sloth_over_));
@@ -270,8 +287,8 @@ PUBLIC(void, bootstrap, (X* x), {
 
 	sloth_code(x, "CELLS", sloth_primitive(x, &sloth_cells_));
 	sloth_code(x, "CHARS", sloth_primitive(x, &sloth_chars_));
-/*
 
+/*
 	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));
 	sloth_code(x, "INVERT", sloth_primitive(x, &sloth_invert_));
 	sloth_code(x, "LSHIFT", sloth_primitive(x, &sloth_l_shift_));
