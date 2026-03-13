@@ -178,6 +178,10 @@ void test_primitive_and_word_creation() {
 	TEST_ASSERT_EQUAL(-1, sloth_primitive(x, &my_primitive));
 	TEST_ASSERT_EQUAL(1, x->p->last);
 	TEST_ASSERT_EQUAL(&my_primitive, *x->p->p);
+
+	sloth_code(x, "MY-PRIMITIVE", -1);
+	TEST_ASSERT_EQUAL(-1, sloth_fetch(x, x->d + 4*sCELL));
+	TEST_ASSERT_EQUAL_MEMORY("MY-PRIMITIVE", x->d + 5*sCELL + 2*suCHAR, strlen("MY-PRIMITIVE"));
 }
 
 int main() {
