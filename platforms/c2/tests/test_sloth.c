@@ -169,6 +169,17 @@ void test_headers() {
 	TEST_ASSERT_EQUAL_MEMORY(name, x->d + 5*sCELL + 2*suCHAR, strlen(name));
 }
 
+/* -- Primitive and word creation ---------------------- */
+
+void my_primitive(X* x) {}
+
+void test_primitive_and_word_creation() {
+	TEST_ASSERT_EQUAL(0, x->p->last);
+	TEST_ASSERT_EQUAL(-1, sloth_primitive(x, &my_primitive));
+	TEST_ASSERT_EQUAL(1, x->p->last);
+	TEST_ASSERT_EQUAL(&my_primitive, *x->p->p);
+}
+
 int main() {
 	UNITY_BEGIN();
 	/* Sloth VM tests */
@@ -179,5 +190,7 @@ int main() {
 	RUN_TEST(test_compilation);
 	RUN_TEST(test_latest);
 	RUN_TEST(test_headers);
+
+	RUN_TEST(test_primitive_and_word_creation);
 	return UNITY_END();
 }
