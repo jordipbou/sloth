@@ -171,7 +171,8 @@ void test_headers() {
 
 /* -- Primitive and word creation ---------------------- */
 
-void my_primitive(X* x) {}
+int my_var = 11;
+void my_primitive(X* x) { my_var = 17; }
 
 void test_primitive_and_word_creation() {
 	TEST_ASSERT_EQUAL(0, x->p->last);
@@ -184,6 +185,131 @@ void test_primitive_and_word_creation() {
 	TEST_ASSERT_EQUAL_MEMORY("MY-PRIMITIVE", x->d + 5*sCELL + 2*suCHAR, strlen("MY-PRIMITIVE"));
 }
 
+/* -- Inner interpreter -------------------------------- */
+
+void my_exit(X* x) { x->ip = -1; }
+
+void test_op() {
+	sloth_set(x, 3*sCELL, 11);
+	x->ip = sloth_to_abs(x, 3*sCELL);
+	TEST_ASSERT_EQUAL(11, sloth_op(x));
+	TEST_ASSERT_EQUAL(sloth_to_abs(x, 4*sCELL), x->ip);
+}
+
+void test_do_prim() {
+	TEST_ASSERT_EQUAL(11, my_var);
+	sloth_primitive(x, &my_primitive);
+	sloth_do_prim(x, -1);
+	TEST_ASSERT_EQUAL(17, my_var);
+}
+
+void test_call() {
+	x->ip = 11;
+	sloth_call(x, 19);
+	TEST_ASSERT_EQUAL(19, x->ip);
+	TEST_ASSERT_EQUAL(1, x->rp);
+	TEST_ASSERT_EQUAL(11, x->r[0]);
+	sloth_rpop(x);
+
+	sloth_call(x, -1);
+	TEST_ASSERT_EQUAL(-1, x->ip);
+}
+
+void test_execute() {
+	sloth_primitive(x, &my_primitive);
+
+	my_var = 11;
+	sloth_execute(x, -1);
+	TEST_ASSERT_EQUAL(17, my_var);
+
+	x->ip = -1;
+	sloth_execute(x, sloth_to_abs(x, 3*sCELL));
+	TEST_ASSERT_EQUAL(0, x->rp);
+	TEST_ASSERT_EQUAL(sloth_to_abs(x, 3*sCELL), x->ip);
+}
+
+void test_inner() {
+	sloth_set(x, 3*sCELL, sloth_primitive(x, my_primitive));
+	sloth_set(x, 4*sCELL, sloth_primitive(x, my_exit));
+	x->ip = sloth_to_abs(x, 3*sCELL);
+	my_var = 11;
+	sloth_inner(x);
+	TEST_ASSERT_EQUAL(17, my_var);
+	TEST_ASSERT_EQUAL(-1, x->ip);
+}
+
+void test_eval() {
+	sloth_set(x, 3*sCELL, sloth_primitive(x, my_primitive));
+	sloth_set(x, 4*sCELL, sloth_primitive(x, my_exit));
+
+	x->ip = sloth_to_abs(x, 3*sCELL);
+	my_var = 11;
+	sloth_eval(x, x->ip);
+	TEST_ASSERT_EQUAL(17, my_var);
+	TEST_ASSERT_EQUAL(-1, x->ip);
+
+	my_var = 11;
+	x->ip = -1;
+	sloth_eval(x, x->ip);
+	TEST_ASSERT_EQUAL(17, my_var);
+}
+
+void my_debug(X* x) { my_var = 23; }
+
+void test_debug_inner() {
+	sloth_set(x, 3*sCELL, sloth_primitive(x, my_primitive));
+	sloth_set(x, 4*sCELL, sloth_primitive(x, my_exit));
+	sloth_primitive(x, &my_debug);
+	my_var = 11;
+	x->ip = sloth_to_abs(x, 4*sCELL);
+	sloth_debug_inner(x, -3);
+	TEST_ASSERT_EQUAL(23, my_var);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(sloth_to_abs(x, 4*sCELL), x->s[0]);
+}
+
+int pre_var = 11;
+void pre_xt(X* x) { pre_var = 13; }
+int inner_var = 17;
+void inner_xt(X* x) { inner_var = 19; }
+int post_var = 23;
+void post_xt(X* x) { post_var = 27; }
+
+void test_debug_() {
+	sloth_primitive(x, my_exit);	
+	sloth_primitive(x, pre_xt);
+	sloth_primitive(x, inner_xt);
+	sloth_primitive(x, post_xt);
+
+	sloth_push(x, -1);
+	sloth_push(x, -2);
+	sloth_push(x, -3);
+	sloth_push(x, -4);
+
+	sloth_debug_(x);
+
+	TEST_ASSERT_EQUAL(13, pre_var);
+	TEST_ASSERT_EQUAL(17, inner_var);
+	TEST_ASSERT_EQUAL(27, post_var);
+
+	sloth_set(x, 3*sCELL, -1);
+
+	pre_var = 11;
+	inner_var = 17;
+	post_var = 23;
+
+	sloth_push(x, sloth_to_abs(x, 3*sCELL));
+	sloth_push(x, -2);
+	sloth_push(x, -3);
+	sloth_push(x, -4);
+
+	sloth_debug_(x);
+
+	TEST_ASSERT_EQUAL(13, pre_var);
+	TEST_ASSERT_EQUAL(19, inner_var);
+	TEST_ASSERT_EQUAL(27, post_var);
+}
+
 int main() {
 	UNITY_BEGIN();
 	/* Sloth VM tests */
@@ -194,7 +320,15 @@ int main() {
 	RUN_TEST(test_compilation);
 	RUN_TEST(test_latest);
 	RUN_TEST(test_headers);
-
 	RUN_TEST(test_primitive_and_word_creation);
+	/* Inner interpreter */
+	RUN_TEST(test_op);
+	RUN_TEST(test_do_prim);
+	RUN_TEST(test_call);
+	RUN_TEST(test_execute);
+	RUN_TEST(test_inner);
+	RUN_TEST(test_eval);
+	RUN_TEST(test_debug_inner);
+	RUN_TEST(test_debug_);
 	return UNITY_END();
 }
