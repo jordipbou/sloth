@@ -332,7 +332,7 @@ P(debug, {
 
 /* -- Exceptions --------------------------------------- */
 
-A(void, sloth_catch, (X* x, CELL q), {
+A(void, catch, (X* x, CELL q), {
 	volatile int tsp = x->sp;
 	volatile int trp = x->rp;
 	volatile CELL tip = x->ip;
@@ -351,7 +351,7 @@ A(void, sloth_catch, (X* x, CELL q), {
 	x->jmpbuf_idx--;
 })
 
-A(void, sloth_throw, (X* x, CELL e), {
+A(void, throw, (X* x, CELL e), {
 	if (x->jmpbuf_idx >= 0) {
 		longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
 	} else {
@@ -371,15 +371,23 @@ A(void, sloth_throw, (X* x, CELL e), {
 	}
 })
 
+P(catch, { sloth_catch(x, sloth_pop(x)); })
+P(throw, { CELL e = sloth_pop(x); if (e) sloth_throw(x, e); })
+
 /* -- Bootstrapping ------------------------------------ */
 
 A(void, bootstrap, (X* x), {
+
+	/* Data and return stack */
+
 	sloth_code(x, "DROP", sloth_primitive(x, &sloth_drop_));
 	sloth_code(x, "DUP", sloth_primitive(x, &sloth_dup_));
 	sloth_code(x, "OVER", sloth_primitive(x, &sloth_over_));
 	sloth_code(x, ">R", sloth_primitive(x, &sloth_to_r_));
 	sloth_code(x, "R>", sloth_primitive(x, &sloth_r_from_));
 	sloth_code(x, "SWAP", sloth_primitive(x, &sloth_swap_));
+
+	/* Memory */
 
 	sloth_code(x, "C@", sloth_primitive(x, &sloth_c_fetch_));
 	sloth_code(x, "C!", sloth_primitive(x, &sloth_c_store_));
@@ -389,6 +397,10 @@ A(void, bootstrap, (X* x), {
 	sloth_code(x, "CELLS", sloth_primitive(x, &sloth_cells_));
 	sloth_code(x, "CHARS", sloth_primitive(x, &sloth_chars_));
 
+	/* Exceptions */
+
+	sloth_code(x, "CATCH", sloth_primitive(x, &sloth_catch_));
+	sloth_code(x, "THROW", sloth_primitive(x, &sloth_throw_));
 /*
 	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));
 	sloth_code(x, "INVERT", sloth_primitive(x, &sloth_invert_));
@@ -407,10 +419,9 @@ A(void, bootstrap, (X* x), {
 	sloth_code(x, "?:", sloth_primitive(x, &sloth_conditional_colon_));
 	sloth_code(x, "?\\", sloth_primitive(x, &sloth_conditional_comment_));
 	sloth_code(x, ";", sloth_primitive(x, &sloth_semicolon_));
+*/
 
-	sloth_code(x, "CATCH", sloth_primitive(x, &sloth_catch_));
-	sloth_code(x, "THROW", sloth_primitive(x, &sloth_throw_));
-
+/*
 	sloth_code(x, "ALLOT", sloth_primitive(x, &sloth_allot_));
 */
 })
