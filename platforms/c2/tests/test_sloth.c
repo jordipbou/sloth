@@ -436,6 +436,27 @@ void test_zbranch_() {
 	TEST_ASSERT_EQUAL(base_ip + sCELL, x->ip);
 }
 
+/* -- Strings ------------------------------------------ */
+
+void test_string_() {
+	sloth_set(x, 100, 5);
+	x->ip = sloth_to_abs(x, 100);
+	sloth_string_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(5, sloth_pop(x));
+	TEST_ASSERT_EQUAL(sloth_to_abs(x, 100 + sCELL), sloth_pop(x));
+	TEST_ASSERT_EQUAL(sloth_aligned(sloth_to_abs(x, 100 + sCELL + 5)), x->ip);
+}
+
+void test_c_string_() {
+	sloth_c_store(x, sloth_to_abs(x, 100), 5);
+	x->ip = sloth_to_abs(x, 100);
+	sloth_c_string_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(sloth_to_abs(x, 100), sloth_pop(x));
+	TEST_ASSERT_EQUAL(sloth_aligned(sloth_to_abs(x, 100 + 6)), x->ip);
+}
+
 int main() {
 	UNITY_BEGIN();
 	/* Sloth VM tests */
@@ -473,5 +494,8 @@ int main() {
 	RUN_TEST(test_rip_);
 	RUN_TEST(test_branch_);
 	RUN_TEST(test_zbranch_);
+	/* Strings */
+	RUN_TEST(test_string_);
+	RUN_TEST(test_c_string_);
 	return UNITY_END();
 }

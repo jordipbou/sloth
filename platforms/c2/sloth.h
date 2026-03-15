@@ -421,9 +421,30 @@ P(throw, { CELL e = sloth_pop(x); if (e) sloth_throw(x, e); })
 
 /* -- Strings ------------------------------------------ */
 
+P(string, {
+	CELL l = sloth_op(x);
+	sloth_push(x, x->ip);
+	sloth_push(x, l);
+	x->ip = sloth_aligned(x->ip + l + 1);
+})
+
+P(c_string, {
+	uCHAR l = sloth_c_fetch(x, x->ip);
+	sloth_push(x, x->ip);
+	x->ip = sloth_aligned(x->ip + l + 2);
+})
+
+
 /* -- Bootstrapping ------------------------------------ */
 
 A(void, bootstrap, (X* x), {
+	/* Basic primitives */
+
+	sloth_code(x, "EXIT", sloth_primitive(x, &sloth_exit_));
+	sloth_code(x, "(LIT)", sloth_primitive(x, &sloth_lit_));
+	sloth_code(x, "(RIP)", sloth_primitive(x, &sloth_rip_));
+	sloth_code(x, "(BRANCH)", sloth_primitive(x, &sloth_branch_));
+	sloth_code(x, "(?BRANCH)", sloth_primitive(x, &sloth_zbranch_));
 
 	/* Data and return stack */
 
@@ -448,6 +469,12 @@ A(void, bootstrap, (X* x), {
 
 	sloth_code(x, "CATCH", sloth_primitive(x, &sloth_catch_));
 	sloth_code(x, "THROW", sloth_primitive(x, &sloth_throw_));
+
+	/* Strings */
+
+	sloth_code(x, "(STRING)", sloth_primitive(x, &sloth_string_));
+	sloth_code(x, "(CSTRING)", sloth_primitive(x, &sloth_c_string_));
+
 /*
 	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));
 	sloth_code(x, "INVERT", sloth_primitive(x, &sloth_invert_));
