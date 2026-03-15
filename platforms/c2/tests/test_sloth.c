@@ -380,6 +380,62 @@ void test_nested_catch() {
 	TEST_ASSERT_EQUAL(-1, x->jmpbuf_idx);
 }
 
+/* -- Inner interpreter primitives -------------------- */
+
+void test_exit_() {
+	// Test rp > 0
+	sloth_rpush(x, 100);
+	sloth_exit_(x);
+	TEST_ASSERT_EQUAL(100, x->ip);
+	TEST_ASSERT_EQUAL(0, x->rp);
+
+	// Test rp == 0
+	sloth_exit_(x);
+	TEST_ASSERT_EQUAL(-1, x->ip);
+}
+
+void test_lit_() {
+	sloth_set(x, 3*sCELL, 42);
+	x->ip = sloth_to_abs(x, 3*sCELL);
+	sloth_lit_(x);
+	TEST_ASSERT_EQUAL(42, sloth_pop(x));
+	TEST_ASSERT_EQUAL(sloth_to_abs(x, 4*sCELL), x->ip);
+}
+
+void test_rip_() {
+	CELL base_ip = sloth_to_abs(x, 3*sCELL);
+	sloth_set(x, 3*sCELL, 10 * sCELL); // offset
+	x->ip = base_ip;
+	sloth_rip_(x);
+	TEST_ASSERT_EQUAL(base_ip + 9*sCELL, sloth_pop(x));
+	TEST_ASSERT_EQUAL(base_ip + sCELL, x->ip);
+}
+
+void test_branch_() {
+	CELL base_ip = sloth_to_abs(x, 3*sCELL);
+	sloth_set(x, 3*sCELL, 10 * sCELL); // offset
+	x->ip = base_ip;
+	sloth_branch_(x);
+	TEST_ASSERT_EQUAL(base_ip + 10*sCELL, x->ip);
+}
+
+void test_zbranch_() {
+	CELL base_ip = sloth_to_abs(x, 3*sCELL);
+	sloth_set(x, 3*sCELL, 10 * sCELL);
+	
+	// Case 0: TOS is 0 (should branch)
+	x->ip = base_ip;
+	sloth_push(x, 0);
+	sloth_zbranch_(x);
+	TEST_ASSERT_EQUAL(base_ip + 10*sCELL, x->ip);
+
+	// Case 1: TOS is NOT 0 (should NOT branch)
+	x->ip = base_ip;
+	sloth_push(x, 1);
+	sloth_zbranch_(x);
+	TEST_ASSERT_EQUAL(base_ip + sCELL, x->ip);
+}
+
 int main() {
 	UNITY_BEGIN();
 	/* Sloth VM tests */
@@ -411,5 +467,11 @@ int main() {
 	RUN_TEST(test_catch_throw);
 	RUN_TEST(test_catch_restores_stack);
 	RUN_TEST(test_nested_catch);
+	/* Inner interpreter primitives */
+	RUN_TEST(test_exit_);
+	RUN_TEST(test_lit_);
+	RUN_TEST(test_rip_);
+	RUN_TEST(test_branch_);
+	RUN_TEST(test_zbranch_);
 	return UNITY_END();
 }
