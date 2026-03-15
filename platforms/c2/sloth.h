@@ -209,7 +209,7 @@ P(store, { CELL a = sloth_pop(x); sloth_store(x, a, sloth_pop(x)); })
 P(cells, { sloth_push(x, sloth_pop(x)*sCELL); })
 P(chars, { /* Does nothing */ })
 
-/* -- Compilation -------------------------------------- */
+/* -- Basic compilation -------------------------------- */
 
 A(void, comma, (X* x, CELL v), { 
 	sloth_store(x, sloth_here(x), v);
@@ -231,8 +231,35 @@ A(void, set_latest, (X* x, CELL w), {
 	sloth_store(x, sloth_user_get(x, SLOTH_CURRENT), w);
 })
 
+A(CELL, get_link, (X* x, CELL w), {
+	return sloth_fetch(x, w);
+})
+
+A(CELL, get_xt, (X* x, CELL w), {
+	return sloth_fetch(x, w + sCELL);
+})
 A(void, set_xt, (X* x, CELL w, CELL xt), { 
 	sloth_store(x, w + sCELL, xt); 
+})
+
+A(uCHAR, get_flags, (X* x, CELL w), {
+	return sloth_c_fetch(x, w + 2*sCELL);
+})
+
+A(uCHAR, set_flags, (X* x, CELL w, uCHAR v), {
+	sloth_c_store(x, w + 2*sCELL, v);
+})
+
+A(CELL, has_flag, (X* x, CELL w, CELL v), { 
+	return sloth_get_flags(x, w) & v; 
+})
+
+A(void, set_flag, (X* x, CELL w, uCHAR v), {
+	sloth_set_flags(x, w, sloth_get_flags(x, w) | v);
+})
+
+A(void, unset_flag, (X* x, CELL w, uCHAR v), {
+	sloth_set_flags(x, w, sloth_get_flags(x, w) & ~v);
 })
 
 /* Header structure: */
@@ -330,6 +357,24 @@ P(debug, {
 	sloth_debug(x, post_xt);
 })
 
+/* Inner interpreter primitives */
+
+P(exit, { x->ip = (x->rp > 0) ? sloth_rpop(x) : -1; })
+
+P(lit, { sloth_push(x, sloth_op(x)); })
+P(rip, {
+	CELL ip = x->ip;
+	CELL o = sloth_op(x);
+	sloth_push(x, ip + o - sCELL);
+})
+
+P(branch, { x->ip += sloth_op(x) - sCELL; })
+P(zbranch, { 
+	x->ip += sloth_pop(x) == 0 ? 
+		(sloth_op(x) - sCELL) 
+		: sCELL; 
+})
+
 /* -- Exceptions --------------------------------------- */
 
 A(void, catch, (X* x, CELL q), {
@@ -373,6 +418,8 @@ A(void, throw, (X* x, CELL e), {
 
 P(catch, { sloth_catch(x, sloth_pop(x)); })
 P(throw, { CELL e = sloth_pop(x); if (e) sloth_throw(x, e); })
+
+/* -- Strings ------------------------------------------ */
 
 /* -- Bootstrapping ------------------------------------ */
 

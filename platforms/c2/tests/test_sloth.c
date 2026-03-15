@@ -149,10 +149,34 @@ void test_compilation() {
 
 /* -- Headers ------------------------------------------ */
 
-void test_latest() {
+void test_get_set_latest() {
 	TEST_ASSERT_EQUAL(0, sloth_get_latest(x));
 	sloth_set_latest(x, 13);
 	TEST_ASSERT_EQUAL(13, sloth_get_latest(x));
+}
+
+void test_get_link() {
+	sloth_set(x, 100, 13);
+	TEST_ASSERT_EQUAL(13, sloth_get_link(x, sloth_to_abs(x, 100)));
+}
+
+void test_get_set_xt() {
+	sloth_set_xt(x, sloth_to_abs(x, 100), 17);
+	TEST_ASSERT_EQUAL(17, sloth_get_xt(x, sloth_to_abs(x, 100)));
+}
+
+void test_get_set_flags() {
+	sloth_set_flags(x, sloth_to_abs(x, 100), 33);
+	TEST_ASSERT_EQUAL(33, sloth_get_flags(x, sloth_to_abs(x, 100)));
+}
+
+void test_has_set_unset_flag() {
+	sloth_set_flags(x, sloth_to_abs(x, 100), 0);
+	TEST_ASSERT_FALSE(sloth_has_flag(x, sloth_to_abs(x, 100), 2));
+	sloth_set_flag(x, sloth_to_abs(x, 100), 2);
+	TEST_ASSERT_TRUE(sloth_has_flag(x, sloth_to_abs(x, 100), 2));
+	sloth_unset_flag(x, sloth_to_abs(x, 100), 2);
+	TEST_ASSERT_FALSE(sloth_has_flag(x, sloth_to_abs(x, 100), 2));
 }
 
 void test_headers() {
@@ -364,8 +388,14 @@ int main() {
 	RUN_TEST(test_return_stack);
 	RUN_TEST(test_memory);
 	RUN_TEST(test_compilation);
-	RUN_TEST(test_latest);
+	/* Headers */
+	RUN_TEST(test_get_set_latest);
+	RUN_TEST(test_get_link);
+	RUN_TEST(test_get_set_xt);
+	RUN_TEST(test_get_set_flags);
+	RUN_TEST(test_has_set_unset_flag);
 	RUN_TEST(test_headers);
+	/* Primitive and word creation */
 	RUN_TEST(test_primitive_and_word_creation);
 	/* Inner interpreter */
 	RUN_TEST(test_op);
