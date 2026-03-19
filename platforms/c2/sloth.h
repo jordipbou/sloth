@@ -114,6 +114,8 @@ typedef struct sloth_VM {
 
 /* -- Displacement of counted string buffer from here -- */
 
+/* TODO CBuffer could be just another space of the normal */
+/* strings circular buffer. */
 #define SLOTH_CBUF							64
 
 /* -- Dictionary variables ----------------------------- */
@@ -439,6 +441,11 @@ P(string, {
 	x->ip = sloth_aligned(x->ip + l + 1);
 })
 
+/* TODO (CSTRING) is used only by CLITERAL that is used only */
+/* by C" that is never used. It could be taken from here by */
+/* making a Forth version that stores a normal string literal */
+/* and copies it to a transient region or to the CBuffer, */
+/* or even to the normal string buffer. */
 P(c_string, {
 	uCHAR l = sloth_c_fetch(x, x->ip);
 	sloth_push(x, x->ip);
@@ -525,21 +532,36 @@ P(quotation, {
 
 P(start_quotation, {
 	CELL s = sloth_user_get(x, SLOTH_STATE);
+	/* If in interpret mode (state<=0), substract 1 from state. */
+	/* If in compile mode (state>0), add 1 to state. */
 	sloth_user_set(x, SLOTH_STATE, s <= 0 ? s - 1 : s + 1);
+	/* If in interpret mode and this is a first level quotation, */
+	/* push its starting address to be able to execute it later. */
 	if (sloth_user_get(x, SLOTH_STATE) == -1) 
 		sloth_push(x, sloth_here(x) + 2*sCELL);
+	/* Push latestXT to be save it while quotation is compiled. */
+	/* LatestXT is needed by recurse. */
 	sloth_push(x, sloth_user_get(x, SLOTH_LATESTXT));
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(QUOTATION)")));
+	/* Push HERE to be able to patch it later with the correct */
+	/* jump distance, and reserve 1 cell for it. */
 	sloth_push(x, sloth_here(x));
 	sloth_comma(x, 0);
+	/* Set latestXT to start of quotation, after (QUOTATION) and */
+	/* the cell with the jump distance. */
 	sloth_user_set(x, SLOTH_LATESTXT, sloth_here(x));
 })
 
 P(end_quotation, {
 	CELL s = sloth_user_get(x, SLOTH_STATE), a = sloth_pop(x);
+	/* Compile an EXIT at the end of the quotation. */
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
+	/* Store the correct jump distance in the reserved cell after */
+	/* the (QUOTATION) word. */
 	sloth_store(x, a, sloth_here(x) - a - sCELL);
+	/* Restore previous latestXT */
 	sloth_user_set(x, SLOTH_LATESTXT, sloth_pop(x));
+	/* Restore previous state */
 	sloth_user_set(x, SLOTH_STATE, s < 0 ? s + 1 : s - 1);
 })
 

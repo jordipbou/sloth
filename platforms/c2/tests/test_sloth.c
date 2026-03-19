@@ -558,9 +558,112 @@ void test_quotation_primitive() {
 	TEST_ASSERT_EQUAL(sloth_to_abs(x, 100 + sCELL), sloth_pop(x));
 }
 
-void test_start_end_quotation() {
-	/* TODO */
+void test_start_quotation_interpret_mode() {
+	sloth_code(x, "(QUOTATION)", 111);
+
+	CELL here = sloth_here(x);
+	sloth_user_set(x, SLOTH_STATE, 0);
+	sloth_start_quotation_(x);
+	TEST_ASSERT_EQUAL(111, sloth_fetch(x, here));
+	TEST_ASSERT_EQUAL(0, sloth_fetch(x, here + sCELL));
+	TEST_ASSERT_EQUAL(-1, sloth_user_get(x, SLOTH_STATE));
+	TEST_ASSERT_EQUAL(3, x->sp);
+	TEST_ASSERT_EQUAL(here + sCELL, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(here + 2*sCELL, sloth_pop(x));
 }
+
+void test_start_nested_quotation_interpret_mode() {
+	sloth_code(x, "(QUOTATION)", 111);
+
+	CELL here = sloth_here(x);
+	sloth_user_set(x, SLOTH_STATE, 0);
+	sloth_start_quotation_(x);
+	sloth_start_quotation_(x);
+	TEST_ASSERT_EQUAL(111, sloth_fetch(x, here));
+	TEST_ASSERT_EQUAL(0, sloth_fetch(x, here + sCELL));
+	TEST_ASSERT_EQUAL(111, sloth_fetch(x, here + 2*sCELL));
+	TEST_ASSERT_EQUAL(0, sloth_fetch(x, here + 3*sCELL));
+	TEST_ASSERT_EQUAL(-2, sloth_user_get(x, SLOTH_STATE));
+	TEST_ASSERT_EQUAL(5, x->sp);
+	TEST_ASSERT_EQUAL(here + 3*sCELL, sloth_pop(x));
+	TEST_ASSERT_EQUAL(here + 2*sCELL, sloth_pop(x));
+	TEST_ASSERT_EQUAL(here + sCELL, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(here + 2*sCELL, sloth_pop(x));
+}
+
+void test_start_quotation_compile_mode() {
+	sloth_code(x, "(QUOTATION)", 111);
+
+	CELL here = sloth_here(x);
+	sloth_user_set(x, SLOTH_STATE, 1);
+	sloth_start_quotation_(x);
+	TEST_ASSERT_EQUAL(111, sloth_fetch(x, here));
+	TEST_ASSERT_EQUAL(0, sloth_fetch(x, here + sCELL));
+	TEST_ASSERT_EQUAL(2, sloth_user_get(x, SLOTH_STATE));
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(here + sCELL, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+}
+
+void test_start_nested_quotation_compile_mode() {
+	sloth_code(x, "(QUOTATION)", 111);
+
+	CELL here = sloth_here(x);
+	sloth_user_set(x, SLOTH_STATE, 1);
+	sloth_start_quotation_(x);
+	sloth_start_quotation_(x);
+	TEST_ASSERT_EQUAL(111, sloth_fetch(x, here));
+	TEST_ASSERT_EQUAL(0, sloth_fetch(x, here + sCELL));
+	TEST_ASSERT_EQUAL(111, sloth_fetch(x, here + 2*sCELL));
+	TEST_ASSERT_EQUAL(0, sloth_fetch(x, here + 3*sCELL));
+	TEST_ASSERT_EQUAL(3, sloth_user_get(x, SLOTH_STATE));
+	TEST_ASSERT_EQUAL(4, x->sp);
+	TEST_ASSERT_EQUAL(here + 3*sCELL, sloth_pop(x));
+	TEST_ASSERT_EQUAL(here + 2*sCELL, sloth_pop(x));
+	TEST_ASSERT_EQUAL(here + sCELL, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+}
+
+void test_end_quotation_interpret_mode() {
+	sloth_code(x, "(QUOTATION)", 111);
+	sloth_code(x, "EXIT", 222);
+
+	CELL here = sloth_here(x);
+	sloth_user_set(x, SLOTH_STATE, 0);
+	sloth_start_quotation_(x);
+	sloth_end_quotation_(x);
+
+	TEST_ASSERT_EQUAL(111, sloth_fetch(x, here));
+	TEST_ASSERT_EQUAL(sCELL, sloth_fetch(x, here + sCELL));
+	TEST_ASSERT_EQUAL(222, sloth_fetch(x, here + 2*sCELL));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_STATE));
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(here + 2*sCELL, sloth_pop(x));
+}
+
+void test_end_nested_quotation_interpret_mode() {
+	sloth_code(x, "(QUOTATION)", 111);
+	sloth_code(x, "EXIT", 222);
+
+	CELL here = sloth_here(x);
+	sloth_user_set(x, SLOTH_STATE, 0);
+	sloth_start_quotation_(x);
+	sloth_start_quotation_(x);
+	sloth_end_quotation_(x);
+
+	TEST_ASSERT_EQUAL(111, sloth_fetch(x, here));
+	TEST_ASSERT_EQUAL(sCELL, sloth_fetch(x, here + 3*sCELL));
+	TEST_ASSERT_EQUAL(222, sloth_fetch(x, here + 4*sCELL));
+	TEST_ASSERT_EQUAL(-1, sloth_user_get(x, SLOTH_STATE));
+	TEST_ASSERT_EQUAL(3, x->sp);
+	TEST_ASSERT_EQUAL(here + sCELL, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(here + 2*sCELL, sloth_pop(x));
+}
+
+/* -- Bootstrapping ------------------------------------ */
 
 void test_bootstrap() {
 	sloth_bootstrap(x);
@@ -620,7 +723,11 @@ int main() {
 	RUN_TEST(test_compile_and_literal);
 	/* Quotations */
 	RUN_TEST(test_quotation_primitive);
-	RUN_TEST(test_start_end_quotation);
+	RUN_TEST(test_start_quotation_interpret_mode);
+	RUN_TEST(test_start_nested_quotation_interpret_mode);
+	RUN_TEST(test_start_quotation_compile_mode);
+	RUN_TEST(test_end_quotation_interpret_mode);
+	RUN_TEST(test_end_nested_quotation_interpret_mode);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();
