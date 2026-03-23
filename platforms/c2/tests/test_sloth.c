@@ -760,6 +760,7 @@ int main() {
 	RUN_TEST(test_start_quotation_interpret_mode);
 	RUN_TEST(test_start_nested_quotation_interpret_mode);
 	RUN_TEST(test_start_quotation_compile_mode);
+	RUN_TEST(test_start_nested_quotation_compile_mode);
 	RUN_TEST(test_end_quotation_interpret_mode);
 	RUN_TEST(test_end_nested_quotation_interpret_mode);
 	RUN_TEST(test_end_quotation_compile_mode);
