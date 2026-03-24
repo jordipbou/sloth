@@ -8,7 +8,9 @@
 #include<string.h>
 #include<assert.h>
 
+/*
 #include "kernel.h"
+*/
 
 /* ----------------------------------------------------- */
 /* ---------------- Virtual machine -------------------- */
@@ -298,20 +300,6 @@ P(immediate, {
 	sloth_set_flag(x, sloth_get_latest(x), SLOTH_IMMEDIATE); 
 })
 
-/* -- Primitive and word creation ---------------------- */
-
-A(CELL, primitive, (X* x, F f), { 
-	assert(x->p->last < x->p->pz);
-	x->p->p[x->p->last++] = f; 
-	return 0 - x->p->last; 
-})
-
-A(CELL, code, (X* x, char* name, CELL xt), {
-	CELL w = sloth_header(x, (CELL)name, strlen(name));
-	sloth_set_xt(x, w, xt);
-	return xt; 
-})
-
 /* -- Inner interpreter -------------------------------- */
 
 A(CELL, op, (X* x), {	
@@ -565,6 +553,28 @@ P(end_quotation, {
 	sloth_user_set(x, SLOTH_STATE, s < 0 ? s + 1 : s - 1);
 })
 
+/* -- Primitive, word and user variable creation ------- */
+
+A(CELL, primitive, (X* x, F f), { 
+	assert(x->p->last < x->p->pz);
+	x->p->p[x->p->last++] = f; 
+	return 0 - x->p->last; 
+})
+
+A(CELL, code, (X* x, char* name, CELL xt), {
+	CELL w = sloth_header(x, (CELL)name, strlen(name));
+	sloth_set_xt(x, w, xt);
+	return xt; 
+})
+
+A(void, user_variable, (X* x, char* name, CELL d, CELL v), {
+	CELL w = sloth_header(x, (CELL)name, strlen(name));
+	sloth_set_xt(x, w, sloth_here(x));
+	sloth_literal(x, (CELL)(x->u + d));
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
+	sloth_store(x, x->u + d, v);
+})
+
 /* -- Bootstrapping ------------------------------------ */
 
 A(void, bootstrap, (X* x), {
@@ -575,6 +585,29 @@ A(void, bootstrap, (X* x), {
 	sloth_code(x, "(RIP)", sloth_primitive(x, &sloth_rip_));
 	sloth_code(x, "(BRANCH)", sloth_primitive(x, &sloth_branch_));
 	sloth_code(x, "(?BRANCH)", sloth_primitive(x, &sloth_zbranch_));
+
+	/* Define user variables */
+
+	sloth_user_variable(x, "(CURRENT)", SLOTH_CURRENT, sloth_to_abs(x, SLOTH_FORTH_WL));
+	sloth_user_variable(x, "#ORDER", SLOTH_ORDER, 2);
+	sloth_user_variable(x, "(LOCALS-WORDLIST)", SLOTH_LOCALS_WORDLIST, 0);
+	sloth_user_variable(x, "CONTEXT", SLOTH_CONTEXT, sloth_to_abs(x, SLOTH_FORTH_WL));
+	sloth_user_variable(x, "BASE", SLOTH_BASE, 10);
+	sloth_user_variable(x, "STATE", SLOTH_STATE, 0);
+	sloth_user_variable(x, "(IBUF)", SLOTH_IBUF, 0);
+	sloth_user_variable(x, ">IN", SLOTH_IPOS, 0);
+	sloth_user_variable(x, "(ILEN)", SLOTH_ILEN, 0);
+	sloth_user_variable(x, "(SOURCE-ID)", SLOTH_SOURCE_ID, 0);
+	sloth_user_variable(x, "(SOURCE-POS)", SLOTH_SOURCE_POS, 0);
+	sloth_user_variable(x, "(LATESTXT)", SLOTH_LATESTXT, 0);
+	sloth_user_variable(x, "(INTERPRET)", SLOTH_INTERPRET, 0);
+
+	sloth_user_variable(x, "(SLOTH_ROOT_PATH_LENGTH)", SLOTH_ROOT_PATH_LENGTH, 0);
+	sloth_user_variable(x, "(SLOTH_PATH_START)", SLOTH_PATH_START, x->u + SLOTH_PATHS);
+	sloth_user_variable(x, "(SLOTH_PATH_END)", SLOTH_PATH_END, x->u + SLOTH_PATHS);
+	sloth_user_variable(x, "(SLOTH_PATHS)", SLOTH_PATHS, 0);
+
+	sloth_user_variable(x, "(INCLUDED-FILES)", SLOTH_INCLUDED_FILES, 0);
 
 	/* Data and return stack */
 
