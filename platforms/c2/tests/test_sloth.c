@@ -697,6 +697,19 @@ void test_end_nested_quotation_compile_mode() {
 	TEST_ASSERT_EQUAL(0, x->sp);
 }
 
+/* -- User variable creation --------------------------- */
+
+void test_user_variable_creation() {
+	CELL h;
+	sloth_code(x, "EXIT", 111);
+	sloth_code(x, "(LIT)", 222);
+	sloth_user_variable(x, "TEST-VAR", 8, 13);
+	TEST_ASSERT_EQUAL(111, sloth_fetch(x, sloth_here(x) - 1*sCELL));
+	TEST_ASSERT_EQUAL(x->u + 8, sloth_fetch(x, sloth_here(x) - 2*sCELL));
+	TEST_ASSERT_EQUAL(222, sloth_fetch(x, sloth_here(x) - 3*sCELL));
+	TEST_ASSERT_EQUAL(13, sloth_fetch(x, x->u + 8));
+}
+
 /* -- Bootstrapping ------------------------------------ */
 
 void test_bootstrap() {
@@ -765,6 +778,8 @@ int main() {
 	RUN_TEST(test_end_nested_quotation_interpret_mode);
 	RUN_TEST(test_end_quotation_compile_mode);
 	RUN_TEST(test_end_nested_quotation_compile_mode);
+	/* User variable creation */
+	RUN_TEST(test_user_variable_creation);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();
