@@ -214,6 +214,12 @@ P(store, { CELL a = sloth_pop(x); sloth_store(x, a, sloth_pop(x)); })
 P(cells, { sloth_push(x, sloth_pop(x)*sCELL); })
 P(chars, { /* Does nothing */ })
 
+/* Inspecting memory */
+
+P(unused, {
+	sloth_push(x, x->d + x->dz - sloth_get(x, SLOTH_HERE)); 
+})
+
 /* -- Basic compilation -------------------------------- */
 
 A(void, comma, (X* x, CELL v), { 
@@ -553,6 +559,314 @@ P(end_quotation, {
 	sloth_user_set(x, SLOTH_STATE, s < 0 ? s + 1 : s - 1);
 })
 
+/* -- End work session --------------------------------- */
+
+P(bye, { printf("\n"); exit(0); });
+
+/* -- Source code preprocessing, interpreting & auditing commands */
+
+#ifndef SLOTH_NO_FILES
+P(file_position, {
+	FILE* fptr = (FILE*)sloth_pop(x);
+	CELL pos = 0, ior = -37;
+	/* TODO To detect incorrect fptr I must store a list of */
+	/* currently opened file pointers. */
+	pos = ftell(fptr);
+	if (!ferror(fptr)) ior = 0;
+	sloth_push(x, pos);
+	/* FIXME This will simulate a double number for now */
+	sloth_push(x, 0);
+	sloth_push(x, ior);
+})
+
+P(read_line, {
+	char buf[1024];
+	FILE *fptr = (FILE*)sloth_pop(x);
+	int u1 = (int)sloth_pop(x);
+	char *caddr = (char*)sloth_pop(x);
+	int u2, l;
+	char *res;
+	/* Read at most u1 characters */
+	if (u1 == 0) {
+		sloth_push(x, 0);
+		sloth_push(x, -1);
+		sloth_push(x, 0);
+	} else {
+		/* We need to read u1 + 1 because fgets counts the */
+		/* zero at the end. */
+		if (fgets(buf, u1 + 1, fptr)) {
+			l = u2 = strlen(buf);
+			/* Detect CR/LF to substract it from counted chars */
+			if (buf[u2 - 1] == 10 || buf[u2 - 1] == 13) u2--;
+			/* In case of CRLF, substract one again */
+			if (buf[u2 - 1] == 10) u2--;
+			/* TODO Is the use of memcpy here portable enough to other */
+			/* programming languages? */
+			memcpy(caddr, buf, l);
+			sloth_push(x, u2);
+			sloth_push(x, -1);
+			sloth_push(x, 0);
+		} else {
+			sloth_push(x, 0);
+			sloth_push(x, 0);
+			if (feof(fptr)) {
+				sloth_push(x, 0);
+			} else {
+				sloth_push(x, -37);
+			}
+		}
+	}
+})
+#endif
+
+/* TODO Refill could be implemented in ans.4th. */
+/* As I have created the api functions 
+/* Except for the comments on the few first lines (that can */
+/* be removed without problems as \ is the fourth definition */
+/* found), REFILL is not used again until the definition of */
+/* ( in line 196 */
+P(refill, {
+	/* FIXME I'm using linebuf here but this buffer will */
+	/* disappear when I return from sloth_refill_ !!!! */
+	/* I suppose REFILL is just being used without using its */
+	/* content and it just works by miracle !!!! */
+	char linebuf[1024];
+	int i;
+	CELL source_id = sloth_user_get(x, SLOTH_SOURCE_ID);
+	switch (source_id) {
+	case -1: 
+		sloth_push(x, 0);
+		break;
+	case 0:
+		sloth_push(x, sloth_user_get(x, SLOTH_IBUF)); 
+		sloth_push(x, 80);
+		sloth_eval(x, sloth_get_xt(x, sloth_find_word(x, "ACCEPT")));
+		sloth_user_set(x, SLOTH_ILEN, sloth_pop(x));
+		sloth_user_set(x, SLOTH_IPOS, 0);
+		sloth_push(x, -1); 
+		break;
+#ifndef SLOTH_NO_FILES
+	default:
+	/*
+		sloth_user_set(x, SLOTH_SOURCE_POS, ftell((FILE*)sloth_user_get(x, SLOTH_SOURCE_ID)));
+	*/
+		sloth_push(x, source_id);
+		sloth_file_position_(x);
+		sloth_user_set(x, SLOTH_SOURCE_POS, sloth_pop(x));
+		/*
+		sloth_user_set(x, SLOTH_SOURCE_POS, sloth_file_get_position(source_id));
+		if (fgets(linebuf, 1024, (FILE *)sloth_user_get(x, SLOTH_SOURCE_ID))) {
+		*/
+		sloth_push(x, (CELL)linebuf);
+		sloth_push(x, 1024);
+		sloth_push(x, source_id);
+		sloth_read_line_(x);
+		/*
+		if (sloth_file_get_string(source_id, linebuf, 1024)) {
+		*/
+		if (!sloth_pop(x)) {
+			sloth_pop(x);
+			sloth_pop(x);
+			sloth_user_set(x, SLOTH_IBUF, (CELL)linebuf);
+			sloth_user_set(x, SLOTH_IPOS, 0);
+			/* Although I haven't found anywhere that \n should */
+			/* not be part of the input buffer when reading from */
+			/* a file, the results from preliminary tests when */
+			/* using SOURCE ... TYPE add newlines (because they */
+			/* are present) and on some other Forths they do not. */
+			/* So I just added a check to remove the \n at the */
+			/* end. */
+			if (linebuf[strlen(linebuf) - 1] < ' ') {
+				sloth_user_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
+			} else {
+				sloth_user_set(x, SLOTH_ILEN, strlen(linebuf));
+			}
+			sloth_push(x, -1);
+		} else {
+			sloth_pop(x);
+			sloth_pop(x);
+			sloth_push(x, 0);
+		}
+		break;
+#endif
+	}	
+})
+
+/* TODO Could SAVE-INPUT and RESTORE-INPUT be implemented */
+/* in ANS Forth? SAVE-INPUT surely... */
+P(save_input, {
+	sloth_push(x, sloth_user_get(x, SLOTH_SOURCE_POS));
+	sloth_push(x, sloth_user_get(x, SLOTH_SOURCE_ID));
+	sloth_push(x, sloth_user_get(x, SLOTH_IBUF));
+	sloth_push(x, sloth_user_get(x, SLOTH_IPOS));
+	sloth_push(x, sloth_user_get(x, SLOTH_ILEN));
+	sloth_push(x, 5);
+})
+
+P(restore_input, {
+	CELL source_id, source_pos;
+	char* res;
+	sloth_pop(x); /* Just drop count */
+	sloth_user_set(x, SLOTH_ILEN, sloth_pop(x));
+	sloth_user_set(x, SLOTH_IPOS, sloth_pop(x));
+	sloth_user_set(x, SLOTH_IBUF, sloth_pop(x));
+	sloth_user_set(x, SLOTH_SOURCE_ID, sloth_pop(x));
+	sloth_user_set(x, SLOTH_SOURCE_POS, sloth_pop(x));
+#ifndef SLOTH_NO_FILES
+	if (sloth_user_get(x, SLOTH_SOURCE_ID) > 0) {
+		fseek(
+			(FILE*)sloth_user_get(x, SLOTH_SOURCE_ID),
+			sloth_user_get(x, SLOTH_SOURCE_POS),
+			SEEK_SET);
+		res = fgets((char*)sloth_user_get(x, SLOTH_IBUF), 1024, (FILE*)sloth_user_get(x, SLOTH_SOURCE_ID));
+		if (!res) {
+			/* TODO Error management */
+		}
+	}
+#endif
+	sloth_push(x, 0);
+})
+
+#ifndef SLOTH_NO_FILES
+/* TODO INCLUDED can not be implemented in ANS Forth because */
+/* its needed to include ans.4th itself. */
+/* But this function is very complex and that will make it */
+/* error prone when porting to another language. Try to */
+/* simplify it and use READ-LINE, etc. from Forth */
+P(included, {
+	FILE *f;
+	char linebuf[1024];
+	CELL linenumber;
+	CELL INTERPRET, e, here, i;
+
+	CELL previbuf = sloth_user_get(x, SLOTH_IBUF);
+	CELL previpos = sloth_user_get(x, SLOTH_IPOS);
+	CELL previlen = sloth_user_get(x, SLOTH_ILEN);
+
+	CELL prevsourceid = sloth_user_get(x, SLOTH_SOURCE_ID);
+
+	size_t l = (size_t)sloth_pop(x);
+	char* a = (char*)sloth_pop(x);
+
+	/* Store current path pointers */
+	char* prevstart = (char*)sloth_user_get(x, SLOTH_PATH_START);
+	char* prevend = (char*)sloth_user_get(x, SLOTH_PATH_END);
+	/* Variables for working with path, initialized to */
+	/* reuse current path if possible. */
+	char* pathstart = prevstart;
+	char* pathend = prevend;
+	char* path_pos;
+	/* Copy pathname/filename to end of current path */
+	strncpy(pathend, a, l);
+	*(pathend + l) = 0;
+	/* Try to use it as absolute path filename or relative to */
+	/* current directory (as has been copied to the end of */
+	/* previous path). */
+	/* TODO explain that rb+ is needed for fopen to be */
+	/* compatible both in Linux and on Windows */
+	f = fopen(pathend, "rb+");
+	if (f) {
+		/* Storing path as absolute or relative to cwd */
+		pathstart = pathend;
+		pathend = pathend + l;
+	} else {
+		/* Trying as relative to previous path. */
+		f = fopen(pathstart, "rb+");
+		if (f) pathend = pathend + l;
+		else {
+			/* Trying as relative to root path. */
+			strncpy(pathend, (char*)(x->u + SLOTH_PATHS), sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH));
+			strncpy(pathend + sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH), a, l);
+			*(pathend + sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH) + l) = 0;
+			f = fopen(pathend, "rb+");
+			if (f) {
+				pathstart = pathend;
+				pathend = pathend + sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH) + l;
+			}
+		}
+	}
+
+	if (f) {
+		/* Remove filename from path... */
+		while (pathend > pathstart) {
+			if (*pathend == '/' || *pathend == '\\') {
+				pathend++;
+				break;
+			}
+			pathend--;
+		}
+		/* ...and store for nested includes. */
+		sloth_user_set(x, SLOTH_PATH_START, (CELL)pathstart);
+		sloth_user_set(x, SLOTH_PATH_END, (CELL)pathend);
+
+		INTERPRET = sloth_user_get(x, SLOTH_INTERPRET);
+
+		sloth_user_set(x, SLOTH_SOURCE_ID, (CELL)f);
+
+		/* Add path+filename to INCLUDED FILES */
+		/* TODO Check if this file has been included before, */
+		/* and don't add it to the linked list. */
+		here = sloth_here(x);
+		sloth_comma(x, sloth_user_get(x, SLOTH_INCLUDED_FILES));
+		sloth_user_set(x, SLOTH_INCLUDED_FILES, here);
+		sloth_comma(x, l);
+		memcpy((char*)sloth_here(x), a, l);
+		sloth_allot(x, l);
+		sloth_align_(x);
+
+		sloth_user_set(x, SLOTH_SOURCE_POS, ftell(f));
+		linenumber = 0;
+		while (fgets(linebuf, 1024, f)) {
+			CELL e;
+			/* printf(">>>> %s\n", linebuf); */
+
+			/* I tried to use _refill from here as the next */
+			/* lines of code do exactly the same but, the */
+			/* input buffer of the included file is overwritten */
+			/* when doing some REFILL from Forth (for an [IF] */
+			/* for example). So I left this here to be able to */
+			/* use linebuf here. */
+			sloth_user_set(x, SLOTH_IBUF, (CELL)linebuf);
+			sloth_user_set(x, SLOTH_IPOS, 0);
+			if (linebuf[strlen(linebuf) - 1] < ' ') {
+				sloth_user_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
+			} else {
+				sloth_user_set(x, SLOTH_ILEN, strlen(linebuf));
+			}
+
+			sloth_catch(x, INTERPRET);
+			e = sloth_pop(x);
+			if (e != 0) {
+				printf("File: %s\n", pathstart);
+				printf("Line (%ld): %s", linenumber, linebuf);	
+				sloth_throw(x, e);
+			}
+
+			sloth_user_set(x, SLOTH_SOURCE_POS, ftell(f));
+
+			linenumber++;
+		}
+
+		sloth_user_set(x, SLOTH_SOURCE_ID, prevsourceid);
+
+		fclose(f);
+	}
+
+	/* Restore previous path */
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)prevstart);
+	sloth_user_set(x, SLOTH_PATH_END, (CELL)prevend);
+
+	/* Restore previous input buffer */
+	sloth_user_set(x, SLOTH_IBUF, previbuf);
+	sloth_user_set(x, SLOTH_IPOS, previpos);
+	sloth_user_set(x, SLOTH_ILEN, previlen);
+
+	if (!f) {
+		sloth_throw(x, -38);
+	}
+})
+#endif
+
 /* -- Primitive, word and user variable creation ------- */
 
 A(CELL, primitive, (X* x, F f), { 
@@ -628,6 +942,8 @@ A(void, bootstrap, (X* x), {
 	sloth_code(x, "CELLS", sloth_primitive(x, &sloth_cells_));
 	sloth_code(x, "CHARS", sloth_primitive(x, &sloth_chars_));
 
+	sloth_code(x, "UNUSED", sloth_primitive(x, &sloth_unused_));
+
 	/* Exceptions */
 
 	sloth_code(x, "CATCH", sloth_primitive(x, &sloth_catch_));
@@ -643,6 +959,19 @@ A(void, bootstrap, (X* x), {
 	sloth_code(x, "(QUOTATION)", sloth_primitive(x, &sloth_quotation_));
 	sloth_code(x, "[:", sloth_primitive(x, &sloth_start_quotation_)); sloth_immediate_(x);
 	sloth_code(x, ";]", sloth_primitive(x, &sloth_end_quotation_)); sloth_immediate_(x);
+
+	/* End work session */
+
+	sloth_code(x, "BYE", sloth_primitive(x, &sloth_bye_));
+
+	/* Source code preprocessing, interpreting & auditing commands */
+
+	sloth_code(x, "REFILL", sloth_primitive(x, &sloth_refill_));
+	sloth_code(x, "SAVE-INPUT", sloth_primitive(x, &sloth_save_input_));
+	sloth_code(x, "RESTORE-INPUT", sloth_primitive(x, &sloth_restore_input_));
+#ifndef SLOTH_NO_FILES
+	sloth_code(x, "INCLUDED", sloth_primitive(x, &sloth_included_));
+#endif
 
 /*
 	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));

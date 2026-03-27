@@ -151,6 +151,10 @@ void test_memory() {
 	sloth_push(x, 1);
 	sloth_chars_(x);
 	TEST_ASSERT_EQUAL(suCHAR, sloth_pop(x));
+
+	sloth_unused_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL((x->d + x->dz) - sloth_here(x), sloth_pop(x));
 }
 
 /* -- Compilation -------------------------------------- */
@@ -710,6 +714,87 @@ void test_user_variable_creation() {
 	TEST_ASSERT_EQUAL(13, sloth_fetch(x, x->u + 8));
 }
 
+/* -- Source code preprocessing, interpreting & auditing commands */
+
+void test_file_position() {
+	/* TODO A non-valid file pointer can't be detected right now */
+	FILE *f = tmpfile();
+	assert(f);
+
+	fwrite("abc", 1, 3, f);
+	fflush(f);
+
+	sloth_push(x, (CELL)f);
+	sloth_file_position_(x);
+	TEST_ASSERT_EQUAL(3, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(3, sloth_pop(x));
+
+	fclose(f);
+}
+
+void test_read_line() {
+	char buf[16];
+	FILE *f = tmpfile();
+	assert(f);
+
+	fwrite("abc", 1, 3, f);
+	fflush(f);
+
+	/* Test read at end of file */
+	sloth_push(x, (CELL)buf);
+	sloth_push(x, 16);
+	sloth_push(x, (CELL)f);
+
+	sloth_read_line_(x);
+
+	TEST_ASSERT_EQUAL(3, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	/* Test correct read */
+	fseek(f, 0, SEEK_SET);
+
+	sloth_push(x, (CELL)buf);
+	sloth_push(x, 16);
+	sloth_push(x, (CELL)f);
+
+	sloth_read_line_(x);
+
+	TEST_ASSERT_EQUAL(3, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_NOT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(3, sloth_pop(x));
+	TEST_ASSERT_EQUAL('a', buf[0]);
+	TEST_ASSERT_EQUAL('b', buf[1]);
+	TEST_ASSERT_EQUAL('c', buf[2]);
+
+	fclose(f);
+}
+
+void my_accept(X* x) { sloth_push(x, 15); }
+
+void test_refill() {
+	sloth_user_set(x, SLOTH_SOURCE_ID, -1);
+	sloth_refill_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	CELL ibuf = sloth_user_get(x, SLOTH_IBUF);
+	sloth_code(x, "ACCEPT", sloth_primitive(x, &my_accept));
+	sloth_user_set(x, SLOTH_SOURCE_ID, 0);
+	sloth_refill_(x);	
+	TEST_ASSERT_EQUAL(ibuf, sloth_user_get(x, SLOTH_IBUF));
+	TEST_ASSERT_EQUAL(15, sloth_user_get(x, SLOTH_ILEN));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_IPOS));
+
+	/* TODO Test refill for files */
+}
+
+/* TODO Tests for save_input, restore_input, included */
+
 /* -- Bootstrapping ------------------------------------ */
 
 void test_bootstrap() {
@@ -780,6 +865,10 @@ int main() {
 	RUN_TEST(test_end_nested_quotation_compile_mode);
 	/* User variable creation */
 	RUN_TEST(test_user_variable_creation);
+	/* Source code preprocessing, interpreting & auditing commands */
+	RUN_TEST(test_file_position);
+	RUN_TEST(test_read_line);
+	RUN_TEST(test_refill);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();
