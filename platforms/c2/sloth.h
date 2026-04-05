@@ -706,33 +706,53 @@ P(restore_input, {
 })
 
 #ifndef SLOTH_NO_FILES
+A(void, save_input_and_path, (X* x), {
+	int i;
+	sloth_save_input_(x);
+	sloth_push(x, sloth_user_get(x, SLOTH_PATH_START));
+	sloth_push(x, sloth_user_get(x, SLOTH_PATH_END));
+	for (i = 0; i < 8; i++) sloth_to_r_(x);
+})
+
+A(void, restore_input_and_path, (X* x), {
+	int i;
+	for (i = 0; i < 8; i++) sloth_r_from_(x);
+	sloth_user_set(x, SLOTH_PATH_END, sloth_pop(x));
+	sloth_user_set(x, SLOTH_PATH_START, sloth_pop(x));
+	sloth_restore_input_(x);
+	sloth_pop(x);
+})
+
 /* TODO INCLUDED can not be implemented in ANS Forth because */
 /* its needed to include ans.4th itself. */
 /* But this function is very complex and that will make it */
 /* error prone when porting to another language. Try to */
 /* simplify it and use READ-LINE, etc. from Forth */
+
+/* INCLUDED is a complex function because it tries to find */
+/* the indicated file in several directories. */
+/* It first tries to open it as an absolute path/current */
+/* directory. If its not possible to open it, it reuses the */
+/* last path from the previous opened file. */
 P(included, {
 	FILE *f;
 	char linebuf[1024];
 	CELL linenumber;
 	CELL INTERPRET, e, here, i;
 
-	CELL previbuf = sloth_user_get(x, SLOTH_IBUF);
-	CELL previpos = sloth_user_get(x, SLOTH_IPOS);
-	CELL previlen = sloth_user_get(x, SLOTH_ILEN);
-
-	CELL prevsourceid = sloth_user_get(x, SLOTH_SOURCE_ID);
-
 	size_t l = (size_t)sloth_pop(x);
 	char* a = (char*)sloth_pop(x);
 
-	/* Store current path pointers */
-	char* prevstart = (char*)sloth_user_get(x, SLOTH_PATH_START);
-	char* prevend = (char*)sloth_user_get(x, SLOTH_PATH_END);
+	sloth_save_input_and_path(x);
+
+	/* TODO Make all this path selection code cleaner */
+	/* The path thing is repeated 3 times, extract it to */
+	/* a helper function that could be tested. */
+
 	/* Variables for working with path, initialized to */
 	/* reuse current path if possible. */
-	char* pathstart = prevstart;
-	char* pathend = prevend;
+	char* pathstart = (char*)sloth_user_get(x, SLOTH_PATH_START);
+	char* pathend = (char*)sloth_user_get(x, SLOTH_PATH_END);
 	char* path_pos;
 	/* Copy pathname/filename to end of current path */
 	strncpy(pathend, a, l);
@@ -813,6 +833,7 @@ P(included, {
 			}
 
 			sloth_catch(x, INTERPRET);
+
 			e = sloth_pop(x);
 			if (e != 0) {
 				printf("File: %s\n", pathstart);
@@ -825,19 +846,10 @@ P(included, {
 			linenumber++;
 		}
 
-		sloth_user_set(x, SLOTH_SOURCE_ID, prevsourceid);
-
 		fclose(f);
 	}
 
-	/* Restore previous path */
-	sloth_user_set(x, SLOTH_PATH_START, (CELL)prevstart);
-	sloth_user_set(x, SLOTH_PATH_END, (CELL)prevend);
-
-	/* Restore previous input buffer */
-	sloth_user_set(x, SLOTH_IBUF, previbuf);
-	sloth_user_set(x, SLOTH_IPOS, previpos);
-	sloth_user_set(x, SLOTH_ILEN, previlen);
+	sloth_restore_input_and_path(x);
 
 	if (!f) {
 		sloth_throw(x, -38);

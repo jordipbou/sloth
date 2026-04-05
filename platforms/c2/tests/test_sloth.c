@@ -2,6 +2,15 @@
 #include "sloth.h"
 #include "unity.h"
 
+#ifdef _WIN32
+#  include <windows.h>
+#else
+#  include <unistd.h>
+#  ifndef MAX_PATH
+#    define MAX_PATH 260
+#  endif
+#endif
+
 X* x;
 char ibuf[1024];
 
@@ -840,7 +849,97 @@ void test_refill_file() {
 	fclose(f);
 }
 
-/* TODO Tests for save_input, restore_input, included */
+/* Portable temp file creation code */
+
+static int write_temp_file(char *pathbuf, const char *content, size_t len) {
+#ifdef _WIN32
+    char tmpdir[MAX_PATH];
+    if (GetTempPathA(MAX_PATH, tmpdir) == 0) return -1;
+    if (GetTempFileNameA(tmpdir, "slo", 0, pathbuf) == 0) return -1;
+    FILE *f = fopen(pathbuf, "wb");
+    if (!f) return -1;
+#else
+    strcpy(pathbuf, "/tmp/sloth_test_XXXXXX");
+    int fd = mkstemp(pathbuf);
+    if (fd == -1) return -1;
+    FILE *f = fdopen(fd, "wb");
+    if (!f) { close(fd); return -1; }
+#endif
+    fwrite(content, 1, len, f);
+    fclose(f);
+    return 0;
+}
+
+int interpret_calls;
+
+void noop_interpret(X* x) {
+	interpret_calls++;
+}
+
+void test_included_absolute_path() {
+	char tmppath[MAX_PATH];
+	char path[256];
+	CELL saved_incl, new_head;
+	CELL ibuf, ipos, ilen, source, source_pos;
+
+	/* Set PATH_START and PATH_END variables */
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+	sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
+	
+	TEST_ASSERT_EQUAL(0, write_temp_file(tmppath, "line one\nline two", 17));
+
+	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &noop_interpret));
+	interpret_calls = 0;
+
+	saved_incl = sloth_user_get(x, SLOTH_INCLUDED_FILES);
+
+	ibuf = sloth_user_get(x, SLOTH_IBUF);
+	ipos = sloth_user_get(x, SLOTH_IPOS);
+	ilen = sloth_user_get(x, SLOTH_ILEN);
+	source = sloth_user_get(x, SLOTH_SOURCE_ID);
+	source_pos = sloth_user_get(x, SLOTH_SOURCE_POS);
+
+	sloth_push(x, (CELL)tmppath);
+	sloth_push(x, strlen(tmppath));
+	sloth_included_(x);
+
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(2, interpret_calls);
+
+	TEST_ASSERT_EQUAL(source_pos, sloth_user_get(x, SLOTH_SOURCE_POS));
+	TEST_ASSERT_EQUAL(source, sloth_user_get(x, SLOTH_SOURCE_ID));
+	TEST_ASSERT_EQUAL(ilen, sloth_user_get(x, SLOTH_ILEN));
+	TEST_ASSERT_EQUAL(ipos, sloth_user_get(x, SLOTH_IPOS));
+	TEST_ASSERT_EQUAL(ibuf, sloth_user_get(x, SLOTH_IBUF));
+
+	/* A new entry must have been prepended to INCLUDED_FILES */
+	new_head = sloth_user_get(x, SLOTH_INCLUDED_FILES);
+	TEST_ASSERT_NOT_EQUAL(saved_incl, new_head);
+	TEST_ASSERT_EQUAL(saved_incl, sloth_fetch(x, new_head));            /* link to prev */
+	TEST_ASSERT_EQUAL((CELL)strlen(tmppath), sloth_fetch(x, new_head + sCELL)); /* name len */
+	TEST_ASSERT_EQUAL_MEMORY(tmppath, (char*)(new_head + 2*sCELL), strlen(tmppath)); /* name */
+
+	remove(tmppath);
+}
+
+void test_included_file_not_found() {
+    char path[256];
+    char missing[] = "sloth_test_no_such_file.4th";
+    CELL throw_prim;
+
+    sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+    sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
+
+    throw_prim = sloth_primitive(x, &sloth_included_);
+    sloth_push(x, (CELL)missing);
+    sloth_push(x, (CELL)strlen(missing));
+		sloth_push(x, throw_prim);
+    sloth_catch_(x);
+    TEST_ASSERT_EQUAL(-38, sloth_pop(x));
+		/* After throwing, the stack is restored to */
+		/* the depth previous to the catch. */
+    TEST_ASSERT_EQUAL(2, x->sp);
+}
 
 /* -- Bootstrapping ------------------------------------ */
 
@@ -917,6 +1016,8 @@ int main() {
 	RUN_TEST(test_read_line);
 	RUN_TEST(test_refill);
 	RUN_TEST(test_refill_file);
+	RUN_TEST(test_included_absolute_path);
+	RUN_TEST(test_included_file_not_found);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();
