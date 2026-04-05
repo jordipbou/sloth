@@ -777,6 +777,9 @@ void test_read_line() {
 void my_accept(X* x) { sloth_push(x, 15); }
 
 void test_refill() {
+	char buf[16];
+	FILE *f;
+
 	sloth_user_set(x, SLOTH_SOURCE_ID, -1);
 	sloth_refill_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
@@ -789,8 +792,46 @@ void test_refill() {
 	TEST_ASSERT_EQUAL(ibuf, sloth_user_get(x, SLOTH_IBUF));
 	TEST_ASSERT_EQUAL(15, sloth_user_get(x, SLOTH_ILEN));
 	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_IPOS));
+}
 
-	/* TODO Test refill for files */
+void test_refill_file() {
+	FILE *f = tmpfile();
+	assert(f);
+
+	fwrite("abc\ndefg", 1, 8, f);
+	fflush(f);
+
+	fseek(f, 0, SEEK_SET);
+
+	sloth_user_set(x, SLOTH_SOURCE_ID, (CELL)f);
+
+	sloth_refill_(x);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_IPOS));
+	TEST_ASSERT_EQUAL(3, sloth_user_get(x, SLOTH_ILEN));
+	TEST_ASSERT_EQUAL_STRING_LEN("abc", sloth_user_get(x, SLOTH_IBUF), 3);
+
+	sloth_push(x, (CELL)f);
+	sloth_file_position_(x);
+	sloth_pop(x);
+	sloth_pop(x);
+	TEST_ASSERT_EQUAL(4, sloth_pop(x));
+
+	sloth_refill_(x);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_IPOS));
+	TEST_ASSERT_EQUAL(4, sloth_user_get(x, SLOTH_ILEN));
+	TEST_ASSERT_EQUAL_STRING_LEN("defg", sloth_user_get(x, SLOTH_IBUF), 4);
+
+	sloth_push(x, (CELL)f);
+	sloth_file_position_(x);
+	sloth_pop(x);
+	sloth_pop(x);
+	TEST_ASSERT_EQUAL(8, sloth_pop(x));
+
+	fclose(f);
 }
 
 /* TODO Tests for save_input, restore_input, included */
@@ -869,6 +910,7 @@ int main() {
 	RUN_TEST(test_file_position);
 	RUN_TEST(test_read_line);
 	RUN_TEST(test_refill);
+	RUN_TEST(test_refill_file);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();

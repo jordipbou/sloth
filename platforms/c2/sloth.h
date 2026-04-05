@@ -652,6 +652,7 @@ P(refill, {
 	*/
 		sloth_push(x, source_id);
 		sloth_file_position_(x);
+		sloth_pop(x);
 		sloth_user_set(x, SLOTH_SOURCE_POS, sloth_pop(x));
 		/*
 		sloth_user_set(x, SLOTH_SOURCE_POS, sloth_file_get_position(source_id));
@@ -676,12 +677,23 @@ P(refill, {
 			/* are present) and on some other Forths they do not. */
 			/* So I just added a check to remove the \n at the */
 			/* end. */
+
+			printf("LINEBUF: [%s]\n", linebuf);
+
 			if (linebuf[strlen(linebuf) - 1] < ' ') {
+
+				printf("1. LINELEN: %ld\n", strlen(linebuf) - 1);
+
 				sloth_user_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
 			} else {
+
+				printf("2. LINELEN: %ld\n", strlen(linebuf));
+
 				sloth_user_set(x, SLOTH_ILEN, strlen(linebuf));
 			}
 			sloth_push(x, -1);
+
+			printf("POST POSITION: %ld\n", ftell((FILE*)source_id));
 		} else {
 			sloth_pop(x);
 			sloth_pop(x);
