@@ -3,6 +3,7 @@
 #include "unity.h"
 
 X* x;
+char ibuf[1024];
 
 void setUp() {
 	/* Create a VM with 64 primitive slots and 1024 bytes */
@@ -795,8 +796,13 @@ void test_refill() {
 }
 
 void test_refill_file() {
+	char ibuf[1024];
 	FILE *f = tmpfile();
 	assert(f);
+
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 1024);
 
 	fwrite("abc\ndefg", 1, 8, f);
 	fflush(f);

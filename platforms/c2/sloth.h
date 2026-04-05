@@ -600,9 +600,9 @@ P(read_line, {
 			if (buf[u2 - 1] == 10 || buf[u2 - 1] == 13) u2--;
 			/* In case of CRLF, substract one again */
 			if (buf[u2 - 1] == 10) u2--;
-			/* TODO Is the use of memcpy here portable enough to other */
-			/* programming languages? */
-			memcpy(caddr, buf, l);
+			memcpy(caddr, buf, u2);
+			/* Ensure that we add the 0 at the end */
+			caddr[u2] = 0;
 			sloth_push(x, u2);
 			sloth_push(x, -1);
 			sloth_push(x, 0);
@@ -620,18 +620,13 @@ P(read_line, {
 #endif
 
 /* TODO Refill could be implemented in ans.4th. */
-/* As I have created the api functions 
+/* As I have created the api functions READ-LINE and */
+/* FILE-POSITION. */
 /* Except for the comments on the few first lines (that can */
 /* be removed without problems as \ is the fourth definition */
 /* found), REFILL is not used again until the definition of */
 /* ( in line 196 */
 P(refill, {
-	/* FIXME I'm using linebuf here but this buffer will */
-	/* disappear when I return from sloth_refill_ !!!! */
-	/* I suppose REFILL is just being used without using its */
-	/* content and it just works by miracle !!!! */
-	char linebuf[1024];
-	int i;
 	CELL source_id = sloth_user_get(x, SLOTH_SOURCE_ID);
 	switch (source_id) {
 	case -1: 
@@ -647,53 +642,24 @@ P(refill, {
 		break;
 #ifndef SLOTH_NO_FILES
 	default:
-	/*
-		sloth_user_set(x, SLOTH_SOURCE_POS, ftell((FILE*)sloth_user_get(x, SLOTH_SOURCE_ID)));
-	*/
 		sloth_push(x, source_id);
 		sloth_file_position_(x);
 		sloth_pop(x);
 		sloth_user_set(x, SLOTH_SOURCE_POS, sloth_pop(x));
-		/*
-		sloth_user_set(x, SLOTH_SOURCE_POS, sloth_file_get_position(source_id));
-		if (fgets(linebuf, 1024, (FILE *)sloth_user_get(x, SLOTH_SOURCE_ID))) {
-		*/
-		sloth_push(x, (CELL)linebuf);
+
+		/* REFILL can only be called after INCLUDE/INCLUDED */
+		/* that means that the line buffer of _included_ will */
+		/* be used and its size is known and fixed. */
+		sloth_push(x, sloth_user_get(x, SLOTH_IBUF));
 		sloth_push(x, 1024);
 		sloth_push(x, source_id);
 		sloth_read_line_(x);
-		/*
-		if (sloth_file_get_string(source_id, linebuf, 1024)) {
-		*/
+
 		if (!sloth_pop(x)) {
 			sloth_pop(x);
-			sloth_pop(x);
-			sloth_user_set(x, SLOTH_IBUF, (CELL)linebuf);
+			sloth_user_set(x, SLOTH_ILEN, sloth_pop(x));
 			sloth_user_set(x, SLOTH_IPOS, 0);
-			/* Although I haven't found anywhere that \n should */
-			/* not be part of the input buffer when reading from */
-			/* a file, the results from preliminary tests when */
-			/* using SOURCE ... TYPE add newlines (because they */
-			/* are present) and on some other Forths they do not. */
-			/* So I just added a check to remove the \n at the */
-			/* end. */
-
-			printf("LINEBUF: [%s]\n", linebuf);
-
-			if (linebuf[strlen(linebuf) - 1] < ' ') {
-
-				printf("1. LINELEN: %ld\n", strlen(linebuf) - 1);
-
-				sloth_user_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
-			} else {
-
-				printf("2. LINELEN: %ld\n", strlen(linebuf));
-
-				sloth_user_set(x, SLOTH_ILEN, strlen(linebuf));
-			}
 			sloth_push(x, -1);
-
-			printf("POST POSITION: %ld\n", ftell((FILE*)source_id));
 		} else {
 			sloth_pop(x);
 			sloth_pop(x);
