@@ -821,6 +821,8 @@ void test_refill_file() {
 	sloth_user_set(x, SLOTH_SOURCE_ID, (CELL)f);
 
 	sloth_refill_(x);
+
+	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
 
 	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_IPOS));
@@ -1029,6 +1031,60 @@ void test_included_root_path() {
 	
 	remove(tmppath);
 }
+
+void refill_interpret(X* x) {
+	sloth_refill_(x);
+	sloth_pop(x);
+	interpret_calls++;
+}
+
+void test_included_and_refill() {
+	char tmppath[MAX_PATH];
+	char path[256];
+	CELL saved_incl, new_head;
+	CELL ibuf, ipos, ilen, source, source_pos;
+
+	/* Set PATH_START and PATH_END variables */
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+	sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
+	
+	TEST_ASSERT_EQUAL(0, write_temp_file(tmppath, "line one\nline two\nline three\nline four", 39));
+
+	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &refill_interpret));
+	interpret_calls = 0;
+
+	saved_incl = sloth_user_get(x, SLOTH_INCLUDED_FILES);
+
+	ibuf = sloth_user_get(x, SLOTH_IBUF);
+	ipos = sloth_user_get(x, SLOTH_IPOS);
+	ilen = sloth_user_get(x, SLOTH_ILEN);
+	source = sloth_user_get(x, SLOTH_SOURCE_ID);
+	source_pos = sloth_user_get(x, SLOTH_SOURCE_POS);
+
+	sloth_push(x, (CELL)tmppath);
+	sloth_push(x, strlen(tmppath));
+	sloth_included_(x);
+
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(2, interpret_calls);
+
+	TEST_ASSERT_EQUAL(source_pos, sloth_user_get(x, SLOTH_SOURCE_POS));
+	TEST_ASSERT_EQUAL(source, sloth_user_get(x, SLOTH_SOURCE_ID));
+	TEST_ASSERT_EQUAL(ilen, sloth_user_get(x, SLOTH_ILEN));
+	TEST_ASSERT_EQUAL(ipos, sloth_user_get(x, SLOTH_IPOS));
+	TEST_ASSERT_EQUAL(ibuf, sloth_user_get(x, SLOTH_IBUF));
+
+	/* A new entry must have been prepended to INCLUDED_FILES */
+	new_head = sloth_user_get(x, SLOTH_INCLUDED_FILES);
+	TEST_ASSERT_NOT_EQUAL(saved_incl, new_head);
+	TEST_ASSERT_EQUAL(saved_incl, sloth_fetch(x, new_head));            /* link to prev */
+	TEST_ASSERT_EQUAL((CELL)strlen(tmppath), sloth_fetch(x, new_head + sCELL)); /* name len */
+	TEST_ASSERT_EQUAL_MEMORY(tmppath, (char*)(new_head + 2*sCELL), strlen(tmppath)); /* name */
+
+	remove(tmppath);
+}
+
+
 /* -- Bootstrapping ------------------------------------ */
 
 void test_bootstrap() {
@@ -1109,6 +1165,7 @@ int main() {
 	RUN_TEST(test_included_file_not_found);
 	RUN_TEST(test_included_relative_path);
 	RUN_TEST(test_included_root_path);
+	RUN_TEST(test_included_and_refill);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();

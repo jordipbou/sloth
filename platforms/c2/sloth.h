@@ -627,6 +627,7 @@ P(read_line, {
 /* found), REFILL is not used again until the definition of */
 /* ( in line 196 */
 P(refill, {
+	CELL flag, ior;
 	CELL source_id = sloth_user_get(x, SLOTH_SOURCE_ID);
 	switch (source_id) {
 	case -1: 
@@ -642,9 +643,12 @@ P(refill, {
 		break;
 #ifndef SLOTH_NO_FILES
 	default:
+		/* File position is stored to go back to it when */
+		/* exiting of nesting includes */
 		sloth_push(x, source_id);
 		sloth_file_position_(x);
 		sloth_pop(x);
+		sloth_pop(x); /* TODO This is most significant part of the double number, it will normally be 0? */
 		sloth_user_set(x, SLOTH_SOURCE_POS, sloth_pop(x));
 
 		/* REFILL can only be called after INCLUDE/INCLUDED */
@@ -655,13 +659,14 @@ P(refill, {
 		sloth_push(x, source_id);
 		sloth_read_line_(x);
 
-		if (!sloth_pop(x)) {
-			sloth_pop(x);
+		ior = sloth_pop(x);
+		flag = sloth_pop(x);
+
+		if (flag && !ior) {
 			sloth_user_set(x, SLOTH_ILEN, sloth_pop(x));
 			sloth_user_set(x, SLOTH_IPOS, 0);
 			sloth_push(x, -1);
 		} else {
-			sloth_pop(x);
 			sloth_pop(x);
 			sloth_push(x, 0);
 		}
@@ -781,7 +786,7 @@ I(FILE*, open_included_file, (X* x, char* a, int l), {
 
 I(void, add_to_included_files_list, (X* x, char* a, int l), {
 		/* TODO Check if this file has been included before, */
-		/* and don't add it to the linked list. */
+		/* and in that case don't add it to the linked list. */
 		CELL here = sloth_here(x);
 		sloth_comma(x, sloth_user_get(x, SLOTH_INCLUDED_FILES));
 		sloth_user_set(x, SLOTH_INCLUDED_FILES, here);
@@ -805,28 +810,17 @@ I(void, add_to_included_files_list, (X* x, char* a, int l), {
 P(included, {
 	FILE *f;
 	char linebuf[1024];
-	CELL linenumber;
-	CELL INTERPRET, e, here, i;
-
+	CELL e, here;
 	size_t l = (size_t)sloth_pop(x);
 	char* a = (char*)sloth_pop(x);
-
 	sloth_save_input_and_path(x);
 
-	f = sloth_open_included_file(x, a, l);
-
-	if (f) {
+	if (f = sloth_open_included_file(x, a, l)) {
+		CELL linenumber = 0;
 		sloth_add_to_included_files_list(x, a, l);
 
 		sloth_user_set(x, SLOTH_SOURCE_ID, (CELL)f);
 
-		INTERPRET = sloth_user_get(x, SLOTH_INTERPRET);
-
-		/* TODO If file has just been opened, why use ftell here? */
-		sloth_user_set(x, SLOTH_SOURCE_POS, ftell(f));
-		linenumber = 0;
-
-	/* TODO Reimplementation with refill, do it when it works
 		sloth_user_set(x, SLOTH_IBUF, (CELL)linebuf);
 		sloth_user_set(x, SLOTH_IPOS, 0);
 		sloth_user_set(x, SLOTH_ILEN, 1024);
@@ -834,50 +828,15 @@ P(included, {
 		do {
 			sloth_refill_(x);
 			if (!sloth_pop(x)) break;
-			sloth_catch(x, INTERPRET);
+			sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
 			e = sloth_pop(x);
 			if (e != 0) {
 				printf("File: %s\n", (char*)sloth_user_get(x, SLOTH_PATH_START));
 				printf("Line (%ld): %s", linenumber, linebuf);	
 				sloth_throw(x, e);
 			}
-			sloth_user_set(x, SLOTH_SOURCE_POS, ftell(f));
 			linenumber++;
 		} while(1);
-	*/
-
-		/* TODO Try to use refill here !!! */
-		while (fgets(linebuf, 1024, f)) {
-			CELL e;
-			/* printf(">>>> %s\n", linebuf); */
-
-			/* I tried to use _refill from here as the next */
-			/* lines of code do exactly the same but, the */
-			/* input buffer of the included file is overwritten */
-			/* when doing some REFILL from Forth (for an [IF] */
-			/* for example). So I left this here to be able to */
-			/* use linebuf here. */
-			sloth_user_set(x, SLOTH_IBUF, (CELL)linebuf);
-			sloth_user_set(x, SLOTH_IPOS, 0);
-			if (linebuf[strlen(linebuf) - 1] < ' ') {
-				sloth_user_set(x, SLOTH_ILEN, strlen(linebuf) - 1);
-			} else {
-				sloth_user_set(x, SLOTH_ILEN, strlen(linebuf));
-			}
-
-			sloth_catch(x, INTERPRET);
-
-			e = sloth_pop(x);
-			if (e != 0) {
-				printf("File: %s\n", (char*)sloth_user_get(x, SLOTH_PATH_START));
-				printf("Line (%ld): %s", linenumber, linebuf);	
-				sloth_throw(x, e);
-			}
-
-			sloth_user_set(x, SLOTH_SOURCE_POS, ftell(f));
-
-			linenumber++;
-		}
 
 		fclose(f);
 	}
