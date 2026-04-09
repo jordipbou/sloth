@@ -706,7 +706,7 @@ P(restore_input, {
 })
 
 #ifndef SLOTH_NO_FILES
-A(void, save_input_and_path, (X* x), {
+I(void, save_input_and_path, (X* x), {
 	int i;
 	sloth_save_input_(x);
 	sloth_push(x, sloth_user_get(x, SLOTH_PATH_START));
@@ -714,7 +714,7 @@ A(void, save_input_and_path, (X* x), {
 	for (i = 0; i < 8; i++) sloth_to_r_(x);
 })
 
-A(void, restore_input_and_path, (X* x), {
+I(void, restore_input_and_path, (X* x), {
 	int i;
 	for (i = 0; i < 8; i++) sloth_r_from_(x);
 	sloth_user_set(x, SLOTH_PATH_END, sloth_pop(x));
@@ -723,37 +723,15 @@ A(void, restore_input_and_path, (X* x), {
 	sloth_pop(x);
 })
 
-/* TODO INCLUDED can not be implemented in ANS Forth because */
-/* its needed to include ans.4th itself. */
-/* But this function is very complex and that will make it */
-/* error prone when porting to another language. Try to */
-/* simplify it and use READ-LINE, etc. from Forth */
-
-/* INCLUDED is a complex function because it tries to find */
-/* the indicated file in several directories. */
-/* It first tries to open it as an absolute path/current */
-/* directory. If its not possible to open it, it reuses the */
-/* last path from the previous opened file. */
-P(included, {
-	FILE *f;
-	char linebuf[1024];
-	CELL linenumber;
-	CELL INTERPRET, e, here, i;
-
-	size_t l = (size_t)sloth_pop(x);
-	char* a = (char*)sloth_pop(x);
-
-	sloth_save_input_and_path(x);
-
-	/* TODO Make all this path selection code cleaner */
-	/* The path thing is repeated 3 times, extract it to */
-	/* a helper function that could be tested. */
+I(FILE*, open_included_file, (X* x, char* a, int l), {
+	FILE* f;
 
 	/* Variables for working with path, initialized to */
 	/* reuse current path if possible. */
 	char* pathstart = (char*)sloth_user_get(x, SLOTH_PATH_START);
 	char* pathend = (char*)sloth_user_get(x, SLOTH_PATH_END);
 	char* path_pos;
+
 	/* Copy pathname/filename to end of current path */
 	strncpy(pathend, a, l);
 	*(pathend + l) = 0;
@@ -796,24 +774,79 @@ P(included, {
 		/* ...and store for nested includes. */
 		sloth_user_set(x, SLOTH_PATH_START, (CELL)pathstart);
 		sloth_user_set(x, SLOTH_PATH_END, (CELL)pathend);
+	}
 
-		INTERPRET = sloth_user_get(x, SLOTH_INTERPRET);
+	return f;
+})
 
-		sloth_user_set(x, SLOTH_SOURCE_ID, (CELL)f);
-
-		/* Add path+filename to INCLUDED FILES */
+I(void, add_to_included_files_list, (X* x, char* a, int l), {
 		/* TODO Check if this file has been included before, */
 		/* and don't add it to the linked list. */
-		here = sloth_here(x);
+		CELL here = sloth_here(x);
 		sloth_comma(x, sloth_user_get(x, SLOTH_INCLUDED_FILES));
 		sloth_user_set(x, SLOTH_INCLUDED_FILES, here);
 		sloth_comma(x, l);
 		memcpy((char*)sloth_here(x), a, l);
 		sloth_allot(x, l);
 		sloth_align_(x);
+})
 
+/* TODO INCLUDED can not be implemented in ANS Forth because */
+/* its needed to include ans.4th itself. */
+/* But this function is very complex and that will make it */
+/* error prone when porting to another language. Try to */
+/* simplify it and use READ-LINE, etc. from Forth */
+
+/* INCLUDED is a complex function because it tries to find */
+/* the indicated file in several directories. */
+/* It first tries to open it as an absolute path/current */
+/* directory. If its not possible to open it, it reuses the */
+/* last path from the previous opened file. */
+P(included, {
+	FILE *f;
+	char linebuf[1024];
+	CELL linenumber;
+	CELL INTERPRET, e, here, i;
+
+	size_t l = (size_t)sloth_pop(x);
+	char* a = (char*)sloth_pop(x);
+
+	sloth_save_input_and_path(x);
+
+	f = sloth_open_included_file(x, a, l);
+
+	if (f) {
+		sloth_add_to_included_files_list(x, a, l);
+
+		sloth_user_set(x, SLOTH_SOURCE_ID, (CELL)f);
+
+		INTERPRET = sloth_user_get(x, SLOTH_INTERPRET);
+
+		/* TODO If file has just been opened, why use ftell here? */
 		sloth_user_set(x, SLOTH_SOURCE_POS, ftell(f));
 		linenumber = 0;
+
+	/* TODO Reimplementation with refill, do it when it works
+		sloth_user_set(x, SLOTH_IBUF, (CELL)linebuf);
+		sloth_user_set(x, SLOTH_IPOS, 0);
+		sloth_user_set(x, SLOTH_ILEN, 1024);
+
+		do {
+			sloth_refill_(x);
+			if (!sloth_pop(x)) break;
+			sloth_catch(x, INTERPRET);
+			e = sloth_pop(x);
+			if (e != 0) {
+				printf("File: %s\n", (char*)sloth_user_get(x, SLOTH_PATH_START));
+				printf("Line (%ld): %s", linenumber, linebuf);	
+				sloth_throw(x, e);
+			}
+			sloth_user_set(x, SLOTH_SOURCE_POS, ftell(f));
+			linenumber++;
+		} while(1);
+	*/
+
+		/* TODO Try to use refill here !!! */
 		while (fgets(linebuf, 1024, f)) {
 			CELL e;
 			/* printf(">>>> %s\n", linebuf); */
@@ -836,7 +869,7 @@ P(included, {
 
 			e = sloth_pop(x);
 			if (e != 0) {
-				printf("File: %s\n", pathstart);
+				printf("File: %s\n", (char*)sloth_user_get(x, SLOTH_PATH_START));
 				printf("Line (%ld): %s", linenumber, linebuf);	
 				sloth_throw(x, e);
 			}

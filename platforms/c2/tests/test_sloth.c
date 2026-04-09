@@ -923,24 +923,112 @@ void test_included_absolute_path() {
 }
 
 void test_included_file_not_found() {
-    char path[256];
-    char missing[] = "sloth_test_no_such_file.4th";
-    CELL throw_prim;
-
-    sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
-    sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
-
-    throw_prim = sloth_primitive(x, &sloth_included_);
-    sloth_push(x, (CELL)missing);
-    sloth_push(x, (CELL)strlen(missing));
-		sloth_push(x, throw_prim);
-    sloth_catch_(x);
-    TEST_ASSERT_EQUAL(-38, sloth_pop(x));
-		/* After throwing, the stack is restored to */
-		/* the depth previous to the catch. */
-    TEST_ASSERT_EQUAL(2, x->sp);
+	char path[256];
+	char missing[] = "sloth_test_no_such_file.4th";
+	CELL throw_prim;
+	
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+	sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
+	
+	throw_prim = sloth_primitive(x, &sloth_included_);
+	sloth_push(x, (CELL)missing);
+	sloth_push(x, (CELL)strlen(missing));
+	sloth_push(x, throw_prim);
+	sloth_catch_(x);
+	TEST_ASSERT_EQUAL(-38, sloth_pop(x));
+	/* After throwing, the stack is restored to */
+	/* the depth previous to the catch. */
+	TEST_ASSERT_EQUAL(2, x->sp);
 }
 
+void test_included_relative_path() {
+	char tmppath[MAX_PATH];
+	char path[256];
+	char *filename, *sep;
+	size_t dirlen;
+	CELL ibuf, ipos, ilen, source, source_pos;
+	
+	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &noop_interpret));
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 0);
+	interpret_calls = 0;
+	
+	TEST_ASSERT_EQUAL(0, write_temp_file(tmppath, "line one\nline two", 17));
+	
+	/* Split tmppath into directory and filename */
+	sep = strrchr(tmppath, '/');
+#ifdef _WIN32
+	char *sep2 = strrchr(tmppath, '\\');
+	if (sep2 > sep) sep = sep2;
+#endif
+	TEST_ASSERT_NOT_NULL(sep);
+	filename = sep + 1;
+	dirlen = filename - tmppath;  /* includes the trailing separator */
+
+	/* Simulate a previous include having set PATH_START/PATH_END
+	   to the directory containing our temp file */
+	memcpy(path, tmppath, dirlen);
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+	sloth_user_set(x, SLOTH_PATH_END,   (CELL)(path + dirlen));
+	
+	/* Push only the filename (no directory) */
+	sloth_push(x, (CELL)filename);
+	sloth_push(x, (CELL)strlen(filename));
+	sloth_included_(x);
+	
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(2, interpret_calls);
+	
+	ibuf = sloth_user_get(x, SLOTH_IBUF);
+	ipos = sloth_user_get(x, SLOTH_IPOS);
+	ilen = sloth_user_get(x, SLOTH_ILEN);
+	source = sloth_user_get(x, SLOTH_SOURCE_ID);
+	source_pos = sloth_user_get(x, SLOTH_SOURCE_POS);
+	
+	remove(tmppath);
+} 
+
+void test_included_root_path() {
+	char tmppath[MAX_PATH];
+	char path[MAX_PATH];
+	char rootpath[MAX_PATH];
+	char *filename, *sep;
+	size_t dirlen;
+	
+	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &noop_interpret));
+	interpret_calls = 0;
+	
+	TEST_ASSERT_EQUAL(0, write_temp_file(tmppath, "line one\nline two", 17));
+	
+	/* Split tmppath into directory and filename */
+	sep = strrchr(tmppath, '/');
+#ifdef _WIN32
+	char *sep2 = strrchr(tmppath, '\\');
+	if (sep2 > sep) sep = sep2;
+#endif
+	TEST_ASSERT_NOT_NULL(sep);
+	filename = sep + 1;
+	dirlen = filename - tmppath;  /* includes the trailing separator */
+	
+	/* PATH_START/PATH_END point to an empty path so the first two
+	   strategies (absolute and relative-to-previous) both fail */
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+	sloth_user_set(x, SLOTH_PATH_END,   (CELL)path);
+	
+	/* Put the temp file's directory into SLOTH_PATHS as the root */
+	memcpy(rootpath, tmppath, dirlen);
+	memcpy((char*)(x->u + SLOTH_PATHS), rootpath, dirlen);
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, (CELL)dirlen);
+	
+	/* Push only the filename (no directory) */
+	sloth_push(x, (CELL)filename);
+	sloth_push(x, (CELL)strlen(filename));
+	sloth_included_(x);
+	
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(2, interpret_calls);
+	
+	remove(tmppath);
+}
 /* -- Bootstrapping ------------------------------------ */
 
 void test_bootstrap() {
@@ -1016,8 +1104,11 @@ int main() {
 	RUN_TEST(test_read_line);
 	RUN_TEST(test_refill);
 	RUN_TEST(test_refill_file);
+	/* TODO Test save_input_and_path and restore_input_and_path */
 	RUN_TEST(test_included_absolute_path);
 	RUN_TEST(test_included_file_not_found);
+	RUN_TEST(test_included_relative_path);
+	RUN_TEST(test_included_root_path);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();
