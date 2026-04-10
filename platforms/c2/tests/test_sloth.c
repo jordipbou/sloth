@@ -119,6 +119,9 @@ void test_memory() {
 	TEST_ASSERT_EQUAL(x->d, sloth_to_abs(x, 0));
 	TEST_ASSERT_EQUAL(0, sloth_to_rel(x, x->d));
 	
+	sloth_b_store(x, sloth_to_abs(x, 1000), -33);
+	TEST_ASSERT_EQUAL(-33, sloth_b_fetch(x, sloth_to_abs(x, 1000)));
+
 	sloth_c_store(x, sloth_to_abs(x, 1000), 'a');
 	TEST_ASSERT_EQUAL('a', sloth_c_fetch(x, sloth_to_abs(x, 1000)));
 	
@@ -514,6 +517,38 @@ void test_c_string_() {
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(sloth_to_abs(x, 100), sloth_pop(x));
 	TEST_ASSERT_EQUAL(sloth_aligned(sloth_to_abs(x, 100 + 6)), x->ip);
+}
+
+void do_test_move(X* x, CELL b, CELL a1, CELL a2, CELL u, CELL v1, CELL v2, CELL v3) {
+	sloth_push(x, sloth_to_abs(x, a1));
+	sloth_push(x, sloth_to_abs(x, a2));
+	sloth_push(x, u);
+	sloth_move_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(v1, *((BYTE*)sloth_to_abs(x, b + 0)));
+	TEST_ASSERT_EQUAL(v2, *((BYTE*)sloth_to_abs(x, b + 1)));
+	TEST_ASSERT_EQUAL(v3, *((BYTE*)sloth_to_abs(x, b + 2)));
+}
+
+void test_move_() {
+	/* Reuses the ANS Forth tests for MOVE */
+	int fbuf = 100;
+	int sbuf = 103;
+
+	*((BYTE*)x->d + fbuf + 0) = 20;
+	*((BYTE*)x->d + fbuf + 1) = 20;
+	*((BYTE*)x->d + fbuf + 2) = 20;
+
+	*((BYTE*)x->d + sbuf + 0) = 12;
+	*((BYTE*)x->d + sbuf + 1) = 34;
+	*((BYTE*)x->d + sbuf + 2) = 56;
+
+	do_test_move(x, fbuf, fbuf, fbuf, 3, 20, 20, 20);
+	do_test_move(x, fbuf, sbuf, fbuf, 0, 20, 20, 20);
+	do_test_move(x, fbuf, sbuf, fbuf, 1, 12, 20, 20);
+	do_test_move(x, fbuf, sbuf, fbuf, 3, 12, 34, 56);
+	do_test_move(x, fbuf, fbuf, fbuf + 1, 2, 12, 12, 34);
+	do_test_move(x, fbuf, fbuf + 1, fbuf, 2, 12, 34, 34);
 }
 
 /* -- Searching ---------------------------------------- */
@@ -1139,6 +1174,7 @@ int main() {
 	/* Strings */
 	RUN_TEST(test_string_);
 	RUN_TEST(test_c_string_);
+	RUN_TEST(test_move_);
 	/* Searching */
 	RUN_TEST(test_searching);
 	/* Compile and literal */

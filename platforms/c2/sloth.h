@@ -29,6 +29,7 @@
 
 /* -- Virtual Machine constants ------------------------ */
 
+typedef int8_t BYTE; /* BYTEs are needed for MOVE */
 typedef uint8_t uCHAR; /* CHARs are always unsigned */
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
@@ -183,6 +184,8 @@ A(CELL, to_rel, (X* x, CELL a), { return a - x->d; })
 
 /* STORE/FETCH/CSTORE/cfetch work on absolute address units, */
 /* not just inside SLOTH dictionary (memory block). */
+A(void, b_store, (X* x, CELL a, BYTE v), { *((BYTE*)a) = v; })
+A(BYTE, b_fetch, (X* x, CELL a), { return *((BYTE*)a); })
 A(void, c_store, (X* x, CELL a, uCHAR v), { *((uCHAR*)a) = v; })
 A(uCHAR, c_fetch, (X* x, CELL a), { return *((uCHAR*)a); })
 A(void, store, (X* x, CELL a, CELL v), { *((CELL*)a) = v; })
@@ -444,6 +447,23 @@ P(c_string, {
 	uCHAR l = sloth_c_fetch(x, x->ip);
 	sloth_push(x, x->ip);
 	x->ip = sloth_aligned(x->ip + l + 2);
+})
+
+/* MOVE moves address units, not characters */
+P(move, {
+	CELL u = sloth_pop(x);
+	CELL addr2 = sloth_pop(x);
+	CELL addr1 = sloth_pop(x);
+	CELL i;
+	if (addr1 >= addr2) {
+		for (i = 0; i < u; i++) {
+			sloth_b_store(x, addr2 + i, sloth_b_fetch(x, addr1 + i));
+		}
+	} else {
+		for (i = u - 1; i >= 0; i--) {
+			sloth_b_store(x, addr2 + i, sloth_b_fetch(x, addr1 + i));
+		}
+	}
 })
 
 /* -- Searching for words ------------------------------ */
@@ -935,6 +955,7 @@ A(void, bootstrap, (X* x), {
 
 	sloth_code(x, "(STRING)", sloth_primitive(x, &sloth_string_));
 	sloth_code(x, "(CSTRING)", sloth_primitive(x, &sloth_c_string_));
+	sloth_code(x, "MOVE", sloth_primitive(x, &sloth_move_));
 
 	/* Quotations */
 
