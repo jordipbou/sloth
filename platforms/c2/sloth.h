@@ -1,4 +1,4 @@
-#ifndef SLOTH_HEADER
+#if !defined(SLOTH_HEADER) || defined(SLOTH_IMPLEMENTATION)
 #define SLOTH_HEADER
 
 #include<stdint.h>
@@ -869,6 +869,52 @@ P(included, {
 })
 #endif
 
+/* -- Input/output operations -------------------------- */
+
+/* -- getch multiplatform definition and implementation  */
+
+#if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
+#define WINDOWS
+#endif
+
+#if defined(WINDOWS)
+#include <conio.h>
+#else
+#include <termios.h>
+#include <unistd.h>
+#endif
+
+#if !defined(WIN32) && !defined(_WIN32) && !defined(_WIN64)
+int getch() {
+	struct termios oldt, newt;
+	int ch;
+	tcgetattr(STDIN_FILENO, &oldt);
+	newt = oldt;
+	newt.c_lflag &= ~(ICANON|ECHO);
+	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+	ch = getchar();
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+	return ch;
+}
+#endif
+
+#if !defined(SLOTH_IMPLEMENTATION)
+void sloth_emit_(X* x);
+#else
+#ifndef SLOTH_CUSTOM_EMIT
+/* Unicode does not work correctly on Windows cmd.exe or */
+/* Windows Terminal because Windows uses UTF-16 by default. */
+P(emit, { printf("%c", (uCHAR)sloth_pop(x)); })
+#endif
+#endif
+#if !defined(SLOTH_IMPLEMENTATION)
+void sloth_key_(X* x);
+#else
+#ifndef SLOTH_CUSTOM_KEY
+P(key, { sloth_push(x, getch()); })
+#endif
+#endif
+
 /* -- Primitive, word and user variable creation ------- */
 
 A(CELL, primitive, (X* x, F f), { 
@@ -956,6 +1002,11 @@ A(void, bootstrap, (X* x), {
 	sloth_code(x, "(STRING)", sloth_primitive(x, &sloth_string_));
 	sloth_code(x, "(CSTRING)", sloth_primitive(x, &sloth_c_string_));
 	sloth_code(x, "MOVE", sloth_primitive(x, &sloth_move_));
+
+	/* Input/output operations */
+
+	sloth_code(x, "EMIT", sloth_primitive(x, &sloth_emit_));
+	sloth_code(x, "KEY", sloth_primitive(x, &sloth_key_));
 
 	/* Quotations */
 
