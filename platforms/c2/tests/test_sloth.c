@@ -1,6 +1,9 @@
-#define SLOTH_IMPLEMENTATION
 #include "sloth.h"
 #include "unity.h"
+
+/* Custom EMIT for testing — replaces the default printf one */
+char emitted_char = 0;
+void sloth_emit_(X* x) { emitted_char = (char)sloth_pop(x); }
 
 #ifdef _WIN32
 #  include <windows.h>
@@ -274,19 +277,19 @@ void test_op() {
 void test_do_prim() {
 	TEST_ASSERT_EQUAL(11, my_var);
 	sloth_primitive(x, &my_primitive);
-	sloth_do_prim(x, -1);
+	sloth__do_prim(x, -1);
 	TEST_ASSERT_EQUAL(17, my_var);
 }
 
 void test_call() {
 	x->ip = 11;
-	sloth_call(x, 19);
+	sloth__call(x, 19);
 	TEST_ASSERT_EQUAL(19, x->ip);
 	TEST_ASSERT_EQUAL(1, x->rp);
 	TEST_ASSERT_EQUAL(11, x->r[0]);
 	sloth_rpop(x);
 	
-	sloth_call(x, -1);
+	sloth__call(x, -1);
 	TEST_ASSERT_EQUAL(-1, x->ip);
 }
 
@@ -294,11 +297,11 @@ void test_execute() {
 	sloth_primitive(x, &my_primitive);
 	
 	my_var = 11;
-	sloth_execute(x, -1);
+	sloth__execute(x, -1);
 	TEST_ASSERT_EQUAL(17, my_var);
 	
 	x->ip = -1;
-	sloth_execute(x, sloth_to_abs(x, 3*sCELL));
+	sloth__execute(x, sloth_to_abs(x, 3*sCELL));
 	TEST_ASSERT_EQUAL(0, x->rp);
 	TEST_ASSERT_EQUAL(sloth_to_abs(x, 3*sCELL), x->ip);
 }
@@ -308,7 +311,7 @@ void test_inner() {
 	sloth_set(x, 4*sCELL, sloth_primitive(x, my_exit));
 	x->ip = sloth_to_abs(x, 3*sCELL);
 	my_var = 11;
-	sloth_inner(x);
+	sloth__inner(x);
 	TEST_ASSERT_EQUAL(17, my_var);
 	TEST_ASSERT_EQUAL(-1, x->ip);
 }
@@ -337,7 +340,7 @@ void test_debug_inner() {
 	sloth_primitive(x, &my_debug);
 	my_var = 11;
 	x->ip = sloth_to_abs(x, 4*sCELL);
-	sloth_debug_inner(x, -3);
+	sloth__debug_inner(x, -3);
 	TEST_ASSERT_EQUAL(23, my_var);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(sloth_to_abs(x, 4*sCELL), x->s[0]);
@@ -559,10 +562,10 @@ void test_searching() {
 	CELL w = sloth_header(x, (CELL)name, (CELL)strlen(name));
 	sloth_set_xt(x, w, 123);
 	
-	TEST_ASSERT_TRUE(sloth_compare_no_case(x, (CELL)name, strlen(name), (CELL)"find-me", strlen("find-me")));
-	TEST_ASSERT_FALSE(sloth_compare_no_case(x, (CELL)name, strlen(name), (CELL)"other", 5));
+	TEST_ASSERT_TRUE(sloth__compare(x, (CELL)name, strlen(name), (CELL)"find-me", strlen("find-me")));
+	TEST_ASSERT_FALSE(sloth__compare(x, (CELL)name, strlen(name), (CELL)"other", 5));
 	
-	TEST_ASSERT_EQUAL(w, sloth_search_word(x, (CELL)name, strlen(name)));
+	TEST_ASSERT_EQUAL(w, sloth__search_word(x, (CELL)name, strlen(name)));
 	TEST_ASSERT_EQUAL(w, sloth_find_word(x, name));
 	
 	// Test sloth_find_ (primitive)
@@ -1119,6 +1122,15 @@ void test_included_and_refill() {
 	remove(tmppath);
 }
 
+/* -- Input/Output ------------------------------------- */
+
+void test_emit() {
+    emitted_char = 0;
+    sloth_push(x, 'Z');
+    sloth_emit_(x);
+    TEST_ASSERT_EQUAL(0, x->sp);
+    TEST_ASSERT_EQUAL('Z', emitted_char);
+}
 
 /* -- Bootstrapping ------------------------------------ */
 
@@ -1202,6 +1214,8 @@ int main() {
 	RUN_TEST(test_included_relative_path);
 	RUN_TEST(test_included_root_path);
 	RUN_TEST(test_included_and_refill);
+	/* Input/output */
+	RUN_TEST(test_emit);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();

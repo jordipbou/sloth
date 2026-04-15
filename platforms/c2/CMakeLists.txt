@@ -9,7 +9,7 @@ target_include_directories(sloth_lib INTERFACE
 
 # terminal SLOTH REPL
 
-add_executable(sloth repl.c)
+add_executable(sloth repl.c sloth.c)
 
 target_compile_definitions(sloth PRIVATE
 	ROOT_PATH="${PROJECT_BINARY_DIR}/../../../../"
@@ -24,5 +24,6 @@ endif()
 
 add_library(unity STATIC tests/unity.c)
 target_include_directories(unity PUBLIC . tests/)
-add_executable(test_sloth tests/test_sloth.c)
+add_executable(test_sloth tests/test_sloth.c sloth.c)
 target_link_libraries(test_sloth unity)
+target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_EMIT)
