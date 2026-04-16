@@ -505,6 +505,26 @@ void test_zbranch_() {
 	TEST_ASSERT_EQUAL(base_ip + sCELL, x->ip);
 }
 
+/* -- Arithmetic and logical operations ---------------- */
+
+void test_and_() {
+	sloth_push(x, 0); sloth_push(x, 0); sloth_and_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, 1); sloth_and_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 0); sloth_and_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 1); sloth_and_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+}
+
 /* -- Strings ------------------------------------------ */
 
 void test_string_() {
@@ -1224,6 +1244,8 @@ int main() {
 	RUN_TEST(test_rip_);
 	RUN_TEST(test_branch_);
 	RUN_TEST(test_zbranch_);
+	/* Arithmetic and logical operations */
+	RUN_TEST(test_and_);
 	/* Strings */
 	RUN_TEST(test_string_);
 	RUN_TEST(test_c_string_);

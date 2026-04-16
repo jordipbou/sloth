@@ -328,6 +328,13 @@ void sloth_throw_(X* x){
 	if (e) sloth_throw(x, e); 
 }
 
+/* -- Arithmetic and logical operations ---------------- */
+
+void sloth_and_(X* x) { 
+	CELL v = sloth_pop(x); 
+	sloth_push(x, sloth_pop(x) & v); 
+}
+
 /* -- Strings ------------------------------------------ */
 
 void sloth_string_(X* x) {
@@ -860,6 +867,10 @@ void sloth_bootstrap(X* x) {
 
 	sloth_code(x, "CATCH", sloth_primitive(x, &sloth_catch_));
 	sloth_code(x, "THROW", sloth_primitive(x, &sloth_throw_));
+
+	/* Arithmetic and logical operations */
+
+	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));
 
 	/* Strings */
 

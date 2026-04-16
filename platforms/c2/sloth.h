@@ -291,6 +291,10 @@ void sloth_throw(X* x, CELL e);
 void sloth_catch_(X* x);
 void sloth_throw_(X* x);
 
+/* -- Arithmetic and logical operations ---------------- */
+
+void sloth_and_(X* x);
+
 /* -- Strings ------------------------------------------ */
 
 void sloth_string_(X* x);
