@@ -525,6 +525,16 @@ void test_and_() {
 	TEST_ASSERT_EQUAL(1, sloth_pop(x));
 }
 
+void test_invert_() {
+	sloth_push(x, 0); sloth_invert_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_invert_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+}
+
 /* -- Strings ------------------------------------------ */
 
 void test_string_() {
@@ -1246,6 +1256,7 @@ int main() {
 	RUN_TEST(test_zbranch_);
 	/* Arithmetic and logical operations */
 	RUN_TEST(test_and_);
+	RUN_TEST(test_invert_);
 	/* Strings */
 	RUN_TEST(test_string_);
 	RUN_TEST(test_c_string_);

@@ -335,6 +335,8 @@ void sloth_and_(X* x) {
 	sloth_push(x, sloth_pop(x) & v); 
 }
 
+void sloth_invert_(X* x) { sloth_push(x, ~sloth_pop(x)); }
+
 /* -- Strings ------------------------------------------ */
 
 void sloth_string_(X* x) {
@@ -871,6 +873,7 @@ void sloth_bootstrap(X* x) {
 	/* Arithmetic and logical operations */
 
 	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));
+	sloth_code(x, "INVERT", sloth_primitive(x, &sloth_invert_));
 
 	/* Strings */
 

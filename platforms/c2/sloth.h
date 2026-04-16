@@ -294,6 +294,7 @@ void sloth_throw_(X* x);
 /* -- Arithmetic and logical operations ---------------- */
 
 void sloth_and_(X* x);
+void sloth_invert_(X* x);
 
 /* -- Strings ------------------------------------------ */
 
