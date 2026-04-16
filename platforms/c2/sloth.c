@@ -334,8 +334,11 @@ void sloth_and_(X* x) {
 	CELL v = sloth_pop(x); 
 	sloth_push(x, sloth_pop(x) & v); 
 }
-
 void sloth_invert_(X* x) { sloth_push(x, ~sloth_pop(x)); }
+void sloth_l_shift_(X* x) { 
+	CELL n = sloth_pop(x); 
+	sloth_push(x, sloth_pop(x) << n); 
+}
 
 /* -- Strings ------------------------------------------ */
 
@@ -874,6 +877,7 @@ void sloth_bootstrap(X* x) {
 
 	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));
 	sloth_code(x, "INVERT", sloth_primitive(x, &sloth_invert_));
+	sloth_code(x, "LSHIFT", sloth_primitive(x, &sloth_l_shift_));
 
 	/* Strings */
 

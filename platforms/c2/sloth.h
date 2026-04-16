@@ -295,6 +295,7 @@ void sloth_throw_(X* x);
 
 void sloth_and_(X* x);
 void sloth_invert_(X* x);
+void sloth_l_shift_(X* x);
 
 /* -- Strings ------------------------------------------ */
 

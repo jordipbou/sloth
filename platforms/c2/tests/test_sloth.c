@@ -535,6 +535,24 @@ void test_invert_() {
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 }
 
+void test_l_shift_() {
+	sloth_push(x, 1); sloth_push(x, 0); sloth_l_shift_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 1); sloth_l_shift_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(2, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 2); sloth_l_shift_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(4, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 15); sloth_l_shift_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(32768, sloth_pop(x));
+}
+
 /* -- Strings ------------------------------------------ */
 
 void test_string_() {
@@ -1257,6 +1275,7 @@ int main() {
 	/* Arithmetic and logical operations */
 	RUN_TEST(test_and_);
 	RUN_TEST(test_invert_);
+	RUN_TEST(test_l_shift_);
 	/* Strings */
 	RUN_TEST(test_string_);
 	RUN_TEST(test_c_string_);
