@@ -426,6 +426,17 @@ void sloth_u_m_slash_mod_(X* x) {
 	sloth_push(x, q);
 }
 
+/* -- Comparison operations ---------------------------- */
+
+void sloth_equals_(X* x) { 
+	CELL a = sloth_pop(x); 
+	sloth_push(x, sloth_pop(x) == a ? -1 : 0); 
+}
+void sloth_less_than_(X* x) { 
+	CELL a = sloth_pop(x); 
+	sloth_push(x, sloth_pop(x) < a ? -1 : 0); 
+}
+
 /* -- Strings ------------------------------------------ */
 
 void sloth_string_(X* x) {
@@ -972,6 +983,10 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "UM*", sloth_primitive(x, &sloth_u_m_star_));
 	sloth_code(x, "UM/MOD", sloth_primitive(x, &sloth_u_m_slash_mod_));
 
+	/* Comparison operations */
+
+	sloth_code(x, "=", sloth_primitive(x, &sloth_equals_));
+	sloth_code(x, "<", sloth_primitive(x, &sloth_less_than_));
 
 	/* Strings */
 

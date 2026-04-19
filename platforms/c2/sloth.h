@@ -304,6 +304,11 @@ void sloth_two_slash_(X* x);
 void sloth_u_m_star_(X* x);
 void sloth_u_m_slash_mod_(X* x);
 
+/* -- Comparison operations ---------------------------- */
+
+void sloth_equals_(X* x);
+void sloth_less_than_(X* x);
+
 /* -- Strings ------------------------------------------ */
 
 void sloth_string_(X* x);

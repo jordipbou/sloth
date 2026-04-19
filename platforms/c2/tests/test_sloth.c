@@ -516,7 +516,7 @@ void test_zbranch_() {
 
 #define MAXUINT				((uCELL)~0)
 #define MAXINT				(((uCELL)~0)>>1)
-#define MININT				((~((uCELL)~0))>>1)
+#define MININT				(~(((uCELL)~0)>>1))
 #define MIDUINT				((((uCELL)~0))>>1)
 #define MIDUINTplus1  (~(((uCELL)~0)>>1))
 
@@ -901,6 +901,104 @@ void test_u_m_slash_mod_() {
 	TEST_ASSERT_EQUAL(MAXUINT, sloth_pop(x));
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
+}
+
+/* -- Comparison operators ----------------------------- */
+
+void test_equals_() {
+	sloth_push(x, 0); sloth_push(x, 0); sloth_equals_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 1); sloth_equals_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_push(x, -1); sloth_equals_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 0); sloth_equals_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_push(x, 0); sloth_equals_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, 1); sloth_equals_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, -1); sloth_equals_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+}
+
+void test_less_than_() {
+	sloth_push(x, 0); sloth_push(x, 1); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 2); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_push(x, 0); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_push(x, 1); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, MININT); sloth_push(x, 0); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, MININT); sloth_push(x, MAXINT); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, MAXINT); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, 0); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 1); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 0); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 2); sloth_push(x, 1); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, -1); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, -1); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, MININT); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, MAXINT); sloth_push(x, MININT); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, MAXINT); sloth_push(x, 0); sloth_less_than_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 }
 
 /* -- Strings ------------------------------------------ */
@@ -1633,6 +1731,9 @@ int main() {
 	RUN_TEST(test_two_slash_);
 	RUN_TEST(test_u_m_star_);
 	RUN_TEST(test_u_m_slash_mod_);
+	/* Comparison operators */
+	RUN_TEST(test_equals_);
+	RUN_TEST(test_less_than_);
 	/* Strings */
 	RUN_TEST(test_string_);
 	RUN_TEST(test_c_string_);
