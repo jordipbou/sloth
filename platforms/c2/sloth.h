@@ -296,6 +296,13 @@ void sloth_throw_(X* x);
 void sloth_and_(X* x);
 void sloth_invert_(X* x);
 void sloth_l_shift_(X* x);
+void sloth_minus_(X* x);
+void sloth_plus_(X* x);
+void sloth_r_shift_(X* x);
+void sloth_star_(X* x);
+void sloth_two_slash_(X* x);
+void sloth_u_m_star_(X* x);
+void sloth_u_m_slash_mod_(X* x);
 
 /* -- Strings ------------------------------------------ */
 

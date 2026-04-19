@@ -330,14 +330,100 @@ void sloth_throw_(X* x){
 
 /* -- Arithmetic and logical operations ---------------- */
 
+void sloth_invert_(X* x) { sloth_push(x, ~sloth_pop(x)); }
 void sloth_and_(X* x) { 
 	CELL v = sloth_pop(x); 
 	sloth_push(x, sloth_pop(x) & v); 
 }
-void sloth_invert_(X* x) { sloth_push(x, ~sloth_pop(x)); }
 void sloth_l_shift_(X* x) { 
 	CELL n = sloth_pop(x); 
 	sloth_push(x, sloth_pop(x) << n); 
+}
+void sloth_minus_(X* x) { 
+	CELL a = sloth_pop(x); 
+	sloth_push(x, sloth_pop(x) - a); 
+}
+void sloth_plus_(X* x) { 
+	CELL a = sloth_pop(x); 
+	sloth_push(x, sloth_pop(x) + a); 
+}
+void sloth_r_shift_(X* x) { 
+	CELL n = sloth_pop(x); 
+	sloth_push(x, ((uCELL)sloth_pop(x)) >> n); 
+}
+void sloth_star_(X* x) { 
+	CELL b = sloth_pop(x); 
+	sloth_push(x, sloth_pop(x) * b); 
+}
+void sloth_two_slash_(X* x) { 
+	sloth_push(x, sloth_pop(x) >> 1); 
+}
+void sloth_u_m_star_(X* x) {
+	uCELL b = (uCELL)sloth_pop(x), a = (uCELL)sloth_pop(x), high, low;
+
+	/* Split each 64-bit integer into 32-bit pieces for multiplication */
+	uCELL a_low = a & hCELL_MASK;
+	uCELL a_high = a >> hCELL_BITS;
+	uCELL b_low = b & hCELL_MASK;
+	uCELL b_high = b >> hCELL_BITS;
+	
+	/* Multiply the 32-bit components */
+	uCELL low_low = a_low * b_low;
+	uCELL low_high = a_low * b_high;
+	uCELL high_low = a_high * b_low;
+	uCELL high_high = a_high * b_high;
+
+	uCELL carry; /* Pre-definition */
+
+	/* Intermediate values for calculating the carries */
+	uCELL mid = low_low >> hCELL_BITS;
+	mid += low_high & hCELL_MASK;
+	mid += high_low & hCELL_MASK;
+	
+	/* Calculate carry for the high part */
+	carry = mid >> hCELL_BITS;
+	
+	/* Calculate the low 64 bits of the result */
+	low = (mid << hCELL_BITS) | (low_low & hCELL_MASK);
+	
+	/* Calculate the high 64 bits of the result */
+	high = high_high + (low_high >> hCELL_BITS) + (high_low >> hCELL_BITS) + carry;
+
+	sloth_push(x, low);
+	sloth_push(x, high);
+}
+/* UM/MOD code taken from pForth */
+#define DULT(du1l,du1h,du2l,du2h) ( (du2h<du1h) ? 0 : ( (du2h==du1h) ? (du1l<du2l) : 1) )
+void sloth_u_m_slash_mod_(X* x) {
+	uCELL ah, al, q, di, bl, bh, sl, sh;
+	bh = (uCELL)sloth_pop(x);
+	bl = 0;
+	ah = (uCELL)sloth_pop(x);
+	al = (uCELL)sloth_pop(x);
+	q = 0;
+	for( di=0; di<CELL_BITS; di++ )
+	{
+	    if( !DULT(al,ah,bl,bh) )
+	    {
+	        sh = 0;
+	        sl = al - bl;
+	        if( al < bl ) sh = 1; /* Borrow */
+	        sh = ah - bh - sh;
+	        ah = sh;
+	        al = sl;
+	        q |= 1;
+	    }
+	    q = q << 1;
+	    bl = (bl >> 1) | (bh << (CELL_BITS-1));
+	    bh = bh >> 1;
+	}
+	if( !DULT(al,ah,bl,bh) )
+	{
+	    al = al - bl;
+	    q |= 1;
+	}
+	sloth_push(x, al); /* rem */
+	sloth_push(x, q);
 }
 
 /* -- Strings ------------------------------------------ */
@@ -875,9 +961,17 @@ void sloth_bootstrap(X* x) {
 
 	/* Arithmetic and logical operations */
 
-	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));
 	sloth_code(x, "INVERT", sloth_primitive(x, &sloth_invert_));
+	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));
 	sloth_code(x, "LSHIFT", sloth_primitive(x, &sloth_l_shift_));
+	sloth_code(x, "-", sloth_primitive(x, &sloth_minus_));
+	sloth_code(x, "+", sloth_primitive(x, &sloth_plus_));
+	sloth_code(x, "RSHIFT", sloth_primitive(x, &sloth_plus_));
+	sloth_code(x, "*", sloth_primitive(x, &sloth_star_));
+	sloth_code(x, "2/", sloth_primitive(x, &sloth_two_slash_));
+	sloth_code(x, "UM*", sloth_primitive(x, &sloth_u_m_star_));
+	sloth_code(x, "UM/MOD", sloth_primitive(x, &sloth_u_m_slash_mod_));
+
 
 	/* Strings */
 
@@ -910,17 +1004,6 @@ void sloth_bootstrap(X* x) {
 #endif
 
 /*
-	sloth_code(x, "AND", sloth_primitive(x, &sloth_and_));
-	sloth_code(x, "INVERT", sloth_primitive(x, &sloth_invert_));
-	sloth_code(x, "LSHIFT", sloth_primitive(x, &sloth_l_shift_));
-	sloth_code(x, "-", sloth_primitive(x, &sloth_minus_));
-	sloth_code(x, "+", sloth_primitive(x, &sloth_plus_));
-	sloth_code(x, "RSHIFT", sloth_primitive(x, &sloth_r_shift_));
-	sloth_code(x, "*", sloth_primitive(x, &sloth_star_));
-	sloth_code(x, "2/", sloth_primitive(x, &sloth_two_slash_));
-	sloth_code(x, "UM*", sloth_primitive(x, &sloth_u_m_star_));
-	sloth_code(x, "UM/MOD", sloth_primitive(x, &sloth_u_m_slash_mod_));
-
 	sloth_code(x, "=", sloth_primitive(x, &sloth_equals_));
 	sloth_code(x, "<", sloth_primitive(x, &sloth_less_than_));
 

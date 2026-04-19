@@ -21,10 +21,15 @@ void sloth_key_(X* x) { sloth_push(x, mock_key_char); }
 X* x;
 char ibuf[1024];
 
+// CELL S0;
+// CELL MIDUINTplus1;
+
 void setUp() {
 	/* Create a VM with 64 primitive slots and 1024 bytes */
 	/* of dictionary. */
 	x = sloth_create(64, 16384, 1024);
+	// S0 = 0;
+	// MIDUINTplus1 = ~(((uCELL)~S0)>>1);
 }
 
 void tearDown() {
@@ -507,6 +512,29 @@ void test_zbranch_() {
 
 /* -- Arithmetic and logical operations ---------------- */
 
+/* These words implement ANS Forth tests adapted to C */
+
+#define MAXUINT				((uCELL)~0)
+#define MAXINT				(((uCELL)~0)>>1)
+#define MININT				((~((uCELL)~0))>>1)
+#define MIDUINT				((((uCELL)~0))>>1)
+#define MIDUINTplus1  (~(((uCELL)~0)>>1))
+
+#define S0						0
+#define S1						((uCELL)~0)
+
+#define MSB						(((uCELL)~((uCELL)~0))>>1)
+
+void test_invert_() {
+	sloth_push(x, 0); sloth_invert_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_invert_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+}
+
 void test_and_() {
 	sloth_push(x, 0); sloth_push(x, 0); sloth_and_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
@@ -523,16 +551,30 @@ void test_and_() {
 	sloth_push(x, 1); sloth_push(x, 1); sloth_and_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(1, sloth_pop(x));
-}
 
-void test_invert_() {
-	sloth_push(x, 0); sloth_invert_(x);
+	sloth_push(x, 0); sloth_invert_(x); sloth_push(x, 1); sloth_and_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
 
-	sloth_push(x, -1); sloth_invert_(x);
+	sloth_push(x, 1); sloth_invert_(x); sloth_push(x, 1); sloth_and_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, S0); sloth_push(x, S0); sloth_and_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(S0, sloth_pop(x));
+
+	sloth_push(x, S0); sloth_push(x, S1); sloth_and_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(S0, sloth_pop(x));
+
+	sloth_push(x, S1); sloth_push(x, S0); sloth_and_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(S0, sloth_pop(x));
+
+	sloth_push(x, S1); sloth_push(x, S1); sloth_and_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(S1, sloth_pop(x));
 }
 
 void test_l_shift_() {
@@ -548,9 +590,317 @@ void test_l_shift_() {
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(4, sloth_pop(x));
 
-	sloth_push(x, 1); sloth_push(x, 15); sloth_l_shift_(x);
+	sloth_push(x, 1); sloth_push(x, 0xF); sloth_l_shift_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL(32768, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0x8000, sloth_pop(x));
+
+	sloth_push(x, S1); sloth_push(x, 1); sloth_l_shift_(x);
+	sloth_push(x, sloth_pop(x) ^ 1);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(S1, sloth_pop(x));
+
+	sloth_push(x, MSB); sloth_push(x, 1); sloth_l_shift_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+}
+
+void test_minus_() {
+	sloth_push(x, 0); sloth_push(x, 5); sloth_minus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-5, sloth_pop(x));
+
+	sloth_push(x, 5); sloth_push(x, 0); sloth_minus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(5, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, -5); sloth_minus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(5, sloth_pop(x));
+
+	sloth_push(x, -5); sloth_push(x, 0); sloth_minus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-5, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 2); sloth_minus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, -2); sloth_minus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(3, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_push(x, 2); sloth_minus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-3, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_push(x, -2); sloth_minus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, 1); sloth_minus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, MIDUINTplus1); sloth_push(x, 1); sloth_minus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(MIDUINT, sloth_pop(x));
+}
+
+void test_plus_() {
+	sloth_push(x, 0); sloth_push(x, 5); sloth_plus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(5, sloth_pop(x));
+
+	sloth_push(x, 5); sloth_push(x, 0); sloth_plus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(5, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, -5); sloth_plus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-5, sloth_pop(x));
+
+	sloth_push(x, -5); sloth_push(x, 0); sloth_plus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-5, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 2); sloth_plus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(3, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, -2); sloth_plus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_push(x, 2); sloth_plus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_push(x, -2); sloth_plus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-3, sloth_pop(x));
+
+	sloth_push(x, -1); sloth_push(x, 1); sloth_plus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, MIDUINT); sloth_push(x, 1); sloth_plus_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(MIDUINTplus1, sloth_pop(x));
+}
+
+void test_r_shift_() {
+	sloth_push(x, 1); sloth_push(x, 0); sloth_r_shift_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 1); sloth_r_shift_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 2); sloth_push(x, 1); sloth_r_shift_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+
+	sloth_push(x, 4); sloth_push(x, 2); sloth_r_shift_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+
+	sloth_push(x, 0x8000); sloth_push(x, 0xF); sloth_r_shift_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+
+	sloth_push(x, MSB); sloth_push(x, 1); sloth_r_shift_(x);
+	sloth_push(x, MSB); sloth_and_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, MSB); sloth_push(x, 1); sloth_r_shift_(x);
+	sloth_push(x, sloth_pop(x) * 2);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(MSB, sloth_pop(x));
+}
+
+void test_star_() {
+	sloth_push(x, 0); sloth_push(x, 0); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	
+	sloth_push(x, 0); sloth_push(x, 1); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 0); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 2); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(2, sloth_pop(x));
+
+	sloth_push(x, 2); sloth_push(x, 1); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(2, sloth_pop(x));
+
+	sloth_push(x, 3); sloth_push(x, 3); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(9, sloth_pop(x));
+
+	sloth_push(x, -3); sloth_push(x, 3); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-9, sloth_pop(x));
+
+	sloth_push(x, 3); sloth_push(x, -3); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(-9, sloth_pop(x));
+
+	sloth_push(x, -3); sloth_push(x, -3); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(9, sloth_pop(x));
+
+	sloth_push(x, MIDUINTplus1); sloth_push(x, 1);
+	sloth_r_shift_(x); sloth_push(x, 2); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(MIDUINTplus1, sloth_pop(x));
+
+	sloth_push(x, MIDUINTplus1); sloth_push(x, 2);
+	sloth_r_shift_(x); sloth_push(x, 4); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(MIDUINTplus1, sloth_pop(x));
+
+	sloth_push(x, MIDUINTplus1); sloth_push(x, 1);
+	sloth_r_shift_(x); sloth_push(x, MIDUINTplus1 | sloth_pop(x)); 
+	sloth_push(x, 2); sloth_star_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(MIDUINTplus1, sloth_pop(x));
+}
+
+void test_two_slash_() {
+	sloth_push(x, S0); sloth_two_slash_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(S0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_two_slash_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 0x4000); sloth_two_slash_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0x2000, sloth_pop(x));
+
+	sloth_push(x, S1); sloth_two_slash_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(S1, sloth_pop(x));
+
+	sloth_push(x, S1^1); sloth_two_slash_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(S1, sloth_pop(x));
+
+	sloth_push(x, MSB); sloth_two_slash_(x);
+	sloth_push(x, MSB); sloth_and_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(MSB, sloth_pop(x));
+}
+
+void test_u_m_star_() {
+	sloth_push(x, 0); sloth_push(x, 0); sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 0); sloth_push(x, 1); sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 0); sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 2); sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(2, sloth_pop(x));
+
+	sloth_push(x, 2); sloth_push(x, 1); sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(2, sloth_pop(x));
+
+	sloth_push(x, 3); sloth_push(x, 3); sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(9, sloth_pop(x));
+
+	sloth_push(x, MIDUINTplus1>>1); sloth_push(x, 2);
+	sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(MIDUINTplus1, sloth_pop(x));
+
+	sloth_push(x, MIDUINTplus1); sloth_push(x, 2);
+	sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, MIDUINTplus1); sloth_push(x, 4);
+	sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(2, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, S1); sloth_push(x, 2);
+	sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(S1<<1, sloth_pop(x));
+
+	sloth_push(x, MAXUINT); sloth_push(x, MAXUINT);
+	sloth_u_m_star_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(~1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+}
+
+void test_u_m_slash_mod_() {
+	sloth_push(x, 0); sloth_push(x, 0); sloth_push(x, 1);
+	sloth_u_m_slash_mod_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, 1); sloth_push(x, 0); sloth_push(x, 2);
+	sloth_u_m_slash_mod_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+
+	sloth_push(x, 3); sloth_push(x, 0); sloth_push(x, 2);
+	sloth_u_m_slash_mod_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+
+	sloth_push(x, MAXUINT); sloth_push(x, 2); sloth_u_m_star_(x);
+	sloth_push(x, 2);	sloth_u_m_slash_mod_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(MAXUINT, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, MAXUINT); sloth_push(x, 2); sloth_u_m_star_(x);
+	sloth_push(x, MAXUINT);	sloth_u_m_slash_mod_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(2, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
+	sloth_push(x, MAXUINT); sloth_push(x, MAXUINT); 
+	sloth_u_m_star_(x);	
+	sloth_push(x, MAXUINT);	sloth_u_m_slash_mod_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(MAXUINT, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+
 }
 
 /* -- Strings ------------------------------------------ */
@@ -1273,9 +1623,16 @@ int main() {
 	RUN_TEST(test_branch_);
 	RUN_TEST(test_zbranch_);
 	/* Arithmetic and logical operations */
-	RUN_TEST(test_and_);
 	RUN_TEST(test_invert_);
+	RUN_TEST(test_and_);
 	RUN_TEST(test_l_shift_);
+	RUN_TEST(test_minus_);
+	RUN_TEST(test_plus_);
+	RUN_TEST(test_r_shift_);
+	RUN_TEST(test_star_);
+	RUN_TEST(test_two_slash_);
+	RUN_TEST(test_u_m_star_);
+	RUN_TEST(test_u_m_slash_mod_);
 	/* Strings */
 	RUN_TEST(test_string_);
 	RUN_TEST(test_c_string_);
