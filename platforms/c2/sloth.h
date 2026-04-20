@@ -397,6 +397,17 @@ void sloth_included_(X* x);
 void sloth_emit_(X* x);
 void sloth_key_(X* x);
 
+/* -- Parsing input ------------------------------------ */
+
+void sloth_word_(X* x);
+
+/* -- Defining words ----------------------------------- */
+
+void sloth_colon_(X* x);
+void sloth_colon_no_name_(X* x);
+void sloth_semicolon_(X* x);
+void sloth_recurse_(X* x);
+
 /* -- Primitive, word and user variable creation ------- */
 
 CELL sloth_primitive(X* x, F f);

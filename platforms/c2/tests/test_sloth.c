@@ -1653,20 +1653,98 @@ void test_key_pushes_char_onto_stack() {
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL('Q', sloth_pop(x));
 	TEST_ASSERT_EQUAL(0, x->sp);
-
-	
 }
 
 void test_key_handles_zero() {
-    mock_key_char = 0;
-    sloth_key_(x);
-    TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	mock_key_char = 0;
+	sloth_key_(x);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 }
 
 void test_key_handles_max_uchar() {
-    mock_key_char = 255;
-    sloth_key_(x);
-    TEST_ASSERT_EQUAL(255, sloth_pop(x));
+	mock_key_char = 255;
+	sloth_key_(x);
+	TEST_ASSERT_EQUAL(255, sloth_pop(x));
+}
+
+/* -- Parsing input ------------------------------------ */
+
+void test_word_() {
+	char *ibuf = "Hello world";
+	CELL addr;
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 11);
+	sloth_push(x, ' ');
+	sloth_word_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	addr = sloth_pop(x);
+	TEST_ASSERT_EQUAL(5, sloth_c_fetch(x, addr));
+	TEST_ASSERT_EQUAL('H', sloth_c_fetch(x, addr + 1*suCHAR));
+	TEST_ASSERT_EQUAL('e', sloth_c_fetch(x, addr + 2*suCHAR));
+	TEST_ASSERT_EQUAL('l', sloth_c_fetch(x, addr + 3*suCHAR));
+	TEST_ASSERT_EQUAL('l', sloth_c_fetch(x, addr + 4*suCHAR));
+	TEST_ASSERT_EQUAL('o', sloth_c_fetch(x, addr + 5*suCHAR));
+
+	sloth_push(x, ' ');
+	sloth_word_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	addr = sloth_pop(x);
+	TEST_ASSERT_EQUAL(5, sloth_c_fetch(x, addr));
+	TEST_ASSERT_EQUAL('w', sloth_c_fetch(x, addr + 1*suCHAR));
+	TEST_ASSERT_EQUAL('o', sloth_c_fetch(x, addr + 2*suCHAR));
+	TEST_ASSERT_EQUAL('r', sloth_c_fetch(x, addr + 3*suCHAR));
+	TEST_ASSERT_EQUAL('l', sloth_c_fetch(x, addr + 4*suCHAR));
+	TEST_ASSERT_EQUAL('d', sloth_c_fetch(x, addr + 5*suCHAR));
+
+	sloth_push(x, ' ');
+	sloth_word_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_c_fetch(x, sloth_pop(x)));
+}
+
+/* -- Defining words ----------------------------------- */
+
+void test_colon_() {
+	char *name = "TEST";
+	CELL here = sloth_here(x);
+	sloth_user_set(x, SLOTH_IBUF, (CELL)name);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 11);
+	sloth_colon_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(here, sloth_get_latest(x));
+	TEST_ASSERT_EQUAL(sloth_here(x), sloth_user_get(x, SLOTH_LATESTXT));
+	TEST_ASSERT_EQUAL(SLOTH_HIDDEN, sloth_get_flags(x, sloth_get_latest(x)));
+	TEST_ASSERT_EQUAL(1, sloth_user_get(x, SLOTH_STATE));
+}
+
+void test_colon_no_name_() {
+	CELL here = sloth_here(x);
+	sloth_colon_no_name_(x);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(sloth_here(x), sloth_user_get(x, SLOTH_LATESTXT));
+	TEST_ASSERT_EQUAL(1, sloth_user_get(x, SLOTH_STATE));
+}
+
+void test_semicolon_() {
+	char *name = "TEST";
+	CELL here = sloth_here(x);
+	sloth_user_set(x, SLOTH_IBUF, (CELL)name);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 11);
+	sloth_colon_(x);
+	sloth_code(x, "EXIT", -1);
+	sloth_semicolon_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_STATE));
+}
+
+void test_recurse_() {
+	CELL here = sloth_here(x);
+	sloth_user_set(x, SLOTH_LATESTXT, 1111);
+	sloth_recurse_(x);
+	TEST_ASSERT_EQUAL(1111, sloth_fetch(x, here));
 }
 
 /* -- Bootstrapping ------------------------------------ */
@@ -1770,6 +1848,13 @@ int main() {
 	RUN_TEST(test_key_pushes_char_onto_stack);
 	RUN_TEST(test_key_handles_zero);
 	RUN_TEST(test_key_handles_max_uchar);
+	/* Parsing input */
+	RUN_TEST(test_word_);
+	/* Defining words */
+	RUN_TEST(test_colon_);
+	RUN_TEST(test_colon_no_name_);
+	RUN_TEST(test_semicolon_);
+	RUN_TEST(test_recurse_);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();

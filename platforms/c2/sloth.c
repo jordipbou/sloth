@@ -888,6 +888,87 @@ void sloth_emit_(X* x) { printf("%c", (uCHAR)sloth_pop(x)); }
 void sloth_key_(X* x) { sloth_push(x, getch()); }
 #endif
 
+/* -- Parsing input ------------------------------------ */
+
+void sloth_word_(X* x) {
+	/* The region to store WORD counted strings starts */
+	/* at here + CBUF. */
+	uCHAR c = (uCHAR)sloth_pop(x);
+	CELL ibuf = sloth_user_get(x, SLOTH_IBUF);
+	CELL ilen = sloth_user_get(x, SLOTH_ILEN);
+	CELL ipos = sloth_user_get(x, SLOTH_IPOS);
+	CELL start, end, i;
+	/* First, ignore c until not c is found */
+	/* The Forth Standard says that if the control character is */
+	/* the space (hex 20) then control characters may be treated */
+	/* as delimiters. */
+	if (c == 32) {
+		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) <= c) 
+			ipos++;
+	} else {
+		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) == c) 
+			ipos++;
+	}
+	start = ibuf + ipos;
+	/* Next, continue parsing until c is found again */
+	if (c == 32) {
+		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) > c) 
+			ipos++;
+	} else {
+		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) != c) 
+			ipos++;
+	}
+	end = ibuf + ipos;	
+	/* Now, copy it to the counted string buffer */
+	/* TODO Here, end-start must be divided by sCHAR to ensure */
+	/* implementations with char != 1 work well */
+	sloth_c_store(x, sloth_here(x) + SLOTH_CBUF, end - start);
+
+	for (i = 0; i < (end - start); i++) {
+		sloth_c_store(
+			x, 
+			sloth_here(x) + SLOTH_CBUF + suCHAR + i*suCHAR, 
+			sloth_c_fetch(x, start + i*suCHAR));
+	}
+	sloth_push(x, sloth_here(x) + SLOTH_CBUF);
+
+	/* If we are not at the end of the input buffer, */
+	/* skip c after the word, but its not part of the counted */
+	/* string */
+	if (ipos < ilen) ipos++;
+	sloth_user_set(x, SLOTH_IPOS, ipos);
+}
+
+/* -- Defining words ----------------------------------- */
+
+void sloth_colon_(X* x) {
+	CELL addr;
+	CELL tok, tlen;
+	sloth_push(x, 32); sloth_word_(x);
+	addr = sloth_pop(x);
+	tok = addr + suCHAR;
+	tlen = sloth_c_fetch(x, addr);
+	sloth_header(x, tok, tlen);
+	sloth_user_set(x, SLOTH_LATESTXT, sloth_get_xt(x, sloth_get_latest(x)));
+	sloth_set_flag(x, sloth_get_latest(x), SLOTH_HIDDEN);
+	sloth_user_set(x, SLOTH_STATE, 1);
+}
+void sloth_colon_no_name_(X* x) { 
+	sloth_push(x, sloth_here(x));
+	sloth_user_set(x, SLOTH_LATESTXT, sloth_here(x));
+	sloth_user_set(x, SLOTH_STATE, 1);
+}
+void sloth_semicolon_(X* x) {
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
+	sloth_user_set(x, SLOTH_STATE, 0);
+	/* Don't change flags for nonames */
+	if (sloth_get_xt(x, sloth_get_latest(x)) == sloth_user_get(x, SLOTH_LATESTXT))
+		sloth_unset_flag(x, sloth_get_latest(x), SLOTH_HIDDEN);
+}
+void sloth_recurse_(X* x) { 
+	sloth_compile(x, sloth_user_get(x, SLOTH_LATESTXT)); 
+}
+
 /* -- Primitive, word and user variable creation ------- */
 
 CELL sloth_primitive(X* x, F f) { 
