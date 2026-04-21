@@ -1779,6 +1779,37 @@ void test_create_() {
 	TEST_ASSERT_EQUAL(-1, sloth_fetch(x, xt+3*sCELL));
 }
 
+void test_do_does_() {
+	char *name = "TEST";
+	CELL here, xt;
+	sloth_user_set(x, SLOTH_IBUF, (CELL)name);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 4);
+	sloth_code(x, "(RIP)", -2);
+	sloth_code(x, "EXIT", -1);
+	here = sloth_here(x);
+	sloth_create_(x);
+	xt = sloth_fetch(x, here + sCELL);
+	TEST_ASSERT_EQUAL(-1, sloth_fetch(x, xt+2*sCELL));
+	sloth_push(x, 13);
+	sloth_do_does_(x);
+	TEST_ASSERT_EQUAL(13, sloth_fetch(x, xt+2*sCELL));
+}
+
+void test_does_() {
+	CELL here;
+	sloth_code(x, "(LIT)", -3);
+	sloth_code(x, "(DOES)", -2);
+	sloth_code(x, "EXIT", -1);
+	here = sloth_here(x);
+	sloth_does_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(-3, sloth_fetch(x, here));
+	TEST_ASSERT_EQUAL(here + 4*sCELL, sloth_fetch(x, here+sCELL));
+	TEST_ASSERT_EQUAL(-2, sloth_fetch(x, here+2*sCELL));
+	TEST_ASSERT_EQUAL(-1, sloth_fetch(x, here+3*sCELL));
+}
+
 /* -- Bootstrapping ------------------------------------ */
 
 void test_bootstrap() {
@@ -1890,6 +1921,8 @@ int main() {
 	RUN_TEST(test_recurse_);
 	RUN_TEST(test_compile_comma_);
 	RUN_TEST(test_create_);
+	RUN_TEST(test_do_does_);
+	RUN_TEST(test_does_);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();

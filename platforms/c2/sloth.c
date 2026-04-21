@@ -992,6 +992,25 @@ void sloth_create_(X* x) {
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT"))); 
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 }
+/* Helper compiled by DOES> that replaces the first EXIT */
+/* compiled by CREATE on the new created word with a call */
+/* to the code after the DOES> in the CREATE DOES> word */
+void sloth_do_does_(X* x) {
+	sloth_store(x, 
+		sloth_get_xt(x, sloth_get_latest(x)) + 2*sCELL, 
+		sloth_pop(x));
+}
+/* DOES> stores the XT of the code that will be executed */
+/* by the created word. That's the address just after the EXIT */
+/* compiled by DOES>. */
+/* When a word is created, that address is pushed to the stack */
+/* and the helper (DOES) is executed, compiling a call to the */
+/* code just after the DOES> in the defining word. */
+void sloth_does_(X* x) {
+	sloth_literal(x, sloth_here(x) + 4*sCELL);
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(DOES)")));
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
+}
 
 /* -- Primitive, word and user variable creation ------- */
 
@@ -1138,6 +1157,8 @@ void sloth_bootstrap(X* x) {
 
 	sloth_code(x, "COMPILE,", sloth_primitive(x, &sloth_compile_comma_));
 	sloth_code(x, "CREATE", sloth_primitive(x, &sloth_create_));
+	sloth_code(x, "(DOES)", sloth_primitive(x, &sloth_do_does_));
+	sloth_code(x, "DOES>", sloth_primitive(x, &sloth_does_)); sloth_immediate_(x);
 }
 
 /* -- Context initialization and destruction ----------- */

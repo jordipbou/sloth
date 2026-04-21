@@ -411,6 +411,8 @@ void sloth_recurse_(X* x);
 
 void sloth_compile_comma_(X* x);
 void sloth_create_(X* x);
+void sloth_do_does_(X* x);
+void sloth_does_(X* x);
 
 /* -- Primitive, word and user variable creation ------- */
 
