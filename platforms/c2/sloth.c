@@ -89,6 +89,7 @@ void sloth_allot(X* x, CELL v) {
 }
 CELL sloth_aligned(CELL a) { return ALIGNED(a, sCELL); }
 
+void sloth_allot_(X* x) { sloth_allot(x, sloth_pop(x)); }
 void sloth_align_(X* x) { 
 	sloth_set(x, SLOTH_HERE, ALIGNED(sloth_here(x), sCELL)); 
 }
@@ -943,12 +944,9 @@ void sloth_word_(X* x) {
 
 void sloth_colon_(X* x) {
 	CELL addr;
-	CELL tok, tlen;
 	sloth_push(x, 32); sloth_word_(x);
 	addr = sloth_pop(x);
-	tok = addr + suCHAR;
-	tlen = sloth_c_fetch(x, addr);
-	sloth_header(x, tok, tlen);
+	sloth_header(x, addr + suCHAR, sloth_c_fetch(x, addr));
 	sloth_user_set(x, SLOTH_LATESTXT, sloth_get_xt(x, sloth_get_latest(x)));
 	sloth_set_flag(x, sloth_get_latest(x), SLOTH_HIDDEN);
 	sloth_user_set(x, SLOTH_STATE, 1);
@@ -967,6 +965,32 @@ void sloth_semicolon_(X* x) {
 }
 void sloth_recurse_(X* x) { 
 	sloth_compile(x, sloth_user_get(x, SLOTH_LATESTXT)); 
+}
+
+void sloth_compile_comma_(X* x) { sloth_compile(x, sloth_pop(x)); }
+/* CREATE parses the next word in the input buffer, creates */
+/* a new header for it and then compiles some code. */
+/* The compiled code is 5 CELLS long and has a RIP instruction */
+/* with a displacement of 5 CELLS and three EXIT instructions. */
+/* The RIP instruction will load onto the stack the address */
+/* after the last EXIT instruction. That's the address used */
+/* by created words. */
+/* The first EXIT instruction exists to be replaced with a */
+/* call to the DOES> part if CREATE DOES> is used and also */
+/* returns after pushing the vlaue address if no DOES> part */
+/* has been called. */
+/* The next EXIT is there to return after calling the DOES> part. */
+/* The last EXIT represents the function to call in case of using */
+/* TO. */
+void sloth_create_(X* x) {
+	CELL addr;
+	sloth_push(x, 32); sloth_word_(x);
+	addr = sloth_pop(x);
+	sloth_header(x, addr + suCHAR, sloth_c_fetch(x, addr));
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(RIP)"))); 
+	sloth_compile(x, 4*sCELL); 
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT"))); 
+	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 }
 
 /* -- Primitive, word and user variable creation ------- */
@@ -1044,6 +1068,8 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "CELLS", sloth_primitive(x, &sloth_cells_));
 	sloth_code(x, "CHARS", sloth_primitive(x, &sloth_chars_));
 
+	sloth_code(x, "ALIGN", sloth_primitive(x, &sloth_align_));
+	sloth_code(x, "ALLOT", sloth_primitive(x, &sloth_allot_));
 	sloth_code(x, "UNUSED", sloth_primitive(x, &sloth_unused_));
 
 	/* Exceptions */
@@ -1099,18 +1125,19 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "INCLUDED", sloth_primitive(x, &sloth_included_));
 #endif
 
-/*
-	sloth_code(x, "=", sloth_primitive(x, &sloth_equals_));
-	sloth_code(x, "<", sloth_primitive(x, &sloth_less_than_));
+	/* Parsing input */
 
-	sloth_code(x, "?:", sloth_primitive(x, &sloth_conditional_colon_));
-	sloth_code(x, "?\\", sloth_primitive(x, &sloth_conditional_comment_));
+	sloth_code(x, "WORD", sloth_primitive(x, &sloth_word_));
+
+	/* Defining words */
+
+	sloth_code(x, ":", sloth_primitive(x, &sloth_colon_));
+	sloth_code(x, ":NONAME", sloth_primitive(x, &sloth_colon_no_name_));
 	sloth_code(x, ";", sloth_primitive(x, &sloth_semicolon_));
-*/
+	sloth_code(x, "RECURSE", sloth_primitive(x, &sloth_recurse_));
 
-/*
-	sloth_code(x, "ALLOT", sloth_primitive(x, &sloth_allot_));
-*/
+	sloth_code(x, "COMPILE,", sloth_primitive(x, &sloth_compile_comma_));
+	sloth_code(x, "CREATE", sloth_primitive(x, &sloth_create_));
 }
 
 /* -- Context initialization and destruction ----------- */

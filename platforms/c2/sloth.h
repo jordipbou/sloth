@@ -199,6 +199,7 @@ CELL sloth_here(X* x);
 void sloth_allot(X* x, CELL v);
 CELL sloth_aligned(CELL a);
 
+void sloth_allot_(X* x);
 void sloth_align_(X* x);
 
 /* Moving data from stack to dictionary and viceversa */
@@ -407,6 +408,9 @@ void sloth_colon_(X* x);
 void sloth_colon_no_name_(X* x);
 void sloth_semicolon_(X* x);
 void sloth_recurse_(X* x);
+
+void sloth_compile_comma_(X* x);
+void sloth_create_(X* x);
 
 /* -- Primitive, word and user variable creation ------- */
 

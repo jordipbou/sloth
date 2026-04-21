@@ -25,11 +25,9 @@ char ibuf[1024];
 // CELL MIDUINTplus1;
 
 void setUp() {
-	/* Create a VM with 64 primitive slots and 1024 bytes */
+	/* Create a VM with 64 primitive slots and 32767 bytes */
 	/* of dictionary. */
-	x = sloth_create(64, 16384, 1024);
-	// S0 = 0;
-	// MIDUINTplus1 = ~(((uCELL)~S0)>>1);
+	x = sloth_create(256, 32767, 1024);
 }
 
 void tearDown() {
@@ -43,7 +41,7 @@ void test_context_init() {
 	TEST_ASSERT_EQUAL(-1, x->ip);
 	TEST_ASSERT_NOT_NULL((void*)x->d);
 	TEST_ASSERT_NOT_NULL((void*)x->u);
-	TEST_ASSERT_EQUAL(16384, x->dz);
+	TEST_ASSERT_EQUAL(32767, x->dz);
 	TEST_ASSERT_EQUAL(1024, x->uz);
 	TEST_ASSERT_EQUAL(-1, x->jmpbuf_idx);
 	TEST_ASSERT_EQUAL(*((CELL*)(x->d + 0*sCELL)), x->d + 3*sCELL);
@@ -180,6 +178,14 @@ void test_memory() {
 	sloth_unused_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL((x->d + x->dz) - sloth_here(x), sloth_pop(x));
+}
+
+void test_allot_() {
+	CELL here = sloth_here(x);
+	sloth_push(x, 10);
+	sloth_allot_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(here + 10, sloth_here(x));
 }
 
 /* -- Compilation -------------------------------------- */
@@ -1747,6 +1753,32 @@ void test_recurse_() {
 	TEST_ASSERT_EQUAL(1111, sloth_fetch(x, here));
 }
 
+void test_compile_comma_() {
+	CELL here = sloth_here(x);
+	sloth_push(x, 123);
+	sloth_compile_comma_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(123, sloth_fetch(x, here));
+}
+
+void test_create_() {
+	char *name = "TEST";
+	CELL here, xt;
+	sloth_user_set(x, SLOTH_IBUF, (CELL)name);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 4);
+	sloth_code(x, "(RIP)", -2);
+	sloth_code(x, "EXIT", -1);
+	here = sloth_here(x);
+	sloth_create_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	xt = sloth_fetch(x, here + sCELL);
+	TEST_ASSERT_EQUAL(-2, sloth_fetch(x, xt));
+	TEST_ASSERT_EQUAL(4*sCELL, sloth_fetch(x, xt+sCELL));
+	TEST_ASSERT_EQUAL(-1, sloth_fetch(x, xt+2*sCELL));
+	TEST_ASSERT_EQUAL(-1, sloth_fetch(x, xt+3*sCELL));
+}
+
 /* -- Bootstrapping ------------------------------------ */
 
 void test_bootstrap() {
@@ -1765,6 +1797,7 @@ int main() {
 	RUN_TEST(test_over_);
 	RUN_TEST(test_return_stack);
 	RUN_TEST(test_memory);
+	RUN_TEST(test_allot_);
 	RUN_TEST(test_compilation);
 	/* Headers */
 	RUN_TEST(test_get_set_latest);
@@ -1855,6 +1888,8 @@ int main() {
 	RUN_TEST(test_colon_no_name_);
 	RUN_TEST(test_semicolon_);
 	RUN_TEST(test_recurse_);
+	RUN_TEST(test_compile_comma_);
+	RUN_TEST(test_create_);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();
