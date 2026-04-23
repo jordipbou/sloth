@@ -414,6 +414,10 @@ void sloth_create_(X* x);
 void sloth_do_does_(X* x);
 void sloth_does_(X* x);
 
+/* -- Outer interpreter -------------------------------- */
+
+void sloth_interpret_(X* x);
+
 /* -- Primitive, word and user variable creation ------- */
 
 CELL sloth_primitive(X* x, F f);

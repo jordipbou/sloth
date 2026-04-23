@@ -1012,6 +1012,110 @@ void sloth_does_(X* x) {
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 }
 
+/* -- Outer interpreter -------------------------------- */
+
+/* INTERPRET is not an ANS word ??!! */
+void sloth_interpret_(X* x) {
+	CELL nt, flag, n;
+	CELL word_addr;
+	char* tok;
+	int tlen;
+	char buf[128]; char *endptr;
+	int is_double;
+	printf("INTERPRET\n");
+	while (sloth_user_get(x, SLOTH_IPOS) < sloth_user_get(x, SLOTH_ILEN)) {
+		sloth_push(x, 32); sloth_word_(x);
+		word_addr = sloth_pop(x);
+		tok = (char*)(word_addr + suCHAR);
+		tlen = sloth_c_fetch(x, word_addr);
+		if (tlen == 0) { return; }
+		sloth_push(x, word_addr);
+		sloth_find_(x);
+		if ((flag = sloth_pop(x)) != 0) {
+			if (sloth_user_get(x, SLOTH_STATE) == 0
+			|| (sloth_user_get(x, SLOTH_STATE) != 0 && flag == 1)) {
+				sloth_eval(x, sloth_pop(x));	
+			} else {
+				sloth_compile(x, sloth_pop(x));
+			}
+		} else {
+			CELL temp_base;
+			temp_base = sloth_user_get(x, SLOTH_BASE);
+			sloth_pop(x);
+			if (tlen == 3 && *tok == '\'' && (*(tok + 2*suCHAR)) == '\'') {
+				/* Character literal */
+				if (sloth_user_get(x, SLOTH_STATE) == 0)	
+					sloth_push(x, *(tok + suCHAR));
+				else 
+					sloth_literal(x, *(tok + suCHAR));
+			} else {
+				is_double = 0;
+				if (*tok == '#') {
+					temp_base = 10;
+					tlen--;
+					tok++;
+				}	else if (*tok == '$') {
+					temp_base = 16;
+					tlen--;
+					tok++;
+				} else if (*tok == '%') {
+					temp_base = 2;
+					tlen--;
+					tok++;
+				} else if (*(tok + tlen - 1) == '.') {
+					tlen--;
+					is_double = 1;
+				}
+				strncpy(buf, tok, tlen);
+				buf[tlen] = 0;
+				n = strtoll(buf, &endptr, temp_base);	
+				if (*endptr == '\0') {
+					if (sloth_user_get(x, SLOTH_STATE) == 0) {
+						sloth_push(x, n);
+						if (is_double) sloth_push(x, n < 0 ? -1 : 0);
+					} else { 
+						sloth_literal(x, n);
+						if (is_double) sloth_literal(x, n < 0 ? -1 : 0);
+					}
+				} else {
+				#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+
+					FCELL r;
+					if (sloth_user_area_get(x, SLOTH_BASE) == 10) {
+						r = strtod(buf, &endptr);	
+						if (r == 0 && buf == endptr) {
+							if (sloth_user_area_get(x, SLOTH_SOURCE_ID) != -1) {
+								printf("%.*s ?\n", tlen, tok);
+							}
+							sloth_throw(x, -13);
+						} else {
+							if (sloth_user_area_get(x, SLOTH_STATE) == 0) {
+								sloth_fpush(x, r);
+							} else {
+								sloth_fliteral(x, r);
+							}
+						}
+					} else {
+						if (sloth_user_area_get(x, SLOTH_SOURCE_ID) != -1) {
+							printf("%.*s ?\n", tlen, tok);
+						}
+						sloth_throw(x, -13);
+					}
+
+				#else
+
+					if (sloth_user_get(x, SLOTH_SOURCE_ID) != -1) {
+						printf("%.*s ?\n", tlen, tok);
+					}
+					sloth_throw(x, -13);
+
+				#endif
+				}
+			}
+		}
+	}
+}
+
 /* -- Primitive, word and user variable creation ------- */
 
 CELL sloth_primitive(X* x, F f) { 
@@ -1059,7 +1163,7 @@ void sloth_bootstrap(X* x) {
 	sloth_user_variable(x, "(SOURCE-ID)", SLOTH_SOURCE_ID, 0);
 	sloth_user_variable(x, "(SOURCE-POS)", SLOTH_SOURCE_POS, 0);
 	sloth_user_variable(x, "(LATESTXT)", SLOTH_LATESTXT, 0);
-	sloth_user_variable(x, "(INTERPRET)", SLOTH_INTERPRET, 0);
+	sloth_user_variable(x, "(INTERPRET)", SLOTH_INTERPRET, sloth_primitive(x, &sloth_interpret_));
 
 	sloth_user_variable(x, "(SLOTH_ROOT_PATH_LENGTH)", SLOTH_ROOT_PATH_LENGTH, 0);
 	sloth_user_variable(x, "(SLOTH_PATH_START)", SLOTH_PATH_START, x->u + SLOTH_PATHS);

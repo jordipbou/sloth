@@ -1810,6 +1810,55 @@ void test_does_() {
 	TEST_ASSERT_EQUAL(-1, sloth_fetch(x, here+3*sCELL));
 }
 
+/* -- Outer interpreter -------------------------------- */
+
+void test_interpret_empty() {
+	sloth_user_set(x, SLOTH_IBUF, 0);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 0);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+}
+
+void test_interpret_character_literals_interpret_mode() {
+	char *ibuf = "'a' 'b'";
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 7);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL('b', sloth_pop(x));
+	TEST_ASSERT_EQUAL('a', sloth_pop(x));
+}
+
+void test_interpret_character_literals_compile_mode() {
+	char *ibuf = "'a' 'b'";
+	CELL here;
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 7);
+	sloth_user_set(x, SLOTH_STATE, 1);
+	sloth_code(x, "(LIT)", -2);
+	here = sloth_here(x);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL('a', sloth_fetch(x, here + sCELL));
+	TEST_ASSERT_EQUAL('b', sloth_fetch(x, here + 3*sCELL));
+}
+
+void test_interpret_numbers() {
+	char *ibuf = "1 0 37 -560";
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 11);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(4, x->sp);
+	TEST_ASSERT_EQUAL(-560, sloth_pop(x));
+	TEST_ASSERT_EQUAL(37, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+}
+
 /* -- Bootstrapping ------------------------------------ */
 
 void test_bootstrap() {
@@ -1923,6 +1972,11 @@ int main() {
 	RUN_TEST(test_create_);
 	RUN_TEST(test_do_does_);
 	RUN_TEST(test_does_);
+	/* Outer interpreter */
+	RUN_TEST(test_interpret_empty);
+	RUN_TEST(test_interpret_character_literals_interpret_mode);
+	RUN_TEST(test_interpret_character_literals_compile_mode);
+	RUN_TEST(test_interpret_numbers);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
 	return UNITY_END();
