@@ -1810,6 +1810,32 @@ void test_does_() {
 	TEST_ASSERT_EQUAL(-1, sloth_fetch(x, here+3*sCELL));
 }
 
+void test_evaluate_() {
+	char *buf = "11 12 +";
+	CELL i;
+	sloth_push(x, (CELL)buf);
+	sloth_push(x, 7);
+	sloth_code(x, "+", sloth_primitive(x, &sloth_plus_));
+	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &sloth_interpret_));
+	sloth_evaluate_(x);
+	for (i = 0; i < x->sp; i++) printf("%ld ", x->s[i]);
+	printf("\n");
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(23, sloth_pop(x));
+}
+
+CELL p0;
+
+void primitive0(X* x) { p0 = 1; }
+
+void test_execute_() {
+	p0 = 0;
+	sloth_push(x, sloth_primitive(x, &primitive0));
+	sloth_execute_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(1, p0);
+}
+
 /* -- Outer interpreter -------------------------------- */
 
 void test_interpret_empty() {
@@ -2078,6 +2104,8 @@ int main() {
 	RUN_TEST(test_create_);
 	RUN_TEST(test_do_does_);
 	RUN_TEST(test_does_);
+	RUN_TEST(test_evaluate_);
+	RUN_TEST(test_execute_);
 	/* Outer interpreter */
 	RUN_TEST(test_interpret_empty);
 	RUN_TEST(test_interpret_character_literals_interpret_mode);

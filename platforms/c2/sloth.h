@@ -414,6 +414,9 @@ void sloth_create_(X* x);
 void sloth_do_does_(X* x);
 void sloth_does_(X* x);
 
+void sloth_evaluate_(X* x);
+void sloth_execute_(X* x);
+
 /* -- Outer interpreter -------------------------------- */
 
 void sloth_interpret_(X* x);

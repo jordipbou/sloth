@@ -1012,6 +1012,41 @@ void sloth_does_(X* x) {
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "EXIT")));
 }
 
+void sloth_evaluate_(X* x) {
+	CELL e;
+	CELL l = sloth_pop(x), a = sloth_pop(x);
+
+	CELL previbuf = sloth_user_get(x, SLOTH_IBUF);
+	CELL previpos = sloth_user_get(x, SLOTH_IPOS);
+	CELL previlen = sloth_user_get(x, SLOTH_ILEN);
+
+	CELL prevsourceid = sloth_user_get(x, SLOTH_SOURCE_ID);
+
+	sloth_user_set(x, SLOTH_SOURCE_ID, -1);
+
+	sloth_user_set(x, SLOTH_IBUF, a);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, l);
+
+	/* To ensure that the input buffer is restored correctly */
+	/* even in case of a throw, I catch any possible throw */
+	/* here and rethrow it after restoring the input buffer. */
+	sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
+		
+	sloth_user_set(x, SLOTH_SOURCE_ID, prevsourceid);
+
+	sloth_user_set(x, SLOTH_IBUF, previbuf);
+	sloth_user_set(x, SLOTH_IPOS, previpos);
+	sloth_user_set(x, SLOTH_ILEN, previlen);
+	
+	e = sloth_pop(x);
+	if (e != 0) {
+		sloth_throw(x, e);
+	}
+}
+
+void sloth_execute_(X* x) { sloth_eval(x, sloth_pop(x)); }
+
 /* -- Outer interpreter -------------------------------- */
 
 /* INTERPRET is not an ANS word ??!! */
@@ -1022,7 +1057,6 @@ void sloth_interpret_(X* x) {
 	int tlen;
 	char buf[128]; char *endptr;
 	int is_double;
-	printf("INTERPRET\n");
 	while (sloth_user_get(x, SLOTH_IPOS) < sloth_user_get(x, SLOTH_ILEN)) {
 		sloth_push(x, 32); sloth_word_(x);
 		word_addr = sloth_pop(x);
@@ -1081,22 +1115,22 @@ void sloth_interpret_(X* x) {
 				#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
 
 					FCELL r;
-					if (sloth_user_area_get(x, SLOTH_BASE) == 10) {
+					if (sloth_user_get(x, SLOTH_BASE) == 10) {
 						r = strtod(buf, &endptr);	
 						if (r == 0 && buf == endptr) {
-							if (sloth_user_area_get(x, SLOTH_SOURCE_ID) != -1) {
+							if (sloth_user_get(x, SLOTH_SOURCE_ID) != -1) {
 								printf("%.*s ?\n", tlen, tok);
 							}
 							sloth_throw(x, -13);
 						} else {
-							if (sloth_user_area_get(x, SLOTH_STATE) == 0) {
+							if (sloth_user_get(x, SLOTH_STATE) == 0) {
 								sloth_fpush(x, r);
 							} else {
 								sloth_fliteral(x, r);
 							}
 						}
 					} else {
-						if (sloth_user_area_get(x, SLOTH_SOURCE_ID) != -1) {
+						if (sloth_user_get(x, SLOTH_SOURCE_ID) != -1) {
 							printf("%.*s ?\n", tlen, tok);
 						}
 						sloth_throw(x, -13);
@@ -1263,6 +1297,9 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "CREATE", sloth_primitive(x, &sloth_create_));
 	sloth_code(x, "(DOES)", sloth_primitive(x, &sloth_do_does_));
 	sloth_code(x, "DOES>", sloth_primitive(x, &sloth_does_)); sloth_immediate_(x);
+
+	sloth_code(x, "EVALUATE", sloth_primitive(x, &sloth_evaluate_));
+	sloth_code(x, "EXECUTE", sloth_primitive(x, &sloth_execute_));
 }
 
 /* -- Context initialization and destruction ----------- */
