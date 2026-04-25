@@ -188,6 +188,13 @@ void test_allot_() {
 	TEST_ASSERT_EQUAL(here + 10, sloth_here(x));
 }
 
+void test_here_() {
+	sloth_here_(x);
+	TEST_ASSERT_EQUAL(sloth_here(x), sloth_pop(x));
+	sloth_here_(x);
+	TEST_ASSERT_EQUAL(sloth_fetch(x, x->d), sloth_pop(x));
+}
+
 /* -- Compilation -------------------------------------- */
 
 void test_compilation() {
@@ -252,14 +259,6 @@ void test_name_and_len() {
 	CELL w = sloth_header(x, (CELL)name, (CELL)strlen(name));
 	TEST_ASSERT_EQUAL_MEMORY(name, (char*)sloth_get_name_addr(x, w), strlen(name));
 	TEST_ASSERT_EQUAL(strlen(name), sloth_get_namelen(x, w));
-}
-
-void test_immediate_() {
-	char name[] = "IMM-WORD";
-	CELL w = sloth_header(x, (CELL)name, (CELL)strlen(name));
-	TEST_ASSERT_FALSE(sloth_has_flag(x, w, SLOTH_IMMEDIATE));
-	sloth_immediate_(x);
-	TEST_ASSERT_TRUE(sloth_has_flag(x, w, SLOTH_IMMEDIATE));
 }
 
 /* -- Primitive and word creation ---------------------- */
@@ -1753,6 +1752,57 @@ void test_recurse_() {
 	TEST_ASSERT_EQUAL(1111, sloth_fetch(x, here));
 }
 
+void test_immediate_() {
+	char name[] = "IMM-WORD";
+	CELL w = sloth_header(x, (CELL)name, (CELL)strlen(name));
+	TEST_ASSERT_FALSE(sloth_has_flag(x, w, SLOTH_IMMEDIATE));
+	sloth_immediate_(x);
+	TEST_ASSERT_TRUE(sloth_has_flag(x, w, SLOTH_IMMEDIATE));
+}
+
+CELL postpone_p1;
+void postpone_primitive1(X* x) {
+	postpone_p1 = 1;
+}
+
+void test_postpone_() {
+	char *ibuf = ": TEST IMM-WORD ;";
+	char *ibuf2 = ": TEST POSTPONE IMM-WORD ;";
+	char *ibuf3 = "TEST";
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 17);
+	postpone_p1 = 0;
+	sloth_code(x, "EXIT", sloth_primitive(x, &sloth_exit_));
+	sloth_code(x, "(LIT)", sloth_primitive(x, &sloth_lit_));
+	sloth_code(x, "(RIP)", sloth_primitive(x, &sloth_rip_));
+	sloth_code(x, ":", sloth_primitive(x, &sloth_colon_));
+	sloth_code(x, ";", sloth_primitive(x, &sloth_semicolon_)); sloth_immediate_(x);
+	sloth_code(x, "COMPILE,", sloth_primitive(x, &sloth_compile_comma_));
+	sloth_code(x, "POSTPONE", sloth_primitive(x, &sloth_postpone_)); sloth_immediate_(x);
+	sloth_code(x, "IMM-WORD", sloth_primitive(x, &postpone_primitive1)); sloth_immediate_(x);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(1, postpone_p1);
+
+	/* Test that IMM-WORD is not executed when POSTPONEd */
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf2);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 26);
+	postpone_p1 = 0;
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(0, postpone_p1);
+
+	/* Test that IMM-WORD was compiled when POSTPONEd */
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf3);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 4);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(1, postpone_p1);
+}
+
 void test_compile_comma_() {
 	CELL here = sloth_here(x);
 	sloth_push(x, 123);
@@ -1818,8 +1868,6 @@ void test_evaluate_() {
 	sloth_code(x, "+", sloth_primitive(x, &sloth_plus_));
 	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &sloth_interpret_));
 	sloth_evaluate_(x);
-	for (i = 0; i < x->sp; i++) printf("%ld ", x->s[i]);
-	printf("\n");
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(23, sloth_pop(x));
 }
@@ -2010,6 +2058,7 @@ int main() {
 	RUN_TEST(test_return_stack);
 	RUN_TEST(test_memory);
 	RUN_TEST(test_allot_);
+	RUN_TEST(test_here_);
 	RUN_TEST(test_compilation);
 	/* Headers */
 	RUN_TEST(test_get_set_latest);
@@ -2019,7 +2068,6 @@ int main() {
 	RUN_TEST(test_has_set_unset_flag);
 	RUN_TEST(test_headers);
 	RUN_TEST(test_name_and_len);
-	RUN_TEST(test_immediate_);
 	/* Primitive and word creation */
 	RUN_TEST(test_primitive_and_word_creation);
 	/* Inner interpreter */
@@ -2100,6 +2148,8 @@ int main() {
 	RUN_TEST(test_colon_no_name_);
 	RUN_TEST(test_semicolon_);
 	RUN_TEST(test_recurse_);
+	RUN_TEST(test_immediate_);
+	RUN_TEST(test_postpone_);
 	RUN_TEST(test_compile_comma_);
 	RUN_TEST(test_create_);
 	RUN_TEST(test_do_does_);

@@ -18,6 +18,8 @@ int getch() {
 
 /* -- Data and return stack ---------------------------- */
 
+#define TOS(x) x->s[x->sp - 1]
+
 void sloth_push(X* x, CELL v) { x->s[x->sp] = v; x->sp++; }
 CELL sloth_pop(X* x) { x->sp--; return x->s[x->sp]; }
 void sloth_rpush(X* x, CELL v) { x->r[x->rp] = v; x->rp++; }
@@ -89,6 +91,7 @@ void sloth_allot(X* x, CELL v) {
 }
 CELL sloth_aligned(CELL a) { return ALIGNED(a, sCELL); }
 
+void sloth_here_(X* x) { sloth_push(x, sloth_here(x)); }
 void sloth_allot_(X* x) { sloth_allot(x, sloth_pop(x)); }
 void sloth_align_(X* x) { 
 	sloth_set(x, SLOTH_HERE, ALIGNED(sloth_here(x), sCELL)); 
@@ -200,10 +203,6 @@ CELL sloth_header(X* x, CELL n, CELL l) {
 	sloth_align_(x); /* Align XT address */
 	sloth_set_xt(x, w, sloth_here(x));
 	return w;
-}
-
-void sloth_immediate_(X* x) { 
-	sloth_set_flag(x, sloth_get_latest(x), SLOTH_IMMEDIATE); 
 }
 
 /* -- Inner interpreter -------------------------------- */
@@ -966,6 +965,32 @@ void sloth_semicolon_(X* x) {
 void sloth_recurse_(X* x) { 
 	sloth_compile(x, sloth_user_get(x, SLOTH_LATESTXT)); 
 }
+void sloth_immediate_(X* x) { 
+	sloth_set_flag(x, sloth_get_latest(x), SLOTH_IMMEDIATE); 
+}
+void sloth_postpone_(X* x) { 
+	CELL i, xt, tok, tlen;
+	sloth_push(x, 32); sloth_word_(x);
+	tok = TOS(x) + suCHAR;
+	tlen = sloth_c_fetch(x, TOS(x));
+	if (tlen == 0) { sloth_pop(x); return; }
+	sloth_find_(x); 
+	i = sloth_pop(x);
+	xt = sloth_pop(x);
+	if (i == 0) { 
+		return;
+	} else if (i == -1) {
+		/* Compile the compilation of the normal word */
+		sloth_literal(x, xt);
+		sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "COMPILE,")));
+	} else if (i == 1) {
+		/* Compile the immediate word */
+
+		sloth_compile(x, xt);
+	}
+}
+
+
 
 void sloth_compile_comma_(X* x) { sloth_compile(x, sloth_pop(x)); }
 /* CREATE parses the next word in the input buffer, creates */
@@ -1052,18 +1077,15 @@ void sloth_execute_(X* x) { sloth_eval(x, sloth_pop(x)); }
 /* INTERPRET is not an ANS word ??!! */
 void sloth_interpret_(X* x) {
 	CELL nt, flag, n;
-	CELL word_addr;
 	char* tok;
 	int tlen;
 	char buf[128]; char *endptr;
 	int is_double;
 	while (sloth_user_get(x, SLOTH_IPOS) < sloth_user_get(x, SLOTH_ILEN)) {
 		sloth_push(x, 32); sloth_word_(x);
-		word_addr = sloth_pop(x);
-		tok = (char*)(word_addr + suCHAR);
-		tlen = sloth_c_fetch(x, word_addr);
-		if (tlen == 0) { return; }
-		sloth_push(x, word_addr);
+		tok = (char*)(TOS(x) + suCHAR);
+		tlen = sloth_c_fetch(x, TOS(x));
+		if (tlen == 0) { sloth_pop(x); return; }
 		sloth_find_(x);
 		if ((flag = sloth_pop(x)) != 0) {
 			if (sloth_user_get(x, SLOTH_STATE) == 0
@@ -1225,7 +1247,8 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "CELLS", sloth_primitive(x, &sloth_cells_));
 	sloth_code(x, "CHARS", sloth_primitive(x, &sloth_chars_));
 
-	sloth_code(x, "ALIGN", sloth_primitive(x, &sloth_align_));
+	sloth_code(x, "HERE", sloth_primitive(x, &sloth_here_));
+  sloth_code(x, "ALIGN", sloth_primitive(x, &sloth_align_));
 	sloth_code(x, "ALLOT", sloth_primitive(x, &sloth_allot_));
 	sloth_code(x, "UNUSED", sloth_primitive(x, &sloth_unused_));
 
@@ -1292,6 +1315,8 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, ":NONAME", sloth_primitive(x, &sloth_colon_no_name_));
 	sloth_code(x, ";", sloth_primitive(x, &sloth_semicolon_));
 	sloth_code(x, "RECURSE", sloth_primitive(x, &sloth_recurse_));
+	sloth_code(x, "IMMEDIATE", sloth_primitive(x, &sloth_immediate_));
+	sloth_code(x, "POSTPONE", sloth_primitive(x, &sloth_postpone_));
 
 	sloth_code(x, "COMPILE,", sloth_primitive(x, &sloth_compile_comma_));
 	sloth_code(x, "CREATE", sloth_primitive(x, &sloth_create_));

@@ -199,6 +199,7 @@ CELL sloth_here(X* x);
 void sloth_allot(X* x, CELL v);
 CELL sloth_aligned(CELL a);
 
+void sloth_here_(X* x);
 void sloth_allot_(X* x);
 void sloth_align_(X* x);
 
@@ -254,8 +255,6 @@ CELL sloth_get_name_addr(X* x, CELL w);
 /* Name uCHAR*namelen	@ NT + 3*sCELL + 2*suCHAR */
 
 CELL sloth_header(X* x, CELL n, CELL l);
-
-void sloth_immediate_(X* x);
 
 /* -- Inner interpreter -------------------------------- */
 
@@ -408,6 +407,8 @@ void sloth_colon_(X* x);
 void sloth_colon_no_name_(X* x);
 void sloth_semicolon_(X* x);
 void sloth_recurse_(X* x);
+void sloth_immediate_(X* x);
+void sloth_postpone_(X* x);
 
 void sloth_compile_comma_(X* x);
 void sloth_create_(X* x);
