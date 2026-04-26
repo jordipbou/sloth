@@ -39,11 +39,23 @@ void sloth_over_(X* x) {
 	sloth_push(x, a);
 }
 void sloth_swap_(X* x) { 
+	if (x->sp < 2) {
+		sloth_throw(x, SLOTH_STACK_UNDERFLOW);
+	} else {
+		CELL a = sloth_pop(x); 
+		CELL b = sloth_pop(x);
+		sloth_push(x, a);
+		sloth_push(x, b);
+	}
+}
+/*
+void sloth_swap_(X* x) { 
 	CELL b = sloth_pop(x); 
 	CELL a = sloth_pop(x); 
 	sloth_push(x, b); 
 	sloth_push(x, a); 
 }
+*/
 void sloth_to_r_(X* x) { 
 	CELL a = sloth_pop(x); 
 	sloth_rpush(x, a); 
@@ -216,7 +228,7 @@ CELL sloth_op(X* x) {
 void sloth__do_prim(X* x, CELL p) { (x->p->p[-1 - p])(x); }
 
 void sloth__call(X* x, CELL q) { 
-	if (x->ip >= 0) sloth_rpush(x, x->ip); 
+	if (x->ip >= 0 || x->rp > 0) sloth_rpush(x, x->ip); 
 	x->ip = q; 
 }
 
@@ -512,6 +524,10 @@ CELL sloth__search_word(X* x, CELL n, int l) {
 	return 0;
 }
 
+CELL sloth_find_word(X* x, char* name) {
+	return sloth__search_word(x, (CELL)name, strlen(name));
+}
+
 void sloth_find_(X* x) {
 	CELL cstring = sloth_pop(x);
 	CELL w = sloth__search_word(
@@ -529,10 +545,6 @@ void sloth_find_(X* x) {
 		sloth_push(x, sloth_get_xt(x, w));
 		sloth_push(x, -1);
 	}
-}
-
-CELL sloth_find_word(X* x, char* name) {
-	return sloth__search_word(x, (CELL)name, strlen(name));
 }
 
 /* -- More compilation --------------------------------- */
@@ -591,7 +603,70 @@ void sloth_end_quotation_(X* x) {
 
 void sloth_bye_(X* x) { printf("\n"); exit(0); }
 
-/* -- Source code preprocessing, interpreting & auditing commands */
+/* -- Input/output and parsing operations -------------- */
+
+#ifndef SLOTH_CUSTOM_EMIT
+/* Unicode does not work correctly on Windows cmd.exe or */
+/* Windows Terminal because Windows uses UTF-16 by default. */
+void sloth_emit_(X* x) { printf("%c", (uCHAR)sloth_pop(x)); }
+#endif
+#ifndef SLOTH_CUSTOM_KEY
+void sloth_key_(X* x) { sloth_push(x, getch()); }
+#endif
+
+void sloth_source_(X* x) { 
+	sloth_push(x, sloth_user_get(x, SLOTH_IBUF)); 
+	sloth_push(x, sloth_user_get(x, SLOTH_ILEN)); 
+}
+
+void sloth_word_(X* x) {
+	/* The region to store WORD counted strings starts */
+	/* at here + CBUF. */
+	uCHAR c = (uCHAR)sloth_pop(x);
+	CELL ibuf = sloth_user_get(x, SLOTH_IBUF);
+	CELL ilen = sloth_user_get(x, SLOTH_ILEN);
+	CELL ipos = sloth_user_get(x, SLOTH_IPOS);
+	CELL start, end, i;
+	/* First, ignore c until not c is found */
+	/* The Forth Standard says that if the control character is */
+	/* the space (hex 20) then control characters may be treated */
+	/* as delimiters. */
+	if (c == 32) {
+		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) <= c) 
+			ipos++;
+	} else {
+		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) == c) 
+			ipos++;
+	}
+	start = ibuf + ipos;
+	/* Next, continue parsing until c is found again */
+	if (c == 32) {
+		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) > c) 
+			ipos++;
+	} else {
+		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) != c) 
+			ipos++;
+	}
+	end = ibuf + ipos;	
+	/* Now, copy it to the counted string buffer */
+	/* TODO Here, end-start must be divided by sCHAR to ensure */
+	/* implementations with char != 1 work well */
+	sloth_c_store(x, sloth_here(x) + SLOTH_CBUF, end - start);
+
+	for (i = 0; i < (end - start); i++) {
+		sloth_c_store(
+			x, 
+			sloth_here(x) + SLOTH_CBUF + suCHAR + i*suCHAR, 
+			sloth_c_fetch(x, start + i*suCHAR));
+	}
+	sloth_push(x, sloth_here(x) + SLOTH_CBUF);
+
+	/* If we are not at the end of the input buffer, */
+	/* skip c after the word, but its not part of the counted */
+	/* string */
+	if (ipos < ilen) ipos++;
+	sloth_user_set(x, SLOTH_IPOS, ipos);
+}
 
 #ifndef SLOTH_NO_FILES
 void sloth_file_position_(X* x) {
@@ -855,12 +930,16 @@ void sloth_included_(X* x) {
 
 		do {
 			sloth_refill_(x);
+			/* Uncomment to see the lines loaded by _included_ */
+			/*
+			printf("LINE (%ld) [%ld %ld]: %.*s\n", linenumber, x->sp, x->rp, (int)sloth_user_get(x, SLOTH_ILEN), (char*)sloth_user_get(x, SLOTH_IBUF));
+			*/
 			if (!sloth_pop(x)) break;
 			sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
 			e = sloth_pop(x);
 			if (e != 0) {
 				printf("File: %s\n", (char*)sloth_user_get(x, SLOTH_PATH_START));
-				printf("Line (%ld): %s", linenumber, linebuf);	
+				printf("Line (%ld): %s\n", linenumber, linebuf);	
 				sloth_throw(x, e);
 			}
 			linenumber++;
@@ -877,67 +956,6 @@ void sloth_included_(X* x) {
 }
 #endif
 
-/* -- Input/output operations -------------------------- */
-
-#ifndef SLOTH_CUSTOM_EMIT
-/* Unicode does not work correctly on Windows cmd.exe or */
-/* Windows Terminal because Windows uses UTF-16 by default. */
-void sloth_emit_(X* x) { printf("%c", (uCHAR)sloth_pop(x)); }
-#endif
-#ifndef SLOTH_CUSTOM_KEY
-void sloth_key_(X* x) { sloth_push(x, getch()); }
-#endif
-
-/* -- Parsing input ------------------------------------ */
-
-void sloth_word_(X* x) {
-	/* The region to store WORD counted strings starts */
-	/* at here + CBUF. */
-	uCHAR c = (uCHAR)sloth_pop(x);
-	CELL ibuf = sloth_user_get(x, SLOTH_IBUF);
-	CELL ilen = sloth_user_get(x, SLOTH_ILEN);
-	CELL ipos = sloth_user_get(x, SLOTH_IPOS);
-	CELL start, end, i;
-	/* First, ignore c until not c is found */
-	/* The Forth Standard says that if the control character is */
-	/* the space (hex 20) then control characters may be treated */
-	/* as delimiters. */
-	if (c == 32) {
-		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) <= c) 
-			ipos++;
-	} else {
-		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) == c) 
-			ipos++;
-	}
-	start = ibuf + ipos;
-	/* Next, continue parsing until c is found again */
-	if (c == 32) {
-		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) > c) 
-			ipos++;
-	} else {
-		while (ipos < ilen && sloth_c_fetch(x, ibuf + ipos) != c) 
-			ipos++;
-	}
-	end = ibuf + ipos;	
-	/* Now, copy it to the counted string buffer */
-	/* TODO Here, end-start must be divided by sCHAR to ensure */
-	/* implementations with char != 1 work well */
-	sloth_c_store(x, sloth_here(x) + SLOTH_CBUF, end - start);
-
-	for (i = 0; i < (end - start); i++) {
-		sloth_c_store(
-			x, 
-			sloth_here(x) + SLOTH_CBUF + suCHAR + i*suCHAR, 
-			sloth_c_fetch(x, start + i*suCHAR));
-	}
-	sloth_push(x, sloth_here(x) + SLOTH_CBUF);
-
-	/* If we are not at the end of the input buffer, */
-	/* skip c after the word, but its not part of the counted */
-	/* string */
-	if (ipos < ilen) ipos++;
-	sloth_user_set(x, SLOTH_IPOS, ipos);
-}
 
 /* -- Defining words ----------------------------------- */
 
@@ -1085,6 +1103,10 @@ void sloth_interpret_(X* x) {
 		sloth_push(x, 32); sloth_word_(x);
 		tok = (char*)(TOS(x) + suCHAR);
 		tlen = sloth_c_fetch(x, TOS(x));
+		/* Uncomment to debug the TOKEN that's being interpreted */
+		/*
+		printf("TOKEN: %.*s [%ld %ld]\n", tlen, tok, x->sp, x->rp);
+		*/
 		if (tlen == 0) { sloth_pop(x); return; }
 		sloth_find_(x);
 		if ((flag = sloth_pop(x)) != 0) {
@@ -1171,6 +1193,71 @@ void sloth_interpret_(X* x) {
 		}
 	}
 }
+
+/* -- Environment queries ------------------------------ */
+
+void sloth_environment_(X* x) {
+	switch (sloth_pop(x)) {
+	case 0: /* /COUNTED-STRING */ sloth_push(x, 64); break;
+	case 1: /* /HOLD */	/* TODO */ break;
+	case 2: /* /PAD */ /* TODO */ break;
+	case 3: /* ADDRESS-UNIT-BITS */	sloth_push(x, CHAR_BIT); break;
+	case 4: /* FLOORED */
+		/* Good explanation about floored/symmetric division: */
+		/* https://www.nimblemachines.com/symmetric-division-considered-harmful/ */
+		sloth_push(x, (-3 / 2 == -2) ? -1 : 0);
+		break;
+	case 5: /* MAX-CHAR */ sloth_push(x, UCHAR_MAX); break;
+	case 6: /* MAX-D */ /* TODO */ break;
+	case 7: /* MAX-N */ /* TODO */ break;
+	case 8: /* MAX-U */	/* TODO */ break;
+	case 9: /* MAX-UD */ /* TODO */ break;
+	case 10: /* RETURN-STACK-CELLS */
+		sloth_push(x, SLOTH_RETURN_STACK_SIZE);
+		break;
+	case 11: /* STACK-CELLS */
+		sloth_push(x, SLOTH_STACK_SIZE);
+		break;
+	case 12: /* FLOATING-STACK */
+		#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+			sloth_push(x, SLOTH_FLOAT_STACK_SIZE);
+		#else
+			sloth_push(x, -1);
+		#endif
+		break;
+	/* Obsolescent queries (but required for tests) */
+	case 100:
+		#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+			sloth_push(x, -1);
+		#else
+			sloth_push(x, 0);
+		#endif
+		break;
+	/* Non standard queries */
+	case -1: /* PLATFORM */
+		/* This code adapted from: */
+		/* https://stackoverflow.com/questions/142508/how-do-i-check-os-with-a-preprocessor-directive */
+		#if defined(_WIN64)
+			sloth_push(x, 0);
+		#elif defined(WIN32) || defined(_WIN32)
+			sloth_push(x, 1);
+		#elif defined(__CYGWIN__) && !defined(_WIN32)
+			sloth_push(x, 2);
+		#elif defined(__ANDROID__)
+			sloth_push(x, 3);
+		#elif defined(__linux__)
+			sloth_push(x, 4);
+		#else
+			sloth_push(x, -1);
+		#endif
+		break;
+	}
+}
+
+/* -- Primitives that I don't like too much ------------ */
+
+void sloth_dict_(X* x) { sloth_push(x, (CELL)x->d); }
+void sloth_empty_return_stack_(X* x) { x->rp = 0; }
 
 /* -- Primitive, word and user variable creation ------- */
 
@@ -1264,7 +1351,7 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "LSHIFT", sloth_primitive(x, &sloth_l_shift_));
 	sloth_code(x, "-", sloth_primitive(x, &sloth_minus_));
 	sloth_code(x, "+", sloth_primitive(x, &sloth_plus_));
-	sloth_code(x, "RSHIFT", sloth_primitive(x, &sloth_plus_));
+	sloth_code(x, "RSHIFT", sloth_primitive(x, &sloth_r_shift_));
 	sloth_code(x, "*", sloth_primitive(x, &sloth_star_));
 	sloth_code(x, "2/", sloth_primitive(x, &sloth_two_slash_));
 	sloth_code(x, "UM*", sloth_primitive(x, &sloth_u_m_star_));
@@ -1281,10 +1368,22 @@ void sloth_bootstrap(X* x) {
 	sloth_code(x, "(CSTRING)", sloth_primitive(x, &sloth_c_string_));
 	sloth_code(x, "MOVE", sloth_primitive(x, &sloth_move_));
 
-	/* Input/output operations */
+	/* Input/output and parsing operations */
 
 	sloth_code(x, "EMIT", sloth_primitive(x, &sloth_emit_));
 	sloth_code(x, "KEY", sloth_primitive(x, &sloth_key_));
+	sloth_code(x, "SOURCE", sloth_primitive(x, &sloth_source_));
+	sloth_code(x, "WORD", sloth_primitive(x, &sloth_word_));
+	sloth_code(x, "REFILL", sloth_primitive(x, &sloth_refill_));
+	sloth_code(x, "SAVE-INPUT", sloth_primitive(x, &sloth_save_input_));
+	sloth_code(x, "RESTORE-INPUT", sloth_primitive(x, &sloth_restore_input_));
+#ifndef SLOTH_NO_FILES
+	sloth_code(x, "INCLUDED", sloth_primitive(x, &sloth_included_));
+#endif
+
+	/* Finding words */
+
+	sloth_code(x, "FIND", sloth_primitive(x, &sloth_find_));
 
 	/* Quotations */
 
@@ -1296,35 +1395,33 @@ void sloth_bootstrap(X* x) {
 
 	sloth_code(x, "BYE", sloth_primitive(x, &sloth_bye_));
 
-	/* Source code preprocessing, interpreting & auditing commands */
-
-	sloth_code(x, "REFILL", sloth_primitive(x, &sloth_refill_));
-	sloth_code(x, "SAVE-INPUT", sloth_primitive(x, &sloth_save_input_));
-	sloth_code(x, "RESTORE-INPUT", sloth_primitive(x, &sloth_restore_input_));
-#ifndef SLOTH_NO_FILES
-	sloth_code(x, "INCLUDED", sloth_primitive(x, &sloth_included_));
-#endif
-
-	/* Parsing input */
-
-	sloth_code(x, "WORD", sloth_primitive(x, &sloth_word_));
-
 	/* Defining words */
 
 	sloth_code(x, ":", sloth_primitive(x, &sloth_colon_));
 	sloth_code(x, ":NONAME", sloth_primitive(x, &sloth_colon_no_name_));
-	sloth_code(x, ";", sloth_primitive(x, &sloth_semicolon_));
-	sloth_code(x, "RECURSE", sloth_primitive(x, &sloth_recurse_));
+	sloth_code(x, ";", sloth_primitive(x, &sloth_semicolon_)); sloth_immediate_(x);
+	sloth_code(x, "RECURSE", sloth_primitive(x, &sloth_recurse_)); sloth_immediate_(x);
 	sloth_code(x, "IMMEDIATE", sloth_primitive(x, &sloth_immediate_));
-	sloth_code(x, "POSTPONE", sloth_primitive(x, &sloth_postpone_));
+	sloth_code(x, "POSTPONE", sloth_primitive(x, &sloth_postpone_)); sloth_immediate_(x);
 
 	sloth_code(x, "COMPILE,", sloth_primitive(x, &sloth_compile_comma_));
 	sloth_code(x, "CREATE", sloth_primitive(x, &sloth_create_));
 	sloth_code(x, "(DOES)", sloth_primitive(x, &sloth_do_does_));
 	sloth_code(x, "DOES>", sloth_primitive(x, &sloth_does_)); sloth_immediate_(x);
 
+	/* Executing */
+
 	sloth_code(x, "EVALUATE", sloth_primitive(x, &sloth_evaluate_));
 	sloth_code(x, "EXECUTE", sloth_primitive(x, &sloth_execute_));
+
+	/* Environment queries */
+
+	sloth_code(x, "(ENVIRONMENT)", sloth_primitive(x, &sloth_environment_));
+
+	/* Primitives I don't like too much */
+
+	sloth_code(x, "DICT", sloth_primitive(x, &sloth_dict_));
+	sloth_code(x, "(EMPTY-RETURN-STACK)", sloth_primitive(x, &sloth_empty_return_stack_));
 }
 
 /* -- Context initialization and destruction ----------- */
@@ -1381,3 +1478,38 @@ void sloth_free(X* x) {
 	free(x->p);
 	free(x);
 }
+
+/* Helpers to work with files from C */
+
+void sloth_set_root_path(X* x, char* s) {
+	memcpy((char*)(x->u + SLOTH_PATHS), s, strlen(s));
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, strlen(s));
+	sloth_user_set(x, SLOTH_PATH_START, x->u + SLOTH_PATHS + strlen(s));
+	sloth_user_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS + strlen(s));
+}
+
+int sloth_include(X* x, char* f) {
+	printf("--- INCLUDING: [%ld %ld] %s\n", x->sp, x->rp, f);
+	sloth_push(x, (CELL)f);
+	sloth_push(x, strlen(f));
+	sloth_catch(x, sloth_get_xt(x, sloth_find_word(x, "INCLUDED")));
+	return sloth_pop(x);
+}
+
+void sloth_evaluate(X* x, char* s) {
+	sloth_push(x, (CELL)s);
+	sloth_push(x, (CELL)strlen(s));
+	sloth_evaluate_(x);
+}
+
+/* Helper REPL */
+
+void sloth_repl(X* x) {
+	char buf[125];
+	sloth_user_set(x, SLOTH_IBUF, (CELL)buf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 80);
+	sloth_eval(x, sloth_get_xt(x, sloth_find_word(x, "QUIT")));
+}
+
+

@@ -4,6 +4,7 @@
 #include<stdio.h>
 #include<string.h>
 #include<assert.h>
+#include<limits.h> /* for CHAR_BIT */
 
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 #define WINDOWS
@@ -328,10 +329,9 @@ void sloth_move_(X* x);
 /* Compare without case */
 int sloth__compare(X* x, CELL a1, uCELL u1, CELL a2, uCELL u2);
 CELL sloth__search_word(X* x, CELL n, int l);
+CELL sloth_find_word(X* x, char* name);
 
 void sloth_find_(X* x);
-
-CELL sloth_find_word(X* x, char* name);
 
 /* -- More compilation --------------------------------- */
 
@@ -349,7 +349,15 @@ void sloth_end_quotation_(X* x);
 
 void sloth_bye_(X* x);
 
-/* -- Source code preprocessing, interpreting & auditing commands */
+/* -- Input/output and parsing operations -------------- */
+
+/* Unicode does not work correctly on Windows cmd.exe or */
+/* Windows Terminal because Windows uses UTF-16 by default. */
+void sloth_emit_(X* x);
+void sloth_key_(X* x);
+
+void sloth_source_(X* x);
+void sloth_word_(X* x);
 
 #ifndef SLOTH_NO_FILES
 void sloth_file_position_(X* x);
@@ -390,17 +398,6 @@ void sloth__add_to_included_files_list(X* x, char* a, int l);
 void sloth_included_(X* x);
 #endif
 
-/* -- Input/output operations -------------------------- */
-
-/* Unicode does not work correctly on Windows cmd.exe or */
-/* Windows Terminal because Windows uses UTF-16 by default. */
-void sloth_emit_(X* x);
-void sloth_key_(X* x);
-
-/* -- Parsing input ------------------------------------ */
-
-void sloth_word_(X* x);
-
 /* -- Defining words ----------------------------------- */
 
 void sloth_colon_(X* x);
@@ -422,6 +419,15 @@ void sloth_execute_(X* x);
 
 void sloth_interpret_(X* x);
 
+/* -- Environment queries ------------------------------ */
+
+void sloth_environment_(X* x);
+
+/* -- Primitives that I don't like too much ------------ */
+
+void sloth_dict_(X* x);
+void sloth_empty_return_stack_(X* x);
+
 /* -- Primitive, word and user variable creation ------- */
 
 CELL sloth_primitive(X* x, F f);
@@ -438,3 +444,13 @@ void sloth__init(X* x, CELL d, CELL dz, CELL u, CELL uz);
 X* sloth_create(int psize, int dsize, int usize);
 X* sloth_new();
 void sloth_free(X* x);
+
+/* -- Helpers to work with files from C ---------------- */
+
+void sloth_set_root_path(X* x, char* s);
+int sloth_include(X* x, char* f);
+void sloth_evaluate(X* x, char* s);
+
+/* -- Helper REPL -------------------------------------- */
+
+void sloth_repl(X* x);

@@ -21,9 +21,6 @@ void sloth_key_(X* x) { sloth_push(x, mock_key_char); }
 X* x;
 char ibuf[1024];
 
-// CELL S0;
-// CELL MIDUINTplus1;
-
 void setUp() {
 	/* Create a VM with 64 primitive slots and 32767 bytes */
 	/* of dictionary. */
@@ -296,6 +293,26 @@ void test_do_prim() {
 }
 
 void test_call() {
+	x->ip = -1;
+	sloth__call(x, 17);
+	TEST_ASSERT_EQUAL(17, x->ip);
+	TEST_ASSERT_EQUAL(0, x->rp);
+
+	/* This test ensures that if there's something in the */
+	/* return stack (like storing input source information) */
+	/* a call pushes the previous IP (in this case -1) to the */
+	/* return stack to not EXIT to a on IP value at the end */
+	/* of the called word. */
+	sloth_rpush(x, 13);
+	x->ip = -1;
+	sloth__call(x, 17);
+	TEST_ASSERT_EQUAL(17, x->ip);
+	TEST_ASSERT_EQUAL(2, x->rp);
+	TEST_ASSERT_EQUAL(-1, x->r[1]);
+	TEST_ASSERT_EQUAL(13, x->r[0]);
+	sloth_rpop(x);
+	sloth_rpop(x);
+
 	x->ip = 11;
 	sloth__call(x, 19);
 	TEST_ASSERT_EQUAL(19, x->ip);
@@ -528,7 +545,7 @@ void test_zbranch_() {
 #define S0						0
 #define S1						((uCELL)~0)
 
-#define MSB						(((uCELL)~((uCELL)~0))>>1)
+#define MSB						((CELL)~(((uCELL)~0) >> 1))
 
 void test_invert_() {
 	sloth_push(x, 0); sloth_invert_(x);
@@ -720,9 +737,8 @@ void test_r_shift_() {
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
 	sloth_push(x, MSB); sloth_push(x, 1); sloth_r_shift_(x);
-	sloth_push(x, sloth_pop(x) * 2);
 	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL(MSB, sloth_pop(x));
+	TEST_ASSERT_EQUAL(MSB, sloth_pop(x)*2);
 }
 
 void test_star_() {
@@ -1627,7 +1643,7 @@ void test_included_and_refill() {
 	remove(tmppath);
 }
 
-/* -- Input/Output ------------------------------------- */
+/* -- Input/Output and parsing ------------------------- */
 
 void test_emit() {
 	emitted_char = 0;
@@ -1672,7 +1688,15 @@ void test_key_handles_max_uchar() {
 	TEST_ASSERT_EQUAL(255, sloth_pop(x));
 }
 
-/* -- Parsing input ------------------------------------ */
+void test_source_() {
+	char *ibuf = "TEST";
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_ILEN, 4);
+	sloth_source_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(4, sloth_pop(x));
+	TEST_ASSERT_EQUAL((CELL)ibuf, sloth_pop(x));
+}
 
 void test_word_() {
 	char *ibuf = "Hello world";
@@ -2136,12 +2160,12 @@ int main() {
 	RUN_TEST(test_included_relative_path);
 	RUN_TEST(test_included_root_path);
 	RUN_TEST(test_included_and_refill);
-	/* Input/output */
+	/* Input/output and parsing */
 	RUN_TEST(test_emit);
 	RUN_TEST(test_key_pushes_char_onto_stack);
 	RUN_TEST(test_key_handles_zero);
 	RUN_TEST(test_key_handles_max_uchar);
-	/* Parsing input */
+	RUN_TEST(test_source_);
 	RUN_TEST(test_word_);
 	/* Defining words */
 	RUN_TEST(test_colon_);
