@@ -9,34 +9,34 @@ public class Sloth {
 
 	/* -- Virtual Machine constants ------------------------ */
 
-	public static final int sCHAR = 2;
+	public static final int suCHAR = 2;
 	public static final int sCELL = 4;
 	public static final int CELL_BITS = 32;
 	public static final int hCELL_MASK = 0xFFFF;
 	public static final int hCELL_BITS = 16;
 	public static final int sFCELL = 4;
 
-	private static final int STACK_SIZE = 64;
-	private static final int RETURN_STACK_SIZE = 64;
-	private static final int FLOAT_STACK_SIZE = 64;
+	protected static final int STACK_SIZE = 64;
+	protected static final int RETURN_STACK_SIZE = 64;
+	protected static final int FLOAT_STACK_SIZE = 64;
 
 	/* -- Virtual Machine context definition --------------- */
 
-	private int d; // Index of the dictionary in m
-	private int u; // Index of the user area in m
+	protected int d; // Index of the dictionary in m
+	protected int u; // Index of the user area in m
 
-	private int s[]; // Data stack
-	private int sp; // Data stack pointer
-	private int r[]; // Return stack
-	private int rp; // Return stack pointer
-	private float f[]; // Floating point stack
-	private int fp; // Floating point stack pointer
+	protected int s[]; // Data stack
+	protected int sp; // Data stack pointer
+	protected int r[]; // Return stack
+	protected int rp; // Return stack pointer
+	protected float f[]; // Floating point stack
+	protected int fp; // Floating point stack pointer
 
-	private int ip; // Instruction pointer
+	protected int ip; // Instruction pointer
 
-	private ArrayList<ByteBuffer> m; // Array of memory blocks
+	protected ArrayList<ByteBuffer> m; // Array of memory blocks
 
-	ArrayList<Consumer<Sloth>> p; // Array of primitives
+	protected ArrayList<Consumer<Sloth>> p; // Array of primitives
 
 	/* This array was created by Gemini for the included */
 	/* implementation, I must re-check it. */
@@ -47,7 +47,15 @@ public class Sloth {
 	public static final int RETURN_STACK_OVERFLOW = -5;
 	public static final int RETURN_STACK_UNDERFLOW = -6;
 
+	/* -- Dictionary variables ----------------------------- */
+
+	public static final int SLOTH_HERE = 0;
+	public static final int SLOTH_INTERNAL_WL = 1*sCELL;
+	public static final int SLOTH_FORTH_WL = 2*sCELL;
+
 	/* -- Context initialization -------------------------- */
+
+	public Sloth() { this(524288, 1024); }
 
 	public Sloth(int dsize, int usize) {
 		s = new int[STACK_SIZE];
@@ -63,6 +71,20 @@ public class Sloth {
 		// Circular buffer for storing Java strings
 		// that need to be converted to Forth strings
 		m.add(ByteBuffer.allocate(2048));
+
+		// Initialize HERE
+		m.get(d).putInt(0*sCELL, 3*sCELL);
+		// Initialize INTERNAL-WORDLIST
+		m.get(d).putInt(1*sCELL, 0);
+		// Initialize FORTH-WORDLIST (the default wordlist) */
+		m.get(d).putInt(2*sCELL, 0);
+
+		// Initialize CURRENT to point to FORTH-WORDLIST
+		m.get(u).putInt(0*sCELL, to_abs(SLOTH_FORTH_WL, d)); // CURRENT
+		m.get(u).putInt(1*sCELL, 2); // #ORDER
+		m.get(u).putInt(2*sCELL, 0); // LOCALS-WORDLIST
+		m.get(u).putInt(3*sCELL, to_abs(SLOTH_FORTH_WL, d)); // CONTEXT 0
+		m.get(u).putInt(4*sCELL, to_abs(SLOTH_INTERNAL_WL, d)); // CONTEXT 
 	}
 
 	// -- Data stack
@@ -117,12 +139,14 @@ public class Sloth {
 	int to_rel(int a) { return a & 0x00FFFFFF; }
 	ByteBuffer block(int a) { return m.get(a >> 24); }
 
-	void cstore(int a, char v) { block(a).putChar(to_rel(a), v); }
-	char cfetch(int a) { return block(a).getChar(to_rel(a)); }
+	void b_store(int a, byte v) { block(a).put(to_rel(a), v); }
+	byte b_fetch(int a) { return block(a).get(to_rel(a)); }
+	void c_store(int a, char v) { block(a).putChar(to_rel(a), v); }
+	char c_fetch(int a) { return block(a).getChar(to_rel(a)); }
 	void store(int a, int v) { block(a).putInt(to_rel(a), v); }
 	int fetch(int a) { return block(a).getInt(to_rel(a)); }
-	void fstore(int a, float v) { block(a).putFloat(to_rel(a), v); }
-	float ffetch(int a) { return block(a).getFloat(to_rel(a)); }
+	void f_store(int a, float v) { block(a).putFloat(to_rel(a), v); }
+	float f_fetch(int a) { return block(a).getFloat(to_rel(a)); }
 
 	// Helpers to use Java Strings with Sloth API
 
@@ -132,7 +156,7 @@ public class Sloth {
 	// as required.
 	int FromString(String s) {
 		ByteBuffer b = m.get(2);
-		if (b.remaining() / sCHAR < s.length()) b.rewind();
+		if (b.remaining() / suCHAR < s.length()) b.rewind();
 		int addr = to_abs(b.position(), 2);
 		for (int i = 0; i < s.length(); i++) {
 			b.putChar(s.charAt(i));
@@ -142,23 +166,29 @@ public class Sloth {
 
 	String ToString(int a, int l) {
 		StringBuffer sb = new StringBuffer();
-		for (int i = 0; i < l; i++) sb.append(cfetch(a + i*sCHAR));
+		for (int i = 0; i < l; i++) sb.append(c_fetch(a + i*suCHAR));
 		return sb.toString();
 	}
 
 	// -- Inner interpreter
 
 	int op() { int o = fetch(ip); ip += sCELL; return o; }
-	private void do_prim(int q) { p.get(-1 - q).accept(this); }
-	private void call(int q) { if (ip >= 0) rpush(ip); ip = q; }
-	private void execute(int q) { if (q < 0) do_prim(q); else call(q); }
-	private void inner() { int t = rp; while (t <= rp && ip >= 0) execute(op()); }
-	void eval(int q) { execute(q); if (q > 0) inner(); }
+	protected void do_prim(int q) { p.get(-1 - q).accept(this); }
+	protected void call(int q) { 
+		if (ip >= 0 || rp > 0) rpush(ip); 
+		ip = q; 
+	}
+	protected void execute(int q) { 
+		if (q < 0) do_prim(q); 
+		else call(q); 
+	}
+	protected void inner() { int t = rp; while (t <= rp && ip >= 0) execute(op()); }
+	public void eval(int q) { execute(q); if (q > 0) inner(); }
 
 	// -- Tracing interpreter
 
-	private void debug(int debug_xt) { push(ip); eval(debug_xt); }
-	private void debug_inner(int debug_xt) {
+	protected void debug(int debug_xt) { push(ip); eval(debug_xt); }
+	protected void debug_inner(int debug_xt) {
 		int t = rp;
 		while (t <= rp && ip >= 0) {
 			debug(debug_xt);
@@ -207,8 +237,8 @@ public class Sloth {
 	public void _throw(int v) {
 		if (v != 0) {
 			System.out.printf("EXCEPTION: %d\n", v);
-			System.out.printf("BUFFER: %s\n", ToString(ua_get(IBUF), ua_get(ILEN)));
-			System.out.printf("TOKEN: %s\n", ToString(ua_get(IBUF) + (ua_get(IPOS)*sCHAR), ua_get(ILEN) - ua_get(IPOS)));
+			System.out.printf("BUFFER: %s\n", ToString(user_get(IBUF), user_get(ILEN)));
+			System.out.printf("TOKEN: %s\n", ToString(user_get(IBUF) + (user_get(IPOS)*suCHAR), user_get(ILEN) - user_get(IPOS)));
 			throw new SlothException(v); 
 		}
 	}
@@ -266,27 +296,27 @@ public class Sloth {
 
 	// -- Helpers
 
-	// In java this is just a synonim for store and get.
+	// Dictionary set/get
 	void set(int a, int v) { store(a, v); }
 	int get(int a) { return fetch(a); }
 
-	void cset(int a, char v) { cstore(a, v); }
-	char cget(int a) { return cfetch(a); }
+	void c_set(int a, char v) { c_store(a, v); }
+	char c_get(int a) { return c_fetch(a); }
 
-	// User area set/get
-	void ua_set(int rel_a, int v) { m.get(u).putInt(to_rel(rel_a), v); }
-	int ua_get(int rel_a) { return m.get(u).getInt(to_rel(rel_a)); }
+	// User area set/get.
+	void user_set(int rel_a, int v) { m.get(u).putInt(to_rel(rel_a), v); }
+	int user_get(int rel_a) { return m.get(u).getInt(to_rel(rel_a)); }
 
 	// Memory management
 	int here() { return get(HERE); }
 	void allot(int v) { set(HERE, here() + v); }
 	int aligned(int a) { return ((a + (sCELL - 1)) & ~(sCELL - 1)); }
-	void align() { set(HERE, aligned(here())); }
+	void _align_() { set(HERE, aligned(here())); }
 
 	// Compilation
 	void comma(int v) { store(here(), v); allot(sCELL); }
-	void ccomma(char v) { cstore(here(), v); allot(sCHAR); }
-	void fcomma(float v) { fstore(here(), v); allot(sFCELL); }
+	void c_comma(char v) { c_store(here(), v); allot(suCHAR); }
+	void f_comma(float v) { f_store(here(), v); allot(sFCELL); }
 	void compile(int xt) { comma(xt); }
 	void literal(int n) { 
 		comma(get_xt(find_word("(LIT)")));
@@ -294,49 +324,47 @@ public class Sloth {
 	}
 	void fliteral(float f) {
 		comma(get_xt(find_word("(FLIT)")));
-		fcomma(f);
+		f_comma(f);
 	}
 
 	// Headers
-	int get_latest() { return fetch(ua_get(CURRENT)); }
-	void set_latest(int w) { store(ua_get(CURRENT), w); }
+	int get_latest() { return fetch(user_get(CURRENT)); }
+	void set_latest(int w) { store(user_get(CURRENT), w); }
+	int get_link(int w) { return fetch(w); }
+	int get_xt(int w) { return fetch(w + sCELL); }
+	void set_xt(int w, int xt) { store(w + sCELL, xt); }
+	char get_flags(int w) { return c_fetch(w + 2*sCELL); }
+	void set_flags(int w, int v) { c_store(w + 2*sCELL, (char)v); }
+	boolean has_flag(int w, int v) { return (get_flags(w) & v) == v; }
+	void set_flag(int w, int v) { 
+		c_store(w + 2*sCELL, (char)(get_flags(w) | v)); 
+	}
+	void unset_flag(int w, int v) {
+		c_store(w + 2*sCELL, (char)(get_flags(w) & ~v));
+	}
+	char get_namelen(int w) { return c_fetch(w + 2*sCELL + suCHAR); }
+	int get_name_addr(int w) { return w + 2*sCELL + 2*suCHAR; }
 
 	// Header structure:
 	// Link (CELL) @ NT
 	// XT (CELL) @ NT + sCELL
 	// Wordlist_link (CELL) @ NT + 2*sCELL
 	// Flags (CHAR) @ NT + 3*sCELL
-	// Name_length (CHAR) @ NT + 3*sCELL + sCHAR
-	// Name (CHAR*namelen) @ NT + 2*sCELL + 2*sCHAR
+	// Name_length (CHAR) @ NT + 3*sCELL + suCHAR
+	// Name (CHAR*namelen) @ NT + 2*sCELL + 2*suCHAR
 
 	int header(int n, int l) {
-		align();
+		_align_();
 		int w = here();
 		comma(get_latest());
 		set_latest(w);
 		comma(0);
-		ccomma((char)0);
-		ccomma((char)l);
-		for (int i = 0; i < l; i++) ccomma(cfetch(n + i*sCHAR));
-		align();
+		c_comma((char)0);
+		c_comma((char)l);
+		for (int i = 0; i < l; i++) c_comma(c_fetch(n + i*suCHAR));
+		_align_();
 		store(w + sCELL, here());
 		return w;
-	}
-
-	int get_link(int w) { return fetch(w); }
-	int get_xt(int w) { return fetch(w + sCELL); }
-	void set_xt(int w, int xt) { store(w + sCELL, xt); }
-	char get_flags(int w) { return cfetch(w + 2*sCELL); }
-	boolean has_flag(int w, int v) { return (get_flags(w) & v) == v; }
-	char get_namelen(int w) { return cfetch(w + 2*sCELL + sCHAR); }
-	int get_name_addr(int w) { return w + 2*sCELL + 2*sCHAR; }
-
-	// Setting flags
-	void set_flag(int w, char v) { 
-		cstore(w + 2*sCELL, (char)(get_flags(w) | v)); 
-	}
-	void unset_flag(int w, char v) {
-		cstore(w + 2*sCELL, (char)(get_flags(w) & ~v));
 	}
 
 	// -- Primitives ----------------------------------------
@@ -349,32 +377,32 @@ public class Sloth {
 		int l = op(); 
 		push(ip); 
 		push(l); 
-		ip = aligned(ip + (l + 1) * sCHAR); 
+		ip = aligned(ip + (l + 1) * suCHAR); 
 	}
 	void _c_string_() {
-		char l = cfetch(ip);
+		char l = c_fetch(ip);
 		push(ip);
-		ip = aligned(ip + (l + 1) * sCHAR + sCHAR);
+		ip = aligned(ip + (l + 1) * suCHAR + suCHAR);
 	}
 	// Quotations (not in ANS Forth yet)
 	void _quotation_() { int d = op(); push(ip); ip += d; }
 	void _start_quotation_() {
-		int s = ua_get(STATE);
-		ua_set(STATE, s <= 0 ? s - 1 : s + 1);
-		if (ua_get(STATE) == -1) push(here() + 2*sCELL);
-		push(ua_get(LATESTXT));
+		int s = user_get(STATE);
+		user_set(STATE, s <= 0 ? s - 1 : s + 1);
+		if (user_get(STATE) == -1) push(here() + 2*sCELL);
+		push(user_get(LATESTXT));
 		compile(get_xt(find_word("(QUOTATION)")));
 		push(here());
 		comma(0);
-		ua_set(LATESTXT, here());
+		user_set(LATESTXT, here());
 	}
 	void _end_quotation_() {
-		int s = ua_get(STATE);
+		int s = user_get(STATE);
 		int a = pop();
 		compile(get_xt(find_word("EXIT")));
 		store(a, here() - a - sCELL);
-		ua_set(LATESTXT, pop());
-		ua_set(STATE, s < 0 ? s + 1 : s - 1);
+		user_set(LATESTXT, pop());
+		user_set(STATE, s < 0 ? s + 1 : s - 1);
 	}
 
 	// Environment queries
@@ -406,48 +434,48 @@ public class Sloth {
 	// starts at "HERE" + CBUF
 	void _word_() {
 		char c = (char)pop();
-		int ibuf = ua_get(IBUF);
-		int ilen = ua_get(ILEN);
-		int ipos = ua_get(IPOS);
+		int ibuf = user_get(IBUF);
+		int ilen = user_get(ILEN);
+		int ipos = user_get(IPOS);
 		// First, ignore c until not c is found
 		// As per the Forth standard, if the control character is the
 		// space (hex 20) then control characters (< 32) may be treated
 		// as delimiters.
 		if (c == 32) {
-			while (ipos < ilen && cfetch(ibuf + (ipos*sCHAR)) <= c) ipos++;
+			while (ipos < ilen && c_fetch(ibuf + (ipos*suCHAR)) <= c) ipos++;
 		} else {
-			while (ipos < ilen && cfetch(ibuf + (ipos*sCHAR)) == c) ipos++;
+			while (ipos < ilen && c_fetch(ibuf + (ipos*suCHAR)) == c) ipos++;
 		}
-		int start = ibuf + (ipos*sCHAR);
+		int start = ibuf + (ipos*suCHAR);
 		// Next, continue parsing until c is found again
 		if (c == 32) {
-			while (ipos < ilen && cfetch(ibuf + (ipos*sCHAR)) > c) ipos++;
+			while (ipos < ilen && c_fetch(ibuf + (ipos*suCHAR)) > c) ipos++;
 		} else {
-			while (ipos < ilen && cfetch(ibuf + (ipos*sCHAR)) != c) ipos++;
+			while (ipos < ilen && c_fetch(ibuf + (ipos*suCHAR)) != c) ipos++;
 		}
-		int end = ibuf + (ipos*sCHAR);
+		int end = ibuf + (ipos*suCHAR);
 		// Now, copy the length and the string to the 
 		// counted string buffer
-		cstore(here() + CBUF, (char)((end - start) / sCHAR));
-		for (int i = 0; i < ((end - start) / sCHAR); i++) {
-			cstore(
-				here() + CBUF + sCHAR + i*sCHAR, 
-				cfetch(start + i*sCHAR));
+		c_store(here() + CBUF, (char)((end - start) / suCHAR));
+		for (int i = 0; i < ((end - start) / suCHAR); i++) {
+			c_store(
+				here() + CBUF + suCHAR + i*suCHAR, 
+				c_fetch(start + i*suCHAR));
 		}
 		push(here() + CBUF);
 		// If not at the end of the input buffer,
 		// skip c after the word, but don't treat it as part
 		// of the counted string.
 		if (ipos < ilen) ipos++;
-		ua_set(IPOS, ipos);
+		user_set(IPOS, ipos);
 	}
 
 	// Finding words
 	boolean compare_without_case(int a1, int u1, int a2, int u2) {
 		if (u1 != u2) return false;
 		for (int i = 0; i < u2; i++) {
-			char a = cfetch(a1 + i*sCHAR);
-			char b = cfetch(a2 + i*sCHAR);
+			char a = c_fetch(a1 + i*suCHAR);
+			char b = c_fetch(a2 + i*suCHAR);
 			if (a >= 97 && a <= 122) a -= 32;
 			if (b >= 97 && b <= 122) b -= 32;
 			if (a != b) return false;
@@ -456,8 +484,8 @@ public class Sloth {
 	}
 
 	int search_word(int n, int l) {
-		for (int i = -1; i < ua_get(ORDER); i++) {
-			int wl = ua_get(CONTEXT + i*sCELL);
+		for (int i = -1; i < user_get(ORDER); i++) {
+			int wl = user_get(CONTEXT + i*sCELL);
 			if (wl != 0) {
 				int w = fetch(wl);
 				while (w > 0) {
@@ -476,7 +504,7 @@ public class Sloth {
 
 	void _find_() {
 		int cstring = pop();
-		int w = search_word(cstring + sCHAR, cfetch(cstring));
+		int w = search_word(cstring + suCHAR, c_fetch(cstring));
 		if (w == 0) { push(cstring); push(0); }
 		else if (has_flag(w, IMMEDIATE)) { push(get_xt(w)); push(1); }
 		else { push(get_xt(w)); push(-1); }
@@ -496,53 +524,53 @@ public class Sloth {
 
 	void _interpret_() {
 		int flag;
-		while (ua_get(IPOS) < ua_get(ILEN)) {
+		while (user_get(IPOS) < user_get(ILEN)) {
 			push(32); _word_();
-			int tok = pick(0) + sCHAR;
-			int tlen = cfetch(pick(0));
+			int tok = pick(0) + suCHAR;
+			int tlen = c_fetch(pick(0));
 			if (tlen == 0) { pop(); return; }
 			_find_();
 			if ((flag = pop()) != 0) {
-				if (ua_get(STATE) == 0 || (ua_get(STATE) != 0 && flag == 1)) {
+				if (user_get(STATE) == 0 || (user_get(STATE) != 0 && flag == 1)) {
 					eval(pop());
 				} else {
 					compile(pop());
 				}
 			} else {
-				int temp_base = ua_get(BASE);
+				int temp_base = user_get(BASE);
 				pop();
 				if (tlen == 3 
-				 && cfetch(tok) == '\'' 
-				 && cfetch(tok + 2*sCHAR) == '\'') {
-					if (ua_get(STATE) == 0) {
-						push(cfetch(tok + sCHAR));
+				 && c_fetch(tok) == '\'' 
+				 && c_fetch(tok + 2*suCHAR) == '\'') {
+					if (user_get(STATE) == 0) {
+						push(c_fetch(tok + suCHAR));
 					} else {
-						literal(cfetch(tok + sCHAR));
+						literal(c_fetch(tok + suCHAR));
 					}
 				} else {
 					boolean is_double = false;
-					if (cfetch(tok) == '#') {
+					if (c_fetch(tok) == '#') {
 						temp_base = 10;
 						tlen--;
-						tok += sCHAR;
-					} else if (cfetch(tok) == '$') {
+						tok += suCHAR;
+					} else if (c_fetch(tok) == '$') {
 						temp_base = 16;
 						tlen--;
-						tok += sCHAR;
-					} else if (cfetch(tok) == '%') {
+						tok += suCHAR;
+					} else if (c_fetch(tok) == '%') {
 						temp_base = 2;
 						tlen--;
-						tok += sCHAR;
-					} else if (cfetch(tok + tlen*sCHAR - sCHAR) == '.') {
+						tok += suCHAR;
+					} else if (c_fetch(tok + tlen*suCHAR - suCHAR) == '.') {
 						tlen--;
 						is_double = true;
 					}
 					StringBuffer buf = new StringBuffer();
 					for (int i = 0; i < tlen; i++) 
-						buf.append(cfetch(tok +i*sCHAR));
+						buf.append(c_fetch(tok +i*suCHAR));
 					try {
 						long n = Long.parseLong(buf.toString(), temp_base);
-						if (ua_get(STATE) == 0) {
+						if (user_get(STATE) == 0) {
 							push((int)n);
 							if (is_double) push(n < 0 ? -1 : 0);
 						} else {
@@ -552,7 +580,7 @@ public class Sloth {
 					} catch(NumberFormatException e1) {
 						try {
 							float r = Float.parseFloat(buf.toString());
-							if (ua_get(STATE) == 0) {
+							if (user_get(STATE) == 0) {
 								fpush(r);
 							} else {
 								fliteral(r);
@@ -568,42 +596,42 @@ public class Sloth {
 
 	// -- Require words to bootstrap
 	void _bye_() { System.out.println(); System.exit(0); }
-	void _unused_() { push(m.get(d).remaining()); }
+	void _unused_() { push(m.get(d).capacity() - here()); }
 	void _refill_() {
-		switch (ua_get(SOURCE_ID)) {
+		switch (user_get(SOURCE_ID)) {
 			case -1:
 				push(0);
 				break;
 			case 0:
-				push(ua_get(IBUF));
+				push(user_get(IBUF));
 				push(80);
 				eval(get_xt(find_word("ACCEPT")));
-				ua_set(ILEN, pop());
-				ua_set(IPOS, 0);
+				user_set(ILEN, pop());
+				user_set(IPOS, 0);
 				push(-1);
 				break;
 			default:
 				// TODO This was made automatically by Gemini, revise.
-				int sourceId = ua_get(SOURCE_ID);
+				int sourceId = user_get(SOURCE_ID);
 				if (sourceId > 0 && sourceId <= openFiles.size()) {
 					java.io.RandomAccessFile raf = openFiles.get(sourceId - 1);
 					try {
-						ua_set(SOURCE_POS, (int)raf.getFilePointer());
+						user_set(SOURCE_POS, (int)raf.getFilePointer());
 						String line = raf.readLine();
 						if (line != null) {
 							ByteBuffer b = m.get(2);
-							if (b.capacity() / sCHAR < line.length() + 1) {
+							if (b.capacity() / suCHAR < line.length() + 1) {
 								// TODO I don't think I need to allocate here...
-								b = ByteBuffer.allocate(Math.max(1024, line.length() + 1) * sCHAR);
+								b = ByteBuffer.allocate(Math.max(1024, line.length() + 1) * suCHAR);
 								m.set(2, b);
 							}
 							b.rewind();
 							for (int i = 0; i < line.length(); i++) {
 								b.putChar(line.charAt(i));
 							}
-							ua_set(IBUF, to_abs(0, 2));
-							ua_set(IPOS, 0);
-							ua_set(ILEN, line.length());
+							user_set(IBUF, to_abs(0, 2));
+							user_set(IPOS, 0);
+							user_set(ILEN, line.length());
 							push(-1);
 						} else {
 							push(0);
@@ -619,33 +647,33 @@ public class Sloth {
 	}
 
 	void _save_input_() {
-		push(ua_get(SOURCE_POS));
-		push(ua_get(SOURCE_ID));
-		push(ua_get(IBUF));
-		push(ua_get(IPOS));
-		push(ua_get(ILEN));
+		push(user_get(SOURCE_POS));
+		push(user_get(SOURCE_ID));
+		push(user_get(IBUF));
+		push(user_get(IPOS));
+		push(user_get(ILEN));
 		push(5);
 	}
 	void _restore_input_() {
 		pop();
-		ua_set(ILEN, pop());
-		ua_set(IPOS, pop());
-		ua_set(IBUF, pop());
-		ua_set(SOURCE_ID, pop());
-		ua_set(SOURCE_POS, pop());
-		if (ua_get(SOURCE_ID) > 0) {
-			int sourceId = ua_get(SOURCE_ID);
+		user_set(ILEN, pop());
+		user_set(IPOS, pop());
+		user_set(IBUF, pop());
+		user_set(SOURCE_ID, pop());
+		user_set(SOURCE_POS, pop());
+		if (user_get(SOURCE_ID) > 0) {
+			int sourceId = user_get(SOURCE_ID);
 			if (sourceId <= openFiles.size()) {
 				java.io.RandomAccessFile raf = openFiles.get(sourceId - 1);
 				try {
-					raf.seek(ua_get(SOURCE_POS));
+					raf.seek(user_get(SOURCE_POS));
 					String line = raf.readLine();
 					if (line != null) {
-						int ibuf = ua_get(IBUF);
+						int ibuf = user_get(IBUF);
 						ByteBuffer b = block(ibuf);
 						int rel = to_rel(ibuf);
 						for (int i = 0; i < line.length(); i++) {
-							b.putChar(rel + (i * sCHAR), line.charAt(i));
+							b.putChar(rel + (i * suCHAR), line.charAt(i));
 						}
 					}
 				} catch (java.io.IOException e) {}
@@ -657,14 +685,14 @@ public class Sloth {
 		int l = pop();
 		int a = pop();
 
-		int previbuf = ua_get(IBUF);
-		int previpos = ua_get(IPOS);
-		int previlen = ua_get(ILEN);
+		int previbuf = user_get(IBUF);
+		int previpos = user_get(IPOS);
+		int previlen = user_get(ILEN);
 
-		int prevsourceid = ua_get(SOURCE_ID);
+		int prevsourceid = user_get(SOURCE_ID);
 
-		int prevstart = ua_get(PATH_START);
-		int prevend = ua_get(PATH_END);
+		int prevstart = user_get(PATH_START);
+		int prevend = user_get(PATH_END);
 
 		int pathstart = prevstart;
 		int pathend = prevend;
@@ -673,9 +701,9 @@ public class Sloth {
 
 		// Copy filename to pathend
 		for (int i = 0; i < l; i++) {
-			cset(pathend + i*sCHAR, cget(a + i*sCHAR));
+			c_set(pathend + i*suCHAR, c_get(a + i*suCHAR));
 		}
-		cset(pathend + l*sCHAR, (char)0);
+		c_set(pathend + l*suCHAR, (char)0);
 
 		java.io.RandomAccessFile f = null;
 		String fullPathString = "";
@@ -684,30 +712,30 @@ public class Sloth {
 			fullPathString = filename;
 			f = new java.io.RandomAccessFile(fullPathString, "r");
 			pathstart = pathend;
-			pathend = pathend + l*sCHAR;
+			pathend = pathend + l*suCHAR;
 		} catch (Exception e1) {
 			try {
-				int totalLen = (pathend + l*sCHAR - pathstart)/sCHAR;
+				int totalLen = (pathend + l*suCHAR - pathstart)/suCHAR;
 				fullPathString = ToString(pathstart, totalLen);
 				f = new java.io.RandomAccessFile(fullPathString, "r");
-				pathend = pathend + l*sCHAR;
+				pathend = pathend + l*suCHAR;
 			} catch (Exception e2) {
 				try {
-					int rootLen = ua_get(ROOT_PATH_LENGTH);
+					int rootLen = user_get(ROOT_PATH_LENGTH);
 					int paths_addr = to_abs(PATHS, u);
 					// Copy root path to pathend
 					for (int i = 0; i < rootLen; i++) {
-						cset(pathend + i*sCHAR, cget(paths_addr + i*sCHAR));
+						c_set(pathend + i*suCHAR, c_get(paths_addr + i*suCHAR));
 					}
 					// Copy filename after root path
 					for (int i = 0; i < l; i++) {
-						cset(pathend + rootLen*sCHAR + i*sCHAR, cget(a + i*sCHAR));
+						c_set(pathend + rootLen*suCHAR + i*suCHAR, c_get(a + i*suCHAR));
 					}
-					cset(pathend + (rootLen + l)*sCHAR, (char)0);
+					c_set(pathend + (rootLen + l)*suCHAR, (char)0);
 					fullPathString = ToString(pathend, rootLen + l);
 					f = new java.io.RandomAccessFile(fullPathString, "r");
 					pathstart = pathend;
-					pathend = pathend + (rootLen + l)*sCHAR;
+					pathend = pathend + (rootLen + l)*suCHAR;
 				} catch (Exception e3) {
 					// Failed to open file
 				}
@@ -717,48 +745,48 @@ public class Sloth {
 		if (f != null) {
 			// Remove filename from path...
 			while (pathend > pathstart) {
-				char c = cget(pathend - sCHAR);
+				char c = c_get(pathend - suCHAR);
 				if (c == '/' || c == '\\') {
 					break;
 				}
-				pathend -= sCHAR;
+				pathend -= suCHAR;
 			}
 			// ...and store for nested includes.
-			ua_set(PATH_START, pathstart);
-			ua_set(PATH_END, pathend);
+			user_set(PATH_START, pathstart);
+			user_set(PATH_END, pathend);
 
-			int interpret_xt = ua_get(INTERPRET);
+			int interpret_xt = user_get(INTERPRET);
 
 			openFiles.add(f);
 			int source_id = openFiles.size();
-			ua_set(SOURCE_ID, source_id);
+			user_set(SOURCE_ID, source_id);
 
 			// Add path+filename to INCLUDED FILES
 			int h = here();
-			comma(ua_get(INCLUDED_FILES));
-			ua_set(INCLUDED_FILES, h);
+			comma(user_get(INCLUDED_FILES));
+			user_set(INCLUDED_FILES, h);
 			comma(l);
 			for (int i = 0; i < l; i++) {
-				ccomma(cget(a + i*sCHAR));
+				c_comma(c_get(a + i*suCHAR));
 			}
-			align();
+			_align_();
 
 			try {
-				ua_set(SOURCE_POS, (int)f.getFilePointer());
+				user_set(SOURCE_POS, (int)f.getFilePointer());
 				int linenumber = 0;
 				String line;
 				while ((line = f.readLine()) != null) {
 					// Create temporary block for line
-					ByteBuffer b = ByteBuffer.allocate(Math.max(1024, line.length() + 1) * sCHAR);
+					ByteBuffer b = ByteBuffer.allocate(Math.max(1024, line.length() + 1) * suCHAR);
 					for (int i = 0; i < line.length(); i++) {
 						b.putChar(line.charAt(i));
 					}
 					m.add(b);
 					int block_idx = m.size() - 1;
 
-					ua_set(IBUF, to_abs(0, block_idx));
-					ua_set(IPOS, 0);
-					ua_set(ILEN, line.length());
+					user_set(IBUF, to_abs(0, block_idx));
+					user_set(IPOS, 0);
+					user_set(ILEN, line.length());
 
 					_catch(interpret_xt);
 					int e = pop();
@@ -767,14 +795,14 @@ public class Sloth {
 						System.out.printf("Line (%d): %s\n", linenumber, line);
 						_throw(e);
 					}
-					ua_set(SOURCE_POS, (int)f.getFilePointer());
+					user_set(SOURCE_POS, (int)f.getFilePointer());
 					linenumber++;
 					m.remove(m.size() - 1);
 				}
 			} catch (java.io.IOException e) {
 				// Handle IO error if needed
 			} finally {
-				ua_set(SOURCE_ID, prevsourceid);
+				user_set(SOURCE_ID, prevsourceid);
 				try {
 					f.close();
 				} catch (java.io.IOException e) {}
@@ -783,13 +811,13 @@ public class Sloth {
 		}
 
 		// Restore previous path
-		ua_set(PATH_START, prevstart);
-		ua_set(PATH_END, prevend);
+		user_set(PATH_START, prevstart);
+		user_set(PATH_END, prevend);
 
 		// Restore previous input buffer
-		ua_set(IBUF, previbuf);
-		ua_set(IPOS, previpos);
-		ua_set(ILEN, previlen);
+		user_set(IBUF, previbuf);
+		user_set(IPOS, previpos);
+		user_set(ILEN, previlen);
 
 		if (f == null) {
 			_throw(-38);
@@ -802,10 +830,10 @@ public class Sloth {
 		int addr1 = pop();
 		if (addr1 >= addr2) {
 			for (int i = 0; i < u; i++) 
-				cstore(addr2 + i*sCHAR, cfetch(addr1 + i*sCHAR));
+				c_store(addr2 + i*suCHAR, c_fetch(addr1 + i*suCHAR));
 		} else {
 			for (int i = u - 1; i >= 0; i--)
-				cstore(addr2 + i*sCHAR, cfetch(addr1 + i*sCHAR));
+				c_store(addr2 + i*suCHAR, c_fetch(addr1 + i*suCHAR));
 		}
 	}
 
@@ -831,8 +859,8 @@ public class Sloth {
 		push((int)Long.divideUnsigned(d, u));
 	}
 
-	void _c_fetch_() { push(cfetch(pop())); }
-	void _c_store_() { int a = pop(); cstore(a, (char)pop()); }
+	void _c_fetch_() { push(c_fetch(pop())); }
+	void _c_store_() { int a = pop(); c_store(a, (char)pop()); }
 	void _fetch_() { push(fetch(pop())); }
 	void _store_() { int a = pop(); store(a, pop()); }
 
@@ -842,27 +870,27 @@ public class Sloth {
 	// Defining routines
 	void _colon_() {
 		push(32); _word_();
-		int tok = pick(0) + sCHAR;
-		int tlen = cfetch(pop());
+		int tok = pick(0) + suCHAR;
+		int tlen = c_fetch(pop());
 		header(tok, tlen);
-		ua_set(LATESTXT, get_xt(get_latest()));
+		user_set(LATESTXT, get_xt(get_latest()));
 		set_flag(get_latest(), HIDDEN);
-		ua_set(STATE, 1);
+		user_set(STATE, 1);
 	}
 	void _colon_no_name_() {
 		push(here());
-		ua_set(LATESTXT, here());
-		ua_set(STATE, 1);
+		user_set(LATESTXT, here());
+		user_set(STATE, 1);
 	}
 	void _semicolon_() {
 		compile(get_xt(find_word("EXIT")));
-		ua_set(STATE, 0);
+		user_set(STATE, 0);
 		// Don't change flags for nonames
-		if (get_xt(get_latest()) == ua_get(LATESTXT)) {
+		if (get_xt(get_latest()) == user_get(LATESTXT)) {
 			unset_flag(get_latest(), HIDDEN);
 		}
 	}
-	void _recurse_() { compile(ua_get(LATESTXT)); }
+	void _recurse_() { compile(user_get(LATESTXT)); }
 	void _catch_() { _catch(pop()); }
 	void _throw_() {
 		int e = pop();
@@ -872,7 +900,7 @@ public class Sloth {
 				int l = pop();
 				int a = pop();
 				StringBuffer buf = new StringBuffer();
-				for (int i = 0; i < l; i++) buf.append(cfetch(a + i*sCHAR));
+				for (int i = 0; i < l; i++) buf.append(c_fetch(a + i*suCHAR));
 				System.out.printf("Error: %s\n", buf.toString());
 			}
 		}
@@ -896,7 +924,7 @@ public class Sloth {
 	// Constructing compiler and interpreter system extensions
 	void _allot_() { allot(pop()); }
 	void _cells_() { push(pop() * sCELL); }
-	void _chars_() { push(pop() * sCHAR); }
+	void _chars_() { push(pop() * suCHAR); }
 	void _compile_comma_() { compile(pop()); }
 	void _create_name_() {
 		int tlen = pop();
@@ -909,8 +937,8 @@ public class Sloth {
 	void _create_() {
 		push(32); _word_();
 		int c = pop();
-		push(c + sCHAR);
-		push(cfetch(c));
+		push(c + suCHAR);
+		push(c_fetch(c));
 		_create_name_();
 	}
 	void do_does(int a) { store(get_xt(get_latest()) + 2*sCELL, a); }
@@ -924,23 +952,23 @@ public class Sloth {
 		int l = pop();
 		int a = pop();
 
-		int previbuf = ua_get(IBUF);
-		int previpos = ua_get(IPOS);
-		int previlen = ua_get(ILEN);
+		int previbuf = user_get(IBUF);
+		int previpos = user_get(IPOS);
+		int previlen = user_get(ILEN);
 
-		int prevsourceid = ua_get(SOURCE_ID);
+		int prevsourceid = user_get(SOURCE_ID);
 
-		ua_set(SOURCE_ID, -1);
-		ua_set(IBUF, a);
-		ua_set(IPOS, 0);
-		ua_set(ILEN, l);
+		user_set(SOURCE_ID, -1);
+		user_set(IBUF, a);
+		user_set(IPOS, 0);
+		user_set(ILEN, l);
 
-		_catch(ua_get(INTERPRET));
+		_catch(user_get(INTERPRET));
 
-		ua_set(SOURCE_ID, prevsourceid);
-		ua_set(IBUF, previbuf);
-		ua_set(IPOS, previpos);
-		ua_set(ILEN, previlen);
+		user_set(SOURCE_ID, prevsourceid);
+		user_set(IBUF, previbuf);
+		user_set(IPOS, previpos);
+		user_set(ILEN, previlen);
 
 		int e = pop();
 		if (e != 0) _throw(e);
@@ -961,8 +989,8 @@ public class Sloth {
 	void _immediate_() { set_flag(get_latest(), IMMEDIATE); }
 	void _postpone_() {
 		push(32); _word_();
-		int tok = pick(0) + sCHAR;
-		int tlen = cfetch(pick(0));
+		int tok = pick(0) + suCHAR;
+		int tlen = c_fetch(pick(0));
 		if (tlen == 0) { pop(); return; }
 		_find_();
 		int i = pop();
@@ -976,7 +1004,7 @@ public class Sloth {
 			compile(xt);
 		}
 	}
-	void _source_() { push(ua_get(IBUF)); push(ua_get(ILEN)); }
+	void _source_() { push(user_get(IBUF)); push(user_get(ILEN)); }
 
 	// Helpers for bootstrapping
 
@@ -989,7 +1017,7 @@ public class Sloth {
 		set_xt(w, xt);
 		return xt;
 	}
-	void ua_variable(String name, int d, int v) {
+	void user_variable(String name, int d, int v) {
 		int w = header(FromString(name), name.length());
 		set_xt(w, here());
 		literal(to_abs(0, u) + d);
@@ -1017,7 +1045,7 @@ public class Sloth {
 		// EXIT and (LIT) must be defined before using 
 		// user_area_variable
 		code("EXIT", primitive((vm) -> _exit_()));
-		ua_set(CURRENT, to_abs(INTERNAL_WL, d));
+		user_set(CURRENT, to_abs(INTERNAL_WL, d));
 		code("(LIT)", primitive((vm) -> _lit_()));
 
 		// TODO Reorder user area variables to not need changing
@@ -1026,24 +1054,24 @@ public class Sloth {
 		// User Area Variables
 		// NOTE What is stored in (CURRENT) here will affect later
 		// use of hedader
-		ua_variable("(CURRENT)", CURRENT, to_abs(FORTH_WL, d));
-		ua_variable("#ORDER", ORDER, 2);
-		ua_variable("(LOCALS-WORDLIST)", LOCALS_WORDLIST, 0);
-		ua_variable("CONTEXT", CONTEXT, to_abs(FORTH_WL, d));
-		ua_variable("BASE", BASE, 10);
-		ua_variable("STATE", STATE, 0);
-		ua_variable("(IBUF)", IBUF, 0);
-		ua_variable(">IN", IPOS, 0);
-		ua_variable("(ILEN)", ILEN, 0);
-		ua_variable("(SOURCE-ID)", SOURCE_ID, 0);
-		ua_variable("(SOURCE-POS)", SOURCE_POS, 0);
-		ua_variable("(LATESTXT)", LATESTXT, 0);
-		ua_variable("(INTERPRET)", INTERPRET, 0);
-		ua_variable("(SLOTH_ROOT_PATH_LENGTH)", ROOT_PATH_LENGTH, 0);
-		ua_variable("(SLOTH_PATH_START)", PATH_START, to_abs(PATHS, u));
-		ua_variable("(SLOTH_PATH_END)", PATH_END, to_abs(PATHS, u));
-		ua_variable("(SLOTH_PATHS)", PATHS, 0);
-		ua_variable("(INCLUDED-FILES)", INCLUDED_FILES, 0);
+		user_variable("(CURRENT)", CURRENT, to_abs(FORTH_WL, d));
+		user_variable("#ORDER", ORDER, 2);
+		user_variable("(LOCALS-WORDLIST)", LOCALS_WORDLIST, 0);
+		user_variable("CONTEXT", CONTEXT, to_abs(FORTH_WL, d));
+		user_variable("BASE", BASE, 10);
+		user_variable("STATE", STATE, 0);
+		user_variable("(IBUF)", IBUF, 0);
+		user_variable(">IN", IPOS, 0);
+		user_variable("(ILEN)", ILEN, 0);
+		user_variable("(SOURCE-ID)", SOURCE_ID, 0);
+		user_variable("(SOURCE-POS)", SOURCE_POS, 0);
+		user_variable("(LATESTXT)", LATESTXT, 0);
+		user_variable("(INTERPRET)", INTERPRET, 0);
+		user_variable("(SLOTH_ROOT_PATH_LENGTH)", ROOT_PATH_LENGTH, 0);
+		user_variable("(SLOTH_PATH_START)", PATH_START, to_abs(PATHS, u));
+		user_variable("(SLOTH_PATH_END)", PATH_END, to_abs(PATHS, u));
+		user_variable("(SLOTH_PATHS)", PATHS, 0);
+		user_variable("(INCLUDED-FILES)", INCLUDED_FILES, 0);
 
 		// Primitives
 		code("(RIP)", primitive((vm) -> _rip_()));
@@ -1055,7 +1083,7 @@ public class Sloth {
 		code("(DOES)", primitive((vm) -> _do_does_()));
 		code("(ENVIRONMENT)", primitive((vm) -> _environment_()));
 
-		ua_set(CURRENT, to_abs(FORTH_WL, d));
+		user_set(CURRENT, to_abs(FORTH_WL, d));
 
 		code("[:", primitive((vm) -> _start_quotation_()));
 		code(";]", primitive((vm) -> _end_quotation_()));
@@ -1129,15 +1157,15 @@ public class Sloth {
 
 		code("DICT", primitive((vm) -> push(to_abs(d, 0))));
 		code("USER", primitive((vm) -> push(to_abs(u, 0))));
-		ua_set(INTERPRET, primitive((vm) -> _interpret_()));
+		user_set(INTERPRET, primitive((vm) -> _interpret_()));
 		code("(EMPTY-RETURN-STACK)", primitive((vm) -> _empty_rs_()));
 	}
 
 	void repl() {
 		m.add(ByteBuffer.allocate(256));
-		ua_set(IBUF, to_abs(0, m.size() - 1));
-		ua_set(IPOS, 0);
-		ua_set(ILEN, 80);
+		user_set(IBUF, to_abs(0, m.size() - 1));
+		user_set(IPOS, 0);
+		user_set(ILEN, 80);
 		eval(get_xt(find_word("QUIT")));
 		// TODO Maybe remove the memory block?
 	}
