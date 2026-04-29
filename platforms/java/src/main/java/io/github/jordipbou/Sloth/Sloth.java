@@ -368,11 +368,12 @@ public class Sloth {
 	}
 
 	// -- Primitives ----------------------------------------
+
 	void _exit_() { ip = (rp > 0) ? rpop() : -1; }
 	void _lit_() { push(op()); }
 	void _rip_() { int tip = ip; int o = op(); push(tip + o - sCELL); }
-	void _branch_() { ip += op() - sCELL; }
-	void _zbranch_() { ip += pop() == 0 ? (op() - sCELL) : sCELL; }
+	void _branch_() { ip += op() ; }
+	void _zbranch_() { ip += pop() == 0 ? op() : sCELL ; }
 	void _string_() { 
 		int l = op(); 
 		push(ip); 

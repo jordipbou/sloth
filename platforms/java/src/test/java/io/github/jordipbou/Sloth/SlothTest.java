@@ -430,4 +430,125 @@ public class SlothTest {
 		assertEquals(19, inner_var);
 		assertEquals(27, post_var);
 	}
+
+	/* -- Exceptions --------------------------------------- */
+	
+	void throw_42_prim(Sloth vm) { sloth._throw(42); }
+
+	@Test
+	public void test_catch_no_throw() {
+		int p = sloth.primitive((vm) -> my_primitive(vm));
+		sloth._catch(p);
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	}
+
+	@Test
+	public void test_catch_throw() {
+		int p = sloth.primitive((vm) -> throw_42_prim(vm));
+		sloth._catch(p);
+		assertEquals(1, sloth.sp);
+		assertEquals(42, sloth.pop());
+	}
+
+	@Test
+	public void test_catch_restores_stack() {
+		sloth.push(1);
+		sloth.push(2);
+		int p = sloth.primitive((vm) -> throw_42_prim(vm));
+		sloth._catch(p);
+		assertEquals(3, sloth.sp);
+		assertEquals(42, sloth.pop());
+		assertEquals(2, sloth.pop());
+		assertEquals(1, sloth.pop());
+	}
+
+	void nested_throw_test_prim(Sloth vm) {
+		int p = sloth.primitive((_vm) -> throw_42_prim(_vm));
+		sloth._catch(p);
+	}
+
+	@Test
+	public void test_nested_catch() {
+		int p = sloth.primitive((vm) -> nested_throw_test_prim(vm));
+		sloth._catch(p);
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());
+		assertEquals(42, sloth.pop());
+	}
+
+	@Test
+	public void test_catch_throw_prim() {
+		int p = sloth.primitive((vm) -> throw_42_prim(vm));
+		sloth.push(p);
+		sloth._catch_();
+		assertEquals(42, sloth.pop());
+
+		sloth.push(0); // No error
+		sloth._throw_();
+		assertEquals(0, sloth.sp);
+	}
+
+	/* -- Inner interpreter primitives -------------------- */
+
+	@Test
+	public void test_exit_() {
+		// Test rp > 0
+		sloth.rpush(100);
+		sloth._exit_();
+		assertEquals(100, sloth.ip);
+		assertEquals(0, sloth.rp);
+
+		// Test rp == 0
+		sloth._exit_();
+		assertEquals(-1, sloth.ip);
+	}
+
+	@Test
+	public void test_lit_() {
+		sloth.set(3*sCELL, 42);
+		sloth.ip = sloth.to_abs(3*sCELL, 0);
+		sloth._lit_();
+		assertEquals(42, sloth.pop());
+		assertEquals(sloth.to_abs(4*sCELL, 0), sloth.ip);
+	}
+
+	@Test
+	public void test_rip_() {
+		int base_ip = sloth.to_abs(3*sCELL, 0);
+		sloth.set(3*sCELL, 10*sCELL); // offset
+		sloth.ip = base_ip;
+		sloth._rip_();
+		assertEquals(base_ip + 9*sCELL, sloth.pop());
+		assertEquals(base_ip + sCELL, sloth.ip);
+	}
+
+	@Test
+	public void test_branch_() {
+		int base_ip = sloth.to_abs(3*sCELL, 0);
+		sloth.set(3*sCELL, 10*sCELL); // offset
+		sloth.ip = base_ip;
+		sloth._branch_();
+		assertEquals(base_ip + 10*sCELL, sloth.ip);
+	}
+
+	@Test
+	public void test_zbranch_() {
+		int base_ip = sloth.to_abs(3*sCELL, 0);
+		sloth.set(3*sCELL, 10*sCELL);
+
+		// Case 0: TOS is 0 (should branch)
+		sloth.ip = base_ip;
+		sloth.push(0);
+		sloth._zbranch_();
+		System.out.printf("%d %d\n", base_ip + 10*sCELL, sloth.ip);
+		assertEquals(base_ip + 10*sCELL, sloth.ip);
+
+		// Case 1: TOS is NOT 0 (should NOT branch)
+		sloth.ip = base_ip;
+		sloth.push(1);
+		sloth._zbranch_();
+		System.out.printf("%d %d\n", base_ip + sCELL, sloth.ip);
+		assertEquals(base_ip + sCELL, sloth.ip);
+	}
 }
