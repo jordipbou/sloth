@@ -551,4 +551,97 @@ public class SlothTest {
 		System.out.printf("%d %d\n", base_ip + sCELL, sloth.ip);
 		assertEquals(base_ip + sCELL, sloth.ip);
 	}
+
+	/* -- Arithmetic and logical operations ---------------- */
+	
+	/* These words implement ANS Forth tests adapted to C */
+	
+	int MAXUINT = ~0;
+	int MAXINT = MAXUINT>>1;
+	int MININT = ~MAXINT;
+	int MIDUINT = MAXUINT;
+	int MIDUINTplus1 = MININT;
+	
+	int S0 = 0;
+	int S1 = MAXUINT;
+	
+	int MSB = MININT;
+
+	@Test
+	public void test_invert_() {
+		sloth.push(0);
+		sloth._invert_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(-1);
+		sloth._invert_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	}
+
+	@Test
+	public void test_and_() {
+		sloth.push(0);
+		sloth.push(0);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(0);
+		sloth.push(1);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	
+		sloth.push(1);
+		sloth.push(0);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(1);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(1, sloth.pop());
+
+		sloth.push(0);
+		sloth._invert_();
+		sloth.push(1);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(1, sloth.pop());
+
+		sloth.push(1);
+		sloth._invert_();
+		sloth.push(1);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(S0);
+		sloth.push(S0);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(S0, sloth.pop());
+
+		sloth.push(S0);
+		sloth.push(S1);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(S0, sloth.pop());
+	
+		sloth.push(S1);
+		sloth.push(S0);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(S0, sloth.pop());
+
+		sloth.push(S1);
+		sloth.push(S1);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(S1, sloth.pop());
+	}
 }
