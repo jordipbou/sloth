@@ -555,9 +555,9 @@ public class SlothTest {
 	/* These words implement ANS Forth tests adapted to C */
 	
 	int MAXUINT = ~0;
-	int MAXINT = MAXUINT>>1;
+	int MAXINT = MAXUINT>>>1;
 	int MININT = ~MAXINT;
-	int MIDUINT = MAXUINT;
+	int MIDUINT = MAXINT;
 	int MIDUINTplus1 = MININT;
 	
 	int S0 = 0;
@@ -744,5 +744,312 @@ public class SlothTest {
 		sloth._minus_();
 		assertEquals(1, sloth.sp);
 		assertEquals(MIDUINT, sloth.pop());
+	}
+
+	@Test
+	public void test_plus_() {
+		sloth.push(0);
+		sloth.push(5);
+		sloth._plus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(5, sloth.pop());
+
+		sloth.push(5);
+		sloth.push(0);
+		sloth._plus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(5, sloth.pop());
+
+		sloth.push(0);
+		sloth.push(-5);
+		sloth._plus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-5, sloth.pop());
+
+		sloth.push(-5);
+		sloth.push(0);
+		sloth._plus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-5, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(2);
+		sloth._plus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(3, sloth.pop());
+	
+		sloth.push(1);
+		sloth.push(-2);
+		sloth._plus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+	
+		sloth.push(-1);
+		sloth.push(2);
+		sloth._plus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(1, sloth.pop());
+	
+		sloth.push(-1);
+		sloth.push(-2);
+		sloth._plus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-3, sloth.pop());
+
+		sloth.push(-1);
+		sloth.push(1);
+		sloth._plus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	
+		sloth.push(MIDUINT);
+		sloth.push(1);
+		sloth._plus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(MIDUINTplus1, sloth.pop());
+	}
+
+	@Test
+	public void test_r_shift_() {
+		sloth.push(1);
+		sloth.push(0);
+		sloth._r_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(1, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(1);
+		sloth._r_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(2);
+		sloth.push(1);
+		sloth._r_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(1, sloth.pop());
+
+		sloth.push(4);
+		sloth.push(2);
+		sloth._r_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(1, sloth.pop());
+
+		sloth.push(0x8000);
+		sloth.push(0xF);
+		sloth._r_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(1, sloth.pop());
+
+		sloth.push(MSB);
+		sloth.push(1);
+		sloth._r_shift_();
+		sloth.push(MSB);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	
+		sloth.push(MSB);
+		sloth.push(1);
+		sloth._r_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(MSB, sloth.pop()*2);
+	}
+
+	@Test
+	public void test_star_() {
+		sloth.push(0);
+		sloth.push(0);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(0);
+		sloth.push(1);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(0);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(2);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(2, sloth.pop());
+
+		sloth.push(2);
+		sloth.push(1);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(2, sloth.pop());
+
+		sloth.push(3);
+		sloth.push(3);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(9, sloth.pop());
+
+		sloth.push(-3);
+		sloth.push(3);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-9, sloth.pop());
+
+		sloth.push(3);
+		sloth.push(-3);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-9, sloth.pop());
+
+		sloth.push(-3);
+		sloth.push(-3);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(9, sloth.pop());
+
+		sloth.push(MIDUINTplus1);
+		sloth.push(1);
+		sloth._r_shift_();
+		sloth.push(2);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(MIDUINTplus1, sloth.pop());
+
+		sloth.push(MIDUINTplus1);
+		sloth.push(2);
+		sloth._r_shift_();
+		sloth.push(4);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(MIDUINTplus1, sloth.pop());
+
+		sloth.push(MIDUINTplus1);
+		sloth.push(1);
+		sloth._r_shift_();
+		sloth.push(MIDUINTplus1 | sloth.pop());
+		sloth.push(2);
+		sloth._star_();
+		assertEquals(1, sloth.sp);
+		assertEquals(MIDUINTplus1, sloth.pop());
+	}
+
+	@Test
+	public void test_two_slash_() {
+		sloth.push(S0);
+		sloth._two_slash_();
+		assertEquals(1, sloth.sp);
+		assertEquals(S0, sloth.pop());
+
+		sloth.push(1);
+		sloth._two_slash_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(0x4000);
+		sloth._two_slash_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0x2000, sloth.pop());
+
+		sloth.push(S1);
+		sloth._two_slash_();
+		assertEquals(1, sloth.sp);
+		assertEquals(S1, sloth.pop());
+
+		sloth.push(S1^1);
+		sloth._two_slash_();
+		assertEquals(1, sloth.sp);
+		assertEquals(S1, sloth.pop());
+
+		sloth.push(MSB);
+		sloth._two_slash_();
+		sloth.push(MSB);
+		sloth._and_();
+		assertEquals(1, sloth.sp);
+		assertEquals(MSB, sloth.pop());
+	}
+	
+	@Test
+	public void test_u_m_star_() {
+		sloth.push(0);
+		sloth.push(0);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());
+		assertEquals(0, sloth.pop());
+
+		sloth.push(0);
+		sloth.push(1);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());
+		assertEquals(0, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(0);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());
+		assertEquals(0, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(2);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());
+		assertEquals(2, sloth.pop());
+	
+		sloth.push(2);
+		sloth.push(1);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());
+		assertEquals(2, sloth.pop());
+
+		sloth.push(3);
+		sloth.push(3);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());
+		assertEquals(9, sloth.pop());
+
+		sloth.push(MIDUINTplus1>>>1);
+		sloth.push(2);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());
+		assertEquals(MIDUINTplus1, sloth.pop());
+
+		sloth.push(MIDUINTplus1);
+		sloth.push(2);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(1, sloth.pop());
+		assertEquals(0, sloth.pop());
+	
+		sloth.push(MIDUINTplus1);
+		sloth.push(4);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(2, sloth.pop());
+		assertEquals(0, sloth.pop());
+	
+		sloth.push(S1);
+		sloth.push(2);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(1, sloth.pop());
+		assertEquals(S1<<1, sloth.pop());
+	
+		sloth.push(MAXUINT);
+		sloth.push(MAXUINT);
+		sloth._u_m_star_();
+		assertEquals(2, sloth.sp);
+		assertEquals(~1, sloth.pop());
+		assertEquals(1, sloth.pop());
 	}
 }

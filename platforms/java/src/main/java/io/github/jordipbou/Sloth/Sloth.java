@@ -107,7 +107,10 @@ public class Sloth {
 	/* TODO: Seems to be of no use, check and remove if */
 	/* necessary, or maintain it to be used by other classes. */
 	long udpop() { long v = upop(); return msp(v << 32) + lsp(upop()); }
-	void dpush(long v) { push((int)lsp(v)); push((int)(v >> 32)); }
+	void dpush(long v) { 
+		push((int)lsp(v)); 
+		push((int)(v >> 32)); 
+	}
 	long dpop() { 
 		long v = lpop(); 
 		return msp(v << 32) + lsp(lpop());
