@@ -541,14 +541,12 @@ public class SlothTest {
 		sloth.ip = base_ip;
 		sloth.push(0);
 		sloth._zbranch_();
-		System.out.printf("%d %d\n", base_ip + 10*sCELL, sloth.ip);
 		assertEquals(base_ip + 10*sCELL, sloth.ip);
 
 		// Case 1: TOS is NOT 0 (should NOT branch)
 		sloth.ip = base_ip;
 		sloth.push(1);
 		sloth._zbranch_();
-		System.out.printf("%d %d\n", base_ip + sCELL, sloth.ip);
 		assertEquals(base_ip + sCELL, sloth.ip);
 	}
 
@@ -643,5 +641,108 @@ public class SlothTest {
 		sloth._and_();
 		assertEquals(1, sloth.sp);
 		assertEquals(S1, sloth.pop());
+	}
+
+	@Test
+	public void test_l_shift_() {
+		sloth.push(1);
+		sloth.push(0);
+		sloth._l_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(1, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(1);
+		sloth._l_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(2, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(2);
+		sloth._l_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(4, sloth.pop());
+	
+		sloth.push(1);
+		sloth.push(0xF);
+		sloth._l_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0x8000, sloth.pop());
+		
+		sloth.push(S1);
+		sloth.push(1);
+		sloth._l_shift_();
+		sloth.push(sloth.pop() ^ 1);
+		assertEquals(1, sloth.sp);
+		assertEquals(S1, sloth.pop());
+
+		sloth.push(MSB);
+		sloth.push(1);
+		sloth._l_shift_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	}
+
+	@Test
+	public void test_minus_() {
+		sloth.push(0);
+		sloth.push(5);
+		sloth._minus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-5, sloth.pop());
+
+		sloth.push(5);
+		sloth.push(0);
+		sloth._minus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(5, sloth.pop());
+
+		sloth.push(0);
+		sloth.push(-5);
+		sloth._minus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(5, sloth.pop());
+	
+		sloth.push(-5);
+		sloth.push(0);
+		sloth._minus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-5, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(2);
+		sloth._minus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(-2);
+		sloth._minus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(3, sloth.pop());
+
+		sloth.push(-1);
+		sloth.push(2);
+		sloth._minus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-3, sloth.pop());
+
+		sloth.push(-1);
+		sloth.push(-2);
+		sloth._minus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(1, sloth.pop());
+
+		sloth.push(0);
+		sloth.push(1);
+		sloth._minus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+	
+		sloth.push(MIDUINTplus1);
+		sloth.push(1);
+		sloth._minus_();
+		assertEquals(1, sloth.sp);
+		assertEquals(MIDUINT, sloth.pop());
 	}
 }
