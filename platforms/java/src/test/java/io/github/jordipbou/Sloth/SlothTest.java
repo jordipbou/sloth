@@ -1052,4 +1052,58 @@ public class SlothTest {
 		assertEquals(~1, sloth.pop());
 		assertEquals(1, sloth.pop());
 	}
+
+	@Test
+	public void test_u_m_slash_mod_() {
+		sloth.push(0);
+		sloth.push(0);
+		sloth.push(1);
+		sloth._u_m_slash_mod_();
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());
+		assertEquals(0, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(0);
+		sloth.push(2);
+		sloth._u_m_slash_mod_();
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());
+		assertEquals(1, sloth.pop());
+
+		sloth.push(3);
+		sloth.push(0);
+		sloth.push(2);
+		sloth._u_m_slash_mod_();
+		assertEquals(2, sloth.sp);
+		assertEquals(1, sloth.pop());
+		assertEquals(1, sloth.pop());
+
+		sloth.push(MAXUINT);
+		sloth.push(2);
+		sloth._u_m_star_();
+		sloth.push(2);
+		sloth._u_m_slash_mod_();
+		assertEquals(2, sloth.sp);
+		assertEquals(MAXUINT, sloth.pop());
+		assertEquals(0, sloth.pop());
+
+		sloth.push(MAXUINT);
+		sloth.push(2);
+		sloth._u_m_star_();
+		sloth.push(MAXUINT);
+		sloth._u_m_slash_mod_();
+		assertEquals(2, sloth.sp);
+		assertEquals(2, sloth.pop());
+		assertEquals(0, sloth.pop());
+
+		sloth.push(MAXUINT);
+		sloth.push(MAXUINT);
+		sloth._u_m_star_();
+		sloth.push(MAXUINT);
+		sloth._u_m_slash_mod_();
+		assertEquals(2, sloth.sp);
+		assertEquals(MAXUINT, sloth.pop());
+		assertEquals(0, sloth.pop());
+	}
 }
