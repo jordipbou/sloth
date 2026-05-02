@@ -1106,4 +1106,205 @@ public class SlothTest {
 		assertEquals(MAXUINT, sloth.pop());
 		assertEquals(0, sloth.pop());
 	}
+
+	/* -- Comparison operators ----------------------------- */
+
+	@Test
+	public void test_equals_() {
+		sloth.push(0);
+		sloth.push(0);
+		sloth._equals_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(1);
+		sloth._equals_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(-1);
+		sloth.push(-1);
+		sloth._equals_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(0);
+		sloth._equals_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(-1);
+		sloth.push(0);
+		sloth._equals_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	
+		sloth.push(0);
+		sloth.push(1);
+		sloth._equals_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	
+		sloth.push(0);
+		sloth.push(-1);
+		sloth._equals_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	}
+
+	@Test
+	public void test_less_than_() {
+		sloth.push(0);
+		sloth.push(1);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(2);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(-1);
+		sloth.push(0);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(-1);
+		sloth.push(1);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(MININT);
+		sloth.push(0);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+	
+		sloth.push(MININT);
+		sloth.push(MAXINT);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(0);
+		sloth.push(MAXINT);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(-1, sloth.pop());
+
+		sloth.push(0);
+		sloth.push(0);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(1);
+		sloth.push(1);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	
+		sloth.push(1);
+		sloth.push(0);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	
+		sloth.push(2);
+		sloth.push(1);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(0);
+		sloth.push(-1);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+		
+		sloth.push(1);
+		sloth.push(-1);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(0);
+		sloth.push(MININT);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		sloth.push(MAXINT);
+		sloth.push(MININT);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+			
+		sloth.push(MAXINT);
+		sloth.push(0);
+		sloth._less_than_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+	}
+
+	/* -- Strings ------------------------------------------ */
+
+	@Test
+	public void test_string_() {
+		sloth.set(100, 5);
+		sloth.ip = sloth.to_abs(100, 0);
+		sloth._string_();
+		assertEquals(2, sloth.sp);
+		assertEquals(5, sloth.pop());
+		assertEquals(sloth.to_abs(100 + sCELL, 0), sloth.pop());
+		assertEquals(sloth.aligned(sloth.to_abs(100 + sCELL + 5*suCHAR, 0)), sloth.ip);
+	}
+
+	@Test
+	public void test_c_string_() {
+		sloth.c_store(sloth.to_abs(100, 0), (char)5);
+		sloth.ip = sloth.to_abs(100, 0);
+		sloth._c_string_();
+		assertEquals(1, sloth.sp);
+		assertEquals(sloth.to_abs(100, 0), sloth.pop());
+		assertEquals(sloth.aligned(sloth.to_abs(100 + 6*suCHAR, 0)), sloth.ip);
+	}
+
+	void do_test_move(int b, int a1, int a2, int u, int v1, int v2, int v3) {
+		sloth.push(sloth.to_abs(a1, 0));
+		sloth.push(sloth.to_abs(a2, 0));
+		sloth.push(u);
+		sloth._move_();
+		assertEquals(0, sloth.sp);
+		assertEquals(v1, sloth.b_fetch(sloth.to_abs(b + 0, 0)));
+		assertEquals(v2, sloth.b_fetch(sloth.to_abs(b + 1, 0)));
+		assertEquals(v3, sloth.b_fetch(sloth.to_abs(b + 2, 0)));
+	}
+
+	@Test
+	public void test_move_() {
+		int fbuf = 100;
+		int sbuf = 103;
+
+		sloth.b_store(fbuf + 0, (byte)20);
+		sloth.b_store(fbuf + 1, (byte)20);
+		sloth.b_store(fbuf + 2, (byte)20);
+
+		sloth.b_store(sbuf + 0, (byte)12);
+		sloth.b_store(sbuf + 1, (byte)34);
+		sloth.b_store(sbuf + 2, (byte)56);
+	
+		do_test_move(fbuf, fbuf, fbuf, 3, 20, 20, 20);
+		do_test_move(fbuf, sbuf, fbuf, 0, 20, 20, 20);
+		do_test_move(fbuf, sbuf, fbuf, 1, 12, 20, 20);
+		do_test_move(fbuf, sbuf, fbuf, 3, 12, 34, 56);
+		do_test_move(fbuf, fbuf, fbuf + 1, 2, 12, 12, 34);
+		do_test_move(fbuf, fbuf + 1, fbuf, 2, 12, 34, 34);
+	}
 }

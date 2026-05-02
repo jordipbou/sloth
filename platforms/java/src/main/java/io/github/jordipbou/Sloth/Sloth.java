@@ -386,7 +386,7 @@ public class Sloth {
 	void _c_string_() {
 		char l = c_fetch(ip);
 		push(ip);
-		ip = aligned(ip + (l + 1) * suCHAR + suCHAR);
+		ip = aligned(ip + l*suCHAR + suCHAR);
 	}
 	// Quotations (not in ANS Forth yet)
 	void _quotation_() { int d = op(); push(ip); ip += d; }
@@ -834,10 +834,10 @@ public class Sloth {
 		int addr1 = pop();
 		if (addr1 >= addr2) {
 			for (int i = 0; i < u; i++) 
-				c_store(addr2 + i*suCHAR, c_fetch(addr1 + i*suCHAR));
+				b_store(addr2 + i, b_fetch(addr1 + i));
 		} else {
 			for (int i = u - 1; i >= 0; i--)
-				c_store(addr2 + i*suCHAR, c_fetch(addr1 + i*suCHAR));
+				b_store(addr2 + i, b_fetch(addr1 + i));
 		}
 	}
 
