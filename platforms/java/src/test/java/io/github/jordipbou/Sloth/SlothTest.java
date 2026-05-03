@@ -1342,4 +1342,178 @@ public class SlothTest {
 		assertEquals(1, sloth.pop()); // Immediate
 		assertEquals(123, sloth.pop());
 	}
+
+	/* -- Compile and literal ------------------------------ */
+
+	@Test
+	public void test_compile_and_literal() {
+		/* Create (LIT) to ensure it's correctly compiled */
+		sloth.code("(LIT)", 999);
+
+		sloth.literal(42);
+		int h = sloth.here();
+		assertEquals(999, sloth.fetch(h - 2*sCELL));
+		assertEquals(42, sloth.fetch(h - sCELL));
+
+		sloth.compile(777);
+		assertEquals(777, sloth.fetch(sloth.here() - sCELL));
+	}
+
+	/* -- Quotations ---------------------------------------- */
+
+	@Test
+	public void test_quotation_primitive() {
+		sloth.set(100, 3*sCELL);
+		sloth.ip = sloth.to_abs(100, 0);
+		sloth._quotation_();
+		assertEquals(sloth.to_abs(100 + 4*sCELL, 0), sloth.ip);
+		assertEquals(sloth.to_abs(100 + sCELL, 0), sloth.pop());
+	}
+
+	@Test
+	public void test_start_quotation_interpret_mode() {
+		sloth.code("(QUOTATION)", 111);
+
+		int here = sloth.here();
+		sloth.user_set(Sloth.SLOTH_STATE, 0);
+		sloth._start_quotation_();
+		assertEquals(111, sloth.fetch(here));
+		assertEquals(0, sloth.fetch(here + sCELL));
+		assertEquals(-1, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(3, sloth.sp);
+		assertEquals(here + sCELL, sloth.pop());
+		assertEquals(0, sloth.pop());
+		assertEquals(here + 2*sCELL, sloth.pop());
+	}
+
+	@Test
+	public void test_start_nested_quotation_interpret_mode() {
+		sloth.code("(QUOTATION)", 111);
+
+		int here = sloth.here();
+		sloth.user_set(Sloth.SLOTH_STATE, 0);
+		sloth._start_quotation_();
+		sloth._start_quotation_();
+		assertEquals(111, sloth.fetch(here));
+		assertEquals(0, sloth.fetch(here + sCELL));
+		assertEquals(111, sloth.fetch(here + 2*sCELL));
+		assertEquals(0, sloth.fetch(here + 3*sCELL));
+		assertEquals(-2, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(5, sloth.sp);
+		assertEquals(here + 3*sCELL, sloth.pop());
+		assertEquals(here + 2*sCELL, sloth.pop());
+		assertEquals(here + sCELL, sloth.pop());
+		assertEquals(0, sloth.pop());
+		assertEquals(here + 2*sCELL, sloth.pop());
+	}
+
+	@Test
+	public void test_start_quotation_compile_mode() {
+		sloth.code("(QUOTATION)", 111);
+
+		int here = sloth.here();
+		sloth.user_set(Sloth.SLOTH_STATE, 1);
+		sloth._start_quotation_();
+		assertEquals(111, sloth.fetch(here));
+		assertEquals(0, sloth.fetch(here + sCELL));
+		assertEquals(2, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(2, sloth.sp);
+		assertEquals(here + sCELL, sloth.pop());
+		assertEquals(0, sloth.pop());
+	}
+
+	@Test
+	public void test_start_nested_quotation_compile_mode() {
+		sloth.code("(QUOTATION)", 111);
+
+		int here = sloth.here();
+		sloth.user_set(Sloth.SLOTH_STATE, 1);
+		sloth._start_quotation_();
+		sloth._start_quotation_();
+		assertEquals(111, sloth.fetch(here));
+		assertEquals(0, sloth.fetch(here + sCELL));
+		assertEquals(111, sloth.fetch(here + 2*sCELL));
+		assertEquals(0, sloth.fetch(here + 3*sCELL));
+		assertEquals(3, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(4, sloth.sp);
+		assertEquals(here + 3*sCELL, sloth.pop());
+		assertEquals(here + 2*sCELL, sloth.pop());
+		assertEquals(here + sCELL, sloth.pop());
+		assertEquals(0, sloth.pop());
+	}
+
+	@Test
+	public void test_end_quotation_interpret_mode() {
+		sloth.code("(QUOTATION)", 111);
+		sloth.code("EXIT", 222);
+
+		int here = sloth.here();
+		sloth.user_set(Sloth.SLOTH_STATE, 0);
+		sloth._start_quotation_();
+		sloth._end_quotation_();
+
+		assertEquals(111, sloth.fetch(here));
+		assertEquals(sCELL, sloth.fetch(here + sCELL));
+		assertEquals(222, sloth.fetch(here + 2*sCELL));
+		assertEquals(0, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(1, sloth.sp);
+		assertEquals(here + 2*sCELL, sloth.pop());
+	}
+
+	@Test
+	public void test_end_nested_quotation_interpret_mode() {
+		sloth.code("(QUOTATION)", 111);
+		sloth.code("EXIT", 222);
+
+		int here = sloth.here();
+		sloth.user_set(Sloth.SLOTH_STATE, 0);
+		sloth._start_quotation_();
+		sloth._start_quotation_();
+		sloth._end_quotation_();
+
+		assertEquals(111, sloth.fetch(here));
+		assertEquals(sCELL, sloth.fetch(here + 3*sCELL));
+		assertEquals(222, sloth.fetch(here + 4*sCELL));
+		assertEquals(-1, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(3, sloth.sp);
+		assertEquals(here + sCELL, sloth.pop());
+		assertEquals(0, sloth.pop());
+		assertEquals(here + 2*sCELL, sloth.pop());
+	}
+
+	@Test
+	public void test_end_quotation_compile_mode() {
+		sloth.code("(QUOTATION)", 111);
+		sloth.code("EXIT", 222);
+
+		int here = sloth.here();
+		sloth.user_set(Sloth.SLOTH_STATE, 1);
+		sloth._start_quotation_();
+		sloth._end_quotation_();
+
+		assertEquals(111, sloth.fetch(here));
+		assertEquals(sCELL, sloth.fetch(here + sCELL));
+		assertEquals(222, sloth.fetch(here + 2*sCELL));
+		assertEquals(1, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(0, sloth.sp);
+	}
+
+	@Test
+	public void test_end_nested_quotation_compile_mode() {
+		sloth.code("(QUOTATION)", 111);
+		sloth.code("EXIT", 222);
+
+		int here = sloth.here();
+		sloth.user_set(Sloth.SLOTH_STATE, 1);
+		sloth._start_quotation_();
+		sloth._start_quotation_();
+		sloth._end_quotation_();
+		sloth._end_quotation_();
+
+		assertEquals(111, sloth.fetch(here));
+		assertEquals(sCELL, sloth.fetch(here + 3*sCELL));
+		assertEquals(222, sloth.fetch(here + 4*sCELL));
+		assertEquals(1, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(0, sloth.sp);
+	}
 }

@@ -47,11 +47,52 @@ public class Sloth {
 	public static final int RETURN_STACK_OVERFLOW = -5;
 	public static final int RETURN_STACK_UNDERFLOW = -6;
 
+	/* -- Displacement of counted string buffer from here -- */
+
+	/* TODO CBuffer could be just another space of the normal */
+	/* strings circular buffer. */
+	public static final int SLOTH_CBUF = 64;
+
 	/* -- Dictionary variables ----------------------------- */
 
 	public static final int SLOTH_HERE = 0;
 	public static final int SLOTH_INTERNAL_WL = 1*sCELL;
 	public static final int SLOTH_FORTH_WL = 2*sCELL;
+
+	/* -- User area variables and buffers ------------------ */
+	
+	public static final int SLOTH_CURRENT = 0*sCELL;
+	public static final int SLOTH_ORDER = 1*sCELL;
+	public static final int SLOTH_LOCALS_WORDLIST = 2*sCELL;
+	public static final int SLOTH_CONTEXT = 3*sCELL;
+	/* There are 16 CELLS reserved to search order */
+	public static final int SLOTH_BASE = 19*sCELL;
+	public static final int SLOTH_STATE = 20*sCELL;
+	public static final int SLOTH_IBUF = 21*sCELL;
+	public static final int SLOTH_IPOS = 22*sCELL;
+	public static final int SLOTH_ILEN = 23*sCELL;
+	public static final int SLOTH_SOURCE_ID = 24*sCELL;
+	public static final int SLOTH_SOURCE_POS = 25*sCELL;
+	public static final int SLOTH_LATESTXT = 26*sCELL;
+	public static final int SLOTH_INTERPRET = 27*sCELL;
+	
+	public static final int SLOTH_ROOT_PATH_LENGTH = 28*sCELL;
+	public static final int SLOTH_PATH_START = 29*sCELL;
+	public static final int SLOTH_PATH_END = 30*sCELL;
+	/* Continuous space to store path strings */
+	public static final int SLOTH_PATHS = 31*sCELL;
+	
+	/* Space between SLOTH_PATHS and SLOTH_INCLUDED_FILES */
+	/* reserved to store paths. */
+	
+	public static final int SLOTH_INCLUDED_FILES = 95*sCELL;
+	
+	public static final int SLOTH_LAST_USER_VAR = 96*sCELL;
+	
+	/* -- Flags for word status ---------------------------- */
+	
+	public static final int SLOTH_HIDDEN = 1;
+	public static final int SLOTH_IMMEDIATE = 2;
 
 	/* -- Context initialization -------------------------- */
 
