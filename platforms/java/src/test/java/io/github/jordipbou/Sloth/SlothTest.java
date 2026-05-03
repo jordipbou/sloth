@@ -1307,4 +1307,39 @@ public class SlothTest {
 		do_test_move(fbuf, fbuf, fbuf + 1, 2, 12, 12, 34);
 		do_test_move(fbuf, fbuf + 1, fbuf, 2, 12, 34, 34);
 	}
+
+	/* -- Searching ---------------------------------------- */
+
+	@Test
+	public void test_searching() {
+		String name = "FIND-ME";
+		int name_addr = sloth.FromString(name);
+		int w = sloth.header(name_addr, name.length());
+		sloth.set_xt(w, 123);
+
+		String s1 = "find-me";
+		int s1_addr = sloth.FromString(s1);
+		String s2 = "other";
+		int s2_addr = sloth.FromString(s2);
+		assertTrue(sloth.compare(name_addr, name.length(), s1_addr, s1.length()));
+		assertFalse(sloth.compare(name_addr, name.length(), s2_addr, s2.length()));
+
+		assertEquals(w, sloth.search_word(name_addr, name.length()));
+		assertEquals(w, sloth.find_word(name));
+	
+		int cstring = sloth.here();
+		sloth.c_comma((char)name.length());
+		for (int i = 0; i < name.length(); i++) sloth.c_comma(name.charAt(i));
+
+		sloth.push(cstring);
+		sloth._find_();
+		assertEquals(-1, sloth.pop()); // Not immediate
+		assertEquals(123, sloth.pop());
+
+		sloth._immediate_();
+		sloth.push(cstring);
+		sloth._find_();
+		assertEquals(1, sloth.pop()); // Immediate
+		assertEquals(123, sloth.pop());
+	}
 }

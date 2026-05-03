@@ -475,7 +475,7 @@ public class Sloth {
 	}
 
 	// Finding words
-	boolean compare_without_case(int a1, int u1, int a2, int u2) {
+	protected boolean compare(int a1, int u1, int a2, int u2) {
 		if (u1 != u2) return false;
 		for (int i = 0; i < u2; i++) {
 			char a = c_fetch(a1 + i*suCHAR);
@@ -487,16 +487,14 @@ public class Sloth {
 		return true;
 	}
 
-	int search_word(int n, int l) {
+	protected int search_word(int n, int l) {
 		for (int i = -1; i < user_get(ORDER); i++) {
 			int wl = user_get(CONTEXT + i*sCELL);
 			if (wl != 0) {
 				int w = fetch(wl);
 				while (w > 0) {
 					if (!has_flag(w, HIDDEN) 
-					 && compare_without_case(
-								get_name_addr(w), get_namelen(w),
-								n, l)) {
+					 && compare(get_name_addr(w), get_namelen(w),	n, l)) {
 						return w;
 					}
 					w = get_link(w);
@@ -506,7 +504,7 @@ public class Sloth {
 		return 0;
 	}
 
-	void _find_() {
+	public void _find_() {
 		int cstring = pop();
 		int w = search_word(cstring + suCHAR, c_fetch(cstring));
 		if (w == 0) { push(cstring); push(0); }
@@ -515,12 +513,7 @@ public class Sloth {
 	}
 
 	// Helper to find words from Java
-	int find_word(String name) {
-		// // Copy the string to a transient memory (3rd ByteBuffer array)
-		// for (int i = 0; i < name.length(); i++) {
-		// 	m.get(2).putChar(name.charAt(i));
-		// }
-		// return search_word(to_abs(0, 2), name.length());
+	public int find_word(String name) {
 		return search_word(FromString(name), name.length());
 	}
 
