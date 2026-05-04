@@ -2,6 +2,9 @@ package io.github.jordipbou.Sloth;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.io.File;
+import java.io.RandomAccessFile;
 import java.io.IOException;
 import java.util.function.Consumer;
 
@@ -19,6 +22,7 @@ public class Sloth {
 	protected static final int STACK_SIZE = 64;
 	protected static final int RETURN_STACK_SIZE = 64;
 	protected static final int FLOAT_STACK_SIZE = 64;
+	protected static final int OBJECT_STACK_SIZE = 64;
 
 	/* -- Virtual Machine context definition --------------- */
 
@@ -34,7 +38,8 @@ public class Sloth {
 
 	protected int ip; // Instruction pointer
 
-	protected ArrayList<ByteBuffer> m; // Array of memory blocks
+	protected HashMap<Integer, Object> o; // Indexed map of objects
+	protected int op; // Last index of previous HashMap
 
 	protected ArrayList<Consumer<Sloth>> p; // Array of primitives
 
@@ -100,33 +105,39 @@ public class Sloth {
 
 	public Sloth(int dsize, int usize) {
 		s = new int[STACK_SIZE];
+		sp = 0;
 		r = new int[RETURN_STACK_SIZE];
+		rp = 0;
 		f = new float[FLOAT_STACK_SIZE];
+		fp = 0;
+
 		ip = -1;
 		p = new ArrayList<Consumer<Sloth>>();
-		m = new ArrayList<ByteBuffer>();
-		m.add(ByteBuffer.allocate(dsize));
+		o = new HashMap<Integer, Object>();
+		op = 0;
+		o.put(op++, ByteBuffer.allocate(dsize));
 		d = 0;
-		m.add(ByteBuffer.allocate(usize));
+		o.put(op++, ByteBuffer.allocate(usize));
 		u = 1;
+
 		// Circular buffer for storing Java strings
 		// that need to be converted to Forth strings
-		m.add(ByteBuffer.allocate(2048));
+		o.put(op++, ByteBuffer.allocate(2048));
 
-		// Initialize HERE
-		m.get(d).putInt(0*sCELL, 3*sCELL);
+		// // Initialize HERE
+		((ByteBuffer)(o.get(d))).putInt(0*sCELL, 3*sCELL);
 		// Initialize INTERNAL-WORDLIST
-		m.get(d).putInt(1*sCELL, 0);
+		((ByteBuffer)(o.get(d))).putInt(1*sCELL, 0);
 		// Initialize FORTH-WORDLIST (the default wordlist) */
-		m.get(d).putInt(2*sCELL, 0);
+		((ByteBuffer)(o.get(d))).putInt(2*sCELL, 0);
 
-		// Initialize CURRENT to point to FORTH-WORDLIST
-		m.get(u).putInt(0*sCELL, to_abs(SLOTH_FORTH_WL, d)); // CURRENT
-		m.get(u).putInt(1*sCELL, 2); // #ORDER
-		m.get(u).putInt(2*sCELL, 0); // LOCALS-WORDLIST
-		m.get(u).putInt(3*sCELL, to_abs(SLOTH_FORTH_WL, d)); // CONTEXT 0
-		m.get(u).putInt(4*sCELL, to_abs(SLOTH_INTERNAL_WL, d)); // CONTEXT 
-	}
+
+		((ByteBuffer)(o.get(u))).putInt(0*sCELL, to_abs(SLOTH_FORTH_WL, d)); // CURRENT
+		((ByteBuffer)(o.get(u))).putInt(1*sCELL, 2); // #ORDER
+		((ByteBuffer)(o.get(u))).putInt(2*sCELL, 0); // LOCALS-WORDLIST
+		((ByteBuffer)(o.get(u))).putInt(3*sCELL, to_abs(SLOTH_FORTH_WL, d)); // CONTEXT 0
+		((ByteBuffer)(o.get(u))).putInt(4*sCELL, to_abs(SLOTH_INTERNAL_WL, d)); // CONTEXT 
+}
 
 	// -- Data stack
 
@@ -181,7 +192,7 @@ public class Sloth {
 
 	int to_abs(int a, int b) { return (b << 24) + a; }
 	int to_rel(int a) { return a & 0x00FFFFFF; }
-	ByteBuffer block(int a) { return m.get(a >> 24); }
+	ByteBuffer block(int a) { return (ByteBuffer)(o.get(a >> 24)); }
 
 	void b_store(int a, byte v) { block(a).put(to_rel(a), v); }
 	byte b_fetch(int a) { return block(a).get(to_rel(a)); }
@@ -199,7 +210,7 @@ public class Sloth {
 	// act as a circular buffer and overwrite previous strings
 	// as required.
 	int FromString(String s) {
-		ByteBuffer b = m.get(2);
+		ByteBuffer b = (ByteBuffer)(o.get(2));
 		if (b.remaining() / suCHAR < s.length()) b.rewind();
 		int addr = to_abs(b.position(), 2);
 		for (int i = 0; i < s.length(); i++) {
@@ -348,8 +359,12 @@ public class Sloth {
 	char c_get(int a) { return c_fetch(a); }
 
 	// User area set/get.
-	void user_set(int rel_a, int v) { m.get(u).putInt(to_rel(rel_a), v); }
-	int user_get(int rel_a) { return m.get(u).getInt(to_rel(rel_a)); }
+	void user_set(int rel_a, int v) { 
+		((ByteBuffer)(o.get(u))).putInt(to_rel(rel_a), v); 
+	}
+	int user_get(int rel_a) { 
+		return ((ByteBuffer)(o.get(u))).getInt(to_rel(rel_a)); 
+	}
 
 	// Memory management
 	int here() { return get(HERE); }
@@ -473,11 +488,11 @@ public class Sloth {
 		}
 	}
 
-	// Parsing input
+	// -- Input/output and parsing operations ------------
 
 	// The region to store WORD generated counted strings
 	// starts at "HERE" + CBUF
-	void _word_() {
+	public void _word_() {
 		char c = (char)pop();
 		int ibuf = user_get(IBUF);
 		int ilen = user_get(ILEN);
@@ -515,127 +530,24 @@ public class Sloth {
 		user_set(IPOS, ipos);
 	}
 
-	// Finding words
-	protected boolean compare(int a1, int u1, int a2, int u2) {
-		if (u1 != u2) return false;
-		for (int i = 0; i < u2; i++) {
-			char a = c_fetch(a1 + i*suCHAR);
-			char b = c_fetch(a2 + i*suCHAR);
-			if (a >= 97 && a <= 122) a -= 32;
-			if (b >= 97 && b <= 122) b -= 32;
-			if (a != b) return false;
-		}
-		return true;
-	}
-
-	protected int search_word(int n, int l) {
-		for (int i = -1; i < user_get(ORDER); i++) {
-			int wl = user_get(CONTEXT + i*sCELL);
-			if (wl != 0) {
-				int w = fetch(wl);
-				while (w > 0) {
-					if (!has_flag(w, HIDDEN) 
-					 && compare(get_name_addr(w), get_namelen(w),	n, l)) {
-						return w;
-					}
-					w = get_link(w);
-				}
+	public void _file_position_() {
+		RandomAccessFile file = (RandomAccessFile)(o.get(pop()));
+		if (file != null) {
+			try {
+				long pos = file.getFilePointer();
+				dpush(pos);
+				push(0);
+			} catch (IOException e) {
+				dpush(0);
+				push(-37);
 			}
-		}
-		return 0;
-	}
-
-	public void _find_() {
-		int cstring = pop();
-		int w = search_word(cstring + suCHAR, c_fetch(cstring));
-		if (w == 0) { push(cstring); push(0); }
-		else if (has_flag(w, IMMEDIATE)) { push(get_xt(w)); push(1); }
-		else { push(get_xt(w)); push(-1); }
-	}
-
-	// Helper to find words from Java
-	public int find_word(String name) {
-		return search_word(FromString(name), name.length());
-	}
-
-	// -- Outer interpreter
-
-	void _interpret_() {
-		int flag;
-		while (user_get(IPOS) < user_get(ILEN)) {
-			push(32); _word_();
-			int tok = pick(0) + suCHAR;
-			int tlen = c_fetch(pick(0));
-			if (tlen == 0) { pop(); return; }
-			_find_();
-			if ((flag = pop()) != 0) {
-				if (user_get(STATE) == 0 || (user_get(STATE) != 0 && flag == 1)) {
-					eval(pop());
-				} else {
-					compile(pop());
-				}
-			} else {
-				int temp_base = user_get(BASE);
-				pop();
-				if (tlen == 3 
-				 && c_fetch(tok) == '\'' 
-				 && c_fetch(tok + 2*suCHAR) == '\'') {
-					if (user_get(STATE) == 0) {
-						push(c_fetch(tok + suCHAR));
-					} else {
-						literal(c_fetch(tok + suCHAR));
-					}
-				} else {
-					boolean is_double = false;
-					if (c_fetch(tok) == '#') {
-						temp_base = 10;
-						tlen--;
-						tok += suCHAR;
-					} else if (c_fetch(tok) == '$') {
-						temp_base = 16;
-						tlen--;
-						tok += suCHAR;
-					} else if (c_fetch(tok) == '%') {
-						temp_base = 2;
-						tlen--;
-						tok += suCHAR;
-					} else if (c_fetch(tok + tlen*suCHAR - suCHAR) == '.') {
-						tlen--;
-						is_double = true;
-					}
-					StringBuffer buf = new StringBuffer();
-					for (int i = 0; i < tlen; i++) 
-						buf.append(c_fetch(tok +i*suCHAR));
-					try {
-						long n = Long.parseLong(buf.toString(), temp_base);
-						if (user_get(STATE) == 0) {
-							push((int)n);
-							if (is_double) push(n < 0 ? -1 : 0);
-						} else {
-							literal((int)n);
-							if (is_double) literal(n < 0 ? -1 : 0);
-						}
-					} catch(NumberFormatException e1) {
-						try {
-							float r = Float.parseFloat(buf.toString());
-							if (user_get(STATE) == 0) {
-								fpush(r);
-							} else {
-								fliteral(r);
-							}
-						} catch(NumberFormatException e2) {
-							_throw(-13);
-						}
-					}
-				}
-			}
+		} else {
+			dpush(0);
+			push(-37);
 		}
 	}
 
-	// -- Require words to bootstrap
-	void _bye_() { System.out.println(); System.exit(0); }
-	void _unused_() { push(m.get(d).capacity() - here()); }
-	void _refill_() {
+	public void _refill_() {
 		switch (user_get(SOURCE_ID)) {
 			case -1:
 				push(0);
@@ -657,11 +569,12 @@ public class Sloth {
 						user_set(SOURCE_POS, (int)raf.getFilePointer());
 						String line = raf.readLine();
 						if (line != null) {
-							ByteBuffer b = m.get(2);
+							ByteBuffer b = (ByteBuffer)(o.get(2));
 							if (b.capacity() / suCHAR < line.length() + 1) {
 								// TODO I don't think I need to allocate here...
+								// ...analyze what's going on..
 								b = ByteBuffer.allocate(Math.max(1024, line.length() + 1) * suCHAR);
-								m.set(2, b);
+								o.put(2, b);
 							}
 							b.rewind();
 							for (int i = 0; i < line.length(); i++) {
@@ -819,8 +732,9 @@ public class Sloth {
 					for (int i = 0; i < line.length(); i++) {
 						b.putChar(line.charAt(i));
 					}
-					m.add(b);
-					int block_idx = m.size() - 1;
+					o.put(op++, b);
+					// int block_idx = m.size() - 1;
+					int block_idx = op - 1;
 
 					user_set(IBUF, to_abs(0, block_idx));
 					user_set(IPOS, 0);
@@ -835,7 +749,7 @@ public class Sloth {
 					}
 					user_set(SOURCE_POS, (int)f.getFilePointer());
 					linenumber++;
-					m.remove(m.size() - 1);
+					o.remove(op - 1);
 				}
 			} catch (java.io.IOException e) {
 				// Handle IO error if needed
@@ -860,6 +774,130 @@ public class Sloth {
 		if (f == null) {
 			_throw(-38);
 		}
+	}
+
+
+	// Finding words
+	protected boolean compare(int a1, int u1, int a2, int u2) {
+		if (u1 != u2) return false;
+		for (int i = 0; i < u2; i++) {
+			char a = c_fetch(a1 + i*suCHAR);
+			char b = c_fetch(a2 + i*suCHAR);
+			if (a >= 97 && a <= 122) a -= 32;
+			if (b >= 97 && b <= 122) b -= 32;
+			if (a != b) return false;
+		}
+		return true;
+	}
+
+	protected int search_word(int n, int l) {
+		for (int i = -1; i < user_get(ORDER); i++) {
+			int wl = user_get(CONTEXT + i*sCELL);
+			if (wl != 0) {
+				int w = fetch(wl);
+				while (w > 0) {
+					if (!has_flag(w, HIDDEN) 
+					 && compare(get_name_addr(w), get_namelen(w),	n, l)) {
+						return w;
+					}
+					w = get_link(w);
+				}
+			}
+		}
+		return 0;
+	}
+
+	public void _find_() {
+		int cstring = pop();
+		int w = search_word(cstring + suCHAR, c_fetch(cstring));
+		if (w == 0) { push(cstring); push(0); }
+		else if (has_flag(w, IMMEDIATE)) { push(get_xt(w)); push(1); }
+		else { push(get_xt(w)); push(-1); }
+	}
+
+	// Helper to find words from Java
+	public int find_word(String name) {
+		return search_word(FromString(name), name.length());
+	}
+
+	// -- Outer interpreter
+
+	void _interpret_() {
+		int flag;
+		while (user_get(IPOS) < user_get(ILEN)) {
+			push(32); _word_();
+			int tok = pick(0) + suCHAR;
+			int tlen = c_fetch(pick(0));
+			if (tlen == 0) { pop(); return; }
+			_find_();
+			if ((flag = pop()) != 0) {
+				if (user_get(STATE) == 0 || (user_get(STATE) != 0 && flag == 1)) {
+					eval(pop());
+				} else {
+					compile(pop());
+				}
+			} else {
+				int temp_base = user_get(BASE);
+				pop();
+				if (tlen == 3 
+				 && c_fetch(tok) == '\'' 
+				 && c_fetch(tok + 2*suCHAR) == '\'') {
+					if (user_get(STATE) == 0) {
+						push(c_fetch(tok + suCHAR));
+					} else {
+						literal(c_fetch(tok + suCHAR));
+					}
+				} else {
+					boolean is_double = false;
+					if (c_fetch(tok) == '#') {
+						temp_base = 10;
+						tlen--;
+						tok += suCHAR;
+					} else if (c_fetch(tok) == '$') {
+						temp_base = 16;
+						tlen--;
+						tok += suCHAR;
+					} else if (c_fetch(tok) == '%') {
+						temp_base = 2;
+						tlen--;
+						tok += suCHAR;
+					} else if (c_fetch(tok + tlen*suCHAR - suCHAR) == '.') {
+						tlen--;
+						is_double = true;
+					}
+					StringBuffer buf = new StringBuffer();
+					for (int i = 0; i < tlen; i++) 
+						buf.append(c_fetch(tok +i*suCHAR));
+					try {
+						long n = Long.parseLong(buf.toString(), temp_base);
+						if (user_get(STATE) == 0) {
+							push((int)n);
+							if (is_double) push(n < 0 ? -1 : 0);
+						} else {
+							literal((int)n);
+							if (is_double) literal(n < 0 ? -1 : 0);
+						}
+					} catch(NumberFormatException e1) {
+						try {
+							float r = Float.parseFloat(buf.toString());
+							if (user_get(STATE) == 0) {
+								fpush(r);
+							} else {
+								fliteral(r);
+							}
+						} catch(NumberFormatException e2) {
+							_throw(-13);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// -- Require words to bootstrap
+	void _bye_() { System.out.println(); System.exit(0); }
+	void _unused_() { 
+		push(((ByteBuffer)(o.get(d))).capacity() - here()); 
 	}
 
 	void _move_() {
@@ -1200,8 +1238,8 @@ public class Sloth {
 	}
 
 	void repl() {
-		m.add(ByteBuffer.allocate(256));
-		user_set(IBUF, to_abs(0, m.size() - 1));
+		o.put(op++, ByteBuffer.allocate(256));
+		user_set(IBUF, to_abs(0, op - 1));
 		user_set(IPOS, 0);
 		user_set(ILEN, 80);
 		eval(get_xt(find_word("QUIT")));
@@ -1209,12 +1247,13 @@ public class Sloth {
 	}
 
 	void evaluate(String c) {
-		m.add(ByteBuffer.allocate(256));
-		m.get(m.size() - 1).clear();
+		ByteBuffer buf = ByteBuffer.allocate(256);
+		buf.clear();
+		o.put(op++, buf);
 		for(int i = 0; i < c.length(); i++) {
-			m.get(m.size() - 1).putChar(c.charAt(i));
+			buf.putChar(c.charAt(i));
 		}
-		push(to_abs(0, m.size() - 1));
+		push(to_abs(0, op - 1));
 		push(c.length());
 		_evaluate_();
 	}

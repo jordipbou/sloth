@@ -11,7 +11,12 @@ import org.junit.After;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 
 public class SlothTest {
 	private Sloth sloth;
@@ -36,13 +41,13 @@ public class SlothTest {
 		assertEquals(-1, sloth.ip);
 		assertEquals(0, sloth.d);
 		assertEquals(1, sloth.u);
-		assertEquals(32767, sloth.m.get(0).capacity());
-		assertEquals(1024, sloth.m.get(1).capacity());
-		assertEquals(3*sCELL, sloth.m.get(0).getInt(0*sCELL));
-		assertEquals(0, sloth.m.get(0).getInt(1*sCELL));
-		assertEquals(0, sloth.m.get(0).getInt(2*sCELL));
-		assertEquals(0, sloth.m.get(0).getInt(3*sCELL));
-		assertEquals(2*sCELL, sloth.m.get(1).getInt(0*sCELL));
+		assertEquals(32767, ((ByteBuffer)(sloth.o.get(0))).capacity());
+		assertEquals(1024, ((ByteBuffer)(sloth.o.get(1))).capacity());
+		assertEquals(3*sCELL, ((ByteBuffer)(sloth.o.get(0))).getInt(0*sCELL));
+		assertEquals(0, ((ByteBuffer)(sloth.o.get(0))).getInt(1*sCELL));
+		assertEquals(0, ((ByteBuffer)(sloth.o.get(0))).getInt(2*sCELL));
+		assertEquals(0, ((ByteBuffer)(sloth.o.get(0))).getInt(3*sCELL));
+		assertEquals(2*sCELL, ((ByteBuffer)(sloth.o.get(1))).getInt(0*sCELL));
 	}
 
 	/* -- Data and return stack ---------------------------- */
@@ -169,7 +174,7 @@ public class SlothTest {
 
 		sloth._unused_();
 		assertEquals(1, sloth.sp);
-		assertEquals(sloth.m.get(0).capacity() - sloth.here(), sloth.pop());
+		assertEquals(((ByteBuffer)(sloth.o.get(0))).capacity() - sloth.here(), sloth.pop());
 	}
 
 	@Test
@@ -1515,5 +1520,42 @@ public class SlothTest {
 		assertEquals(222, sloth.fetch(here + 4*sCELL));
 		assertEquals(1, sloth.user_get(Sloth.SLOTH_STATE));
 		assertEquals(0, sloth.sp);
+	}
+
+	/* -- User variable creation --------------------------- */
+
+	@Test
+	public void test_user_variable_creation() {
+		int h;
+		sloth.code("EXIT", 111);
+		sloth.code("(LIT)", 222);
+		sloth.user_variable("TEST-VAR", 8, 13);
+		assertEquals(111, sloth.fetch(sloth.here() - sCELL));
+		assertEquals(sloth.to_abs(8, 1), sloth.fetch(sloth.here() - 2*sCELL));
+		assertEquals(222, sloth.fetch(sloth.here() - 3*sCELL));
+		assertEquals(13, sloth.fetch(sloth.to_abs(8, 1)));
+	}
+
+	/* Source code preprocessing, interpreting & auditing commands */
+
+	@Test
+	public void test_file_position() {
+		try {
+			Path f = Files.createTempFile(null, null);
+			RandomAccessFile raf = new RandomAccessFile(f.toFile(), "rw");
+			int idx = sloth.op++;
+			sloth.o.put(idx, raf);
+
+			raf.writeBytes("abc");
+
+			sloth.push(idx);
+			sloth._file_position_();
+			assertEquals(3, sloth.sp);
+			assertEquals(0, sloth.pop());
+			assertEquals(0, sloth.pop());
+			assertEquals(3, sloth.pop());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 }
