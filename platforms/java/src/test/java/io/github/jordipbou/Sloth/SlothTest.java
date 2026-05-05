@@ -1606,4 +1606,26 @@ public class SlothTest {
 			e.printStackTrace();
 		}
 	}
+
+	void my_accept(Sloth vm) { vm.push(15); }
+
+	@Test
+	public void test_refill() {
+		int buf_idx = sloth.op++;
+		sloth.o.put(buf_idx, ByteBuffer.allocate(16));
+		int buf = sloth.to_abs(0, buf_idx);
+
+		sloth.user_set(Sloth.SLOTH_SOURCE_ID, -1);
+		sloth._refill_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.pop());
+
+		int ibuf = sloth.user_get(Sloth.SLOTH_IBUF);
+		sloth.code("ACCEPT", sloth.primitive((vm) -> my_accept(vm)));
+		sloth.user_set(Sloth.SLOTH_SOURCE_ID, 0);
+		sloth._refill_();
+		assertEquals(ibuf, sloth.user_get(Sloth.SLOTH_IBUF));
+		assertEquals(15, sloth.user_get(Sloth.SLOTH_ILEN));
+		assertEquals(0, sloth.user_get(Sloth.SLOTH_IPOS));
+	}
 }
