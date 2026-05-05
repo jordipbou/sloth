@@ -531,19 +531,54 @@ public class Sloth {
 	}
 
 	public void _file_position_() {
-		RandomAccessFile file = (RandomAccessFile)(o.get(pop()));
-		if (file != null) {
-			try {
-				long pos = file.getFilePointer();
-				dpush(pos);
-				push(0);
-			} catch (IOException e) {
+		try {
+			RandomAccessFile file = (RandomAccessFile)(o.get(pop()));
+			if (file != null) {
+				try {
+					long pos = file.getFilePointer();
+					dpush(pos);
+					push(0);
+				} catch (IOException e) {
+					dpush(0);
+					push(-37);
+				}
+			} else {
 				dpush(0);
 				push(-37);
 			}
-		} else {
-			dpush(0);
-			push(-37);
+		} catch (ClassCastException e) {
+			// TODO
+			e.printStackTrace();
+		}
+	}
+
+	public void _read_line_() {
+		try {
+			RandomAccessFile file = (RandomAccessFile)(o.get(pop()));	
+			int u1 = pop();
+			int caddr = pop();
+			try {
+				if (file.getFilePointer() >= file.length()) {
+					push(0);
+					push(0);
+					push(0);
+				} else {
+					String buf = file.readLine();
+					int i;
+					for (i = 0; i < buf.length() && i < u1; i++) {
+						b_store(caddr + i, (byte)buf.charAt(i));
+					}
+					push(i);
+					push(-1);
+					push(0);
+				}
+			} catch (IOException e) {
+				// TODO
+				e.printStackTrace();
+			}
+		} catch (ClassCastException e) {
+			// TODO
+			e.printStackTrace();
 		}
 	}
 

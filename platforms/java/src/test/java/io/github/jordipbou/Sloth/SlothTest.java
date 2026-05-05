@@ -1558,4 +1558,52 @@ public class SlothTest {
 			e.printStackTrace();
 		}
 	}
+
+	@Test
+	public void test_read_line() {
+		int buf_idx = sloth.op++;
+		sloth.o.put(buf_idx, ByteBuffer.allocate(16));
+		int buf = sloth.to_abs(0, buf_idx);
+		try {
+			Path f = Files.createTempFile(null, null);
+			RandomAccessFile raf = new RandomAccessFile(f.toFile(), "rw");
+			int file_idx = sloth.op++;
+			sloth.o.put(file_idx, raf);
+
+			raf.writeBytes("abc");
+
+			/* Test read at end of file */
+
+			sloth.push(buf);
+			sloth.push(16);
+			sloth.push(file_idx);
+
+			sloth._read_line_();
+
+			assertEquals(3, sloth.sp);
+			assertEquals(0, sloth.pop());
+			assertEquals(0, sloth.pop());
+			assertEquals(0, sloth.pop());
+
+			/* Test correct read */
+
+			raf.seek(0L);
+
+			sloth.push(buf);
+			sloth.push(16);
+			sloth.push(file_idx);
+
+			sloth._read_line_();
+	
+			assertEquals(3, sloth.sp);
+			assertEquals(0, sloth.pop());
+			assertNotEquals(0, sloth.pop());
+			assertEquals(3, sloth.pop());
+			assertEquals('a', (char)sloth.b_fetch(buf + 0));
+			assertEquals('b', (char)sloth.b_fetch(buf + 1));
+			assertEquals('c', (char)sloth.b_fetch(buf + 2));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 }
