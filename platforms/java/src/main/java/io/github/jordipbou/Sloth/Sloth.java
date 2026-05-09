@@ -552,6 +552,9 @@ public class Sloth {
 		}
 	}
 
+	// As this implementation uses 2 bytes characters, it
+	// reads a byte stream from file but stores it as 2 bytes
+	// characters in memory.
 	public void _read_line_() {
 		try {
 			RandomAccessFile file = (RandomAccessFile)(o.get(pop()));	
@@ -566,7 +569,8 @@ public class Sloth {
 					String buf = file.readLine();
 					int i;
 					for (i = 0; i < buf.length() && i < u1; i++) {
-						b_store(caddr + i, (byte)buf.charAt(i));
+						// b_store(caddr + i, (byte)buf.charAt(i));
+						c_store(caddr + i*suCHAR, buf.charAt(i));
 					}
 					push(i);
 					push(-1);
@@ -583,7 +587,8 @@ public class Sloth {
 	}
 
 	public void _refill_() {
-		switch (user_get(SOURCE_ID)) {
+		int source_id = user_get(SOURCE_ID);
+		switch (source_id) {
 			case -1:
 				push(0);
 				break;
@@ -596,36 +601,30 @@ public class Sloth {
 				push(-1);
 				break;
 			default:
-				// TODO This was made automatically by Gemini, revise.
-				int sourceId = user_get(SOURCE_ID);
-				if (sourceId > 0 && sourceId <= openFiles.size()) {
-					java.io.RandomAccessFile raf = openFiles.get(sourceId - 1);
-					try {
-						user_set(SOURCE_POS, (int)raf.getFilePointer());
-						String line = raf.readLine();
-						if (line != null) {
-							ByteBuffer b = (ByteBuffer)(o.get(2));
-							if (b.capacity() / suCHAR < line.length() + 1) {
-								// TODO I don't think I need to allocate here...
-								// ...analyze what's going on..
-								b = ByteBuffer.allocate(Math.max(1024, line.length() + 1) * suCHAR);
-								o.put(2, b);
-							}
-							b.rewind();
-							for (int i = 0; i < line.length(); i++) {
-								b.putChar(line.charAt(i));
-							}
-							user_set(IBUF, to_abs(0, 2));
-							user_set(IPOS, 0);
-							user_set(ILEN, line.length());
-							push(-1);
-						} else {
-							push(0);
-						}
-					} catch (java.io.IOException e) {
-						push(0);
-					}
+				/* File position is stored to go back to it when */
+				/* exiting of nesting includes */
+				push(source_id);
+				_file_position_();
+				pop();
+				user_set(SLOTH_SOURCE_POS, (int)dpop());
+
+				/* REFILL can only be called after INCLUDE/INCLUDED */
+				/* that means that the line buffer of _included_ will */
+				/* be used and its size is known and fixed. */
+				push(user_get(SLOTH_IBUF));
+				push(1024);
+				push(source_id);
+				_read_line_();
+
+				int ior = pop();
+				int flag = pop();
+
+				if (flag != 0 && ior == 0) {
+					user_set(SLOTH_ILEN, pop());
+					user_set(SLOTH_IPOS, 0);
+					push(-1);
 				} else {
+					pop();
 					push(0);
 				}
 				break;

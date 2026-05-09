@@ -1599,9 +1599,9 @@ public class SlothTest {
 			assertEquals(0, sloth.pop());
 			assertNotEquals(0, sloth.pop());
 			assertEquals(3, sloth.pop());
-			assertEquals('a', (char)sloth.b_fetch(buf + 0));
-			assertEquals('b', (char)sloth.b_fetch(buf + 1));
-			assertEquals('c', (char)sloth.b_fetch(buf + 2));
+			assertEquals('a', sloth.c_fetch(buf + 0*suCHAR));
+			assertEquals('b', sloth.c_fetch(buf + 1*suCHAR));
+			assertEquals('c', sloth.c_fetch(buf + 2*suCHAR));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -1627,5 +1627,63 @@ public class SlothTest {
 		assertEquals(ibuf, sloth.user_get(Sloth.SLOTH_IBUF));
 		assertEquals(15, sloth.user_get(Sloth.SLOTH_ILEN));
 		assertEquals(0, sloth.user_get(Sloth.SLOTH_IPOS));
+	}
+
+	@Test
+	public void test_refill_file() {
+		int buf_idx = sloth.op++;
+		sloth.o.put(buf_idx, ByteBuffer.allocate(16));
+		int buf = sloth.to_abs(0, buf_idx);
+
+		try {
+			Path f = Files.createTempFile(null, null);
+			RandomAccessFile raf = new RandomAccessFile(f.toFile(), "rw");
+			int file_idx = sloth.op++;
+			sloth.o.put(file_idx, raf);
+
+			sloth.user_set(Sloth.SLOTH_IBUF, buf);
+			sloth.user_set(Sloth.SLOTH_IPOS, 0);
+			sloth.user_set(Sloth.SLOTH_ILEN, 1024);
+
+			raf.writeBytes("abc\ndefg");
+
+			raf.seek(0);
+
+			sloth.user_set(Sloth.SLOTH_SOURCE_ID, file_idx);
+
+			sloth._refill_();
+
+			assertEquals(1, sloth.sp);
+			assertEquals(-1, sloth.pop());
+
+			assertEquals(0, sloth.user_get(Sloth.SLOTH_IPOS));
+			assertEquals(3, sloth.user_get(Sloth.SLOTH_ILEN));
+			System.out.println(sloth.ToString(sloth.user_get(Sloth.SLOTH_IBUF), 3));
+			System.out.printf("%c ", (char)sloth.b_fetch(sloth.user_get(Sloth.SLOTH_IBUF) + 0));
+			System.out.printf("%c ", (char)sloth.b_fetch(sloth.user_get(Sloth.SLOTH_IBUF) + 1));
+			System.out.printf("%c\n", (char)sloth.b_fetch(sloth.user_get(Sloth.SLOTH_IBUF) + 2));
+			assertEquals("abc", sloth.ToString(sloth.user_get(Sloth.SLOTH_IBUF), 3));
+
+			sloth.push(file_idx);
+			sloth._file_position_();
+			sloth.pop();
+			sloth.pop();
+			assertEquals(4, sloth.pop());
+
+			sloth._refill_();
+			assertEquals(-1, sloth.pop());
+
+			assertEquals(0, sloth.user_get(Sloth.SLOTH_IPOS));
+			assertEquals(4, sloth.user_get(Sloth.SLOTH_ILEN));
+			assertEquals("defg", sloth.ToString(sloth.user_get(Sloth.SLOTH_IBUF), 4));
+
+			sloth.push(file_idx);
+			sloth._file_position_();
+			sloth.pop();
+			sloth.pop();
+			assertEquals(8, sloth.pop());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 }
