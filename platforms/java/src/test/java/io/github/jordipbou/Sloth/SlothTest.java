@@ -1658,10 +1658,6 @@ public class SlothTest {
 
 			assertEquals(0, sloth.user_get(Sloth.SLOTH_IPOS));
 			assertEquals(3, sloth.user_get(Sloth.SLOTH_ILEN));
-			System.out.println(sloth.ToString(sloth.user_get(Sloth.SLOTH_IBUF), 3));
-			System.out.printf("%c ", (char)sloth.b_fetch(sloth.user_get(Sloth.SLOTH_IBUF) + 0));
-			System.out.printf("%c ", (char)sloth.b_fetch(sloth.user_get(Sloth.SLOTH_IBUF) + 1));
-			System.out.printf("%c\n", (char)sloth.b_fetch(sloth.user_get(Sloth.SLOTH_IBUF) + 2));
 			assertEquals("abc", sloth.ToString(sloth.user_get(Sloth.SLOTH_IBUF), 3));
 
 			sloth.push(file_idx);
@@ -1685,5 +1681,67 @@ public class SlothTest {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	/* Portable temp file creation code */
+
+	public String write_temp_file(String content) {
+		try {
+			Path tempFile = Files.createTempFile(null, null);
+			tempFile.toFile().deleteOnExit(); // cleaned up when JVM exits
+			Files.writeString(tempFile, content);
+			return tempFile.toAbsolutePath().toString();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return "";
+		}
+	}
+	
+	int interpret_calls;
+	
+	public void noop_interpret(Sloth vm) {
+		interpret_calls++;
+	}
+
+	@Test
+	public void test_included_absolute_path() {
+		// Set PATH_START and PATH_END pointing to an empty buffer
+		int path_idx = sloth.op++;
+		sloth.o.put(path_idx, ByteBuffer.allocate(256));
+		int path = sloth.to_abs(0, path_idx);
+		sloth.user_set(Sloth.SLOTH_PATH_START, path);
+		sloth.user_set(Sloth.SLOTH_PATH_END, path);
+
+		String tmppath = write_temp_file("line one\nline two");
+
+		sloth.user_set(Sloth.SLOTH_INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
+		interpret_calls = 0;
+
+		int saved_incl = sloth.user_get(Sloth.SLOTH_INCLUDED_FILES);
+
+		int ibuf = sloth.user_get(Sloth.SLOTH_IBUF);
+		int ipos = sloth.user_get(Sloth.SLOTH_IPOS);
+		int ilen = sloth.user_get(Sloth.SLOTH_ILEN);
+		int source = sloth.user_get(Sloth.SLOTH_SOURCE_ID);
+		int source_pos = sloth.user_get(Sloth.SLOTH_SOURCE_POS);
+
+		sloth.push(sloth.FromString(tmppath));
+		sloth.push(tmppath.length());
+		sloth._included_();
+
+		assertEquals(0, sloth.sp);
+		assertEquals(2, interpret_calls);
+
+		assertEquals(source_pos, sloth.user_get(Sloth.SLOTH_SOURCE_POS));
+		assertEquals(source, sloth.user_get(Sloth.SLOTH_SOURCE_ID));
+		assertEquals(ilen, sloth.user_get(Sloth.SLOTH_ILEN));
+		assertEquals(ipos, sloth.user_get(Sloth.SLOTH_IPOS));
+		assertEquals(ibuf, sloth.user_get(Sloth.SLOTH_IBUF));
+
+		/* A new entry must have been prepended to INCLUDED_FILES */
+		int new_head = sloth.user_get(Sloth.SLOTH_INCLUDED_FILES);
+		assertNotEquals(saved_incl, new_head);
+		assertEquals(tmppath.length(), sloth.fetch(new_head + sCELL));
+		assertEquals(tmppath, sloth.ToString(new_head + 2*sCELL, tmppath.length()));
 	}
 }

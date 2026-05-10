@@ -639,6 +639,7 @@ public class Sloth {
 		push(user_get(ILEN));
 		push(5);
 	}
+	
 	void _restore_input_() {
 		pop();
 		user_set(ILEN, pop());
@@ -666,150 +667,137 @@ public class Sloth {
 		}
 		push(0);
 	}
-	void _included_() {
-		int l = pop();
-		int a = pop();
 
-		int previbuf = user_get(IBUF);
-		int previpos = user_get(IPOS);
-		int previlen = user_get(ILEN);
+	protected void save_input_and_path() {
+		_save_input_();
+		push(user_get(SLOTH_PATH_START));
+		push(user_get(SLOTH_PATH_END));
+		for (int i = 0; i < 8; i++) _to_r_();
+	}
+	
+	protected void restore_input_and_path() {
+		for (int i = 0; i < 8; i++) _r_from_();
+		user_set(SLOTH_PATH_END, pop());
+		user_set(SLOTH_PATH_START, pop());
+		_restore_input_();
+		pop();
+	}
 
-		int prevsourceid = user_get(SOURCE_ID);
+	protected RandomAccessFile open_included_file(String name) throws IOException {
+		/* Variables for working with path, initialized to */
+		/* reuse current path if possible. */
+		int pathstart = user_get(SLOTH_PATH_START);
+		int pathend = user_get(SLOTH_PATH_END);
+		int path_pos;
 
-		int prevstart = user_get(PATH_START);
-		int prevend = user_get(PATH_END);
-
-		int pathstart = prevstart;
-		int pathend = prevend;
-
-		String filename = ToString(a, l);
-
-		// Copy filename to pathend
-		for (int i = 0; i < l; i++) {
-			c_set(pathend + i*suCHAR, c_get(a + i*suCHAR));
+		/* Copy pathname/filename to end of current path */
+		for (int i = 0; i < name.length(); i++) {
+			c_store(pathend + i*suCHAR, name.charAt(i));
 		}
-		c_set(pathend + l*suCHAR, (char)0);
 
-		java.io.RandomAccessFile f = null;
-		String fullPathString = "";
-
-		try {
-			fullPathString = filename;
-			f = new java.io.RandomAccessFile(fullPathString, "r");
+		/* Absolute or relative to current directory */
+		RandomAccessFile f = new RandomAccessFile(name, "r");
+		if (f != null) {
+			/* Storing path as absolute or relative to cwd */
 			pathstart = pathend;
-			pathend = pathend + l*suCHAR;
-		} catch (Exception e1) {
-			try {
-				int totalLen = (pathend + l*suCHAR - pathstart)/suCHAR;
-				fullPathString = ToString(pathstart, totalLen);
-				f = new java.io.RandomAccessFile(fullPathString, "r");
-				pathend = pathend + l*suCHAR;
-			} catch (Exception e2) {
-				try {
-					int rootLen = user_get(ROOT_PATH_LENGTH);
-					int paths_addr = to_abs(PATHS, u);
-					// Copy root path to pathend
-					for (int i = 0; i < rootLen; i++) {
-						c_set(pathend + i*suCHAR, c_get(paths_addr + i*suCHAR));
-					}
-					// Copy filename after root path
-					for (int i = 0; i < l; i++) {
-						c_set(pathend + rootLen*suCHAR + i*suCHAR, c_get(a + i*suCHAR));
-					}
-					c_set(pathend + (rootLen + l)*suCHAR, (char)0);
-					fullPathString = ToString(pathend, rootLen + l);
-					f = new java.io.RandomAccessFile(fullPathString, "r");
-					pathstart = pathend;
-					pathend = pathend + (rootLen + l)*suCHAR;
-				} catch (Exception e3) {
-					// Failed to open file
-				}
-			}
+			pathend = pathend + name.length();
+		} else {
+			// TODO Relative and root-relative paths
 		}
 
 		if (f != null) {
-			// Remove filename from path...
+			/* Remove filename from path */
 			while (pathend > pathstart) {
-				char c = c_get(pathend - suCHAR);
-				if (c == '/' || c == '\\') {
+				if (c_fetch(pathend) == '/' || c_fetch(pathend) == '\\') {
+					pathend += suCHAR;
 					break;
 				}
 				pathend -= suCHAR;
 			}
-			// ...and store for nested includes.
-			user_set(PATH_START, pathstart);
-			user_set(PATH_END, pathend);
-
-			int interpret_xt = user_get(INTERPRET);
-
-			openFiles.add(f);
-			int source_id = openFiles.size();
-			user_set(SOURCE_ID, source_id);
-
-			// Add path+filename to INCLUDED FILES
-			int h = here();
-			comma(user_get(INCLUDED_FILES));
-			user_set(INCLUDED_FILES, h);
-			comma(l);
-			for (int i = 0; i < l; i++) {
-				c_comma(c_get(a + i*suCHAR));
-			}
-			_align_();
-
-			try {
-				user_set(SOURCE_POS, (int)f.getFilePointer());
-				int linenumber = 0;
-				String line;
-				while ((line = f.readLine()) != null) {
-					// Create temporary block for line
-					ByteBuffer b = ByteBuffer.allocate(Math.max(1024, line.length() + 1) * suCHAR);
-					for (int i = 0; i < line.length(); i++) {
-						b.putChar(line.charAt(i));
-					}
-					o.put(op++, b);
-					// int block_idx = m.size() - 1;
-					int block_idx = op - 1;
-
-					user_set(IBUF, to_abs(0, block_idx));
-					user_set(IPOS, 0);
-					user_set(ILEN, line.length());
-
-					_catch(interpret_xt);
-					int e = pop();
-					if (e != 0) {
-						System.out.println("File: " + fullPathString);
-						System.out.printf("Line (%d): %s\n", linenumber, line);
-						_throw(e);
-					}
-					user_set(SOURCE_POS, (int)f.getFilePointer());
-					linenumber++;
-					o.remove(op - 1);
-				}
-			} catch (java.io.IOException e) {
-				// Handle IO error if needed
-			} finally {
-				user_set(SOURCE_ID, prevsourceid);
-				try {
-					f.close();
-				} catch (java.io.IOException e) {}
-				openFiles.remove(openFiles.size() - 1);
-			}
+			/* ...and store for nested includes. */
+			user_set(SLOTH_PATH_START, pathstart);
+			user_set(SLOTH_PATH_END, pathend);
 		}
 
-		// Restore previous path
-		user_set(PATH_START, prevstart);
-		user_set(PATH_END, prevend);
+		return f;
+	}
 
-		// Restore previous input buffer
-		user_set(IBUF, previbuf);
-		user_set(IPOS, previpos);
-		user_set(ILEN, previlen);
+	protected void add_to_included_files_list(String name) {
+			/* TODO Check if this file has been included before, */
+			/* and in that case don't add it to the linked list. */
+			int here = here();
+			comma(user_get(SLOTH_INCLUDED_FILES));
+			user_set(SLOTH_INCLUDED_FILES, here);
+			comma(name.length());
+			for (int i = 0; i < name.length(); i++) {
+				c_comma(name.charAt(i));
+			}
+			_align_();
+	}
+	
+	/* TODO INCLUDED can not be implemented in ANS Forth because */
+	/* its needed to include ans.4th itself. */
+	/* But this function is very complex and that will make it */
+	/* error prone when porting to another language. Try to */
+	/* simplify it and use READ-LINE, etc. from Forth */
+	
+	/* INCLUDED is a complex function because it tries to find */
+	/* the indicated file in several directories. */
+	/* It first tries to open it as an absolute path/current */
+	/* directory. If its not possible to open it, it reuses the */
+	/* last path from the previous opened file. */
+	public void _included_() {
+		int l = pop();
+		int a = pop();
+		String name = ToString(a, l);
 
-		if (f == null) {
+		save_input_and_path();
+
+		try {
+			RandomAccessFile raf = open_included_file(name);
+
+			int linenumber = 0;
+			add_to_included_files_list(name);
+
+			int idx = op++;
+			o.put(idx, raf);
+			user_set(SLOTH_SOURCE_ID, idx);
+
+			int buf_idx = op++;
+			o.put(buf_idx, ByteBuffer.allocate(1024*suCHAR));
+			int buf = to_abs(0, buf_idx);
+
+			user_set(SLOTH_IBUF, buf);
+			user_set(SLOTH_IPOS, 0);
+			user_set(SLOTH_ILEN, 1024);
+
+			do {
+				_refill_();
+				if (pop() == 0) break;
+				_catch(user_get(SLOTH_INTERPRET));
+				int e = pop();
+				if (e != 0) {
+					int pathstart = user_get(SLOTH_PATH_START);
+					int pathend = user_get(SLOTH_PATH_END);
+					String path = ToString(pathstart, (pathstart - pathend)/suCHAR);
+					System.out.printf("File: %s\n", path);
+					System.out.printf("Line (%ld): %s\n", linenumber, ToString(buf, user_get(SLOTH_ILEN)));
+					_throw(e);
+				}
+				linenumber++;
+			} while(true);
+
+			raf.close();
+
+			o.remove(idx);
+			o.remove(buf_idx);
+
+			restore_input_and_path();
+		} catch (IOException e) {
+			restore_input_and_path();
 			_throw(-38);
 		}
 	}
-
 
 	// Finding words
 	protected boolean compare(int a1, int u1, int a2, int u2) {
