@@ -17,6 +17,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 
 public class SlothTest {
 	private Sloth sloth;
@@ -1709,6 +1710,7 @@ public class SlothTest {
 		int path_idx = sloth.op++;
 		sloth.o.put(path_idx, ByteBuffer.allocate(256));
 		int path = sloth.to_abs(0, path_idx);
+
 		sloth.user_set(Sloth.SLOTH_PATH_START, path);
 		sloth.user_set(Sloth.SLOTH_PATH_END, path);
 
@@ -1744,4 +1746,66 @@ public class SlothTest {
 		assertEquals(tmppath.length(), sloth.fetch(new_head + sCELL));
 		assertEquals(tmppath, sloth.ToString(new_head + 2*sCELL, tmppath.length()));
 	}
+
+	@Test
+	public void test_included_file_not_found() {
+		int path_idx = sloth.op++;
+		sloth.o.put(path_idx, ByteBuffer.allocate(256));
+		int path = sloth.to_abs(0, path_idx);
+
+		sloth.user_set(Sloth.SLOTH_PATH_START, path);
+		sloth.user_set(Sloth.SLOTH_PATH_END, path);
+
+		int throw_prim = sloth.primitive((vm) -> vm._included_());		
+		String missing = "sloth_test_no_such_file.4th";
+		sloth.push(sloth.FromString(missing));
+		sloth.push(missing.length());
+		sloth.push(throw_prim);
+		sloth._catch_();
+
+		assertEquals(-38, sloth.pop());
+		/* After throwing, the stack is restored to */
+		/* the depth previous to the catch. */
+		assertEquals(2, sloth.sp);
+	}
+
+	@Test
+	public void test_included_relative_path() {
+		sloth.user_set(Sloth.SLOTH_INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
+		sloth.user_set(Sloth.SLOTH_ROOT_PATH_LENGTH, 0);
+		interpret_calls = 0;
+
+		String tmpfile = write_temp_file("line one\nline two");
+		int tmppath = sloth.FromString(tmpfile);
+
+		System.out.printf("TMP-FILE: %s\n", tmpfile);
+
+		// Split tmppath into directory and filename
+		int sep = tmpfile.lastIndexOf(System.getProperty("file.separator"));
+		assertNotEquals(0, sep);
+		int filename = tmppath + (sep + 1)*suCHAR;
+		int dirlen = sep + 1;
+		int filelen = tmpfile.length() - dirlen;
+
+		// Simulate a previous include having set PATH_START/PATH_END
+		// to the directory containing our temp file
+		int path = sloth.FromString(tmpfile.substring(0, dirlen));
+
+		sloth.user_set(Sloth.SLOTH_PATH_START, path);
+		sloth.user_set(Sloth.SLOTH_PATH_END, path + (dirlen*suCHAR));
+
+		// Push only the filename (no directory)
+		sloth.push(filename);
+		sloth.push(filelen);
+		sloth._included_();
+
+		assertEquals(0, sloth.sp);
+		assertEquals(2, interpret_calls);
+
+		int ibuf = sloth.user_get(Sloth.SLOTH_IBUF);
+		int ipos = sloth.user_get(Sloth.SLOTH_IPOS);
+		int ilen = sloth.user_get(Sloth.SLOTH_ILEN);
+		int source = sloth.user_get(Sloth.SLOTH_SOURCE_ID);
+		int source_pos = sloth.user_get(Sloth.SLOTH_SOURCE_POS);
+	} 
 }

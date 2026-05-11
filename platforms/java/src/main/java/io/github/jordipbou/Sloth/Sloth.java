@@ -684,40 +684,46 @@ public class Sloth {
 	}
 
 	protected RandomAccessFile open_included_file(String name) throws IOException {
-		/* Variables for working with path, initialized to */
-		/* reuse current path if possible. */
+		// Variables for working with path, initialized to
+		// reuse current path if possible.
 		int pathstart = user_get(SLOTH_PATH_START);
 		int pathend = user_get(SLOTH_PATH_END);
 		int path_pos;
 
-		/* Copy pathname/filename to end of current path */
-		for (int i = 0; i < name.length(); i++) {
-			c_store(pathend + i*suCHAR, name.charAt(i));
-		}
-
-		/* Absolute or relative to current directory */
-		RandomAccessFile f = new RandomAccessFile(name, "r");
-		if (f != null) {
-			/* Storing path as absolute or relative to cwd */
+		RandomAccessFile f;
+		try {
+			// Absolute or relative to current directory
+			f = new RandomAccessFile(name, "r");
 			pathstart = pathend;
-			pathend = pathend + name.length();
-		} else {
-			// TODO Relative and root-relative paths
+			pathend = pathend + name.length()*suCHAR;
+		} catch (IOException e) {
+			try {
+				// Try relative to last directory
+
+				// Copy pathname/filename to end of current path
+				for (int i = 0; i < name.length(); i++) {
+					c_store(pathend + i*suCHAR, name.charAt(i));
+				}
+
+				String rel_path = ToString(pathstart, (pathend - pathstart)/suCHAR + name.length());
+				f = new RandomAccessFile(rel_path, "r");
+				pathend = pathend + name.length()*suCHAR;
+			} catch (IOException ie) {
+				throw ie;
+			}
 		}
 
-		if (f != null) {
-			/* Remove filename from path */
-			while (pathend > pathstart) {
-				if (c_fetch(pathend) == '/' || c_fetch(pathend) == '\\') {
-					pathend += suCHAR;
-					break;
-				}
-				pathend -= suCHAR;
+		// Remove filename from path
+		while (pathend > pathstart) {
+			if (c_fetch(pathend) == '/' || c_fetch(pathend) == '\\') {
+				pathend += suCHAR;
+				break;
 			}
-			/* ...and store for nested includes. */
-			user_set(SLOTH_PATH_START, pathstart);
-			user_set(SLOTH_PATH_END, pathend);
+			pathend -= suCHAR;
 		}
+		// ...and store for nested includes.
+		user_set(SLOTH_PATH_START, pathstart);
+		user_set(SLOTH_PATH_END, pathend);
 
 		return f;
 	}
