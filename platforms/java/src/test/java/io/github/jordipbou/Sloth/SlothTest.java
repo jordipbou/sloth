@@ -1813,7 +1813,6 @@ public class SlothTest {
 		interpret_calls = 0;
 
 		String tmppath = write_temp_file("line one\nline two");
-		System.out.printf("TMPPATH: [%s]\n", tmppath);
 
 		// Split tmppath into directory and filename
 		int sep = tmppath.lastIndexOf(System.getProperty("file.separator"));
@@ -1887,5 +1886,108 @@ public class SlothTest {
 		// link to prev
 		assertEquals(tmpfile.length(), sloth.fetch(new_head + sCELL)); // name len
 		assertEquals(tmpfile, sloth.ToString(new_head + 2*sCELL, tmpfile.length())); // name
+	}
+
+	// -- Input/Output and parsing -------------------------
+
+	// Custom EMIT for testing — replaces the default printf one 
+	char emitted_char = 0;
+	void test_emit_(Sloth vm) { emitted_char = (char)vm.pop(); }
+
+	@Test
+	public void test_emit() {
+		// Test the test_emit_ function
+		emitted_char = 0;
+		sloth.push('Z');
+		test_emit_(sloth);
+		assertEquals(0, sloth.sp);
+		assertEquals('Z', emitted_char);
+
+		// Ensure that our custom emit is being used
+		sloth.primitive((vm) -> test_emit_(vm));
+		sloth.push('Z');
+		sloth.do_prim(-1);
+		assertEquals(0, sloth.sp);
+		assertEquals('Z', emitted_char);
+	}
+
+	// Custom KEY for testing
+	int mock_key_char = 0;
+	void test_key_(Sloth vm) { sloth.push(mock_key_char); }
+
+	@Test
+	public void test_key_pushes_char_onto_stack() {
+		mock_key_char = 'Q';
+		test_key_(sloth);
+		assertEquals(1, sloth.sp);
+		assertEquals('Q', sloth.pop());
+		assertEquals(0, sloth.sp);
+	
+		// Ensure that our custom key is being used
+		mock_key_char = 'Q';
+		sloth.primitive((vm) -> test_key_(vm));
+		sloth.do_prim(-1);
+		assertEquals(1, sloth.sp);
+		assertEquals('Q', sloth.pop());
+		assertEquals(0, sloth.sp);
+	}
+
+	@Test
+	public void test_key_handles_zero() {
+		mock_key_char = 0;
+		test_key_(sloth);
+		assertEquals(0, sloth.pop());
+	}
+
+	@Test
+	public void test_key_handles_max_uchar() {
+		mock_key_char = 255;
+		test_key_(sloth);
+		assertEquals(255, sloth.pop());
+	}
+
+	@Test
+	public void test_source_() {
+		int ibuf = sloth.FromString("TEST");
+		sloth.user_set(Sloth.SLOTH_IBUF, ibuf);
+		sloth.user_set(Sloth.SLOTH_ILEN, 4);
+		sloth._source_();
+		assertEquals(2, sloth.sp);
+		assertEquals(4, sloth.pop());
+		assertEquals(ibuf, sloth.pop());
+	}
+
+	@Test
+	public void test_word_() {
+		int ibuf = sloth.FromString("Hello world");
+		sloth.user_set(Sloth.SLOTH_IBUF, ibuf);
+		sloth.user_set(Sloth.SLOTH_IPOS, 0);
+		sloth.user_set(Sloth.SLOTH_ILEN, 11);
+		sloth.push(' ');
+		sloth._word_();
+		assertEquals(1, sloth.sp);
+		int addr = sloth.pop();
+		assertEquals(5, sloth.c_fetch(addr));
+		assertEquals('H', sloth.c_fetch(addr + 1*suCHAR));
+		assertEquals('e', sloth.c_fetch(addr + 2*suCHAR));
+		assertEquals('l', sloth.c_fetch(addr + 3*suCHAR));
+		assertEquals('l', sloth.c_fetch(addr + 4*suCHAR));
+		assertEquals('o', sloth.c_fetch(addr + 5*suCHAR));
+
+		sloth.push(' ');
+		sloth._word_();
+		assertEquals(1, sloth.sp);
+		addr = sloth.pop();
+		assertEquals(5, sloth.c_fetch(addr));
+		assertEquals('w', sloth.c_fetch(addr + 1*suCHAR));
+		assertEquals('o', sloth.c_fetch(addr + 2*suCHAR));
+		assertEquals('r', sloth.c_fetch(addr + 3*suCHAR));
+		assertEquals('l', sloth.c_fetch(addr + 4*suCHAR));
+		assertEquals('d', sloth.c_fetch(addr + 5*suCHAR));
+
+		sloth.push(' ');
+		sloth._word_();
+		assertEquals(1, sloth.sp);
+		assertEquals(0, sloth.c_fetch(sloth.pop()));
 	}
 }

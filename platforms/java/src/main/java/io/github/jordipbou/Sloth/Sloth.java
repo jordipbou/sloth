@@ -1300,6 +1300,7 @@ public class Sloth {
 	}
 
 	// --
+
 	void set_root_path(String path) {
 		int paths = to_abs(user_get(SLOTH_PATHS), 0);
 		for (int i = 0; i < path.length(); i++) {
