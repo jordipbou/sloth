@@ -1839,4 +1839,53 @@ public class SlothTest {
 		assertEquals(0, sloth.sp);
 		assertEquals(2, interpret_calls);
 	}
+
+	void refill_interpret(Sloth vm) {
+		vm._refill_();
+		vm.pop();
+		interpret_calls++;
+	}
+
+	@Test
+	public void test_included_and_refill() {
+		sloth.user_set(Sloth.SLOTH_INTERPRET, sloth.primitive((vm) -> refill_interpret(vm)));
+		interpret_calls = 0;
+
+		String tmpfile = write_temp_file("line one\nline two\nline three\nline four");
+		int tmppath = sloth.FromString(tmpfile);
+
+		// Set PATH_START and PATH_END variables to an empty buffer
+		int path_buf = sloth.FromString(" ".repeat(260));
+		sloth.user_set(Sloth.SLOTH_PATH_START, path_buf);
+		sloth.user_set(Sloth.SLOTH_PATH_END, path_buf);
+
+		int saved_incl = sloth.user_get(Sloth.SLOTH_INCLUDED_FILES);		
+	
+		int ibuf = sloth.user_get(Sloth.SLOTH_IBUF);
+		int ipos = sloth.user_get(Sloth.SLOTH_IPOS);
+		int ilen = sloth.user_get(Sloth.SLOTH_ILEN);
+		int source = sloth.user_get(Sloth.SLOTH_SOURCE_ID);
+		int source_pos = sloth.user_get(Sloth.SLOTH_SOURCE_POS);
+
+		sloth.push(tmppath);
+		sloth.push(tmpfile.length());
+		sloth._included_();
+
+		assertEquals(0, sloth.sp);
+		assertEquals(2, interpret_calls);
+
+		assertEquals(source_pos, sloth.user_get(Sloth.SLOTH_SOURCE_POS));
+		assertEquals(source, sloth.user_get(Sloth.SLOTH_SOURCE_ID));
+		assertEquals(ilen, sloth.user_get(Sloth.SLOTH_ILEN));
+		assertEquals(ipos, sloth.user_get(Sloth.SLOTH_IPOS));
+		assertEquals(ibuf, sloth.user_get(Sloth.SLOTH_IBUF));
+
+		// A new entry must have been prepended to INCLUDED_FILES
+		int new_head = sloth.user_get(Sloth.SLOTH_INCLUDED_FILES);
+		assertNotEquals(saved_incl, new_head);
+		assertEquals(saved_incl, sloth.fetch(new_head));
+		// link to prev
+		assertEquals(tmpfile.length(), sloth.fetch(new_head + sCELL)); // name len
+		assertEquals(tmpfile, sloth.ToString(new_head + 2*sCELL, tmpfile.length())); // name
+	}
 }
