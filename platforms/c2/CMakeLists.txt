@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(sloth-repl LANGUAGES C)
 
-add_library(sloth_lib INTERFACE)
+add_subdirectory(libs/cpnbi)
 
+add_library(sloth_lib INTERFACE)
 target_include_directories(sloth_lib INTERFACE
 	${CMAKE_CURRENT_SOURCE_DIR}/
 )
@@ -14,6 +15,8 @@ add_executable(sloth repl.c sloth.c)
 target_compile_definitions(sloth PRIVATE
 	ROOT_PATH="${PROJECT_BINARY_DIR}/../../../../"
 )
+
+target_link_libraries(sloth cpnbi)
 
 if(UNIX)
 	# Only needed if compiling floating point support (and on Linux!)
@@ -27,3 +30,4 @@ target_include_directories(unity PUBLIC . tests/)
 add_executable(test_sloth tests/test_sloth.c sloth.c)
 target_link_libraries(test_sloth unity)
 target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_EMIT)
+target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_KEY)

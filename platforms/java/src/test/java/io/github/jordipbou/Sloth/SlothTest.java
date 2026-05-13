@@ -1778,8 +1778,6 @@ public class SlothTest {
 		String tmpfile = write_temp_file("line one\nline two");
 		int tmppath = sloth.FromString(tmpfile);
 
-		System.out.printf("TMP-FILE: %s\n", tmpfile);
-
 		// Split tmppath into directory and filename
 		int sep = tmpfile.lastIndexOf(System.getProperty("file.separator"));
 		assertNotEquals(0, sep);
@@ -1808,4 +1806,37 @@ public class SlothTest {
 		int source = sloth.user_get(Sloth.SLOTH_SOURCE_ID);
 		int source_pos = sloth.user_get(Sloth.SLOTH_SOURCE_POS);
 	} 
+
+	@Test
+	public void test_included_root_path() {
+		sloth.user_set(Sloth.SLOTH_INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
+		interpret_calls = 0;
+
+		String tmppath = write_temp_file("line one\nline two");
+		System.out.printf("TMPPATH: [%s]\n", tmppath);
+
+		// Split tmppath into directory and filename
+		int sep = tmppath.lastIndexOf(System.getProperty("file.separator"));
+		assertNotEquals(0, sep);
+		int dirlen = sep + 1;
+
+		// Put the temp file's directory into SLOTH_PATHS as the root
+		// PATH_START/PATH_END point to an empty path so the first two
+		// strategies (absolute and relative-to-previous) both fail
+		int paths = sloth.FromString(tmppath);
+		sloth.user_set(Sloth.SLOTH_PATHS, paths);
+		sloth.user_set(Sloth.SLOTH_ROOT_PATH_LENGTH, dirlen);
+		sloth.user_set(Sloth.SLOTH_PATH_START, paths + dirlen*suCHAR);
+		sloth.user_set(Sloth.SLOTH_PATH_END, paths + dirlen*suCHAR);
+		int filename = paths + dirlen*suCHAR;
+		int filelen = tmppath.length() - dirlen;
+
+		// Push only the filename (no directory)
+		sloth.push(filename);
+		sloth.push(filelen);
+		sloth._included_();
+	
+		assertEquals(0, sloth.sp);
+		assertEquals(2, interpret_calls);
+	}
 }

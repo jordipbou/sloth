@@ -709,7 +709,13 @@ public class Sloth {
 				f = new RandomAccessFile(rel_path, "r");
 				pathend = pathend + name.length()*suCHAR;
 			} catch (IOException ie) {
-				throw ie;
+				try {
+					// Try relative to ROOT path
+					String root_path = ToString(user_get(SLOTH_PATHS), user_get(SLOTH_ROOT_PATH_LENGTH)).concat(name);
+					f = new RandomAccessFile(root_path, "r");
+				} catch (IOException ie2) {
+					throw ie2;
+				}
 			}
 		}
 
@@ -1291,5 +1297,16 @@ public class Sloth {
 		push(f.length());
 		_catch(get_xt(find_word("INCLUDED")));
 		return pop();
+	}
+
+	// --
+	void set_root_path(String path) {
+		int paths = to_abs(user_get(SLOTH_PATHS), 0);
+		for (int i = 0; i < path.length(); i++) {
+			c_store(paths + i*suCHAR, path.charAt(i));	
+		}
+		user_set(SLOTH_ROOT_PATH_LENGTH, path.length());
+		user_set(SLOTH_PATH_START, paths + path.length()*suCHAR);
+		user_set(SLOTH_PATH_END, paths + path.length()*suCHAR);
 	}
 } 

@@ -235,7 +235,7 @@ void sloth_set_xt(X* x, CELL w, CELL xt);
 
 uCHAR sloth_get_flags(X* x, CELL w);
 
-uCHAR sloth_set_flags(X* x, CELL w, uCHAR v);
+void sloth_set_flags(X* x, CELL w, uCHAR v);
 
 CELL sloth_has_flag(X* x, CELL w, CELL v);
 

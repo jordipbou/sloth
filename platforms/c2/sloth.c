@@ -170,7 +170,7 @@ uCHAR sloth_get_flags(X* x, CELL w) {
 	return sloth_c_fetch(x, w + 2*sCELL);
 }
 
-uCHAR sloth_set_flags(X* x, CELL w, uCHAR v) {
+void sloth_set_flags(X* x, CELL w, uCHAR v) {
 	sloth_c_store(x, w + 2*sCELL, v);
 }
 
@@ -863,10 +863,10 @@ FILE* sloth__open_included_file(X* x, char* a, int l) {
 			strncpy(pathend + sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH), a, l);
 			*(pathend + sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH) + l) = 0;
 			f = fopen(pathend, "rb+");
-			if (f) {
-				pathstart = pathend;
-				pathend = pathend + sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH) + l;
-			}
+			/* Opening a file from the root path must not change */
+			/* pathstart or pathend as everytime a file is opened */
+			/* it can be checked against root, no need to remember it */
+			/* and it's better to just remember previous dirs. */
 		}
 	}
 
@@ -930,10 +930,6 @@ void sloth_included_(X* x) {
 
 		do {
 			sloth_refill_(x);
-			/* Uncomment to see the lines loaded by _included_ */
-			/*
-			printf("LINE (%ld) [%ld %ld]: %.*s\n", linenumber, x->sp, x->rp, (int)sloth_user_get(x, SLOTH_ILEN), (char*)sloth_user_get(x, SLOTH_IBUF));
-			*/
 			if (!sloth_pop(x)) break;
 			sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
 			e = sloth_pop(x);
@@ -1103,10 +1099,6 @@ void sloth_interpret_(X* x) {
 		sloth_push(x, 32); sloth_word_(x);
 		tok = (char*)(TOS(x) + suCHAR);
 		tlen = sloth_c_fetch(x, TOS(x));
-		/* Uncomment to debug the TOKEN that's being interpreted */
-		/*
-		printf("TOKEN: %.*s [%ld %ld]\n", tlen, tok, x->sp, x->rp);
-		*/
 		if (tlen == 0) { sloth_pop(x); return; }
 		sloth_find_(x);
 		if ((flag = sloth_pop(x)) != 0) {
@@ -1489,7 +1481,6 @@ void sloth_set_root_path(X* x, char* s) {
 }
 
 int sloth_include(X* x, char* f) {
-	printf("--- INCLUDING: [%ld %ld] %s\n", x->sp, x->rp, f);
 	sloth_push(x, (CELL)f);
 	sloth_push(x, strlen(f));
 	sloth_catch(x, sloth_get_xt(x, sloth_find_word(x, "INCLUDED")));

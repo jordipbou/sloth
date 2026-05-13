@@ -26,10 +26,12 @@ int main(int argc, char**argv) {
 	X* x = sloth_new();
 
 	sloth_bootstrap(x);
+	/*
 	sloth_bootstrap_facility_wordset(x);
 	sloth_bootstrap_file_wordset(x);
 	sloth_bootstrap_locals_wordset(x);
 	sloth_bootstrap_memory_wordset(x);
+	*/
 
 	sloth_include(x, ROOT_PATH "4th/ans.4th");
 

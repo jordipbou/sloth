@@ -42,6 +42,8 @@ int getch();
 /* virtual machine.                                      */
 /* ----------------------------------------------------- */
 
+/* -- Virtual Machine constants ------------------------ */
+
 typedef uint8_t uCHAR; /* CHARs are always unsigned */
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
@@ -80,6 +82,8 @@ typedef uintptr_t uCELL;
 #ifndef SLOTH_FLOAT_STACK_SIZE
 #define SLOTH_FLOAT_STACK_SIZE 64
 #endif
+
+/* -- Virtual Machine context definition --------------- */
 
 struct sloth_VM;
 typedef void (*F)(struct sloth_VM*);
@@ -134,13 +138,13 @@ CELL sloth_rpop(X* x);
 
 /* -- Memory ------------------------------------------- */
 
+CELL sloth_to_abs(X* x, CELL a);
+CELL sloth_to_rel(X* x, CELL a);
+
 void sloth_cstore(X* x, CELL a, uCHAR v);
 uCHAR sloth_cfetch(X* x, CELL a);
 void sloth_store(X* x, CELL a, CELL v);
 CELL sloth_fetch(X* x, CELL a);
-
-CELL sloth_to_abs(X* x, CELL a);
-CELL sloth_to_rel(X* x, CELL a);
 
 /* -- Inner interpreter -------------------------------- */
 
@@ -160,200 +164,6 @@ void sloth__debug_inner(X* x, CELL debug_xt);
 void sloth_catch(X* x, CELL q);
 void sloth_throw(X* x, CELL e);
 
-#ifdef SLOTH_IMPLEMENTATION
-
-/* ----------------------------------------------------- */
-/* --------- Virtual machine implementation ------------ */
-/* ----------------------------------------------------- */
-
-/* -- getch multiplatform implementation --------------- */
-
-#if !defined(WIN32) && !defined(_WIN32) && !defined(_WIN64)
-int getch() {
-	struct termios oldt, newt;
-	int ch;
-	tcgetattr(STDIN_FILENO, &oldt);
-	newt = oldt;
-	newt.c_lflag &= ~(ICANON|ECHO);
-	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-	ch = getchar();
-	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-	return ch;
-}
-#endif
-
-/* -- Context initialization/destruction --------------- */
-
-void sloth_init(X* x, CELL d, CELL sz, CELL u, CELL uz) { 
-	x->sp = 0; 
-	x->rp = 0; 
-	x->ip = -1; 
-	x->d = d;
-	x->sz = sz;
-	x->u = u;
-	x->uz = uz;
-
-	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
-
-		x->fp = 0;
-
-	#endif
-
-	x->jmpbuf_idx = -1;
-}
-
-/* TODO Allow the ability to not use malloc at all in */
-/* this file. */
-X* sloth_create(int psize, int dsize, int usize) {
-	X* x;
-
-	x = malloc(sizeof(X));
-	x->p = malloc(sizeof(sloth_P));
-	x->p->p = malloc(sizeof(F) * psize);
-	x->p->last = 0;
-	x->p->sz = psize;
-	x->d = (CELL)malloc(dsize);
-	x->u = (CELL)malloc(usize);
-
-	sloth_init(x, x->d, dsize, x->u, usize);
-
-	return x;
-}
-
-X* sloth_new() { return sloth_create(512, 524288, 1024); }
-
-void sloth_free(X* x) {
-	free((void*)x->d);
-	free(x->p->p);
-	free(x->p);
-	free(x);
-}
-
-/* -- Data stack --------------------------------------- */
-
-void sloth_push(X* x, CELL v) { x->s[x->sp] = v; x->sp++; }
-CELL sloth_pop(X* x) { x->sp--; return x->s[x->sp]; }
-CELL sloth_pick(X* x, CELL a) { return x->s[x->sp - a - 1]; }
-
-/* -- Return stack ------------------------------------- */
-
-void sloth_rpush(X* x, CELL v) { x->r[x->rp] = v; x->rp++; }
-CELL sloth_rpop(X* x) { x->rp--; return x->r[x->rp]; }
-
-/* -- Memory ------------------------------------------- */
-
-/* 
-STORE/FETCH/CSTORE/cfetch work on absolute address units,
-not just inside SLOTH dictionary (memory block).
-*/
-void sloth_cstore(X* x, CELL a, uCHAR v) { *((uCHAR*)a) = v; }
-uCHAR sloth_cfetch(X* x, CELL a) { return *((uCHAR*)a); }
-void sloth_store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
-CELL sloth_fetch(X* x, CELL a) { return *((CELL*)a); }
-
-/*
-The next two functions allow transforming from relative to
-absolute addresses.
-*/
-CELL sloth_to_abs(X* x, CELL a) { return (CELL)(x->d + a); }
-
-CELL sloth_to_rel(X* x, CELL a) { return a - x->d; }
-
-/* -- Inner interpreter -------------------------------- */
-
-CELL sloth_op(X* x) {
-	CELL o = sloth_fetch(x, x->ip);
-	x->ip += sCELL;
-	return o;
-}
-
-void sloth__do_prim(X* x, CELL p) { 
-	(x->p->p[-1 - p])(x); 
-}
-
-void sloth__call(X* x, CELL q) { 
-	if (x->ip >= 0) sloth_rpush(x, x->ip); 
-	x->ip = q; 
-}
-
-void sloth__execute(X* x, CELL q) { 
-	if (q < 0) sloth__do_prim(x, q); 
-	else sloth__call(x, q); 
-}
-
-void sloth__inner(X* x) { 
-	CELL t = x->rp;
-	while (t <= x->rp && x->ip >= 0) { 
-		sloth__execute(x, sloth_op(x));
-	} 
-}
-
-void sloth_eval(X* x, CELL q) { 
-	sloth__execute(x, q); 
-	if (q > 0) sloth__inner(x); 
-}
-
-/* Tracing eval */
-
-void sloth__debug(X* x, CELL debug_xt) {
-	/* TODO It would be interesting to add a variable to */
-	/* temporarily deactivate debugging to just trace a */
-	/* part of code, for example */
-	sloth_push(x, x->ip);
-	sloth_eval(x, debug_xt);
-}
-
-void sloth__debug_inner(X* x, CELL debug_xt) {
-	CELL t = x->rp;
-	while (t <= x->rp && x->ip >= 0) {
-		sloth__debug(x, debug_xt);
-		sloth__execute(x, sloth_op(x));
-	}
-}
-
-/* -- Exceptions --------------------------------------- */
-
-void sloth_catch(X* x, CELL q) {
-	volatile int tsp = x->sp;
-	volatile int trp = x->rp;
-	volatile CELL tip = x->ip;
-	volatile int e;
-
-	if (!(e = setjmp(x->jmpbuf[++x->jmpbuf_idx]))) {
-		sloth_eval(x, q);
-		sloth_push(x, 0);
-	} else {
-		x->sp = tsp;
-		x->rp = trp;
-		x->ip = tip;
-		sloth_push(x, (CELL)e);
-	}
-
-	x->jmpbuf_idx--;
-}
-
-void sloth_throw(X* x, CELL e) {
-	if (x->jmpbuf_idx >= 0) {
-		longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
-	} else {
-		CELL ibuf = *((CELL*)(x->u+20*sCELL));
-		CELL ipos = *((CELL*)(x->u+21*sCELL));
-		CELL ilen = *((CELL*)(x->u+22*sCELL));
-		if (ibuf && ipos <= ilen) {
-		    printf("BUFFER: <%.*s>\n", (int)ilen, (char*)ibuf);
-		    printf("TOKEN: <%.*s>\n", (int)(ilen - ipos), (char*)(ibuf + ipos));
-		}
-#if defined(WINDOWS)
-		printf("Exception: %Id\n", e);
-#else
-		printf("Exception: %ld\n", e);
-#endif
-		exit(e);
-	}
-}
-
-#endif
-
 /* ---------------------------------------------------- */
 /* -- Forth Kernel ------------------------------------ */
 /* ---------------------------------------------------- */
@@ -364,59 +174,6 @@ void sloth_throw(X* x, CELL e) {
 /* words from unsafe words in the Forth layer, as words */
 /* exposing the internals will be needed.               */
 /* ---------------------------------------------------- */
-
-/* -- Constants --------------------------------------- */
-
-/* Exceptions */
-#define SLOTH_STACK_OVERFLOW					-3
-#define SLOTH_STACK_UNDERFLOW					-4
-#define SLOTH_RETURN_STACK_OVERFLOW		-5
-#define SLOTH_RETURN_STACK_UNDERFLOW	-6
-
-/* Displacement of counted string buffer from here */
-#define SLOTH_CBUF				64	/* Counted string buffer */
-
-/* Relative addresses of variables accessed both from C */
-/* and Forth. */
-
-#define SLOTH_HERE							0	
-#define SLOTH_INTERNAL_WL				1*sCELL
-#define SLOTH_FORTH_WL					2*sCELL
-
-/* User area variables */
-
-#define SLOTH_CURRENT						0*sCELL
-#define SLOTH_ORDER							1*sCELL
-#define SLOTH_LOCALS_WORDLIST		2*sCELL
-#define SLOTH_CONTEXT						3*sCELL
-/* There are 16 CELLS reserved to search order */
-#define SLOTH_BASE							19*sCELL
-#define SLOTH_STATE							20*sCELL
-#define SLOTH_IBUF							21*sCELL
-#define SLOTH_IPOS							22*sCELL
-#define SLOTH_ILEN							23*sCELL
-#define SLOTH_SOURCE_ID					24*sCELL
-#define SLOTH_SOURCE_POS				25*sCELL
-#define SLOTH_LATESTXT					26*sCELL
-#define SLOTH_INTERPRET					27*sCELL
-
-#define SLOTH_ROOT_PATH_LENGTH	28*sCELL
-#define SLOTH_PATH_START				29*sCELL
-#define SLOTH_PATH_END					30*sCELL
-/* Continuous space to store path strings */
-#define SLOTH_PATHS							31*sCELL
-
-/* Space between SLOTH_PATHS and SLOTH_INCLUDED_FILES */
-/* reserved to store paths. */
-
-#define SLOTH_INCLUDED_FILES		95*sCELL
-
-#define SLOTH_LAST_USER_VAR			96*sCELL
-
-/* Word statuses */
-
-#define SLOTH_HIDDEN					1
-#define SLOTH_IMMEDIATE				2
 
 /* -- Helpers ----------------------------------------- */
 
@@ -475,7 +232,9 @@ CELL sloth_get_name_addr(X* x, CELL w);
 void sloth_set_flag(X* x, CELL w, uCHAR v);
 void sloth_unset_flag(X* x, CELL w, uCHAR v);
 
-/* -- Primitives -------------------------------------- */
+/* ---------------------------------------------------- */
+/* -- Forth Primitives -------------------------------- */
+/* ---------------------------------------------------- */
 
 void sloth_exit_(X* x);
 void sloth_lit_(X* x);
@@ -631,7 +390,250 @@ void sloth_evaluate(X* x, char* s);
 
 void sloth_repl(X* x);
 
+/* -- Constants --------------------------------------- */
+
+/* Exceptions */
+#define SLOTH_STACK_OVERFLOW					-3
+#define SLOTH_STACK_UNDERFLOW					-4
+#define SLOTH_RETURN_STACK_OVERFLOW		-5
+#define SLOTH_RETURN_STACK_UNDERFLOW	-6
+
+/* Displacement of counted string buffer from here */
+#define SLOTH_CBUF				64	/* Counted string buffer */
+
+/* Relative addresses of variables accessed both from C */
+/* and Forth. */
+
+#define SLOTH_HERE							0	
+#define SLOTH_INTERNAL_WL				1*sCELL
+#define SLOTH_FORTH_WL					2*sCELL
+
+/* User area variables */
+
+#define SLOTH_CURRENT						0*sCELL
+#define SLOTH_ORDER							1*sCELL
+#define SLOTH_LOCALS_WORDLIST		2*sCELL
+#define SLOTH_CONTEXT						3*sCELL
+/* There are 16 CELLS reserved to search order */
+#define SLOTH_BASE							19*sCELL
+#define SLOTH_STATE							20*sCELL
+#define SLOTH_IBUF							21*sCELL
+#define SLOTH_IPOS							22*sCELL
+#define SLOTH_ILEN							23*sCELL
+#define SLOTH_SOURCE_ID					24*sCELL
+#define SLOTH_SOURCE_POS				25*sCELL
+#define SLOTH_LATESTXT					26*sCELL
+#define SLOTH_INTERPRET					27*sCELL
+
+#define SLOTH_ROOT_PATH_LENGTH	28*sCELL
+#define SLOTH_PATH_START				29*sCELL
+#define SLOTH_PATH_END					30*sCELL
+/* Continuous space to store path strings */
+#define SLOTH_PATHS							31*sCELL
+
+/* Space between SLOTH_PATHS and SLOTH_INCLUDED_FILES */
+/* reserved to store paths. */
+
+#define SLOTH_INCLUDED_FILES		95*sCELL
+
+#define SLOTH_LAST_USER_VAR			96*sCELL
+
+/* Word statuses */
+
+#define SLOTH_HIDDEN					1
+#define SLOTH_IMMEDIATE				2
+
 #ifdef SLOTH_IMPLEMENTATION
+
+/* ----------------------------------------------------- */
+/* --------- Virtual machine implementation ------------ */
+/* ----------------------------------------------------- */
+
+/* -- getch multiplatform implementation --------------- */
+
+#if !defined(WIN32) && !defined(_WIN32) && !defined(_WIN64)
+int getch() {
+	struct termios oldt, newt;
+	int ch;
+	tcgetattr(STDIN_FILENO, &oldt);
+	newt = oldt;
+	newt.c_lflag &= ~(ICANON|ECHO);
+	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+	ch = getchar();
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+	return ch;
+}
+#endif
+
+/* -- Context initialization/destruction --------------- */
+
+void sloth_init(X* x, CELL d, CELL sz, CELL u, CELL uz) { 
+	x->sp = 0; 
+	x->rp = 0; 
+	x->ip = -1; 
+	x->d = d;
+	x->sz = sz;
+	x->u = u;
+	x->uz = uz;
+
+	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+
+		x->fp = 0;
+
+	#endif
+
+	x->jmpbuf_idx = -1;
+}
+
+/* TODO Allow the ability to not use malloc at all in */
+/* this file. */
+X* sloth_create(int psize, int dsize, int usize) {
+	X* x;
+
+	x = malloc(sizeof(X));
+	x->p = malloc(sizeof(sloth_P));
+	x->p->p = malloc(sizeof(F) * psize);
+	x->p->last = 0;
+	x->p->sz = psize;
+	x->d = (CELL)malloc(dsize);
+	x->u = (CELL)malloc(usize);
+
+	sloth_init(x, x->d, dsize, x->u, usize);
+
+	return x;
+}
+
+X* sloth_new() { return sloth_create(512, 524288, 1024); }
+
+void sloth_free(X* x) {
+	free((void*)x->d);
+	free(x->p->p);
+	free(x->p);
+	free(x);
+}
+
+/* -- Data stack --------------------------------------- */
+
+void sloth_push(X* x, CELL v) { x->s[x->sp] = v; x->sp++; }
+CELL sloth_pop(X* x) { x->sp--; return x->s[x->sp]; }
+CELL sloth_pick(X* x, CELL a) { return x->s[x->sp - a - 1]; }
+
+/* -- Return stack ------------------------------------- */
+
+void sloth_rpush(X* x, CELL v) { x->r[x->rp] = v; x->rp++; }
+CELL sloth_rpop(X* x) { x->rp--; return x->r[x->rp]; }
+
+/* -- Memory ------------------------------------------- */
+
+/*
+The next two functions allow transforming from relative to
+absolute addresses.
+*/
+CELL sloth_to_abs(X* x, CELL a) { return (CELL)(x->d + a); }
+
+CELL sloth_to_rel(X* x, CELL a) { return a - x->d; }
+
+/* 
+STORE/FETCH/CSTORE/cfetch work on absolute address units,
+not just inside SLOTH dictionary (memory block).
+*/
+void sloth_cstore(X* x, CELL a, uCHAR v) { *((uCHAR*)a) = v; }
+uCHAR sloth_cfetch(X* x, CELL a) { return *((uCHAR*)a); }
+void sloth_store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
+CELL sloth_fetch(X* x, CELL a) { return *((CELL*)a); }
+
+/* -- Inner interpreter -------------------------------- */
+
+CELL sloth_op(X* x) {
+	CELL o = sloth_fetch(x, x->ip);
+	x->ip += sCELL;
+	return o;
+}
+
+void sloth__do_prim(X* x, CELL p) { 
+	(x->p->p[-1 - p])(x); 
+}
+
+void sloth__call(X* x, CELL q) { 
+	if (x->ip >= 0) sloth_rpush(x, x->ip); 
+	x->ip = q; 
+}
+
+void sloth__execute(X* x, CELL q) { 
+	if (q < 0) sloth__do_prim(x, q); 
+	else sloth__call(x, q); 
+}
+
+void sloth__inner(X* x) { 
+	CELL t = x->rp;
+	while (t <= x->rp && x->ip >= 0) { 
+		sloth__execute(x, sloth_op(x));
+	} 
+}
+
+void sloth_eval(X* x, CELL q) { 
+	sloth__execute(x, q); 
+	if (q > 0) sloth__inner(x); 
+}
+
+/* Tracing eval */
+
+void sloth__debug(X* x, CELL debug_xt) {
+	/* TODO It would be interesting to add a variable to */
+	/* temporarily deactivate debugging to just trace a */
+	/* part of code, for example */
+	sloth_push(x, x->ip);
+	sloth_eval(x, debug_xt);
+}
+
+void sloth__debug_inner(X* x, CELL debug_xt) {
+	CELL t = x->rp;
+	while (t <= x->rp && x->ip >= 0) {
+		sloth__debug(x, debug_xt);
+		sloth__execute(x, sloth_op(x));
+	}
+}
+
+/* -- Exceptions --------------------------------------- */
+
+void sloth_catch(X* x, CELL q) {
+	volatile int tsp = x->sp;
+	volatile int trp = x->rp;
+	volatile CELL tip = x->ip;
+	volatile int e;
+
+	if (!(e = setjmp(x->jmpbuf[++x->jmpbuf_idx]))) {
+		sloth_eval(x, q);
+		sloth_push(x, 0);
+	} else {
+		x->sp = tsp;
+		x->rp = trp;
+		x->ip = tip;
+		sloth_push(x, (CELL)e);
+	}
+
+	x->jmpbuf_idx--;
+}
+
+void sloth_throw(X* x, CELL e) {
+	if (x->jmpbuf_idx >= 0) {
+		longjmp(x->jmpbuf[x->jmpbuf_idx], (int)e);
+	} else {
+		CELL ibuf = *((CELL*)(x->u+20*sCELL));
+		CELL ipos = *((CELL*)(x->u+21*sCELL));
+		CELL ilen = *((CELL*)(x->u+22*sCELL));
+		if (ibuf && ipos <= ilen) {
+		    printf("BUFFER: <%.*s>\n", (int)ilen, (char*)ibuf);
+		    printf("TOKEN: <%.*s>\n", (int)(ilen - ipos), (char*)(ibuf + ipos));
+		}
+#if defined(WINDOWS)
+		printf("Exception: %Id\n", e);
+#else
+		printf("Exception: %ld\n", e);
+#endif
+		exit(e);
+	}
+}
 
 /* ---------------------------------------------------- */
 /* -- Forth Kernel implementation --------------------- */
@@ -760,7 +762,13 @@ void sloth_unset_flag(X* x, CELL w, uCHAR v) {
 	sloth_cstore(x, w + 2*sCELL, sloth_get_flags(x, w) & ~v);
 }
 
-/* -- Primitives -------------------------------------- */
+/* ---------------------------------------------------- */
+/* -- Forth Primitives -------------------------------- */
+/* ---------------------------------------------------- */
+/* All words defined here must use only functions from  */
+/* the previous layer. Only basic control structures    */
+/* and assignment are allowed to easy portability.      */
+/* ---------------------------------------------------- */
 
 void sloth_exit_(X* x) { 
 	x->ip = (x->rp > 0) ? sloth_rpop(x) : -1; 
