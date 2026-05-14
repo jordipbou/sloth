@@ -1731,6 +1731,164 @@ void test_word_() {
 	TEST_ASSERT_EQUAL(0, sloth_c_fetch(x, sloth_pop(x)));
 }
 
+/* -- Outer interpreter -------------------------------- */
+
+void test_interpret_empty() {
+	sloth_user_set(x, SLOTH_IBUF, 0);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 0);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+}
+
+void test_interpret_character_literals_interpret_mode() {
+	char *ibuf = "'a' 'b'";
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 7);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL('b', sloth_pop(x));
+	TEST_ASSERT_EQUAL('a', sloth_pop(x));
+}
+
+void test_interpret_character_literals_compile_mode() {
+	char *ibuf = "'a' 'b'";
+	CELL here;
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 7);
+	sloth_user_set(x, SLOTH_STATE, 1);
+	sloth_code(x, "(LIT)", -2);
+	here = sloth_here(x);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL('a', sloth_fetch(x, here + sCELL));
+	TEST_ASSERT_EQUAL('b', sloth_fetch(x, here + 3*sCELL));
+}
+
+void test_interpret_number_literals_interpret_mode() {
+	char *ibuf = "1 0 37 -560";
+	sloth_user_set(x, SLOTH_BASE, 10);
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 11);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(4, x->sp);
+	TEST_ASSERT_EQUAL(-560, sloth_pop(x));
+	TEST_ASSERT_EQUAL(37, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(1, sloth_pop(x));
+
+	ibuf = "%1111 #15 $f";
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 12);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(3, x->sp);
+	TEST_ASSERT_EQUAL(15, sloth_pop(x));
+	TEST_ASSERT_EQUAL(15, sloth_pop(x));
+	TEST_ASSERT_EQUAL(15, sloth_pop(x));
+}
+
+void test_interpret_number_literals_compile_mode() {
+	char *ibuf = "1 0 37 -560";
+	CELL here;
+	sloth_user_set(x, SLOTH_BASE, 10);
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 11);
+	sloth_user_set(x, SLOTH_STATE, 1);
+	sloth_code(x, "(LIT)", -2);
+	here = sloth_here(x);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(1, sloth_fetch(x, here + sCELL));
+	TEST_ASSERT_EQUAL(0, sloth_fetch(x, here + 3*sCELL));
+	TEST_ASSERT_EQUAL(37, sloth_fetch(x, here + 5*sCELL));
+	TEST_ASSERT_EQUAL(-560, sloth_fetch(x, here + 7*sCELL));
+
+	ibuf = "%1111 #15 $f";
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 12);
+	sloth_user_set(x, SLOTH_STATE, 1);
+	sloth_code(x, "(LIT)", -2);
+	here = sloth_here(x);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(15, sloth_fetch(x, here + sCELL));
+	TEST_ASSERT_EQUAL(15, sloth_fetch(x, here + 3*sCELL));
+	TEST_ASSERT_EQUAL(15, sloth_fetch(x, here + 5*sCELL));
+}
+
+/* TODO Tests for floating point literals */
+
+CELL p1 = 0, p2 = 0;
+
+void primitive1(X* x) { p1 = 1; }
+void primitive2(X* x) { p2 = 1; }
+
+void test_interpret_() {
+	char *ibuf = "11 PRIM1 13 PRIM2";
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 17);
+	sloth_code(x, "PRIM1", sloth_primitive(x, &primitive1));
+	sloth_code(x, "PRIM2", sloth_primitive(x, &primitive2));
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(13, sloth_pop(x));
+	TEST_ASSERT_EQUAL(11, sloth_pop(x));
+	TEST_ASSERT_EQUAL(1, p1);
+	TEST_ASSERT_EQUAL(1, p2);
+}
+
+void test_interpret_compile_mode() {
+	char *ibuf = "11 PRIM1 13 PRIM2";
+	CELL here;
+	sloth_user_set(x, SLOTH_BASE, 10);
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 17);
+	sloth_user_set(x, SLOTH_STATE, 1);
+	sloth_code(x, "EXIT", -1);
+	sloth_code(x, "(LIT)", -2);
+	sloth_code(x, "PRIM1", -3);
+	sloth_code(x, "PRIM2", -4);
+	here = sloth_here(x);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(-2, sloth_fetch(x, here + 0*sCELL));
+	TEST_ASSERT_EQUAL(11, sloth_fetch(x, here + 1*sCELL));
+	TEST_ASSERT_EQUAL(-3, sloth_fetch(x, here + 2*sCELL));
+	TEST_ASSERT_EQUAL(-2, sloth_fetch(x, here + 3*sCELL));
+	TEST_ASSERT_EQUAL(13, sloth_fetch(x, here + 4*sCELL));
+	TEST_ASSERT_EQUAL(-4, sloth_fetch(x, here + 5*sCELL));
+}
+
+void test_interpret_immediate_words_compile_mode() {
+	char *ibuf = "11 PRIM1 13 PRIM2";
+	CELL here;
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 17);
+	sloth_user_set(x, SLOTH_STATE, 1);
+	sloth_code(x, "PRIM1", sloth_primitive(x, &primitive1)); sloth_immediate_(x);
+	sloth_code(x, "(LIT)", -2);
+	sloth_code(x, "PRIM2", -3);
+	here = sloth_here(x);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(-2, sloth_fetch(x, here + 0*sCELL));
+	TEST_ASSERT_EQUAL(11, sloth_fetch(x, here + 1*sCELL));
+	TEST_ASSERT_EQUAL(-2, sloth_fetch(x, here + 2*sCELL));
+	TEST_ASSERT_EQUAL(13, sloth_fetch(x, here + 3*sCELL));
+	TEST_ASSERT_EQUAL(-3, sloth_fetch(x, here + 4*sCELL));
+
+	TEST_ASSERT_EQUAL(1, p1);
+}
+
 /* -- Defining words ----------------------------------- */
 
 void test_colon_() {
@@ -1905,161 +2063,6 @@ void test_execute_() {
 	sloth_execute_(x);
 	TEST_ASSERT_EQUAL(0, x->sp);
 	TEST_ASSERT_EQUAL(1, p0);
-}
-
-/* -- Outer interpreter -------------------------------- */
-
-void test_interpret_empty() {
-	sloth_user_set(x, SLOTH_IBUF, 0);
-	sloth_user_set(x, SLOTH_IPOS, 0);
-	sloth_user_set(x, SLOTH_ILEN, 0);
-	sloth_interpret_(x);
-	TEST_ASSERT_EQUAL(0, x->sp);
-}
-
-void test_interpret_character_literals_interpret_mode() {
-	char *ibuf = "'a' 'b'";
-	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
-	sloth_user_set(x, SLOTH_IPOS, 0);
-	sloth_user_set(x, SLOTH_ILEN, 7);
-	sloth_interpret_(x);
-	TEST_ASSERT_EQUAL(2, x->sp);
-	TEST_ASSERT_EQUAL('b', sloth_pop(x));
-	TEST_ASSERT_EQUAL('a', sloth_pop(x));
-}
-
-void test_interpret_character_literals_compile_mode() {
-	char *ibuf = "'a' 'b'";
-	CELL here;
-	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
-	sloth_user_set(x, SLOTH_IPOS, 0);
-	sloth_user_set(x, SLOTH_ILEN, 7);
-	sloth_user_set(x, SLOTH_STATE, 1);
-	sloth_code(x, "(LIT)", -2);
-	here = sloth_here(x);
-	sloth_interpret_(x);
-	TEST_ASSERT_EQUAL(0, x->sp);
-	TEST_ASSERT_EQUAL('a', sloth_fetch(x, here + sCELL));
-	TEST_ASSERT_EQUAL('b', sloth_fetch(x, here + 3*sCELL));
-}
-
-void test_interpret_number_literals_interpret_mode() {
-	char *ibuf = "1 0 37 -560";
-	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
-	sloth_user_set(x, SLOTH_IPOS, 0);
-	sloth_user_set(x, SLOTH_ILEN, 11);
-	sloth_interpret_(x);
-	TEST_ASSERT_EQUAL(4, x->sp);
-	TEST_ASSERT_EQUAL(-560, sloth_pop(x));
-	TEST_ASSERT_EQUAL(37, sloth_pop(x));
-	TEST_ASSERT_EQUAL(0, sloth_pop(x));
-	TEST_ASSERT_EQUAL(1, sloth_pop(x));
-
-	ibuf = "%1111 #15 $f";
-	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
-	sloth_user_set(x, SLOTH_IPOS, 0);
-	sloth_user_set(x, SLOTH_ILEN, 12);
-	sloth_interpret_(x);
-	TEST_ASSERT_EQUAL(3, x->sp);
-	TEST_ASSERT_EQUAL(15, sloth_pop(x));
-	TEST_ASSERT_EQUAL(15, sloth_pop(x));
-	TEST_ASSERT_EQUAL(15, sloth_pop(x));
-}
-
-void test_interpret_number_literals_compile_mode() {
-	char *ibuf = "1 0 37 -560";
-	CELL here;
-	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
-	sloth_user_set(x, SLOTH_IPOS, 0);
-	sloth_user_set(x, SLOTH_ILEN, 11);
-	sloth_user_set(x, SLOTH_STATE, 1);
-	sloth_code(x, "(LIT)", -2);
-	here = sloth_here(x);
-	sloth_interpret_(x);
-	TEST_ASSERT_EQUAL(0, x->sp);
-	TEST_ASSERT_EQUAL(1, sloth_fetch(x, here + sCELL));
-	TEST_ASSERT_EQUAL(0, sloth_fetch(x, here + 3*sCELL));
-	TEST_ASSERT_EQUAL(37, sloth_fetch(x, here + 5*sCELL));
-	TEST_ASSERT_EQUAL(-560, sloth_fetch(x, here + 7*sCELL));
-
-	ibuf = "%1111 #15 $f";
-	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
-	sloth_user_set(x, SLOTH_IPOS, 0);
-	sloth_user_set(x, SLOTH_ILEN, 13);
-	sloth_user_set(x, SLOTH_STATE, 1);
-	sloth_code(x, "(LIT)", -2);
-	here = sloth_here(x);
-	sloth_interpret_(x);
-	TEST_ASSERT_EQUAL(0, x->sp);
-	TEST_ASSERT_EQUAL(15, sloth_fetch(x, here + sCELL));
-	TEST_ASSERT_EQUAL(15, sloth_fetch(x, here + 3*sCELL));
-	TEST_ASSERT_EQUAL(15, sloth_fetch(x, here + 5*sCELL));
-}
-
-/* TODO Tests for floating point literals */
-
-CELL p1 = 0, p2 = 0;
-
-void primitive1(X* x) { p1 = 1; }
-void primitive2(X* x) { p2 = 1; }
-
-void test_interpret_() {
-	char *ibuf = "11 PRIM1 13 PRIM2";
-	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
-	sloth_user_set(x, SLOTH_IPOS, 0);
-	sloth_user_set(x, SLOTH_ILEN, 17);
-	sloth_code(x, "PRIM1", sloth_primitive(x, &primitive1));
-	sloth_code(x, "PRIM2", sloth_primitive(x, &primitive2));
-	sloth_interpret_(x);
-	TEST_ASSERT_EQUAL(2, x->sp);
-	TEST_ASSERT_EQUAL(13, sloth_pop(x));
-	TEST_ASSERT_EQUAL(11, sloth_pop(x));
-	TEST_ASSERT_EQUAL(1, p1);
-	TEST_ASSERT_EQUAL(1, p2);
-}
-
-void test_interpret_compile_mode() {
-	char *ibuf = "11 PRIM1 13 PRIM2";
-	CELL here;
-	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
-	sloth_user_set(x, SLOTH_IPOS, 0);
-	sloth_user_set(x, SLOTH_ILEN, 17);
-	sloth_user_set(x, SLOTH_STATE, 1);
-	sloth_code(x, "EXIT", -1);
-	sloth_code(x, "(LIT)", -2);
-	sloth_code(x, "PRIM1", -3);
-	sloth_code(x, "PRIM2", -4);
-	here = sloth_here(x);
-	sloth_interpret_(x);
-	TEST_ASSERT_EQUAL(0, x->sp);
-	TEST_ASSERT_EQUAL(-2, sloth_fetch(x, here + 0*sCELL));
-	TEST_ASSERT_EQUAL(11, sloth_fetch(x, here + 1*sCELL));
-	TEST_ASSERT_EQUAL(-3, sloth_fetch(x, here + 2*sCELL));
-	TEST_ASSERT_EQUAL(-2, sloth_fetch(x, here + 3*sCELL));
-	TEST_ASSERT_EQUAL(13, sloth_fetch(x, here + 4*sCELL));
-	TEST_ASSERT_EQUAL(-4, sloth_fetch(x, here + 5*sCELL));
-}
-
-void test_interpret_immediate_words_compile_mode() {
-	char *ibuf = "11 PRIM1 13 PRIM2";
-	CELL here;
-	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
-	sloth_user_set(x, SLOTH_IPOS, 0);
-	sloth_user_set(x, SLOTH_ILEN, 17);
-	sloth_user_set(x, SLOTH_STATE, 1);
-	sloth_code(x, "PRIM1", sloth_primitive(x, &primitive1)); sloth_immediate_(x);
-	sloth_code(x, "(LIT)", -2);
-	sloth_code(x, "PRIM2", -3);
-	here = sloth_here(x);
-	sloth_interpret_(x);
-	TEST_ASSERT_EQUAL(0, x->sp);
-	TEST_ASSERT_EQUAL(-2, sloth_fetch(x, here + 0*sCELL));
-	TEST_ASSERT_EQUAL(11, sloth_fetch(x, here + 1*sCELL));
-	TEST_ASSERT_EQUAL(-2, sloth_fetch(x, here + 2*sCELL));
-	TEST_ASSERT_EQUAL(13, sloth_fetch(x, here + 3*sCELL));
-	TEST_ASSERT_EQUAL(-3, sloth_fetch(x, here + 4*sCELL));
-
-	TEST_ASSERT_EQUAL(1, p1);
 }
 
 /* -- Bootstrapping ------------------------------------ */

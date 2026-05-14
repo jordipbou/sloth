@@ -192,7 +192,7 @@ public class SlothTest {
 		sloth._here_();
 		assertEquals(sloth.here(), sloth.pop());
 		sloth._here_();
-		assertEquals(sloth.fetch(sloth.to_abs(0, 0)), sloth.pop());
+		assertEquals(sloth.fetch(sloth.to_abs(0)), sloth.pop());
 	}
 
 	/* -- Compilation -------------------------------------- */
@@ -221,51 +221,51 @@ public class SlothTest {
 	@Test
 	public void test_get_link() {
 		sloth.set(100, 13);
-		assertEquals(13, sloth.get_link(sloth.to_abs(100, 0)));
+		assertEquals(13, sloth.get_link(sloth.to_abs(100)));
 	}
 
 	@Test
 	public void test_get_set_xt() {
-		sloth.set_xt(sloth.to_abs(100, 0), 17);
-		assertEquals(17, sloth.get_xt(sloth.to_abs(100, 0)));
+		sloth.set_xt(sloth.to_abs(100), 17);
+		assertEquals(17, sloth.get_xt(sloth.to_abs(100)));
 	}
 
 	@Test
 	public void test_get_set_flags() {
-		sloth.set_flags(sloth.to_abs(100, 0), 33);
-		assertEquals(33, sloth.get_flags(sloth.to_abs(100, 0)));
+		sloth.set_flags(sloth.to_abs(100), 33);
+		assertEquals(33, sloth.get_flags(sloth.to_abs(100)));
 	}
 
 	@Test
 	public void test_has_set_unset_flag() {
-		sloth.set_flags(sloth.to_abs(100, 0), 0);
-		assertFalse(sloth.has_flag(sloth.to_abs(100, 0), 2));
-		sloth.set_flag(sloth.to_abs(100, 0), 2);
-		assertTrue(sloth.has_flag(sloth.to_abs(100, 0), 2));
-		sloth.unset_flag(sloth.to_abs(100, 0), 2);
-		assertFalse(sloth.has_flag(sloth.to_abs(100, 0), 2));
+		sloth.set_flags(sloth.to_abs(100), 0);
+		assertFalse(sloth.has_flag(sloth.to_abs(100), 2));
+		sloth.set_flag(sloth.to_abs(100), 2);
+		assertTrue(sloth.has_flag(sloth.to_abs(100), 2));
+		sloth.unset_flag(sloth.to_abs(100), 2);
+		assertFalse(sloth.has_flag(sloth.to_abs(100), 2));
 	}
 
 	@Test
 	public void test_headers() {
 		String name = "NEW-WORD";
-		int name_addr = sloth.FromString(name);
+		int name_addr = sloth.fromString(name);
 		int w = sloth.header(name_addr, name.length());
 		assertEquals(sloth.aligned(w + 2*sCELL + 2*suCHAR + name.length()*suCHAR), sloth.here());
 		assertEquals(sloth.aligned(sloth.here()), sloth.here());
 		assertEquals(3*sCELL, sloth.get_latest());
 		assertEquals(sloth.here(), sloth.fetch(4*sCELL));
 		assertEquals(0, sloth.c_fetch(5*sCELL));
-		assertEquals(name, sloth.ToString(5*sCELL + 2*suCHAR, sloth.c_fetch(5*sCELL + suCHAR)));
+		assertEquals(name, sloth.toString(5*sCELL + 2*suCHAR, sloth.c_fetch(5*sCELL + suCHAR)));
 	}
 
 	@Test
 	public void test_name_and_len() {
 		String name = "TEST-WORD";
-		int name_addr = sloth.FromString(name);
+		int name_addr = sloth.fromString(name);
 		int w = sloth.header(name_addr, name.length());
 		assertEquals(name.length(), sloth.get_namelen(w));
-		assertEquals(name, sloth.ToString(sloth.get_name_addr(w), sloth.get_namelen(w)));
+		assertEquals(name, sloth.toString(sloth.get_name_addr(w), sloth.get_namelen(w)));
 	}
 
 	/* -- Primitive and word creation ---------------------- */
@@ -282,7 +282,7 @@ public class SlothTest {
 		int word = sloth.here();
 		sloth.code("MY-PRIMITIVE", -1);
 		assertEquals(-1, sloth.fetch(4*sCELL));
-		assertEquals("MY-PRIMITIVE", sloth.ToString(sloth.get_name_addr(word), sloth.get_namelen(word)));
+		assertEquals("MY-PRIMITIVE", sloth.toString(sloth.get_name_addr(word), sloth.get_namelen(word)));
 	}
 
 	/* -- Inner interpreter -------------------------------- */
@@ -290,9 +290,9 @@ public class SlothTest {
 	@Test
 	public void test_op() {
 		sloth.set(3*sCELL, 11);
-		sloth.ip = sloth.to_abs(3*sCELL, 0);
+		sloth.ip = sloth.to_abs(3*sCELL);
 		assertEquals(11, sloth.op());
-		assertEquals(sloth.to_abs(4*sCELL, 0), sloth.ip);
+		assertEquals(sloth.to_abs(4*sCELL), sloth.ip);
 	}
 
 	@Test
@@ -344,9 +344,9 @@ public class SlothTest {
 		assertEquals(17, my_var);
 
 		sloth.ip = -1;
-		sloth.execute(sloth.to_abs(3*sCELL, 0));
+		sloth.execute(sloth.to_abs(3*sCELL));
 		assertEquals(0, sloth.rp);
-		assertEquals(sloth.to_abs(3*sCELL, 0), sloth.ip);
+		assertEquals(sloth.to_abs(3*sCELL), sloth.ip);
 	}
 
 	void my_exit(Sloth vm) { sloth.ip=  -1; }
@@ -355,7 +355,7 @@ public class SlothTest {
 	public void test_inner() {
 		sloth.set(3*sCELL, sloth.primitive((vm) -> my_primitive(vm)));
 		sloth.set(4*sCELL, sloth.primitive((vm) -> my_exit(vm)));
-		sloth.ip = sloth.to_abs(3*sCELL, 0);
+		sloth.ip = sloth.to_abs(3*sCELL);
 		my_var = 11;
 		sloth.inner();
 		assertEquals(17, my_var);
@@ -367,7 +367,7 @@ public class SlothTest {
 		sloth.set(3*sCELL, sloth.primitive((vm) -> my_primitive(vm)));
 		sloth.set(4*sCELL, sloth.primitive((vm) -> my_exit(vm)));
 
-		sloth.ip = sloth.to_abs(3*sCELL, 0);
+		sloth.ip = sloth.to_abs(3*sCELL);
 		my_var = 11;
 		sloth.eval(sloth.ip);
 		assertEquals(17, my_var);
@@ -387,11 +387,11 @@ public class SlothTest {
 		sloth.set(4*sCELL, sloth.primitive((vm) -> my_exit(vm)));
 		sloth.primitive((vm) -> my_debug(vm));
 		my_var = 11;
-		sloth.ip = sloth.to_abs(4*sCELL, 0);
+		sloth.ip = sloth.to_abs(4*sCELL);
 		sloth.debug_inner(-3);
 		assertEquals(23, my_var);
 		assertEquals(1, sloth.sp);
-		assertEquals(sloth.to_abs(4*sCELL, 0), sloth.s[0]);
+		assertEquals(sloth.to_abs(4*sCELL), sloth.s[0]);
 	}
 
 	int pre_var = 11;
@@ -425,7 +425,7 @@ public class SlothTest {
 		inner_var = 17;
 		post_var = 23;
 
-		sloth.push(sloth.to_abs(3*sCELL, 0));
+		sloth.push(sloth.to_abs(3*sCELL));
 		sloth.push(-2);
 		sloth.push(-3);
 		sloth.push(-4);
@@ -513,15 +513,15 @@ public class SlothTest {
 	@Test
 	public void test_lit_() {
 		sloth.set(3*sCELL, 42);
-		sloth.ip = sloth.to_abs(3*sCELL, 0);
+		sloth.ip = sloth.to_abs(3*sCELL);
 		sloth._lit_();
 		assertEquals(42, sloth.pop());
-		assertEquals(sloth.to_abs(4*sCELL, 0), sloth.ip);
+		assertEquals(sloth.to_abs(4*sCELL), sloth.ip);
 	}
 
 	@Test
 	public void test_rip_() {
-		int base_ip = sloth.to_abs(3*sCELL, 0);
+		int base_ip = sloth.to_abs(3*sCELL);
 		sloth.set(3*sCELL, 10*sCELL); // offset
 		sloth.ip = base_ip;
 		sloth._rip_();
@@ -531,7 +531,7 @@ public class SlothTest {
 
 	@Test
 	public void test_branch_() {
-		int base_ip = sloth.to_abs(3*sCELL, 0);
+		int base_ip = sloth.to_abs(3*sCELL);
 		sloth.set(3*sCELL, 10*sCELL); // offset
 		sloth.ip = base_ip;
 		sloth._branch_();
@@ -540,7 +540,7 @@ public class SlothTest {
 
 	@Test
 	public void test_zbranch_() {
-		int base_ip = sloth.to_abs(3*sCELL, 0);
+		int base_ip = sloth.to_abs(3*sCELL);
 		sloth.set(3*sCELL, 10*sCELL);
 
 		// Case 0: TOS is 0 (should branch)
@@ -1264,33 +1264,33 @@ public class SlothTest {
 	@Test
 	public void test_string_() {
 		sloth.set(100, 5);
-		sloth.ip = sloth.to_abs(100, 0);
+		sloth.ip = sloth.to_abs(100);
 		sloth._string_();
 		assertEquals(2, sloth.sp);
 		assertEquals(5, sloth.pop());
-		assertEquals(sloth.to_abs(100 + sCELL, 0), sloth.pop());
-		assertEquals(sloth.aligned(sloth.to_abs(100 + sCELL + 5*suCHAR, 0)), sloth.ip);
+		assertEquals(sloth.to_abs(100 + sCELL), sloth.pop());
+		assertEquals(sloth.aligned(sloth.to_abs(100 + sCELL + 5*suCHAR)), sloth.ip);
 	}
 
 	@Test
 	public void test_c_string_() {
-		sloth.c_store(sloth.to_abs(100, 0), (char)5);
-		sloth.ip = sloth.to_abs(100, 0);
+		sloth.c_store(sloth.to_abs(100), (char)5);
+		sloth.ip = sloth.to_abs(100);
 		sloth._c_string_();
 		assertEquals(1, sloth.sp);
-		assertEquals(sloth.to_abs(100, 0), sloth.pop());
-		assertEquals(sloth.aligned(sloth.to_abs(100 + 6*suCHAR, 0)), sloth.ip);
+		assertEquals(sloth.to_abs(100), sloth.pop());
+		assertEquals(sloth.aligned(sloth.to_abs(100 + 6*suCHAR)), sloth.ip);
 	}
 
 	void do_test_move(int b, int a1, int a2, int u, int v1, int v2, int v3) {
-		sloth.push(sloth.to_abs(a1, 0));
-		sloth.push(sloth.to_abs(a2, 0));
+		sloth.push(sloth.to_abs(a1));
+		sloth.push(sloth.to_abs(a2));
 		sloth.push(u);
 		sloth._move_();
 		assertEquals(0, sloth.sp);
-		assertEquals(v1, sloth.b_fetch(sloth.to_abs(b + 0, 0)));
-		assertEquals(v2, sloth.b_fetch(sloth.to_abs(b + 1, 0)));
-		assertEquals(v3, sloth.b_fetch(sloth.to_abs(b + 2, 0)));
+		assertEquals(v1, sloth.b_fetch(sloth.to_abs(b + 0)));
+		assertEquals(v2, sloth.b_fetch(sloth.to_abs(b + 1)));
+		assertEquals(v3, sloth.b_fetch(sloth.to_abs(b + 2)));
 	}
 
 	@Test
@@ -1319,14 +1319,14 @@ public class SlothTest {
 	@Test
 	public void test_searching() {
 		String name = "FIND-ME";
-		int name_addr = sloth.FromString(name);
+		int name_addr = sloth.fromString(name);
 		int w = sloth.header(name_addr, name.length());
 		sloth.set_xt(w, 123);
 
 		String s1 = "find-me";
-		int s1_addr = sloth.FromString(s1);
+		int s1_addr = sloth.fromString(s1);
 		String s2 = "other";
-		int s2_addr = sloth.FromString(s2);
+		int s2_addr = sloth.fromString(s2);
 		assertTrue(sloth.compare(name_addr, name.length(), s1_addr, s1.length()));
 		assertFalse(sloth.compare(name_addr, name.length(), s2_addr, s2.length()));
 
@@ -1370,10 +1370,10 @@ public class SlothTest {
 	@Test
 	public void test_quotation_primitive() {
 		sloth.set(100, 3*sCELL);
-		sloth.ip = sloth.to_abs(100, 0);
+		sloth.ip = sloth.to_abs(100);
 		sloth._quotation_();
-		assertEquals(sloth.to_abs(100 + 4*sCELL, 0), sloth.ip);
-		assertEquals(sloth.to_abs(100 + sCELL, 0), sloth.pop());
+		assertEquals(sloth.to_abs(100 + 4*sCELL), sloth.ip);
+		assertEquals(sloth.to_abs(100 + sCELL), sloth.pop());
 	}
 
 	@Test
@@ -1381,11 +1381,11 @@ public class SlothTest {
 		sloth.code("(QUOTATION)", 111);
 
 		int here = sloth.here();
-		sloth.user_set(Sloth.SLOTH_STATE, 0);
+		sloth.user_set(Sloth.STATE, 0);
 		sloth._start_quotation_();
 		assertEquals(111, sloth.fetch(here));
 		assertEquals(0, sloth.fetch(here + sCELL));
-		assertEquals(-1, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(-1, sloth.user_get(Sloth.STATE));
 		assertEquals(3, sloth.sp);
 		assertEquals(here + sCELL, sloth.pop());
 		assertEquals(0, sloth.pop());
@@ -1397,14 +1397,14 @@ public class SlothTest {
 		sloth.code("(QUOTATION)", 111);
 
 		int here = sloth.here();
-		sloth.user_set(Sloth.SLOTH_STATE, 0);
+		sloth.user_set(Sloth.STATE, 0);
 		sloth._start_quotation_();
 		sloth._start_quotation_();
 		assertEquals(111, sloth.fetch(here));
 		assertEquals(0, sloth.fetch(here + sCELL));
 		assertEquals(111, sloth.fetch(here + 2*sCELL));
 		assertEquals(0, sloth.fetch(here + 3*sCELL));
-		assertEquals(-2, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(-2, sloth.user_get(Sloth.STATE));
 		assertEquals(5, sloth.sp);
 		assertEquals(here + 3*sCELL, sloth.pop());
 		assertEquals(here + 2*sCELL, sloth.pop());
@@ -1418,11 +1418,11 @@ public class SlothTest {
 		sloth.code("(QUOTATION)", 111);
 
 		int here = sloth.here();
-		sloth.user_set(Sloth.SLOTH_STATE, 1);
+		sloth.user_set(Sloth.STATE, 1);
 		sloth._start_quotation_();
 		assertEquals(111, sloth.fetch(here));
 		assertEquals(0, sloth.fetch(here + sCELL));
-		assertEquals(2, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(2, sloth.user_get(Sloth.STATE));
 		assertEquals(2, sloth.sp);
 		assertEquals(here + sCELL, sloth.pop());
 		assertEquals(0, sloth.pop());
@@ -1433,14 +1433,14 @@ public class SlothTest {
 		sloth.code("(QUOTATION)", 111);
 
 		int here = sloth.here();
-		sloth.user_set(Sloth.SLOTH_STATE, 1);
+		sloth.user_set(Sloth.STATE, 1);
 		sloth._start_quotation_();
 		sloth._start_quotation_();
 		assertEquals(111, sloth.fetch(here));
 		assertEquals(0, sloth.fetch(here + sCELL));
 		assertEquals(111, sloth.fetch(here + 2*sCELL));
 		assertEquals(0, sloth.fetch(here + 3*sCELL));
-		assertEquals(3, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(3, sloth.user_get(Sloth.STATE));
 		assertEquals(4, sloth.sp);
 		assertEquals(here + 3*sCELL, sloth.pop());
 		assertEquals(here + 2*sCELL, sloth.pop());
@@ -1454,14 +1454,14 @@ public class SlothTest {
 		sloth.code("EXIT", 222);
 
 		int here = sloth.here();
-		sloth.user_set(Sloth.SLOTH_STATE, 0);
+		sloth.user_set(Sloth.STATE, 0);
 		sloth._start_quotation_();
 		sloth._end_quotation_();
 
 		assertEquals(111, sloth.fetch(here));
 		assertEquals(sCELL, sloth.fetch(here + sCELL));
 		assertEquals(222, sloth.fetch(here + 2*sCELL));
-		assertEquals(0, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(0, sloth.user_get(Sloth.STATE));
 		assertEquals(1, sloth.sp);
 		assertEquals(here + 2*sCELL, sloth.pop());
 	}
@@ -1472,7 +1472,7 @@ public class SlothTest {
 		sloth.code("EXIT", 222);
 
 		int here = sloth.here();
-		sloth.user_set(Sloth.SLOTH_STATE, 0);
+		sloth.user_set(Sloth.STATE, 0);
 		sloth._start_quotation_();
 		sloth._start_quotation_();
 		sloth._end_quotation_();
@@ -1480,7 +1480,7 @@ public class SlothTest {
 		assertEquals(111, sloth.fetch(here));
 		assertEquals(sCELL, sloth.fetch(here + 3*sCELL));
 		assertEquals(222, sloth.fetch(here + 4*sCELL));
-		assertEquals(-1, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(-1, sloth.user_get(Sloth.STATE));
 		assertEquals(3, sloth.sp);
 		assertEquals(here + sCELL, sloth.pop());
 		assertEquals(0, sloth.pop());
@@ -1493,14 +1493,14 @@ public class SlothTest {
 		sloth.code("EXIT", 222);
 
 		int here = sloth.here();
-		sloth.user_set(Sloth.SLOTH_STATE, 1);
+		sloth.user_set(Sloth.STATE, 1);
 		sloth._start_quotation_();
 		sloth._end_quotation_();
 
 		assertEquals(111, sloth.fetch(here));
 		assertEquals(sCELL, sloth.fetch(here + sCELL));
 		assertEquals(222, sloth.fetch(here + 2*sCELL));
-		assertEquals(1, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(1, sloth.user_get(Sloth.STATE));
 		assertEquals(0, sloth.sp);
 	}
 
@@ -1510,7 +1510,7 @@ public class SlothTest {
 		sloth.code("EXIT", 222);
 
 		int here = sloth.here();
-		sloth.user_set(Sloth.SLOTH_STATE, 1);
+		sloth.user_set(Sloth.STATE, 1);
 		sloth._start_quotation_();
 		sloth._start_quotation_();
 		sloth._end_quotation_();
@@ -1519,7 +1519,7 @@ public class SlothTest {
 		assertEquals(111, sloth.fetch(here));
 		assertEquals(sCELL, sloth.fetch(here + 3*sCELL));
 		assertEquals(222, sloth.fetch(here + 4*sCELL));
-		assertEquals(1, sloth.user_get(Sloth.SLOTH_STATE));
+		assertEquals(1, sloth.user_get(Sloth.STATE));
 		assertEquals(0, sloth.sp);
 	}
 
@@ -1532,9 +1532,9 @@ public class SlothTest {
 		sloth.code("(LIT)", 222);
 		sloth.user_variable("TEST-VAR", 8, 13);
 		assertEquals(111, sloth.fetch(sloth.here() - sCELL));
-		assertEquals(sloth.to_abs(8, 1), sloth.fetch(sloth.here() - 2*sCELL));
+		assertEquals(sloth.to_abs(8, sloth.u), sloth.fetch(sloth.here() - 2*sCELL));
 		assertEquals(222, sloth.fetch(sloth.here() - 3*sCELL));
-		assertEquals(13, sloth.fetch(sloth.to_abs(8, 1)));
+		assertEquals(13, sloth.fetch(sloth.to_abs(8, sloth.u)));
 	}
 
 	/* Source code preprocessing, interpreting & auditing commands */
@@ -1616,18 +1616,18 @@ public class SlothTest {
 		sloth.o.put(buf_idx, ByteBuffer.allocate(16));
 		int buf = sloth.to_abs(0, buf_idx);
 
-		sloth.user_set(Sloth.SLOTH_SOURCE_ID, -1);
+		sloth.user_set(Sloth.SOURCE_ID, -1);
 		sloth._refill_();
 		assertEquals(1, sloth.sp);
 		assertEquals(0, sloth.pop());
 
-		int ibuf = sloth.user_get(Sloth.SLOTH_IBUF);
+		int ibuf = sloth.user_get(Sloth.IBUF);
 		sloth.code("ACCEPT", sloth.primitive((vm) -> my_accept(vm)));
-		sloth.user_set(Sloth.SLOTH_SOURCE_ID, 0);
+		sloth.user_set(Sloth.SOURCE_ID, 0);
 		sloth._refill_();
-		assertEquals(ibuf, sloth.user_get(Sloth.SLOTH_IBUF));
-		assertEquals(15, sloth.user_get(Sloth.SLOTH_ILEN));
-		assertEquals(0, sloth.user_get(Sloth.SLOTH_IPOS));
+		assertEquals(ibuf, sloth.user_get(Sloth.IBUF));
+		assertEquals(15, sloth.user_get(Sloth.ILEN));
+		assertEquals(0, sloth.user_get(Sloth.IPOS));
 	}
 
 	@Test
@@ -1642,24 +1642,24 @@ public class SlothTest {
 			int file_idx = sloth.op++;
 			sloth.o.put(file_idx, raf);
 
-			sloth.user_set(Sloth.SLOTH_IBUF, buf);
-			sloth.user_set(Sloth.SLOTH_IPOS, 0);
-			sloth.user_set(Sloth.SLOTH_ILEN, 1024);
+			sloth.user_set(Sloth.IBUF, buf);
+			sloth.user_set(Sloth.IPOS, 0);
+			sloth.user_set(Sloth.ILEN, 1024);
 
 			raf.writeBytes("abc\ndefg");
 
 			raf.seek(0);
 
-			sloth.user_set(Sloth.SLOTH_SOURCE_ID, file_idx);
+			sloth.user_set(Sloth.SOURCE_ID, file_idx);
 
 			sloth._refill_();
 
 			assertEquals(1, sloth.sp);
 			assertEquals(-1, sloth.pop());
 
-			assertEquals(0, sloth.user_get(Sloth.SLOTH_IPOS));
-			assertEquals(3, sloth.user_get(Sloth.SLOTH_ILEN));
-			assertEquals("abc", sloth.ToString(sloth.user_get(Sloth.SLOTH_IBUF), 3));
+			assertEquals(0, sloth.user_get(Sloth.IPOS));
+			assertEquals(3, sloth.user_get(Sloth.ILEN));
+			assertEquals("abc", sloth.toString(sloth.user_get(Sloth.IBUF), 3));
 
 			sloth.push(file_idx);
 			sloth._file_position_();
@@ -1670,9 +1670,9 @@ public class SlothTest {
 			sloth._refill_();
 			assertEquals(-1, sloth.pop());
 
-			assertEquals(0, sloth.user_get(Sloth.SLOTH_IPOS));
-			assertEquals(4, sloth.user_get(Sloth.SLOTH_ILEN));
-			assertEquals("defg", sloth.ToString(sloth.user_get(Sloth.SLOTH_IBUF), 4));
+			assertEquals(0, sloth.user_get(Sloth.IPOS));
+			assertEquals(4, sloth.user_get(Sloth.ILEN));
+			assertEquals("defg", sloth.toString(sloth.user_get(Sloth.IBUF), 4));
 
 			sloth.push(file_idx);
 			sloth._file_position_();
@@ -1711,40 +1711,40 @@ public class SlothTest {
 		sloth.o.put(path_idx, ByteBuffer.allocate(256));
 		int path = sloth.to_abs(0, path_idx);
 
-		sloth.user_set(Sloth.SLOTH_PATH_START, path);
-		sloth.user_set(Sloth.SLOTH_PATH_END, path);
+		sloth.user_set(Sloth.PATH_START, path);
+		sloth.user_set(Sloth.PATH_END, path);
 
 		String tmppath = write_temp_file("line one\nline two");
 
-		sloth.user_set(Sloth.SLOTH_INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
+		sloth.user_set(Sloth.INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
 		interpret_calls = 0;
 
-		int saved_incl = sloth.user_get(Sloth.SLOTH_INCLUDED_FILES);
+		int saved_incl = sloth.user_get(Sloth.INCLUDED_FILES);
 
-		int ibuf = sloth.user_get(Sloth.SLOTH_IBUF);
-		int ipos = sloth.user_get(Sloth.SLOTH_IPOS);
-		int ilen = sloth.user_get(Sloth.SLOTH_ILEN);
-		int source = sloth.user_get(Sloth.SLOTH_SOURCE_ID);
-		int source_pos = sloth.user_get(Sloth.SLOTH_SOURCE_POS);
+		int ibuf = sloth.user_get(Sloth.IBUF);
+		int ipos = sloth.user_get(Sloth.IPOS);
+		int ilen = sloth.user_get(Sloth.ILEN);
+		int source = sloth.user_get(Sloth.SOURCE_ID);
+		int source_pos = sloth.user_get(Sloth.SOURCE_POS);
 
-		sloth.push(sloth.FromString(tmppath));
+		sloth.push(sloth.fromString(tmppath));
 		sloth.push(tmppath.length());
 		sloth._included_();
 
 		assertEquals(0, sloth.sp);
 		assertEquals(2, interpret_calls);
 
-		assertEquals(source_pos, sloth.user_get(Sloth.SLOTH_SOURCE_POS));
-		assertEquals(source, sloth.user_get(Sloth.SLOTH_SOURCE_ID));
-		assertEquals(ilen, sloth.user_get(Sloth.SLOTH_ILEN));
-		assertEquals(ipos, sloth.user_get(Sloth.SLOTH_IPOS));
-		assertEquals(ibuf, sloth.user_get(Sloth.SLOTH_IBUF));
+		assertEquals(source_pos, sloth.user_get(Sloth.SOURCE_POS));
+		assertEquals(source, sloth.user_get(Sloth.SOURCE_ID));
+		assertEquals(ilen, sloth.user_get(Sloth.ILEN));
+		assertEquals(ipos, sloth.user_get(Sloth.IPOS));
+		assertEquals(ibuf, sloth.user_get(Sloth.IBUF));
 
 		/* A new entry must have been prepended to INCLUDED_FILES */
-		int new_head = sloth.user_get(Sloth.SLOTH_INCLUDED_FILES);
+		int new_head = sloth.user_get(Sloth.INCLUDED_FILES);
 		assertNotEquals(saved_incl, new_head);
 		assertEquals(tmppath.length(), sloth.fetch(new_head + sCELL));
-		assertEquals(tmppath, sloth.ToString(new_head + 2*sCELL, tmppath.length()));
+		assertEquals(tmppath, sloth.toString(new_head + 2*sCELL, tmppath.length()));
 	}
 
 	@Test
@@ -1753,12 +1753,12 @@ public class SlothTest {
 		sloth.o.put(path_idx, ByteBuffer.allocate(256));
 		int path = sloth.to_abs(0, path_idx);
 
-		sloth.user_set(Sloth.SLOTH_PATH_START, path);
-		sloth.user_set(Sloth.SLOTH_PATH_END, path);
+		sloth.user_set(Sloth.PATH_START, path);
+		sloth.user_set(Sloth.PATH_END, path);
 
 		int throw_prim = sloth.primitive((vm) -> vm._included_());		
 		String missing = "sloth_test_no_such_file.4th";
-		sloth.push(sloth.FromString(missing));
+		sloth.push(sloth.fromString(missing));
 		sloth.push(missing.length());
 		sloth.push(throw_prim);
 		sloth._catch_();
@@ -1771,12 +1771,12 @@ public class SlothTest {
 
 	@Test
 	public void test_included_relative_path() {
-		sloth.user_set(Sloth.SLOTH_INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
-		sloth.user_set(Sloth.SLOTH_ROOT_PATH_LENGTH, 0);
+		sloth.user_set(Sloth.INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
+		sloth.user_set(Sloth.ROOT_PATH_LENGTH, 0);
 		interpret_calls = 0;
 
 		String tmpfile = write_temp_file("line one\nline two");
-		int tmppath = sloth.FromString(tmpfile);
+		int tmppath = sloth.fromString(tmpfile);
 
 		// Split tmppath into directory and filename
 		int sep = tmpfile.lastIndexOf(System.getProperty("file.separator"));
@@ -1787,10 +1787,10 @@ public class SlothTest {
 
 		// Simulate a previous include having set PATH_START/PATH_END
 		// to the directory containing our temp file
-		int path = sloth.FromString(tmpfile.substring(0, dirlen));
+		int path = sloth.fromString(tmpfile.substring(0, dirlen));
 
-		sloth.user_set(Sloth.SLOTH_PATH_START, path);
-		sloth.user_set(Sloth.SLOTH_PATH_END, path + (dirlen*suCHAR));
+		sloth.user_set(Sloth.PATH_START, path);
+		sloth.user_set(Sloth.PATH_END, path + (dirlen*suCHAR));
 
 		// Push only the filename (no directory)
 		sloth.push(filename);
@@ -1800,16 +1800,16 @@ public class SlothTest {
 		assertEquals(0, sloth.sp);
 		assertEquals(2, interpret_calls);
 
-		int ibuf = sloth.user_get(Sloth.SLOTH_IBUF);
-		int ipos = sloth.user_get(Sloth.SLOTH_IPOS);
-		int ilen = sloth.user_get(Sloth.SLOTH_ILEN);
-		int source = sloth.user_get(Sloth.SLOTH_SOURCE_ID);
-		int source_pos = sloth.user_get(Sloth.SLOTH_SOURCE_POS);
+		int ibuf = sloth.user_get(Sloth.IBUF);
+		int ipos = sloth.user_get(Sloth.IPOS);
+		int ilen = sloth.user_get(Sloth.ILEN);
+		int source = sloth.user_get(Sloth.SOURCE_ID);
+		int source_pos = sloth.user_get(Sloth.SOURCE_POS);
 	} 
 
 	@Test
 	public void test_included_root_path() {
-		sloth.user_set(Sloth.SLOTH_INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
+		sloth.user_set(Sloth.INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
 		interpret_calls = 0;
 
 		String tmppath = write_temp_file("line one\nline two");
@@ -1819,14 +1819,14 @@ public class SlothTest {
 		assertNotEquals(0, sep);
 		int dirlen = sep + 1;
 
-		// Put the temp file's directory into SLOTH_PATHS as the root
+		// Put the temp file's directory into PATHS as the root
 		// PATH_START/PATH_END point to an empty path so the first two
 		// strategies (absolute and relative-to-previous) both fail
-		int paths = sloth.FromString(tmppath);
-		sloth.user_set(Sloth.SLOTH_PATHS, paths);
-		sloth.user_set(Sloth.SLOTH_ROOT_PATH_LENGTH, dirlen);
-		sloth.user_set(Sloth.SLOTH_PATH_START, paths + dirlen*suCHAR);
-		sloth.user_set(Sloth.SLOTH_PATH_END, paths + dirlen*suCHAR);
+		int paths = sloth.fromString(tmppath);
+		sloth.user_set(Sloth.PATHS, paths);
+		sloth.user_set(Sloth.ROOT_PATH_LENGTH, dirlen);
+		sloth.user_set(Sloth.PATH_START, paths + dirlen*suCHAR);
+		sloth.user_set(Sloth.PATH_END, paths + dirlen*suCHAR);
 		int filename = paths + dirlen*suCHAR;
 		int filelen = tmppath.length() - dirlen;
 
@@ -1847,24 +1847,24 @@ public class SlothTest {
 
 	@Test
 	public void test_included_and_refill() {
-		sloth.user_set(Sloth.SLOTH_INTERPRET, sloth.primitive((vm) -> refill_interpret(vm)));
+		sloth.user_set(Sloth.INTERPRET, sloth.primitive((vm) -> refill_interpret(vm)));
 		interpret_calls = 0;
 
 		String tmpfile = write_temp_file("line one\nline two\nline three\nline four");
-		int tmppath = sloth.FromString(tmpfile);
+		int tmppath = sloth.fromString(tmpfile);
 
 		// Set PATH_START and PATH_END variables to an empty buffer
-		int path_buf = sloth.FromString(" ".repeat(260));
-		sloth.user_set(Sloth.SLOTH_PATH_START, path_buf);
-		sloth.user_set(Sloth.SLOTH_PATH_END, path_buf);
+		int path_buf = sloth.fromString(" ".repeat(260));
+		sloth.user_set(Sloth.PATH_START, path_buf);
+		sloth.user_set(Sloth.PATH_END, path_buf);
 
-		int saved_incl = sloth.user_get(Sloth.SLOTH_INCLUDED_FILES);		
+		int saved_incl = sloth.user_get(Sloth.INCLUDED_FILES);		
 	
-		int ibuf = sloth.user_get(Sloth.SLOTH_IBUF);
-		int ipos = sloth.user_get(Sloth.SLOTH_IPOS);
-		int ilen = sloth.user_get(Sloth.SLOTH_ILEN);
-		int source = sloth.user_get(Sloth.SLOTH_SOURCE_ID);
-		int source_pos = sloth.user_get(Sloth.SLOTH_SOURCE_POS);
+		int ibuf = sloth.user_get(Sloth.IBUF);
+		int ipos = sloth.user_get(Sloth.IPOS);
+		int ilen = sloth.user_get(Sloth.ILEN);
+		int source = sloth.user_get(Sloth.SOURCE_ID);
+		int source_pos = sloth.user_get(Sloth.SOURCE_POS);
 
 		sloth.push(tmppath);
 		sloth.push(tmpfile.length());
@@ -1873,19 +1873,19 @@ public class SlothTest {
 		assertEquals(0, sloth.sp);
 		assertEquals(2, interpret_calls);
 
-		assertEquals(source_pos, sloth.user_get(Sloth.SLOTH_SOURCE_POS));
-		assertEquals(source, sloth.user_get(Sloth.SLOTH_SOURCE_ID));
-		assertEquals(ilen, sloth.user_get(Sloth.SLOTH_ILEN));
-		assertEquals(ipos, sloth.user_get(Sloth.SLOTH_IPOS));
-		assertEquals(ibuf, sloth.user_get(Sloth.SLOTH_IBUF));
+		assertEquals(source_pos, sloth.user_get(Sloth.SOURCE_POS));
+		assertEquals(source, sloth.user_get(Sloth.SOURCE_ID));
+		assertEquals(ilen, sloth.user_get(Sloth.ILEN));
+		assertEquals(ipos, sloth.user_get(Sloth.IPOS));
+		assertEquals(ibuf, sloth.user_get(Sloth.IBUF));
 
 		// A new entry must have been prepended to INCLUDED_FILES
-		int new_head = sloth.user_get(Sloth.SLOTH_INCLUDED_FILES);
+		int new_head = sloth.user_get(Sloth.INCLUDED_FILES);
 		assertNotEquals(saved_incl, new_head);
 		assertEquals(saved_incl, sloth.fetch(new_head));
 		// link to prev
 		assertEquals(tmpfile.length(), sloth.fetch(new_head + sCELL)); // name len
-		assertEquals(tmpfile, sloth.ToString(new_head + 2*sCELL, tmpfile.length())); // name
+		assertEquals(tmpfile, sloth.toString(new_head + 2*sCELL, tmpfile.length())); // name
 	}
 
 	// -- Input/Output and parsing -------------------------
@@ -1948,9 +1948,9 @@ public class SlothTest {
 
 	@Test
 	public void test_source_() {
-		int ibuf = sloth.FromString("TEST");
-		sloth.user_set(Sloth.SLOTH_IBUF, ibuf);
-		sloth.user_set(Sloth.SLOTH_ILEN, 4);
+		int ibuf = sloth.fromString("TEST");
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.ILEN, 4);
 		sloth._source_();
 		assertEquals(2, sloth.sp);
 		assertEquals(4, sloth.pop());
@@ -1959,10 +1959,10 @@ public class SlothTest {
 
 	@Test
 	public void test_word_() {
-		int ibuf = sloth.FromString("Hello world");
-		sloth.user_set(Sloth.SLOTH_IBUF, ibuf);
-		sloth.user_set(Sloth.SLOTH_IPOS, 0);
-		sloth.user_set(Sloth.SLOTH_ILEN, 11);
+		int ibuf = sloth.fromString("Hello world");
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 11);
 		sloth.push(' ');
 		sloth._word_();
 		assertEquals(1, sloth.sp);
@@ -1989,5 +1989,352 @@ public class SlothTest {
 		sloth._word_();
 		assertEquals(1, sloth.sp);
 		assertEquals(0, sloth.c_fetch(sloth.pop()));
+	}
+
+	// -- Outer interpreter --------------------------------
+
+	@Test
+	public void test_interpret_empty() {
+		sloth.user_set(Sloth.IBUF, 0);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 0);
+		sloth._interpret_();
+		assertEquals(0, sloth.sp);
+	}
+
+	@Test
+	public void test_interpret_character_literals_interpret_mode() {
+		int ibuf = sloth.fromString("'a' 'b'");
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 7);
+		sloth._interpret_();
+		assertEquals(2, sloth.sp);
+		assertEquals('b', sloth.pop());
+		assertEquals('a', sloth.pop());
+	}
+
+	@Test
+	public void test_interpret_character_literals_compile_mode() {
+		int ibuf = sloth.fromString("'a' 'b'");
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 7);
+		sloth.user_set(Sloth.STATE, 1);
+		sloth.code("(LIT)", -2);
+		int here = sloth.here();
+		sloth._interpret_();
+		assertEquals(0, sloth.sp);
+		assertEquals('a', sloth.fetch(here + sCELL));
+		assertEquals('b', sloth.fetch(here + 3*sCELL));
+	}
+
+	@Test 
+	public void test_interpret_number_literals_interpret_mode() {
+		int ibuf = sloth.fromString("1 0 37 -560");
+		sloth.user_set(Sloth.BASE, 10);
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 11);
+		sloth._interpret_();
+		assertEquals(4, sloth.sp);
+		assertEquals(-560, sloth.pop());
+		assertEquals(37, sloth.pop());
+		assertEquals(0, sloth.pop());
+		assertEquals(1, sloth.pop());
+
+		ibuf = sloth.fromString("%1111 #15 $f");
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 12);
+		sloth._interpret_();
+		assertEquals(3, sloth.sp);
+		assertEquals(15, sloth.pop());
+		assertEquals(15, sloth.pop());
+		assertEquals(15, sloth.pop());
+	}
+
+	@Test
+	public void test_interpret_number_literals_compile_mode() {
+		int ibuf = sloth.fromString("1 0 37 -560");
+		sloth.user_set(Sloth.BASE, 10);
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 11);
+		sloth.user_set(Sloth.STATE, 1);
+		sloth.code("(LIT)", -2);
+		int here = sloth.here();
+		sloth._interpret_();
+		assertEquals(0, sloth.sp);
+		assertEquals(1, sloth.fetch(here + sCELL));
+		assertEquals(0, sloth.fetch(here + 3*sCELL));
+		assertEquals(37, sloth.fetch(here + 5*sCELL));
+		assertEquals(-560, sloth.fetch(here + 7*sCELL));
+
+		ibuf = sloth.fromString("%1111 #15 $f");
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 12);
+		sloth.user_set(Sloth.STATE, 1);
+		sloth.code("(LIT)", -2);
+		here = sloth.here();
+		sloth._interpret_();
+		assertEquals(0, sloth.sp);
+		assertEquals(15, sloth.fetch(here + sCELL));
+		assertEquals(15, sloth.fetch(here + 3*sCELL));
+		assertEquals(15, sloth.fetch(here + 5*sCELL));
+	}
+
+	// TODO Tests for floating point literals
+	
+	int p1 = 0, p2 = 0;
+	void primitive1(Sloth vm) { p1 = 1; }
+	void primitive2(Sloth vm) { p2 = 1; }
+
+	@Test
+	public void test_interpret_() {
+		int ibuf = sloth.fromString("11 PRIM1 13 PRIM2");
+		sloth.user_set(Sloth.BASE, 10);
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 17);
+		sloth.code("PRIM1", sloth.primitive((vm) -> primitive1(vm)));
+		sloth.code("PRIM2", sloth.primitive((vm) -> primitive2(vm)));
+		sloth._interpret_();
+		assertEquals(2, sloth.sp);
+		assertEquals(13, sloth.pop());
+		assertEquals(11, sloth.pop());
+		assertEquals(1, p1);
+		assertEquals(1, p2);
+	}
+
+	@Test
+	public void test_interpret_compile_mode() {
+		int ibuf = sloth.fromString("11 PRIM1 13 PRIM2");
+		sloth.user_set(Sloth.BASE, 10);
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 17);
+		sloth.user_set(Sloth.STATE, 1);
+		sloth.code("EXIT", -1);
+		sloth.code("(LIT)", -2);
+		sloth.code("PRIM1", -3);
+		sloth.code("PRIM2", -4);
+		int here = sloth.here();
+		sloth._interpret_();
+		assertEquals(0, sloth.sp);
+		assertEquals(-2, sloth.fetch(here + 0*sCELL));
+		assertEquals(11, sloth.fetch(here + 1*sCELL));
+		assertEquals(-3, sloth.fetch(here + 2*sCELL));
+		assertEquals(-2, sloth.fetch(here + 3*sCELL));
+		assertEquals(13, sloth.fetch(here + 4*sCELL));
+		assertEquals(-4, sloth.fetch(here + 5*sCELL));
+	}
+
+	@Test
+	public void test_interpret_immediate_words_compile_mode() {
+		int ibuf = sloth.fromString("11 PRIM1 13 PRIM2");
+		sloth.user_set(Sloth.BASE, 10);
+		sloth.user_set(Sloth.IBUF, ibuf);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 17);
+		sloth.user_set(Sloth.STATE, 1);
+		sloth.code("PRIM1", sloth.primitive((vm) -> primitive1(vm)));
+		sloth._immediate_();
+		sloth.code("(LIT)", -2);
+		sloth.code("PRIM2", -3);
+		int here = sloth.here();
+		sloth._interpret_();
+		assertEquals(0, sloth.sp);
+		assertEquals(-2, sloth.fetch(here + 0*sCELL));
+		assertEquals(11, sloth.fetch(here + 1*sCELL));
+		assertEquals(-2, sloth.fetch(here + 2*sCELL));
+		assertEquals(13, sloth.fetch(here + 3*sCELL));
+		assertEquals(-3, sloth.fetch(here + 4*sCELL));
+		assertEquals(1, p1);
+	}
+
+	// -- Defining words -----------------------------------
+
+	@Test
+	public void test_colon_() {
+		String name = "TEST";
+		int here = sloth.here();
+		sloth.user_set(Sloth.IBUF, sloth.fromString(name));
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 11);
+		sloth._colon_();
+		assertEquals(0, sloth.sp);
+		assertEquals(here, sloth.get_latest());
+		assertEquals(sloth.here(), sloth.user_get(Sloth.LATESTXT));
+		assertEquals(Sloth.HIDDEN, sloth.get_flags(sloth.get_latest()));
+		assertEquals(1, sloth.user_get(Sloth.STATE));
+	}
+
+	@Test
+	public void test_colon_no_name_() {
+		int here = sloth.here();
+		sloth._colon_no_name_();
+		assertEquals(1, sloth.sp);
+		assertEquals(sloth.here(), sloth.user_get(Sloth.LATESTXT));
+		assertEquals(1, sloth.user_get(Sloth.STATE));
+	}
+
+	@Test
+	public void test_semicolon_() {
+		String name = "TEST";
+		int here = sloth.here();
+		sloth.user_set(Sloth.IBUF, sloth.fromString(name));
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 11);
+		sloth._colon_();
+		sloth.code("EXIT", -1);
+		sloth._semicolon_();
+		assertEquals(0, sloth.sp);
+		assertEquals(0, sloth.user_get(Sloth.STATE));
+	}
+
+	@Test
+	public void test_recurse_() {
+		int here = sloth.here();
+		sloth.user_set(Sloth.LATESTXT, 1111);
+		sloth._recurse_();
+		assertEquals(1111, sloth.fetch(here));
+	}
+
+	@Test
+	public void test_immediate_() {
+		int w = sloth.header("IMM-WORD");
+		assertFalse(sloth.has_flag(w, Sloth.IMMEDIATE));
+		sloth._immediate_();
+		assertTrue(sloth.has_flag(w, Sloth.IMMEDIATE));
+	}
+
+	int postpone_p1;
+	void postpone_primitive1(Sloth vm) { postpone_p1 = 1;	}
+
+	@Test
+	public void test_postpone_() {
+		int ibuf1 = sloth.fromString(": TEST IMM-WORD ;");
+		int ibuf2 = sloth.fromString(": TEST POSTPONE IMM-WORD ;");
+		int ibuf3 = sloth.fromString("TEST");
+		sloth.user_set(Sloth.IBUF, ibuf1);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 17);
+		postpone_p1 = 0;
+		sloth.code("EXIT", sloth.primitive((vm) -> vm._exit_()));
+		sloth.code("(LIT)", sloth.primitive((vm) -> vm._lit_()));
+		sloth.code("(RIP)", sloth.primitive((vm) -> vm._rip_()));
+		sloth.code(":", sloth.primitive((vm) -> vm._colon_()));
+		sloth.code(";", sloth.primitive((vm) -> vm._semicolon_()));
+		sloth._immediate_();
+		sloth.code("COMPILE,", sloth.primitive((vm) -> vm._compile_comma_()));
+		sloth.code("POSTPONE", sloth.primitive((vm) -> vm._postpone_()));
+		sloth._immediate_();
+		sloth.code("IMM-WORD", sloth.primitive((vm) -> postpone_primitive1(vm)));
+		sloth._immediate_();
+		sloth._interpret_();
+		assertEquals(0, sloth.sp);
+		assertEquals(1, postpone_p1);
+
+		// Test that IMM-WORD is not executed when POSTPONEd
+		sloth.user_set(Sloth.IBUF, ibuf2);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 26);
+		postpone_p1 = 0;
+		sloth._interpret_();
+		assertEquals(0, sloth.sp);
+		assertEquals(0, postpone_p1);
+
+		// Test that IMM-WORD was compiled when POSTPONEd
+		sloth.user_set(Sloth.IBUF, ibuf3);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 4);
+		sloth._interpret_();
+		assertEquals(0, sloth.sp);
+		assertEquals(1, postpone_p1);
+	}
+
+	@Test
+	public void test_compile_comma_() {
+		int here = sloth.here();
+		sloth.push(123);
+		sloth._compile_comma_();
+		assertEquals(0, sloth.sp);
+		assertEquals(123, sloth.fetch(here));
+	}
+
+	@Test
+	public void test_create_() {
+		int name = sloth.fromString("TEST");
+		sloth.user_set(Sloth.IBUF, name);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 4);
+		sloth.code("(RIP)", -2);
+		sloth.code("EXIT", -1);
+		int here = sloth.here();
+		sloth._create_();
+		assertEquals(0, sloth.sp);
+		int xt = sloth.fetch(here + sCELL);
+		assertEquals(-2, sloth.fetch(xt));
+		assertEquals(4*sCELL, sloth.fetch(xt+sCELL));
+		assertEquals(-1, sloth.fetch(xt+2*sCELL));
+		assertEquals(-1, sloth.fetch(xt+3*sCELL));
+	}
+
+	@Test
+	public void test_do_does_() {
+		int name = sloth.fromString("TEST");
+		sloth.user_set(Sloth.IBUF, name);
+		sloth.user_set(Sloth.IPOS, 0);
+		sloth.user_set(Sloth.ILEN, 4);
+		sloth.code("(RIP)", -2);
+		sloth.code("EXIT", -1);
+		int here = sloth.here();
+		sloth._create_();
+		int xt = sloth.fetch(here + sCELL);
+		assertEquals(-1, sloth.fetch(xt+2*sCELL));
+		sloth.push(13);
+		sloth._do_does_();
+		assertEquals(13, sloth.fetch(xt+2*sCELL));
+	}
+
+	@Test
+	public void test_does_() {
+		sloth.code("(LIT)", -3);
+		sloth.code("(DOES)", -2);
+		sloth.code("EXIT", -1);
+		int here = sloth.here();
+		sloth._does_();
+		assertEquals(0, sloth.sp);
+		assertEquals(-3, sloth.fetch(here));
+		assertEquals(here + 4*sCELL, sloth.fetch(here+sCELL));
+		assertEquals(-2, sloth.fetch(here+2*sCELL));
+		assertEquals(-1, sloth.fetch(here+3*sCELL));
+	}
+
+	@Test
+	public void test_evaluate_() {
+		int buf = sloth.fromString("11 12 +");
+		sloth.user_set(Sloth.BASE, 10);
+		sloth.push(buf);
+		sloth.push(7);
+		sloth.code("+", sloth.primitive((vm) -> vm._plus_()));
+		sloth.user_set(Sloth.INTERPRET, sloth.primitive((vm) -> vm._interpret_()));
+		sloth._evaluate_();
+		assertEquals(1, sloth.sp);
+		assertEquals(23, sloth.pop());
+	}
+
+	int p0;
+	void primitive0(Sloth vm) { p0 = 1; }
+
+	@Test
+	public void test_execute_() {
+		p0 = 0;
+		sloth.push(sloth.primitive((vm) -> primitive0(vm)));
+		sloth._execute_();
+		assertEquals(0, sloth.sp);
+		assertEquals(1, p0);
 	}
 }

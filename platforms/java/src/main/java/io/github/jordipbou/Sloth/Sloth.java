@@ -56,48 +56,48 @@ public class Sloth {
 
 	/* TODO CBuffer could be just another space of the normal */
 	/* strings circular buffer. */
-	public static final int SLOTH_CBUF = 64;
+	public static final int CBUF = 64;
 
 	/* -- Dictionary variables ----------------------------- */
 
-	public static final int SLOTH_HERE = 0;
-	public static final int SLOTH_INTERNAL_WL = 1*sCELL;
-	public static final int SLOTH_FORTH_WL = 2*sCELL;
+	public static final int HERE = 0;
+	public static final int INTERNAL_WL = 1*sCELL;
+	public static final int FORTH_WL = 2*sCELL;
 
 	/* -- User area variables and buffers ------------------ */
 	
-	public static final int SLOTH_CURRENT = 0*sCELL;
-	public static final int SLOTH_ORDER = 1*sCELL;
-	public static final int SLOTH_LOCALS_WORDLIST = 2*sCELL;
-	public static final int SLOTH_CONTEXT = 3*sCELL;
+	public static final int CURRENT = 0*sCELL;
+	public static final int ORDER = 1*sCELL;
+	public static final int LOCALS_WORDLIST = 2*sCELL;
+	public static final int CONTEXT = 3*sCELL;
 	/* There are 16 CELLS reserved to search order */
-	public static final int SLOTH_BASE = 19*sCELL;
-	public static final int SLOTH_STATE = 20*sCELL;
-	public static final int SLOTH_IBUF = 21*sCELL;
-	public static final int SLOTH_IPOS = 22*sCELL;
-	public static final int SLOTH_ILEN = 23*sCELL;
-	public static final int SLOTH_SOURCE_ID = 24*sCELL;
-	public static final int SLOTH_SOURCE_POS = 25*sCELL;
-	public static final int SLOTH_LATESTXT = 26*sCELL;
-	public static final int SLOTH_INTERPRET = 27*sCELL;
+	public static final int BASE = 19*sCELL;
+	public static final int STATE = 20*sCELL;
+	public static final int IBUF = 21*sCELL;
+	public static final int IPOS = 22*sCELL;
+	public static final int ILEN = 23*sCELL;
+	public static final int SOURCE_ID = 24*sCELL;
+	public static final int SOURCE_POS = 25*sCELL;
+	public static final int LATESTXT = 26*sCELL;
+	public static final int INTERPRET = 27*sCELL;
 	
-	public static final int SLOTH_ROOT_PATH_LENGTH = 28*sCELL;
-	public static final int SLOTH_PATH_START = 29*sCELL;
-	public static final int SLOTH_PATH_END = 30*sCELL;
+	public static final int ROOT_PATH_LENGTH = 28*sCELL;
+	public static final int PATH_START = 29*sCELL;
+	public static final int PATH_END = 30*sCELL;
 	/* Continuous space to store path strings */
-	public static final int SLOTH_PATHS = 31*sCELL;
+	public static final int PATHS = 31*sCELL;
 	
-	/* Space between SLOTH_PATHS and SLOTH_INCLUDED_FILES */
+	/* Space between PATHS and INCLUDED_FILES */
 	/* reserved to store paths. */
 	
-	public static final int SLOTH_INCLUDED_FILES = 95*sCELL;
+	public static final int INCLUDED_FILES = 95*sCELL;
 	
-	public static final int SLOTH_LAST_USER_VAR = 96*sCELL;
+	public static final int LAST_USER_VAR = 96*sCELL;
 	
 	/* -- Flags for word status ---------------------------- */
 	
-	public static final int SLOTH_HIDDEN = 1;
-	public static final int SLOTH_IMMEDIATE = 2;
+	public static final int HIDDEN = 1;
+	public static final int IMMEDIATE = 2;
 
 	/* -- Context initialization -------------------------- */
 
@@ -115,10 +115,8 @@ public class Sloth {
 		p = new ArrayList<Consumer<Sloth>>();
 		o = new HashMap<Integer, Object>();
 		op = 0;
-		o.put(op++, ByteBuffer.allocate(dsize));
-		d = 0;
-		o.put(op++, ByteBuffer.allocate(usize));
-		u = 1;
+		d = putObject(ByteBuffer.allocate(dsize));
+		u = putObject(ByteBuffer.allocate(usize));
 
 		// Circular buffer for storing Java strings
 		// that need to be converted to Forth strings
@@ -132,11 +130,11 @@ public class Sloth {
 		((ByteBuffer)(o.get(d))).putInt(2*sCELL, 0);
 
 
-		((ByteBuffer)(o.get(u))).putInt(0*sCELL, to_abs(SLOTH_FORTH_WL, d)); // CURRENT
+		((ByteBuffer)(o.get(u))).putInt(0*sCELL, to_abs(FORTH_WL)); // CURRENT
 		((ByteBuffer)(o.get(u))).putInt(1*sCELL, 2); // #ORDER
 		((ByteBuffer)(o.get(u))).putInt(2*sCELL, 0); // LOCALS-WORDLIST
-		((ByteBuffer)(o.get(u))).putInt(3*sCELL, to_abs(SLOTH_FORTH_WL, d)); // CONTEXT 0
-		((ByteBuffer)(o.get(u))).putInt(4*sCELL, to_abs(SLOTH_INTERNAL_WL, d)); // CONTEXT 
+		((ByteBuffer)(o.get(u))).putInt(3*sCELL, to_abs(FORTH_WL)); // CONTEXT 0
+		((ByteBuffer)(o.get(u))).putInt(4*sCELL, to_abs(INTERNAL_WL)); // CONTEXT 
 }
 
 	// -- Data stack
@@ -191,6 +189,7 @@ public class Sloth {
 	// Convert between absolute and relative addresses
 
 	int to_abs(int a, int b) { return (b << 24) + a; }
+	int to_abs(int a) { return (d << 24) + a; }
 	int to_rel(int a) { return a & 0x00FFFFFF; }
 	ByteBuffer block(int a) { return (ByteBuffer)(o.get(a >> 24)); }
 
@@ -209,7 +208,7 @@ public class Sloth {
 	// Java Strings to it. No need to delete them, this will
 	// act as a circular buffer and overwrite previous strings
 	// as required.
-	int FromString(String s) {
+	int fromString(String s) {
 		ByteBuffer b = (ByteBuffer)(o.get(2));
 		if (b.remaining() / suCHAR < s.length()) b.rewind();
 		int addr = to_abs(b.position(), 2);
@@ -219,10 +218,19 @@ public class Sloth {
 		return addr;
 	}
 
-	String ToString(int a, int l) {
+	String toString(int a, int l) {
 		StringBuffer sb = new StringBuffer();
 		for (int i = 0; i < l; i++) sb.append(c_fetch(a + i*suCHAR));
 		return sb.toString();
+	}
+
+	// Helper to use Java Objects with Sloth API
+
+	int putObject(Object obj) {
+		int idx = op;
+		while (o.containsKey(idx)) { idx = op++; }
+		o.put(idx, obj);
+		return idx;
 	}
 
 	// -- Inner interpreter
@@ -292,63 +300,14 @@ public class Sloth {
 	public void _throw(int v) {
 		if (v != 0) {
 			System.out.printf("EXCEPTION: %d\n", v);
-			System.out.printf("BUFFER: %s\n", ToString(user_get(IBUF), user_get(ILEN)));
-			System.out.printf("TOKEN: %s\n", ToString(user_get(IBUF) + (user_get(IPOS)*suCHAR), user_get(ILEN) - user_get(IPOS)));
+			System.out.printf("BUFFER: %s\n", toString(user_get(IBUF), user_get(ILEN)));
+			System.out.printf("TOKEN: %s\n", toString(user_get(IBUF) + (user_get(IPOS)*suCHAR), user_get(ILEN) - user_get(IPOS)));
 			throw new SlothException(v); 
 		}
 	}
 
 	// == Forth Kernel
-
-	// Constants 
 	
-	// Displacement of counted string buffer from "here"
-	private static final int CBUF = 64;
-	
-	// Relative addresses of variables accessed both from C
-	// and Forth.
-
-	// Start of dictionary variables
-	
-	private static final int HERE = 0;
-	private static final int INTERNAL_WL = 1*sCELL;
-	private static final int FORTH_WL = 2*sCELL;
-	
-	// User area variables
-	
-	private static final int CURRENT = 0*sCELL;
-	private static final int ORDER = 1*sCELL;
-	private static final int LOCALS_WORDLIST = 2*sCELL;
-	private static final int CONTEXT = 3*sCELL;
-	// Here there are 16 CELLS reserved to search order
-	private static final int BASE = 19*sCELL;
-	private static final int STATE = 20*sCELL;
-	private static final int IBUF = 21*sCELL;
-	private static final int IPOS = 22*sCELL;
-	private static final int ILEN = 23*sCELL;
-	private static final int SOURCE_ID = 24*sCELL;
-	private static final int SOURCE_POS = 25*sCELL;
-	private static final int LATESTXT = 26*sCELL;
-	private static final int INTERPRET = 27*sCELL;
-
-	private static final int ROOT_PATH_LENGTH = 28*sCELL;
-	private static final int PATH_START = 29*sCELL;
-	private static final int PATH_END = 30*sCELL;
-	// Continuous space to store path strings
-	private static final int PATHS = 31*sCELL;
-	
-	// Space between SLOTH_PATHS and SLOTH_INCLUDED_FILES
-	// reserved to store path strings.
-	
-	private static final int INCLUDED_FILES = 95*sCELL;
-	
-	private static final int LAST_USER_VAR = 96*sCELL;
-	
-	// Word statuses
-	
-	private static final char HIDDEN = 1;
-	private static final char IMMEDIATE = 2;
-
 	// -- Helpers
 
 	// Dictionary set/get
@@ -425,6 +384,8 @@ public class Sloth {
 		store(w + sCELL, here());
 		return w;
 	}
+
+	int header(String n) { return header(fromString(n), n.length()); }
 
 	// -- Primitives ----------------------------------------
 
@@ -606,12 +567,12 @@ public class Sloth {
 				push(source_id);
 				_file_position_();
 				pop();
-				user_set(SLOTH_SOURCE_POS, (int)dpop());
+				user_set(SOURCE_POS, (int)dpop());
 
 				/* REFILL can only be called after INCLUDE/INCLUDED */
 				/* that means that the line buffer of _included_ will */
 				/* be used and its size is known and fixed. */
-				push(user_get(SLOTH_IBUF));
+				push(user_get(IBUF));
 				push(1024);
 				push(source_id);
 				_read_line_();
@@ -620,8 +581,8 @@ public class Sloth {
 				int flag = pop();
 
 				if (flag != 0 && ior == 0) {
-					user_set(SLOTH_ILEN, pop());
-					user_set(SLOTH_IPOS, 0);
+					user_set(ILEN, pop());
+					user_set(IPOS, 0);
 					push(-1);
 				} else {
 					pop();
@@ -670,15 +631,15 @@ public class Sloth {
 
 	protected void save_input_and_path() {
 		_save_input_();
-		push(user_get(SLOTH_PATH_START));
-		push(user_get(SLOTH_PATH_END));
+		push(user_get(PATH_START));
+		push(user_get(PATH_END));
 		for (int i = 0; i < 8; i++) _to_r_();
 	}
 	
 	protected void restore_input_and_path() {
 		for (int i = 0; i < 8; i++) _r_from_();
-		user_set(SLOTH_PATH_END, pop());
-		user_set(SLOTH_PATH_START, pop());
+		user_set(PATH_END, pop());
+		user_set(PATH_START, pop());
 		_restore_input_();
 		pop();
 	}
@@ -686,8 +647,8 @@ public class Sloth {
 	protected RandomAccessFile open_included_file(String name) throws IOException {
 		// Variables for working with path, initialized to
 		// reuse current path if possible.
-		int pathstart = user_get(SLOTH_PATH_START);
-		int pathend = user_get(SLOTH_PATH_END);
+		int pathstart = user_get(PATH_START);
+		int pathend = user_get(PATH_END);
 		int path_pos;
 
 		RandomAccessFile f;
@@ -705,13 +666,13 @@ public class Sloth {
 					c_store(pathend + i*suCHAR, name.charAt(i));
 				}
 
-				String rel_path = ToString(pathstart, (pathend - pathstart)/suCHAR + name.length());
+				String rel_path = toString(pathstart, (pathend - pathstart)/suCHAR + name.length());
 				f = new RandomAccessFile(rel_path, "r");
 				pathend = pathend + name.length()*suCHAR;
 			} catch (IOException ie) {
 				try {
 					// Try relative to ROOT path
-					String root_path = ToString(user_get(SLOTH_PATHS), user_get(SLOTH_ROOT_PATH_LENGTH)).concat(name);
+					String root_path = toString(user_get(PATHS), user_get(ROOT_PATH_LENGTH)).concat(name);
 					f = new RandomAccessFile(root_path, "r");
 				} catch (IOException ie2) {
 					throw ie2;
@@ -728,8 +689,8 @@ public class Sloth {
 			pathend -= suCHAR;
 		}
 		// ...and store for nested includes.
-		user_set(SLOTH_PATH_START, pathstart);
-		user_set(SLOTH_PATH_END, pathend);
+		user_set(PATH_START, pathstart);
+		user_set(PATH_END, pathend);
 
 		return f;
 	}
@@ -738,8 +699,8 @@ public class Sloth {
 			/* TODO Check if this file has been included before, */
 			/* and in that case don't add it to the linked list. */
 			int here = here();
-			comma(user_get(SLOTH_INCLUDED_FILES));
-			user_set(SLOTH_INCLUDED_FILES, here);
+			comma(user_get(INCLUDED_FILES));
+			user_set(INCLUDED_FILES, here);
 			comma(name.length());
 			for (int i = 0; i < name.length(); i++) {
 				c_comma(name.charAt(i));
@@ -761,7 +722,7 @@ public class Sloth {
 	public void _included_() {
 		int l = pop();
 		int a = pop();
-		String name = ToString(a, l);
+		String name = toString(a, l);
 
 		save_input_and_path();
 
@@ -773,27 +734,27 @@ public class Sloth {
 
 			int idx = op++;
 			o.put(idx, raf);
-			user_set(SLOTH_SOURCE_ID, idx);
+			user_set(SOURCE_ID, idx);
 
 			int buf_idx = op++;
 			o.put(buf_idx, ByteBuffer.allocate(1024*suCHAR));
 			int buf = to_abs(0, buf_idx);
 
-			user_set(SLOTH_IBUF, buf);
-			user_set(SLOTH_IPOS, 0);
-			user_set(SLOTH_ILEN, 1024);
+			user_set(IBUF, buf);
+			user_set(IPOS, 0);
+			user_set(ILEN, 1024);
 
 			do {
 				_refill_();
 				if (pop() == 0) break;
-				_catch(user_get(SLOTH_INTERPRET));
+				_catch(user_get(INTERPRET));
 				int e = pop();
 				if (e != 0) {
-					int pathstart = user_get(SLOTH_PATH_START);
-					int pathend = user_get(SLOTH_PATH_END);
-					String path = ToString(pathstart, (pathstart - pathend)/suCHAR);
+					int pathstart = user_get(PATH_START);
+					int pathend = user_get(PATH_END);
+					String path = toString(pathstart, (pathstart - pathend)/suCHAR);
 					System.out.printf("File: %s\n", path);
-					System.out.printf("Line (%ld): %s\n", linenumber, ToString(buf, user_get(SLOTH_ILEN)));
+					System.out.printf("Line (%ld): %s\n", linenumber, toString(buf, user_get(ILEN)));
 					_throw(e);
 				}
 				linenumber++;
@@ -851,7 +812,7 @@ public class Sloth {
 
 	// Helper to find words from Java
 	public int find_word(String name) {
-		return search_word(FromString(name), name.length());
+		return search_word(fromString(name), name.length());
 	}
 
 	// -- Outer interpreter
@@ -871,7 +832,6 @@ public class Sloth {
 					compile(pop());
 				}
 			} else {
-				int temp_base = user_get(BASE);
 				pop();
 				if (tlen == 3 
 				 && c_fetch(tok) == '\'' 
@@ -883,6 +843,7 @@ public class Sloth {
 					}
 				} else {
 					boolean is_double = false;
+					int temp_base = user_get(BASE);
 					if (c_fetch(tok) == '#') {
 						temp_base = 10;
 						tlen--;
@@ -929,6 +890,7 @@ public class Sloth {
 	}
 
 	// -- Require words to bootstrap
+
 	void _bye_() { System.out.println(); System.exit(0); }
 	void _unused_() { 
 		push(((ByteBuffer)(o.get(d))).capacity() - here()); 
@@ -1073,6 +1035,9 @@ public class Sloth {
 		user_set(IPOS, 0);
 		user_set(ILEN, l);
 
+		// To ensure that the input buffer is restored correctly
+		// even in case of a throw, I catch any possible throw
+		// here and rethrow it after restoring the input buffer.
 		_catch(user_get(INTERPRET));
 
 		user_set(SOURCE_ID, prevsourceid);
@@ -1123,12 +1088,12 @@ public class Sloth {
 		return 0 - p.size();
 	}
 	int code(String name, int xt) {
-		int w = header(FromString(name), name.length());
+		int w = header(name);
 		set_xt(w, xt);
 		return xt;
 	}
 	void user_variable(String name, int d, int v) {
-		int w = header(FromString(name), name.length());
+		int w = header(name);
 		set_xt(w, here());
 		literal(to_abs(0, u) + d);
 		compile(get_xt(find_word("EXIT")));
@@ -1141,21 +1106,21 @@ public class Sloth {
 
 	void bootstrap_kernel() {
 		// Initialization of dictionary
-		store(to_abs(0, d), to_abs(sCELL, d)); /* HERE */
+		store(to_abs(0), to_abs(sCELL)); /* HERE */
 		comma(0); /* INTERNAL-WORDLIST */
 		comma(0); /* FORTH-WORDLIST */
 		comma(0); /* INCLUDED FILES LINKED LIST */
 		// Initialization of user area
-		store(to_abs(0*sCELL, u), to_abs(FORTH_WL, d)); // CURRENT
+		store(to_abs(0*sCELL, u), to_abs(FORTH_WL)); // CURRENT
 		store(to_abs(1*sCELL, u), 2); // #ORDER
 		store(to_abs(2*sCELL, u), 0); // LOCALS-WORDLIST
-		store(to_abs(3*sCELL, u), to_abs(FORTH_WL, d)); // CONTEXT 0
-		store(to_abs(4*sCELL, u), to_abs(INTERNAL_WL, d)); // CONTEXT 1
+		store(to_abs(3*sCELL, u), to_abs(FORTH_WL)); // CONTEXT 0
+		store(to_abs(4*sCELL, u), to_abs(INTERNAL_WL)); // CONTEXT 1
 		// Basic primitives
 		// EXIT and (LIT) must be defined before using 
 		// user_area_variable
 		code("EXIT", primitive((vm) -> _exit_()));
-		user_set(CURRENT, to_abs(INTERNAL_WL, d));
+		user_set(CURRENT, to_abs(INTERNAL_WL));
 		code("(LIT)", primitive((vm) -> _lit_()));
 
 		// TODO Reorder user area variables to not need changing
@@ -1164,10 +1129,10 @@ public class Sloth {
 		// User Area Variables
 		// NOTE What is stored in (CURRENT) here will affect later
 		// use of hedader
-		user_variable("(CURRENT)", CURRENT, to_abs(FORTH_WL, d));
+		user_variable("(CURRENT)", CURRENT, to_abs(FORTH_WL));
 		user_variable("#ORDER", ORDER, 2);
 		user_variable("(LOCALS-WORDLIST)", LOCALS_WORDLIST, 0);
-		user_variable("CONTEXT", CONTEXT, to_abs(FORTH_WL, d));
+		user_variable("CONTEXT", CONTEXT, to_abs(FORTH_WL));
 		user_variable("BASE", BASE, 10);
 		user_variable("STATE", STATE, 0);
 		user_variable("(IBUF)", IBUF, 0);
@@ -1177,10 +1142,10 @@ public class Sloth {
 		user_variable("(SOURCE-POS)", SOURCE_POS, 0);
 		user_variable("(LATESTXT)", LATESTXT, 0);
 		user_variable("(INTERPRET)", INTERPRET, 0);
-		user_variable("(SLOTH_ROOT_PATH_LENGTH)", ROOT_PATH_LENGTH, 0);
-		user_variable("(SLOTH_PATH_START)", PATH_START, to_abs(PATHS, u));
-		user_variable("(SLOTH_PATH_END)", PATH_END, to_abs(PATHS, u));
-		user_variable("(SLOTH_PATHS)", PATHS, 0);
+		user_variable("(ROOT_PATH_LENGTH)", ROOT_PATH_LENGTH, 0);
+		user_variable("(PATH_START)", PATH_START, to_abs(PATHS, u));
+		user_variable("(PATH_END)", PATH_END, to_abs(PATHS, u));
+		user_variable("(PATHS)", PATHS, 0);
 		user_variable("(INCLUDED-FILES)", INCLUDED_FILES, 0);
 
 		// Primitives
@@ -1193,7 +1158,7 @@ public class Sloth {
 		code("(DOES)", primitive((vm) -> _do_does_()));
 		code("(ENVIRONMENT)", primitive((vm) -> _environment_()));
 
-		user_set(CURRENT, to_abs(FORTH_WL, d));
+		user_set(CURRENT, to_abs(FORTH_WL));
 
 		code("[:", primitive((vm) -> _start_quotation_()));
 		code(";]", primitive((vm) -> _end_quotation_()));
@@ -1265,13 +1230,14 @@ public class Sloth {
 		code("WORD", primitive((vm) -> _word_()));
 		code("FIND", primitive((vm) -> _find_()));
 
-		code("DICT", primitive((vm) -> push(to_abs(d, 0))));
-		code("USER", primitive((vm) -> push(to_abs(u, 0))));
+		code("DICT", primitive((vm) -> push(to_abs(d))));
+		code("USER", primitive((vm) -> push(to_abs(u))));
 		user_set(INTERPRET, primitive((vm) -> _interpret_()));
 		code("(EMPTY-RETURN-STACK)", primitive((vm) -> _empty_rs_()));
 	}
 
 	void repl() {
+		// TODO use putObject?
 		o.put(op++, ByteBuffer.allocate(256));
 		user_set(IBUF, to_abs(0, op - 1));
 		user_set(IPOS, 0);
@@ -1281,6 +1247,7 @@ public class Sloth {
 	}
 
 	void evaluate(String c) {
+		// TODO use putObject ?
 		ByteBuffer buf = ByteBuffer.allocate(256);
 		buf.clear();
 		o.put(op++, buf);
@@ -1293,7 +1260,7 @@ public class Sloth {
 	}
 
 	int include(String f) {
-		push(FromString(f));
+		push(fromString(f));
 		push(f.length());
 		_catch(get_xt(find_word("INCLUDED")));
 		return pop();
@@ -1302,12 +1269,12 @@ public class Sloth {
 	// --
 
 	void set_root_path(String path) {
-		int paths = to_abs(user_get(SLOTH_PATHS), 0);
+		int paths = to_abs(user_get(PATHS));
 		for (int i = 0; i < path.length(); i++) {
 			c_store(paths + i*suCHAR, path.charAt(i));	
 		}
-		user_set(SLOTH_ROOT_PATH_LENGTH, path.length());
-		user_set(SLOTH_PATH_START, paths + path.length()*suCHAR);
-		user_set(SLOTH_PATH_END, paths + path.length()*suCHAR);
+		user_set(ROOT_PATH_LENGTH, path.length());
+		user_set(PATH_START, paths + path.length()*suCHAR);
+		user_set(PATH_END, paths + path.length()*suCHAR);
 	}
 } 
