@@ -226,22 +226,23 @@ INTERNAL-WORDLIST SET-CURRENT
 \ Displacement for Buffers allocated after HERE. 
 \ If HERE moves the buffers addresses are not longer valid.
 
-64
+64 \ Starting address, 64 bytes ahead of HERE,
+   \ no need to multiply by CHAR
 ?CONSTANT (CBUF-DISPLACEMENT)	\ Counted string buffer
 
-128
+(CBUF-DISPLACEMENT) 64 CHARS +
 ?CONSTANT (SBUF-DISPLACEMENT)	\ String buffer
 
 ?VARIABLE (SBUF-POS) \ String buffer cursor position
 0 (SBUF-POS) !
  
 256
-?CONSTANT (SBUF-MAX-LENGTH) \ String buffer max length
+?CONSTANT (SBUF-MAX-LENGTH) \ String buffer max length in chars
 
-384
+(SBUF-DISPLACEMENT) (SBUF-MAX-LENGTH) CHARS +
 ?CONSTANT (NBUF-DISPLACEMENT)	\ Numeric output buffer
 
-416
+(NBUF-DISPLACEMENT) 200 CHARS +
 ?CONSTANT (PAD-DISPLACEMENT)	\ PAD
 
 FORTH-WORDLIST SET-CURRENT
@@ -353,13 +354,13 @@ FORTH-WORDLIST SET-CURRENT
 
 \ -- Platform definition ----------------------------------
 
-?: WIN64? ( -- flag ) -1 (ENVIRONMENT) 0 = ;
-?: WIN32? ( -- flag ) -1 (ENVIRONMENT) 1 = ;
-?: WINDOWS? ( -- flag ) 
-?\		-1 (ENVIRONMENT)
-?\		DUP 0 = SWAP 1 = OR
-?\ ;
-?: LINUX? ( -- flag ) -1 (ENVIRONMENT) 4 = ;
+\ ?: WIN64? ( -- flag ) -1 (ENVIRONMENT) 0 = ;
+\ ?: WIN32? ( -- flag ) -1 (ENVIRONMENT) 1 = ;
+\ ?: WINDOWS? ( -- flag ) 
+\ ?\		-1 (ENVIRONMENT)
+\ ?\		DUP 0 = SWAP 1 = OR
+\ ?\ ;
+\ ?: LINUX? ( -- flag ) -1 (ENVIRONMENT) 4 = ;
 
 \ -- More arithmetic operations ---------------------------
 
@@ -657,26 +658,16 @@ FORTH-WORDLIST SET-CURRENT
 ?\		DROP DROP DROP 
 ?\ ;
 
-?: ERASE ( c-addr n -- ) 0 FILL ;
+?: ERASE ( c-addr n -- ) 1 CHARS / 0 FILL ;
 
 ?: BLANK ( c-addr u -- ) BL FILL ;
 
 \ Implementation from ANS Forth standard comment
 ?: TYPE ( c-addr u -- ) 0 ?DO COUNT EMIT LOOP DROP ;
 
-?: (RETURN-KEY) ( -- n )
-?\		WINDOWS? IF 13 
-?\		ELSE LINUX? IF 10 THEN
-?\		THEN
-?\		POSTPONE LITERAL
-?\ ; IMMEDIATE
-
-?: (DELETE-KEY) ( -- n )
-?\		WINDOWS? IF 8
-?\		ELSE LINUX? IF 127 THEN
-?\		THEN
-?\		POSTPONE LITERAL
-?\ ; IMMEDIATE
+\ TODO Change these to be immediate and write the value on compile
+?: (RETURN-KEY) ( -- n ) -2 (ENVIRONMENT) ;
+?: (DELETE-KEY) ( -- n ) -3 (ENVIRONMENT) ;
 
 ?: ACCEPT ( c-addr +n1 -- +n2 )
 ?\		BOUNDS ( c-addr2 c-addr1 )
@@ -702,6 +693,8 @@ FORTH-WORDLIST SET-CURRENT
 ?\			SPACE ( add one space for clarity )
 ?\		THEN
 ?\		- R> SWAP -
+\ Ensure that ACCEPT returns the number of chars (not bytes)
+?\		1 CHARS /
 ?\ ;
 
 \ -- Numeric output ---------------------------------------
@@ -715,12 +708,13 @@ FORTH-WORDLIST SET-CURRENT
 ?\ CREATE <HOLD 100 CHARS DUP ALLOT <HOLD + CONSTANT HOLD>
    
 ?: <# ( -- ) HOLD> HLD ! ;
-?: HOLD	( c -- ) HLD @ 1- DUP HLD ! C! ;
+?: HOLD	( c -- ) HLD @ 1 CHARS - DUP HLD ! C! ;
+
 ?: # ( d1 -- d2 ) 
 ?\		BASE @ UD/MOD ROT 9 OVER < IF 7 + THEN 48 + HOLD 
 ?\ ;
 ?: #S ( d1 -- d2 ) BEGIN # OVER OVER OR 0= UNTIL ;
-?: #> ( d -- c-addr len ) DROP DROP HLD @ HOLD> OVER - ;
+?: #> ( d -- c-addr len ) DROP DROP HLD @ HOLD> OVER - 1 CHARS / ;
 
    
 ?: SIGN	( n -- ) 0 < IF 45 HOLD THEN ;
@@ -742,7 +736,8 @@ FORTH-WORDLIST SET-CURRENT
 
 \ Taken from SwapForth that indicates taken from standard
 ?: HOLDS ( addr u -- )
-?\		BEGIN DUP WHILE 1- 2DUP + C@ HOLD REPEAT 2DROP
+\ ?\		BEGIN DUP WHILE 1- 2DUP + C@ HOLD REPEAT 2DROP
+?\		BEGIN DUP WHILE 1- 2DUP CHARS + C@ HOLD REPEAT 2DROP
 ?\ ;
 
 \ -- Definitions ------------------------------------------
@@ -913,15 +908,16 @@ FORTH-WORDLIST SET-CURRENT
 
 \ -- CMOVE from strings wordset (required by SLITERAL) ----
 
-\ Implementation taken from SwapForth
+\ Implementation taken from SwapForth, but modified to
+\ use CHARS <> 1
 ?: CMOVE ( c-addr1 c-addr2 u -- )
 ?\		BOUNDS ROT >R
 ?\		BEGIN
 ?\		    2DUP XOR
 ?\		WHILE
 ?\		    R@ C@ OVER C!
-?\		    R> 1+ >R
-?\		    1+
+?\			R> CHAR+ >R
+?\			CHAR+
 ?\		REPEAT
 ?\		R> DROP 2DROP
 ?\ ;
@@ -1099,6 +1095,12 @@ SET-CURRENT
 
 \ == String literals ======================================
 
+\ SLITERAL and CLITERAL add a 0 to the end of the string
+\ literal to make it more interoperable with the C 
+\ implementation.
+\ Zero end has to be checked always but if the literal
+\ has it there's no need to copy to a temp buffer.
+
 \ -- SLITERAL from strings wordset (required by S") -------
 
 ?: SLITERAL ( c-addr1 u -- ) ( -- c-addr2 u )
@@ -1136,7 +1138,7 @@ SET-CURRENT
 \ as required by the standard.
 ?\			HERE (SBUF-DISPLACEMENT) +
 ?\			OVER (SBUF-MAX-LENGTH) (SBUF-POS) @ - < IF
-?\				(SBUF-POS) @ +
+?\				(SBUF-POS) CHARS @ +
 ?\				OVER (SBUF-POS) @ + (SBUF-POS) !
 ?\			ELSE
 ?\				0 (SBUF-POS) !
@@ -1475,7 +1477,9 @@ DECIMAL
 
 : addchar       \ char string --
 \ *G Add the character to the end of the counted string.
-  tuck count + c!
+\ Modified adding CHARS to correctly manage the cases where
+\ CHAR <> BYTE
+  tuck count CHARS + c!
   1 swap c+!
 ;
 
@@ -1483,7 +1487,9 @@ DECIMAL
 \ *G Add the string described by C-ADDR U to the counted string at
 \ ** $DEST. The strings must not overlap.
   >r
-  tuck  r@ count +  swap cmove          \ add source to end
+\ Modified adding CHARS to correctly manage the cases where
+\ CHAR <> BYTE
+ tuck  r@ count CHARS +  swap cmove    \ add source to end
   r> c+!                                \ add length to count
 ;
 
@@ -1545,7 +1551,9 @@ create CRLF$    \ -- addr ; CR/LF as counted string
     1 /string  crlf$ count r> append  exit
   then
   over c@ [char] a [char] z 1+ within if
-    over c@ [char] a - EscapeTable + c@  r> addchar
+\ Modified adding CHARS to correctly manage the cases where
+\ CHAR <> BYTE
+    over c@ [char] a - CHARS EscapeTable + c@  r> addchar
   else
     over c@ r> addchar
   then
@@ -1603,11 +1611,15 @@ create pocket  \ -- addr
 \    This would normally be an internal system buffer.
 
 s" /COUNTED-STRING" environment? 0= [if] 256 [then]
-1 chars + allot
+\ Modified adding CHARS to correctly manage the cases where
+\ CHAR <> BYTE
+CHARS 1 chars + allot
 
 create pocket2
 s" /COUNTED-STRING" environment? 0= [if] 256 [then]
-1 chars + allot
+\ Modified adding CHARS to correctly manage the cases where
+\ CHAR <> BYTE
+CHARS 1 chars + allot
 
 : CHANGE-POCKET ( -- )
 	1 (CURRENT-POCKET) @ - (CURRENT-POCKET) !

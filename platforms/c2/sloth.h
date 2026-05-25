@@ -114,7 +114,7 @@ typedef struct sloth_VM {
 
 /* TODO CBuffer could be just another space of the normal */
 /* strings circular buffer. */
-#define SLOTH_CBUF							64
+#define SLOTH_CBUF							64*suCHAR
 
 /* -- Dictionary variables ----------------------------- */
 

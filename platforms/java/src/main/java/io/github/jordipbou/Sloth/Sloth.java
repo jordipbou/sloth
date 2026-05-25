@@ -1,3 +1,12 @@
+// Ideas:
+// * linenumber in _include_ gets out of phase with real line
+//   numbers if REFILL is called from inside Forth code.
+//   Create a variable LINENUMBER in user area and update it
+//   when doing a REFILL from a FILE. On opening a new file,
+//   just set it to 0.
+// * The main problem seems related to chars = 2 bytes in
+//   ANS code. Ask claude to help there.
+
 package io.github.jordipbou.Sloth;
 
 import java.nio.ByteBuffer;
@@ -9,8 +18,16 @@ import java.io.IOException;
 import java.util.function.Consumer;
 
 public class Sloth {
+	static final int KEY_BACKSPACE;
+	static final int KEY_ENTER;
+	
+	static {
+	    String os = System.getProperty("os.name").toLowerCase();
+	    KEY_BACKSPACE = os.contains("win") ? 8 : 127;
+			KEY_ENTER = os.contains("win") ? 13 : 10;  // \r on Windows, \n on Linux/Mac
+ 	}
 
-	/* -- Virtual Machine constants ------------------------ */
+	// -- Virtual Machine constants ------------------------
 
 	public static final int suCHAR = 2;
 	public static final int sCELL = 4;
@@ -24,10 +41,11 @@ public class Sloth {
 	protected static final int FLOAT_STACK_SIZE = 64;
 	protected static final int OBJECT_STACK_SIZE = 64;
 
-	/* -- Virtual Machine context definition --------------- */
+	// -- Virtual Machine context definition ---------------
 
 	protected int d; // Index of the dictionary in m
 	protected int u; // Index of the user area in m
+	protected int ts; // Index of temporal string area in m
 
 	protected int s[]; // Data stack
 	protected int sp; // Data stack pointer
@@ -38,13 +56,15 @@ public class Sloth {
 
 	protected int ip; // Instruction pointer
 
+	protected int ep; // Exception stack pointer
+
 	protected HashMap<Integer, Object> o; // Indexed map of objects
 	protected int op; // Last index of previous HashMap
 
 	protected ArrayList<Consumer<Sloth>> p; // Array of primitives
 
-	/* This array was created by Gemini for the included */
-	/* implementation, I must re-check it. */
+	// This array was created by Gemini for the included
+	// implementation, I must re-check it.
 	private ArrayList<java.io.RandomAccessFile> openFiles = new ArrayList<>();
 
 	public static final int STACK_OVERFLOW = -3;
@@ -52,25 +72,25 @@ public class Sloth {
 	public static final int RETURN_STACK_OVERFLOW = -5;
 	public static final int RETURN_STACK_UNDERFLOW = -6;
 
-	/* -- Displacement of counted string buffer from here -- */
+	// -- Displacement of counted string buffer from here --
 
-	/* TODO CBuffer could be just another space of the normal */
-	/* strings circular buffer. */
+	// TODO CBuffer could be just another space of the normal
+	// strings circular buffer.
 	public static final int CBUF = 64;
 
-	/* -- Dictionary variables ----------------------------- */
+	// -- Dictionary variables -----------------------------
 
 	public static final int HERE = 0;
 	public static final int INTERNAL_WL = 1*sCELL;
 	public static final int FORTH_WL = 2*sCELL;
 
-	/* -- User area variables and buffers ------------------ */
+	// -- User area variables and buffers ------------------
 	
 	public static final int CURRENT = 0*sCELL;
 	public static final int ORDER = 1*sCELL;
 	public static final int LOCALS_WORDLIST = 2*sCELL;
 	public static final int CONTEXT = 3*sCELL;
-	/* There are 16 CELLS reserved to search order */
+	// There are 16 CELLS reserved to search order
 	public static final int BASE = 19*sCELL;
 	public static final int STATE = 20*sCELL;
 	public static final int IBUF = 21*sCELL;
@@ -84,22 +104,24 @@ public class Sloth {
 	public static final int ROOT_PATH_LENGTH = 28*sCELL;
 	public static final int PATH_START = 29*sCELL;
 	public static final int PATH_END = 30*sCELL;
-	/* Continuous space to store path strings */
+	// Continuous space to store path strings, PATHS is just
+	// an address inside user area, not a value, so it must
+	// be used as to_abs(PATHS, u)
 	public static final int PATHS = 31*sCELL;
 	
-	/* Space between PATHS and INCLUDED_FILES */
-	/* reserved to store paths. */
+	// Space between PATHS and INCLUDED_FILES
+	// reserved to store paths.
 	
 	public static final int INCLUDED_FILES = 95*sCELL;
 	
 	public static final int LAST_USER_VAR = 96*sCELL;
 	
-	/* -- Flags for word status ---------------------------- */
+	// -- Flags for word status ----------------------------
 	
 	public static final int HIDDEN = 1;
 	public static final int IMMEDIATE = 2;
 
-	/* -- Context initialization -------------------------- */
+	// -- Context initialization --------------------------
 
 	public Sloth() { this(524288, 1024); }
 
@@ -112,15 +134,15 @@ public class Sloth {
 		fp = 0;
 
 		ip = -1;
+		ep = 0;
 		p = new ArrayList<Consumer<Sloth>>();
 		o = new HashMap<Integer, Object>();
 		op = 0;
 		d = putObject(ByteBuffer.allocate(dsize));
 		u = putObject(ByteBuffer.allocate(usize));
-
 		// Circular buffer for storing Java strings
 		// that need to be converted to Forth strings
-		o.put(op++, ByteBuffer.allocate(2048));
+		ts = putObject(ByteBuffer.allocate(2048));
 
 		// // Initialize HERE
 		((ByteBuffer)(o.get(d))).putInt(0*sCELL, 3*sCELL);
@@ -209,9 +231,9 @@ public class Sloth {
 	// act as a circular buffer and overwrite previous strings
 	// as required.
 	int fromString(String s) {
-		ByteBuffer b = (ByteBuffer)(o.get(2));
+		ByteBuffer b = (ByteBuffer)(o.get(ts));
 		if (b.remaining() / suCHAR < s.length()) b.rewind();
-		int addr = to_abs(b.position(), 2);
+		int addr = to_abs(b.position(), ts);
 		for (int i = 0; i < s.length(); i++) {
 			b.putChar(s.charAt(i));
 		}
@@ -227,10 +249,15 @@ public class Sloth {
 	// Helper to use Java Objects with Sloth API
 
 	int putObject(Object obj) {
-		int idx = op;
-		while (o.containsKey(idx)) { idx = op++; }
-		o.put(idx, obj);
-		return idx;
+		// Advance op until finding a free slot
+    while (o.containsKey(op)) { op++; }
+    int idx = op++; // Claim this slot and advance op for next time
+    o.put(idx, obj);
+    return idx;
+	}
+
+	void removeObject(int idx) {
+		o.remove(idx);	
 	}
 
 	// -- Inner interpreter
@@ -245,8 +272,34 @@ public class Sloth {
 		if (q < 0) do_prim(q); 
 		else call(q); 
 	}
-	protected void inner() { int t = rp; while (t <= rp && ip >= 0) execute(op()); }
+	protected void inner() { 
+		int t = rp; 
+		while (t <= rp && ip >= 0) {
+			// int inst = op();
+			// System.out.printf("INST: %d %s\n", inst, wordForXT(inst));
+			execute(op()); 
+			// execute(inst);
+		}
+	}
 	public void eval(int q) { execute(q); if (q > 0) inner(); }
+
+	// DEBUGGING
+	protected String wordForXT(int xt) {
+		for (int i = -1; i < user_get(ORDER); i++) {
+			int wl = user_get(CONTEXT + i*sCELL);
+			if (wl != 0) {
+				int w = fetch(wl);
+				while (w > 0) {
+					if (get_xt(w) == xt) {
+						return toString(get_name_addr(w), get_namelen(w));
+					}
+					w = get_link(w);
+				}
+			}
+		}
+		return "[[UNKNOWN WORD]]";
+	
+	}
 
 	// -- Tracing interpreter
 
@@ -258,6 +311,17 @@ public class Sloth {
 			execute(op());
 		}
 	}
+	protected void _debug_() {
+		int post_xt = pop(); 
+		int inner_xt = pop();
+		int pre_xt = pop();
+		int q = pop();
+		debug(pre_xt);
+		execute(q);
+		if (q > 0) debug_inner(inner_xt);
+		debug(post_xt);
+	}
+
 
 	// -- Exceptions
 
@@ -277,6 +341,7 @@ public class Sloth {
 		int tsp = sp;
 		int trp = rp;
 		int tip = ip;
+		ep = ep + 1;
 		try {
 			eval(q);
 			push(0);
@@ -291,17 +356,35 @@ public class Sloth {
 			// environment. Its up to the user to decide if the
 			// exception is sever enough to restart the system.
 			e.printStackTrace();
+			System.out.printf("IP: %d\n", ip);
+			System.out.printf("STACK: <%d> ", sp);
+			for (int i = 0; i < sp; i++) {
+				System.out.printf("%d ", s[i]);
+			}
+			System.out.printf("\nRETURN STACK: <%d> ", rp);
+			for (int i = 0; i < rp; i++) {
+				System.out.printf("%d ", r[i]);
+			}
+			System.out.printf("\n");
 			sp = tsp;
 			rp = trp;
 			push(-1000);
 		}
+		ep = ep - 1;
 	}
 
 	public void _throw(int v) {
+		// TODO In C, when executing the tests the prints do not
+		// appear because there is a CATCH in place. Check how to
+		// do that in Java.
 		if (v != 0) {
-			System.out.printf("EXCEPTION: %d\n", v);
-			System.out.printf("BUFFER: %s\n", toString(user_get(IBUF), user_get(ILEN)));
-			System.out.printf("TOKEN: %s\n", toString(user_get(IBUF) + (user_get(IPOS)*suCHAR), user_get(ILEN) - user_get(IPOS)));
+			// TODO Print only if there is no exception frame
+			// in the exception stack.
+			if (ep == 0) {
+				System.out.printf("EXCEPTION: %d\n", v);
+				System.out.printf("BUFFER: %s\n", toString(user_get(IBUF), user_get(ILEN)));
+				System.out.printf("TOKEN: %s\n", toString(user_get(IBUF) + (user_get(IPOS)*suCHAR), user_get(ILEN) - user_get(IPOS)));
+			}
 			throw new SlothException(v); 
 		}
 	}
@@ -366,9 +449,8 @@ public class Sloth {
 	// Header structure:
 	// Link (CELL) @ NT
 	// XT (CELL) @ NT + sCELL
-	// Wordlist_link (CELL) @ NT + 2*sCELL
-	// Flags (CHAR) @ NT + 3*sCELL
-	// Name_length (CHAR) @ NT + 3*sCELL + suCHAR
+	// Flags (CHAR) @ NT + 2*sCELL
+	// Name_length (CHAR) @ NT + 2*sCELL + suCHAR
 	// Name (CHAR*namelen) @ NT + 2*sCELL + 2*suCHAR
 
 	int header(int n, int l) {
@@ -403,13 +485,13 @@ public class Sloth {
 	void _c_string_() {
 		char l = c_fetch(ip);
 		push(ip);
-		ip = aligned(ip + l*suCHAR + suCHAR);
+		ip = aligned(ip + (l + 2) * suCHAR);
 	}
 	// Quotations (not in ANS Forth yet)
 	void _quotation_() { int d = op(); push(ip); ip += d; }
 	void _start_quotation_() {
-		int s = user_get(STATE);
-		user_set(STATE, s <= 0 ? s - 1 : s + 1);
+		int state = user_get(STATE);
+		user_set(STATE, state <= 0 ? state - 1 : state + 1);
 		if (user_get(STATE) == -1) push(here() + 2*sCELL);
 		push(user_get(LATESTXT));
 		compile(get_xt(find_word("(QUOTATION)")));
@@ -441,11 +523,12 @@ public class Sloth {
 		case 9: break; // TODO MAX-UD
 		case 10: push(RETURN_STACK_SIZE); break; // RETURN-STACK-CELLS
 		case 11: push(STACK_SIZE); break; // STACK-CELLS
-		case 12: push(FLOAT_STACK_SIZE); break; // FLOATING-STACK
+		case 12: push(-1); break; // push(FLOAT_STACK_SIZE); break; // FLOATING-STACK
 		// Obsolescent queries (required for tests)
 		case 100: push(-1); break;
 		// Non standard queries
-		case -1: push(5); break;
+		case -2: push(KEY_ENTER); break;
+		case -3: push(KEY_BACKSPACE); break;
 		}
 	}
 
@@ -584,6 +667,17 @@ public class Sloth {
 					user_set(ILEN, pop());
 					user_set(IPOS, 0);
 					push(-1);
+					// Uncomment to debug
+					// TODO Add current linenumber as some type of 
+					// variable to be able to access it later
+					// System.out.printf("REFILL: %s ", toString(user_get(IBUF), user_get(ILEN)));
+					// System.out.printf("<%d> ", sp);
+					// for (int i = 0; i < sp; i++) {
+					// 	System.out.printf("%d ", s[i]);
+					// }
+					// System.out.printf("\n");
+					// ---
+
 				} else {
 					pop();
 					push(0);
@@ -649,46 +743,58 @@ public class Sloth {
 		// reuse current path if possible.
 		int pathstart = user_get(PATH_START);
 		int pathend = user_get(PATH_END);
-		int path_pos;
 
 		RandomAccessFile f;
+		String updated_path = "";
 		try {
 			// Absolute or relative to current directory
 			f = new RandomAccessFile(name, "r");
+			updated_path = name;
 			pathstart = pathend;
-			pathend = pathend + name.length()*suCHAR;
 		} catch (IOException e) {
 			try {
-				// Try relative to last directory
-
-				// Copy pathname/filename to end of current path
-				for (int i = 0; i < name.length(); i++) {
-					c_store(pathend + i*suCHAR, name.charAt(i));
-				}
-
-				String rel_path = toString(pathstart, (pathend - pathstart)/suCHAR + name.length());
-				f = new RandomAccessFile(rel_path, "r");
+				// Try relative to last included directory
+				updated_path = name;
+				f = 
+					new RandomAccessFile(
+						toString(
+							pathstart, 
+							(pathend - pathstart)/suCHAR
+						).concat(name)
+					, "r");
 				pathend = pathend + name.length()*suCHAR;
 			} catch (IOException ie) {
 				try {
 					// Try relative to ROOT path
-					String root_path = toString(user_get(PATHS), user_get(ROOT_PATH_LENGTH)).concat(name);
-					f = new RandomAccessFile(root_path, "r");
+					updated_path = 
+						toString(
+							to_abs(PATHS, u), 
+							user_get(ROOT_PATH_LENGTH)
+						).concat(name);
+					f = new RandomAccessFile(updated_path, "r");
 				} catch (IOException ie2) {
 					throw ie2;
 				}
 			}
 		}
 
-		// Remove filename from path
-		while (pathend > pathstart) {
-			if (c_fetch(pathend) == '/' || c_fetch(pathend) == '\\') {
-				pathend += suCHAR;
-				break;
-			}
-			pathend -= suCHAR;
+		// Update path to allow opening files that their paths
+		// are relative to a previous opened file (in a nested way).
+
+		// Remove the filename from the updated path string
+		updated_path = 
+			updated_path.substring(
+				0, 
+				Math.max(
+					updated_path.lastIndexOf('/'), 
+					updated_path.lastIndexOf('\\')
+				) + 1);
+
+		for (int i = 0; i < updated_path.length(); i++) {
+			c_store(pathend + i*suCHAR, updated_path.charAt(i));
 		}
-		// ...and store for nested includes.
+		pathend = pathend + updated_path.length()*suCHAR;
+
 		user_set(PATH_START, pathstart);
 		user_set(PATH_END, pathend);
 
@@ -732,29 +838,42 @@ public class Sloth {
 			int linenumber = 0;
 			add_to_included_files_list(name);
 
-			int idx = op++;
-			o.put(idx, raf);
-			user_set(SOURCE_ID, idx);
-
-			int buf_idx = op++;
-			o.put(buf_idx, ByteBuffer.allocate(1024*suCHAR));
-			int buf = to_abs(0, buf_idx);
-
-			user_set(IBUF, buf);
+			user_set(SOURCE_ID, putObject(raf));
+			int buf_idx = putObject(ByteBuffer.allocate(1024*suCHAR));
+			user_set(IBUF, to_abs(0, buf_idx));
 			user_set(IPOS, 0);
 			user_set(ILEN, 1024);
 
 			do {
 				_refill_();
 				if (pop() == 0) break;
+				// Uncomment to debug included files
+				// System.out.printf("INCLUDED: [%d] %s\n", linenumber, toString(user_get(IBUF), user_get(ILEN)));
+				// System.out.printf("<%d> ", sp);
+				// for (int i = 0; i < sp; i++) {
+				// 	System.out.printf("%d ", s[i]);
+				// }
+				// System.out.printf("\n");
+				// ---
 				_catch(user_get(INTERPRET));
 				int e = pop();
+				// Debug
+				// At the end of the line try to find :
+				// There must be some moment that the linked list
+				// goes boom
+				try {
+					try_to_break_search();
+				} catch (Exception ex) {
+					System.out.printf("BROKE!!!\n");
+					e = -2000;
+				}
+				// \Debug
 				if (e != 0) {
 					int pathstart = user_get(PATH_START);
 					int pathend = user_get(PATH_END);
 					String path = toString(pathstart, (pathstart - pathend)/suCHAR);
 					System.out.printf("File: %s\n", path);
-					System.out.printf("Line (%ld): %s\n", linenumber, toString(buf, user_get(ILEN)));
+					System.out.printf("Line (%d): %s\n", linenumber, toString(user_get(IBUF), user_get(ILEN)));
 					_throw(e);
 				}
 				linenumber++;
@@ -762,8 +881,8 @@ public class Sloth {
 
 			raf.close();
 
-			o.remove(idx);
 			o.remove(buf_idx);
+			o.remove(user_get(SOURCE_ID));
 
 			restore_input_and_path();
 		} catch (IOException e) {
@@ -804,10 +923,14 @@ public class Sloth {
 
 	public void _find_() {
 		int cstring = pop();
-		int w = search_word(cstring + suCHAR, c_fetch(cstring));
-		if (w == 0) { push(cstring); push(0); }
-		else if (has_flag(w, IMMEDIATE)) { push(get_xt(w)); push(1); }
-		else { push(get_xt(w)); push(-1); }
+		try {
+			int w = search_word(cstring + suCHAR, c_fetch(cstring));
+			if (w == 0) { push(cstring); push(0); }
+			else if (has_flag(w, IMMEDIATE)) { push(get_xt(w)); push(1); }
+			else { push(get_xt(w)); push(-1); }
+		} catch (Exception e) {
+			System.out.printf("WORD SEARCHED:%s:\n", toString(cstring + suCHAR, c_fetch(cstring)));
+		}
 	}
 
 	// Helper to find words from Java
@@ -823,7 +946,10 @@ public class Sloth {
 			push(32); _word_();
 			int tok = pick(0) + suCHAR;
 			int tlen = c_fetch(pick(0));
-			if (tlen == 0) { pop(); return; }
+			if (tlen == 0) { pop(); break; } // return; }
+			// Debugging
+			// System.out.printf("TOKEN: [%d] {%s}\n", tlen, toString(tok, tlen));
+			// \Debugging
 			_find_();
 			if ((flag = pop()) != 0) {
 				if (user_get(STATE) == 0 || (user_get(STATE) != 0 && flag == 1)) {
@@ -967,8 +1093,9 @@ public class Sloth {
 	void _throw_() {
 		int e = pop();
 		if (e != 0) {
-			if (e == -2) {
-				// If it's ABORT" print the message
+			if (e == -2 && ep == 0) {
+				// If it's ABORT" print the message only if there
+				// is no exception frame on the exception stack.
 				int l = pop();
 				int a = pop();
 				StringBuffer buf = new StringBuffer();
@@ -991,7 +1118,10 @@ public class Sloth {
 	void _over_() { push(pick(1)); }
 	void _to_r_() { rpush(pop()); }
 	void _r_from_() { push(rpop()); }
-	void _swap_() { int a = pop(); int b = pop(); push(a); push(b); }
+	void _swap_() { 
+		if (sp < 2) throw new SlothException(-4);
+		int a = pop(); int b = pop(); push(a); push(b); 
+	}
 
 	// Constructing compiler and interpreter system extensions
 	void _allot_() { allot(pop()); }
@@ -1049,17 +1179,6 @@ public class Sloth {
 		if (e != 0) _throw(e);
 	}
 	void _execute_() { eval(pop()); }
-	// Debug is not ANS
-	void _debug_() {
-		int post_xt = pop();
-		int inner_xt = pop();
-		int pre_xt = pop();
-		int q = pop();
-		debug(pre_xt);
-		execute(q);
-		if (q > 0) debug_inner(inner_xt);
-		debug(post_xt);
-	}
 	void _here_() { push(here()); }
 	void _immediate_() { set_flag(get_latest(), IMMEDIATE); }
 	void _postpone_() {
@@ -1104,31 +1223,78 @@ public class Sloth {
 
 	// Bootstrapping
 
-	void bootstrap_kernel() {
-		// Initialization of dictionary
-		store(to_abs(0), to_abs(sCELL)); /* HERE */
-		comma(0); /* INTERNAL-WORDLIST */
-		comma(0); /* FORTH-WORDLIST */
-		comma(0); /* INCLUDED FILES LINKED LIST */
-		// Initialization of user area
-		store(to_abs(0*sCELL, u), to_abs(FORTH_WL)); // CURRENT
-		store(to_abs(1*sCELL, u), 2); // #ORDER
-		store(to_abs(2*sCELL, u), 0); // LOCALS-WORDLIST
-		store(to_abs(3*sCELL, u), to_abs(FORTH_WL)); // CONTEXT 0
-		store(to_abs(4*sCELL, u), to_abs(INTERNAL_WL)); // CONTEXT 1
+	// Temporal for testing...
+	protected void _accept_() {
+		int l = pop();
+		int a = pop();
+		int n = 0;
+		do {
+			_key_();
+			int key = pop();
+			switch (key) {
+				case 13: case 10: push(n); return;
+				case 8: case 127: 
+					push(8); _emit_(); push(32); _emit_(); push(8); _emit_();
+					n--;
+					break;
+				default:
+					if (key > 31) {	
+						push(key);
+						_emit_();
+						c_store(a + n*suCHAR, (char)key);
+						n++;
+					}
+					break;
+			}
+		} while (true);
+	}
+
+	protected void _quit_() {
+		rp = 0; // Empty the return stack
+		user_set(SOURCE_ID, 0); // Set source to user input device
+		user_set(STATE, 0); // Ensure we're in interpretate state
+		do {
+			_refill_();	if (pop() == 0) return;
+			_catch(user_get(INTERPRET));
+			int v = pop();
+			switch (v) {
+				case 0:
+					if (user_get(STATE) == 0) {
+						System.out.printf(" OK");
+						if (sp > 0) {
+							System.out.printf(" <%d> ", sp);
+							for (int i = 0; i < sp; i++) {
+								System.out.printf("%d ", s[i]);
+							}
+						}
+					} else {
+						System.out.printf("Compiling");
+					}
+					System.out.printf("\n");
+					break;
+				case -1:
+					// TODO Aborted
+					user_set(STATE, 0);
+					break;
+				case -2:
+					// TODO Display message from Abort"	
+					user_set(STATE, 0);
+					break;
+				default:
+					System.out.printf("Exception # %d\n", v);
+					break;
+			}
+		} while (true);
+	}
+
+	void bootstrap() {
 		// Basic primitives
-		// EXIT and (LIT) must be defined before using 
-		// user_area_variable
-		code("EXIT", primitive((vm) -> _exit_()));
-		user_set(CURRENT, to_abs(INTERNAL_WL));
-		code("(LIT)", primitive((vm) -> _lit_()));
-
-		// TODO Reorder user area variables to not need changing
-		// between wordlists
-
-		// User Area Variables
-		// NOTE What is stored in (CURRENT) here will affect later
-		// use of hedader
+		code("EXIT", primitive((vm) -> vm._exit_()));
+		code("(LIT)", primitive((vm) -> vm._lit_()));
+		code("(RIP)", primitive((vm) -> vm._rip_()));
+		code("(BRANCH)", primitive((vm) -> vm._branch_()));
+		code("(?BRANCH)", primitive((vm) -> vm._zbranch_()));
+		// Define user variables
 		user_variable("(CURRENT)", CURRENT, to_abs(FORTH_WL));
 		user_variable("#ORDER", ORDER, 2);
 		user_variable("(LOCALS-WORDLIST)", LOCALS_WORDLIST, 0);
@@ -1141,109 +1307,122 @@ public class Sloth {
 		user_variable("(SOURCE-ID)", SOURCE_ID, 0);
 		user_variable("(SOURCE-POS)", SOURCE_POS, 0);
 		user_variable("(LATESTXT)", LATESTXT, 0);
-		user_variable("(INTERPRET)", INTERPRET, 0);
-		user_variable("(ROOT_PATH_LENGTH)", ROOT_PATH_LENGTH, 0);
-		user_variable("(PATH_START)", PATH_START, to_abs(PATHS, u));
-		user_variable("(PATH_END)", PATH_END, to_abs(PATHS, u));
-		user_variable("(PATHS)", PATHS, 0);
+		user_variable("(INTERPRET)", INTERPRET, primitive((vm) -> vm._interpret_()));
+
+		user_variable("(SLOTH_ROOT_PATH_LENGTH)", ROOT_PATH_LENGTH, 0);
+		user_variable("(SLOTH_PATH_START)", PATH_START, to_abs(PATHS, u));
+		user_variable("(SLOTH_PATH_END)", PATH_END, to_abs(PATHS, u));
+		user_variable("(SLOTH_PATHS)", PATHS, 0);
+
 		user_variable("(INCLUDED-FILES)", INCLUDED_FILES, 0);
 
-		// Primitives
-		code("(RIP)", primitive((vm) -> _rip_()));
-		code("(BRANCH)", primitive((vm) -> _branch_()));
-		code("(?BRANCH)", primitive((vm) -> _zbranch_()));
-		code("(STRING)", primitive((vm) -> _string_()));
-		code("(CSTRING)", primitive((vm) -> _c_string_()));
-		code("(QUOTATION)", primitive((vm) -> _quotation_()));
-		code("(DOES)", primitive((vm) -> _do_does_()));
-		code("(ENVIRONMENT)", primitive((vm) -> _environment_()));
+		// Data and return stack
+		code("DROP", primitive((vm) -> vm._drop_()));
+		code("DUP", primitive((vm) -> vm._dup_()));
+		code("OVER", primitive((vm) -> vm._over_()));
+		code(">R", primitive((vm) -> vm._to_r_()));
+		code("R>", primitive((vm) -> vm._r_from_()));
+		code("SWAP", primitive((vm) -> vm._swap_()));
 
-		user_set(CURRENT, to_abs(FORTH_WL));
+		// Memory
+		code("C@", primitive((vm) -> vm._c_fetch_()));
+		code("C!", primitive((vm) -> vm._c_store_()));
+		code("@", primitive((vm) -> vm._fetch_()));
+		code("!", primitive((vm) -> vm._store_()));
 
-		code("[:", primitive((vm) -> _start_quotation_()));
-		code(";]", primitive((vm) -> _end_quotation_()));
+		code("CELLS", primitive((vm) -> vm._cells_()));
+		code("CHARS", primitive((vm) -> vm._chars_()));
 
-		code("UNUSED", primitive((vm) -> _unused_()));
-		code("BYE", primitive((vm) -> _bye_()));
+		code("HERE", primitive((vm) -> vm._here_()));
+		code("ALIGN", primitive((vm) -> vm._align_()));
+		code("ALLOT", primitive((vm) -> vm._allot_()));
+		code("UNUSED", primitive((vm) -> vm._unused_()));
 
-		code("REFILL", primitive((vm) -> _refill_()));
-		code("SAVE-INPUT", primitive((vm) -> _save_input_()));
-		code("RESTORE-INPUT", primitive((vm) -> _restore_input_()));
-		code("INCLUDED", primitive((vm) -> _included_()));
+		// Exceptions
+		code("CATCH", primitive((vm) -> vm._catch_()));
+		code("THROW", primitive((vm) -> vm._throw_()));
 
-		code("MOVE", primitive((vm) -> _move_()));
+		// Arithmetic and logical operations
+		code("INVERT", primitive((vm) -> vm._invert_()));
+		code("AND", primitive((vm) -> vm._and_()));
+		code("LSHIFT", primitive((vm) -> vm._l_shift_()));
+		code("-", primitive((vm) -> vm._minus_()));
+		code("+", primitive((vm) -> vm._plus_()));
+		code("RSHIFT", primitive((vm) -> vm._r_shift_()));
+		code("*", primitive((vm) -> vm._star_()));
+		code("2/", primitive((vm) -> vm._two_slash_()));
+		code("UM*", primitive((vm) -> vm._u_m_star_()));
+		code("UM/MOD", primitive((vm) -> vm._u_m_slash_mod_()));
 
-		code("EMIT", primitive((vm) -> _emit_()));
-		code("KEY", primitive((vm) -> _key_()));
+		// Comparison operations
+		code("=", primitive((vm) -> vm._equals_()));
+		code("<", primitive((vm) -> vm._less_than_()));
 
-		code("AND", primitive((vm) -> _and_()));
-		code("INVERT", primitive((vm) -> _invert_()));
-		code("LSHIFT", primitive((vm) -> _l_shift_()));
-		code("-", primitive((vm) -> _minus_()));
-		code("+", primitive((vm) -> _plus_()));
-		code("RSHIFT", primitive((vm) -> _r_shift_()));
-		code("*", primitive((vm) -> _star_()));
-		code("2/", primitive((vm) -> _two_slash_()));
-		code("UM*", primitive((vm) -> _u_m_star_()));
-		code("UM/MOD", primitive((vm) -> _u_m_slash_mod_()));
+		// Strings
+		code("(STRING)", primitive((vm) -> vm._string_()));
+		code("(CSTRING)", primitive((vm) -> vm._c_string_()));
+		code("MOVE", primitive((vm) -> vm._move_()));
 
-		code("C@", primitive((vm) -> _c_fetch_()));
-		code("C!", primitive((vm) -> _c_store_()));
-		code("@", primitive((vm) -> _fetch_()));
-		code("!", primitive((vm) -> _store_()));
+		// Input/output and parsing operations
+		code("EMIT", primitive((vm) -> vm._emit_()));
+		code("KEY", primitive((vm) -> vm._key_()));
+		code("SOURCE", primitive((vm) -> vm._source_()));
+		code("WORD", primitive((vm) -> vm._word_()));
+		code("REFILL", primitive((vm) -> vm._refill_()));
+		code("SAVE-INPUT", primitive((vm) -> vm._save_input_()));
+		code("RESTORE-INPUT", primitive((vm) -> vm._restore_input_()));
+		code("INCLUDED", primitive((vm) -> vm._included_()));
 
-		// In C there is INT@ and INT!, no sense here neither
+		// Finding words
+		code("FIND", primitive((vm) -> vm._find_()));
 
-		code("=", primitive((vm) -> _equals_()));
-		code("<", primitive((vm) -> _less_than_()));
+		// Quotations
+		code("(QUOTATION)", primitive((vm) -> vm._quotation_()));
+		code("[:", primitive((vm) -> vm._start_quotation_())); _immediate_();
+		code(";]", primitive((vm) -> vm._end_quotation_())); _immediate_();
 
-		code(":", primitive((vm) -> _colon_()));
-		code(":NONAME", primitive((vm) -> _colon_no_name_()));
-		code(";", primitive((vm) -> _semicolon_())); _immediate_();
+		// End work session
+		code("BYE", primitive((vm) -> vm._bye_()));
 
-		code("CATCH", primitive((vm) -> _catch_()));
-		code("THROW", primitive((vm) -> _throw_()));
+		// Defining words
+		code(":", primitive((vm) -> vm._colon_()));
+		code(":NONAME", primitive((vm) -> vm._colon_no_name_()));
+		code(";", primitive((vm) -> vm._semicolon_())); _immediate_();
+		code("RECURSE", primitive((vm) -> vm._recurse_())); _immediate_();
+		code("IMMEDIATE", primitive((vm) -> vm._immediate_()));
+		code("POSTPONE", primitive((vm) -> vm._postpone_())); _immediate_();
 
-		code("DROP", primitive((vm) -> _drop_()));
-		code("DUP", primitive((vm) -> _dup_()));
-		code("OVER", primitive((vm) -> _over_()));
-		code(">R", primitive((vm) -> _to_r_()));
-		code("R>", primitive((vm) -> _r_from_()));
-		code("SWAP", primitive((vm) -> _swap_()));
+		code("COMPILE,", primitive((vm) -> vm._compile_comma_()));
+		code("CREATE", primitive((vm) -> vm._create_()));
+		code("(DOES)", primitive((vm) -> vm._do_does_()));
+		code("DOES>", primitive((vm) -> vm._does_())); _immediate_();
 
-		code("RECURSE", primitive((vm) -> _recurse_())); _immediate_();
+		// Executing
+		code("EVALUATE", primitive((vm) -> vm._evaluate_()));
+		code("EXECUTE", primitive((vm) -> vm._execute_()));
 
-		code("ALLOT", primitive((vm) -> _allot_()));
-		code("CELLS", primitive((vm) -> _cells_()));
-		code("CHARS", primitive((vm) -> _chars_()));
-		code("COMPILE,", primitive((vm) -> _compile_comma_()));
-		code("CREATE-NAME", primitive((vm) -> _create_name_()));
-		code("CREATE", primitive((vm) -> _create_()));
-		code("DOES>", primitive((vm) -> _does_()));
-		code("EVALUATE", primitive((vm) -> _evaluate_()));
-		code("EXECUTE", primitive((vm) -> _execute_()));
-		/* NON ANS */ code("DEBUG", primitive((vm) -> _debug_()));
-		code("HERE", primitive((vm) -> _here_()));
-		code("IMMEDIATE", primitive((vm) -> _immediate_()));
-		code("POSTPONE", primitive((vm) -> _postpone_()));
-		code("SOURCE", primitive((vm) -> _source_()));
-		code("WORD", primitive((vm) -> _word_()));
-		code("FIND", primitive((vm) -> _find_()));
+		// Environment queries
+		code("(ENVIRONMENT)", primitive((vm) -> vm._environment_()));
 
-		code("DICT", primitive((vm) -> push(to_abs(d))));
-		code("USER", primitive((vm) -> push(to_abs(u))));
-		user_set(INTERPRET, primitive((vm) -> _interpret_()));
-		code("(EMPTY-RETURN-STACK)", primitive((vm) -> _empty_rs_()));
+		// Primitives I don't like too much
+		code("DICT", primitive((vm) -> vm.push(to_abs(0))));
+		code("(EMPTY-RETURN-STACK)", primitive((vm) -> vm.rp = 0));
+
+		// -- DEBUGGING
+		code("BREAKPOINT", primitive((vm) -> _breakpoint_()));
+		// code("ACCEPT", primitive((vm) -> _accept_()));
+		// code("QUIT", primitive((vm) -> _quit_()));
 	}
 
 	void repl() {
-		// TODO use putObject?
-		o.put(op++, ByteBuffer.allocate(256));
-		user_set(IBUF, to_abs(0, op - 1));
+		ByteBuffer bb = ByteBuffer.allocate(80*suCHAR);
+		int block = putObject(bb);
+		user_set(IBUF, to_abs(0, block));
 		user_set(IPOS, 0);
 		user_set(ILEN, 80);
+		System.out.printf("REPL::IBUF:%d::IPOS:%d::ILEN:%d\n", user_get(IBUF), user_get(IPOS), user_get(ILEN));
 		eval(get_xt(find_word("QUIT")));
-		// TODO Maybe remove the memory block?
+		removeObject(block);
 	}
 
 	void evaluate(String c) {
@@ -1269,7 +1448,7 @@ public class Sloth {
 	// --
 
 	void set_root_path(String path) {
-		int paths = to_abs(user_get(PATHS));
+		int paths = to_abs(PATHS, u);
 		for (int i = 0; i < path.length(); i++) {
 			c_store(paths + i*suCHAR, path.charAt(i));	
 		}
@@ -1277,4 +1456,41 @@ public class Sloth {
 		user_set(PATH_START, paths + path.length()*suCHAR);
 		user_set(PATH_END, paths + path.length()*suCHAR);
 	}
-} 
+
+	// -- Debugging 
+
+	void _breakpoint_() {
+		System.out.printf("BREAKPOINT\n");
+		// TODO Just stop until a key is pressed or something
+		// happens
+		do {
+			_key_();
+			int key = pop();
+			switch (key) {
+			case 13: case 10: return;
+			case 27: _bye_(); break;
+			case 115:
+				System.out.printf("\n<%d> ");
+				for (int i = 0; i < sp; i++) {
+					System.out.printf("%d ", s[i]);
+				}
+				System.out.printf("\n");
+				break;
+			}
+		} while (true);
+	} 
+
+	void try_to_break_search() {
+		int t = 0;
+		for (int i = -1; i < user_get(ORDER); i++) {
+			int wl = user_get(CONTEXT + i*sCELL);
+			if (wl != 0) {
+				int w = fetch(wl);
+				while (w > 0) {
+					if (has_flag(w, HIDDEN)) { /* Do nothing */ t = 1; }
+					w = get_link(w);
+				}
+			}
+		}
+	}
+}

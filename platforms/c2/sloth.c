@@ -1243,6 +1243,19 @@ void sloth_environment_(X* x) {
 			sloth_push(x, -1);
 		#endif
 		break;
+	case -2: /* RETURN KEY */
+		#if defined(_WIN64) || defined(WIN32) || defined(_WIN32)
+			sloth_push(x, 13);
+		#else
+			sloth_push(x, 10);
+		#endif
+		break;
+	case -3: /* BACKSPACE KEY */
+		#if defined(_WIN64) || defined(WIN32) || defined(_WIN32)
+			sloth_push(x, 8);
+		#else
+			sloth_push(x, 127);
+		#endif
 	}
 }
 

@@ -42,8 +42,11 @@ public class SlothTest {
 		assertEquals(-1, sloth.ip);
 		assertEquals(0, sloth.d);
 		assertEquals(1, sloth.u);
-		assertEquals(32767, ((ByteBuffer)(sloth.o.get(0))).capacity());
-		assertEquals(1024, ((ByteBuffer)(sloth.o.get(1))).capacity());
+		assertEquals(2, sloth.ts);
+		assertEquals(3, sloth.op);
+		assertEquals(32767, ((ByteBuffer)(sloth.o.get(sloth.d))).capacity());
+		assertEquals(1024, ((ByteBuffer)(sloth.o.get(sloth.u))).capacity());
+		assertEquals(2048, ((ByteBuffer)(sloth.o.get(sloth.ts))).capacity());
 		assertEquals(3*sCELL, ((ByteBuffer)(sloth.o.get(0))).getInt(0*sCELL));
 		assertEquals(0, ((ByteBuffer)(sloth.o.get(0))).getInt(1*sCELL));
 		assertEquals(0, ((ByteBuffer)(sloth.o.get(0))).getInt(2*sCELL));
@@ -141,6 +144,8 @@ public class SlothTest {
 
 		sloth.user_set(1000, 111);
 		assertEquals(111, sloth.user_get(1000));
+		// Ensure writing in user area does not overwrite dictionary
+		assertEquals(13, sloth.get(1000)); 
 
 		assertEquals(3*sCELL, sloth.here());
 		sloth.allot(sCELL);
@@ -1769,43 +1774,40 @@ public class SlothTest {
 		assertEquals(2, sloth.sp);
 	}
 
+	void included_relative_path_interpret(Sloth vm) {
+		interpret_calls++;
+		if (interpret_calls == 1) {
+			vm._included_();	
+		}
+	}
+
 	@Test
 	public void test_included_relative_path() {
-		sloth.user_set(Sloth.INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
-		sloth.user_set(Sloth.ROOT_PATH_LENGTH, 0);
+		sloth.user_set(Sloth.INTERPRET, sloth.primitive((vm) -> included_relative_path_interpret(vm)));
 		interpret_calls = 0;
 
-		String tmpfile = write_temp_file("line one\nline two");
-		int tmppath = sloth.fromString(tmpfile);
+		String tmppath = write_temp_file("line one\nline two");
 
 		// Split tmppath into directory and filename
-		int sep = tmpfile.lastIndexOf(System.getProperty("file.separator"));
+		int sep = tmppath.lastIndexOf(System.getProperty("file.separator"));
 		assertNotEquals(0, sep);
-		int filename = tmppath + (sep + 1)*suCHAR;
 		int dirlen = sep + 1;
-		int filelen = tmpfile.length() - dirlen;
 
-		// Simulate a previous include having set PATH_START/PATH_END
-		// to the directory containing our temp file
-		int path = sloth.fromString(tmpfile.substring(0, dirlen));
+		// Reserve a string big enough for this tests
+		sloth.user_set(Sloth.PATH_START, sloth.fromString("                                                  "));
+		sloth.user_set(Sloth.PATH_END, sloth.user_get(Sloth.PATH_START));
 
-		sloth.user_set(Sloth.PATH_START, path);
-		sloth.user_set(Sloth.PATH_END, path + (dirlen*suCHAR));
-
-		// Push only the filename (no directory)
-		sloth.push(filename);
-		sloth.push(filelen);
+		// I push the filename only first to be used by the
+		// _include_ called by custom_included_interpret
+		sloth.push(sloth.fromString(tmppath.substring(dirlen, tmppath.length())));
+		sloth.push(tmppath.length() - dirlen);
+		sloth.push(sloth.fromString(tmppath));
+		sloth.push(tmppath.length());
 		sloth._included_();
 
 		assertEquals(0, sloth.sp);
-		assertEquals(2, interpret_calls);
-
-		int ibuf = sloth.user_get(Sloth.IBUF);
-		int ipos = sloth.user_get(Sloth.IPOS);
-		int ilen = sloth.user_get(Sloth.ILEN);
-		int source = sloth.user_get(Sloth.SOURCE_ID);
-		int source_pos = sloth.user_get(Sloth.SOURCE_POS);
-	} 
+		assertEquals(4, interpret_calls);
+	}
 
 	@Test
 	public void test_included_root_path() {
@@ -1822,12 +1824,40 @@ public class SlothTest {
 		// Put the temp file's directory into PATHS as the root
 		// PATH_START/PATH_END point to an empty path so the first two
 		// strategies (absolute and relative-to-previous) both fail
-		int paths = sloth.fromString(tmppath);
-		sloth.user_set(Sloth.PATHS, paths);
+		for (int i = 0; i < tmppath.length(); i++) {
+			sloth.c_store(sloth.to_abs(Sloth.PATHS, sloth.u) + i*suCHAR, tmppath.charAt(i));
+		}
 		sloth.user_set(Sloth.ROOT_PATH_LENGTH, dirlen);
-		sloth.user_set(Sloth.PATH_START, paths + dirlen*suCHAR);
-		sloth.user_set(Sloth.PATH_END, paths + dirlen*suCHAR);
-		int filename = paths + dirlen*suCHAR;
+		sloth.user_set(Sloth.PATH_START, sloth.to_abs(Sloth.PATHS, sloth.u) + dirlen*suCHAR);
+		sloth.user_set(Sloth.PATH_END, sloth.to_abs(Sloth.PATHS, sloth.u) + dirlen*suCHAR);
+		int filename = sloth.to_abs(Sloth.PATHS, sloth.u) + dirlen*suCHAR;
+		int filelen = tmppath.length() - dirlen;
+
+		// Push only the filename (no directory)
+		sloth.push(filename);
+		sloth.push(filelen);
+		sloth._included_();
+	
+		assertEquals(0, sloth.sp);
+		assertEquals(2, interpret_calls);
+	}
+
+	// Next test is exact to previous but using set_root_path
+	// function.
+	@Test
+	public void test_included_with_set_root_path() {
+		sloth.user_set(Sloth.INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
+		interpret_calls = 0;
+
+		String tmppath = write_temp_file("line one\nline two");
+
+		// Split tmppath into directory and filename
+		int sep = tmppath.lastIndexOf(System.getProperty("file.separator"));
+		assertNotEquals(0, sep);
+		int dirlen = sep + 1;
+
+		sloth.set_root_path(tmppath.substring(0, dirlen));
+		int filename = sloth.fromString(tmppath.substring(dirlen, tmppath.length()));
 		int filelen = tmppath.length() - dirlen;
 
 		// Push only the filename (no directory)
@@ -1886,6 +1916,10 @@ public class SlothTest {
 		// link to prev
 		assertEquals(tmpfile.length(), sloth.fetch(new_head + sCELL)); // name len
 		assertEquals(tmpfile, sloth.toString(new_head + 2*sCELL, tmpfile.length())); // name
+	}
+
+	@Test
+	public void test_add_to_included_files_list() {
 	}
 
 	// -- Input/Output and parsing -------------------------
@@ -2336,5 +2370,41 @@ public class SlothTest {
 		sloth._execute_();
 		assertEquals(0, sloth.sp);
 		assertEquals(1, p0);
+	}
+
+	// -- Bootstrapping ------------------------------------
+
+	@Test
+	public void test_bootstrap() {
+		sloth.bootstrap();
+
+		assertNotEquals(0, sloth.find_word("EXIT"));
+		assertNotEquals(0, sloth.find_word("DUP"));
+		assertNotEquals(0, sloth.find_word("@"));
+	}
+
+	@Test
+	public void test_bootstrap_user_area() {
+		sloth.bootstrap();
+		
+		assertEquals(sloth.to_abs(Sloth.FORTH_WL), sloth.user_get(Sloth.CURRENT));
+		assertEquals(2, sloth.user_get(Sloth.ORDER));
+		assertEquals(0, sloth.user_get(Sloth.LOCALS_WORDLIST));
+		assertEquals(sloth.to_abs(Sloth.FORTH_WL), sloth.user_get(Sloth.CONTEXT));
+		assertEquals(sloth.to_abs(Sloth.INTERNAL_WL), sloth.user_get(Sloth.CONTEXT + sCELL));
+		assertEquals(10, sloth.user_get(Sloth.BASE));
+		assertEquals(0, sloth.user_get(Sloth.STATE));
+		assertEquals(0, sloth.user_get(Sloth.IBUF));
+		assertEquals(0, sloth.user_get(Sloth.IPOS));
+		assertEquals(0, sloth.user_get(Sloth.ILEN));
+		assertEquals(0, sloth.user_get(Sloth.SOURCE_ID));
+		assertEquals(0, sloth.user_get(Sloth.SOURCE_POS));
+		assertEquals(0, sloth.user_get(Sloth.LATESTXT));
+		assertNotEquals(0, sloth.user_get(Sloth.INTERPRET));
+		assertEquals(0, sloth.user_get(Sloth.ROOT_PATH_LENGTH));
+		assertEquals(sloth.to_abs(Sloth.PATHS, sloth.u), sloth.user_get(Sloth.PATH_START));
+		assertEquals(sloth.to_abs(Sloth.PATHS, sloth.u), sloth.user_get(Sloth.PATH_END));
+		assertEquals(0, sloth.user_get(Sloth.PATHS));
+		assertEquals(0, sloth.user_get(Sloth.INCLUDED_FILES));
 	}
 }

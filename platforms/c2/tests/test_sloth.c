@@ -2069,9 +2069,34 @@ void test_execute_() {
 
 void test_bootstrap() {
 	sloth_bootstrap(x);
+
 	TEST_ASSERT_NOT_EQUAL(0, sloth_find_word(x, "EXIT"));
 	TEST_ASSERT_NOT_EQUAL(0, sloth_find_word(x, "DUP"));
 	TEST_ASSERT_NOT_EQUAL(0, sloth_find_word(x, "@"));
+}
+
+void test_bootstrap_user_area() {
+	sloth_bootstrap(x);
+
+	TEST_ASSERT_EQUAL(sloth_to_abs(x, SLOTH_FORTH_WL), sloth_user_get(x, SLOTH_CURRENT));
+	TEST_ASSERT_EQUAL(2, sloth_user_get(x, SLOTH_ORDER));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_LOCALS_WORDLIST));
+	TEST_ASSERT_EQUAL(sloth_to_abs(x, SLOTH_FORTH_WL), sloth_user_get(x, SLOTH_CONTEXT));
+	TEST_ASSERT_EQUAL(sloth_to_abs(x, SLOTH_INTERNAL_WL), sloth_user_get(x, SLOTH_CONTEXT + sCELL));
+	TEST_ASSERT_EQUAL(10, sloth_user_get(x, SLOTH_BASE));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_STATE));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_IBUF));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_IPOS));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_ILEN));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_SOURCE_ID));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_SOURCE_POS));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_LATESTXT));
+	TEST_ASSERT_NOT_EQUAL(0, sloth_user_get(x, SLOTH_INTERPRET));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH));
+	TEST_ASSERT_EQUAL(x->u + SLOTH_PATHS, sloth_user_get(x, SLOTH_PATH_START));
+	TEST_ASSERT_EQUAL(x->u + SLOTH_PATHS, sloth_user_get(x, SLOTH_PATH_END));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_PATHS));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_INCLUDED_FILES));
 }
 
 int main() {
@@ -2193,5 +2218,6 @@ int main() {
 	RUN_TEST(test_interpret_immediate_words_compile_mode);
 	/* Bootstrap */
 	RUN_TEST(test_bootstrap);
+	RUN_TEST(test_bootstrap_user_area);
 	return UNITY_END();
 }
