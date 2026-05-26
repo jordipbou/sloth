@@ -43,7 +43,8 @@ allowing immediate feedback and iteration.
   implemented in Forth itself, allowing easy porting to other 
 	platforms.  
 - **Cross-language / cross-platform:** Sloth aims to run on as many
-  platforms and programming languages as possible.  
+  platforms and programming languages as possible. Right now there
+	are a C implementation and a Java implementation.
 - **Easily hackable:** Every part of Sloth should be simple enough 
   for one developer to understand and modify for specific use cases.
 
