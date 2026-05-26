@@ -43,6 +43,8 @@ public class Sloth {
 
 	// -- Virtual Machine context definition ---------------
 
+	protected ByteBuffer[] m; // "Continuous memory"
+
 	protected int d; // Index of the dictionary in m
 	protected int u; // Index of the user area in m
 	protected int ts; // Index of temporal string area in m
@@ -58,8 +60,7 @@ public class Sloth {
 
 	protected int ep; // Exception stack pointer
 
-	protected HashMap<Integer, Object> o; // Indexed map of objects
-	protected int op; // Last index of previous HashMap
+	protected Object[] o; // Indexed array of objects
 
 	protected ArrayList<Consumer<Sloth>> p; // Array of primitives
 
@@ -123,9 +124,9 @@ public class Sloth {
 
 	// -- Context initialization --------------------------
 
-	public Sloth() { this(524288, 1024); }
-
-	public Sloth(int dsize, int usize) {
+	public Sloth() { this(524288, 1024, 1024); }
+	public Sloth(int dsize, int usize) { this(dsize, usize, 1024); }
+	public Sloth(int dsize, int usize, int osize) {
 		s = new int[STACK_SIZE];
 		sp = 0;
 		r = new int[RETURN_STACK_SIZE];
@@ -136,27 +137,30 @@ public class Sloth {
 		ip = -1;
 		ep = 0;
 		p = new ArrayList<Consumer<Sloth>>();
-		o = new HashMap<Integer, Object>();
-		op = 0;
-		d = putObject(ByteBuffer.allocate(dsize));
-		u = putObject(ByteBuffer.allocate(usize));
-		// Circular buffer for storing Java strings
-		// that need to be converted to Forth strings
-		ts = putObject(ByteBuffer.allocate(2048));
 
-		// // Initialize HERE
-		((ByteBuffer)(o.get(d))).putInt(0*sCELL, 3*sCELL);
+		// Objects array
+		o = new Object[osize];
+
+		// There are only 8 bits for memory blocks, so no
+		// more than 256 simultaneous memory blocks will
+		// exist.
+		m = new ByteBuffer[256];
+		d = putByteBuffer(ByteBuffer.allocate(dsize));
+		u = putByteBuffer(ByteBuffer.allocate(usize));
+		ts = putByteBuffer(ByteBuffer.allocate(2048));
+
+		// Initialize HERE
+		m[d].putInt(0*sCELL, 3*sCELL);
 		// Initialize INTERNAL-WORDLIST
-		((ByteBuffer)(o.get(d))).putInt(1*sCELL, 0);
+		m[d].putInt(1*sCELL, 0);
 		// Initialize FORTH-WORDLIST (the default wordlist) */
-		((ByteBuffer)(o.get(d))).putInt(2*sCELL, 0);
+		m[d].putInt(2*sCELL, 0);
 
-
-		((ByteBuffer)(o.get(u))).putInt(0*sCELL, to_abs(FORTH_WL)); // CURRENT
-		((ByteBuffer)(o.get(u))).putInt(1*sCELL, 2); // #ORDER
-		((ByteBuffer)(o.get(u))).putInt(2*sCELL, 0); // LOCALS-WORDLIST
-		((ByteBuffer)(o.get(u))).putInt(3*sCELL, to_abs(FORTH_WL)); // CONTEXT 0
-		((ByteBuffer)(o.get(u))).putInt(4*sCELL, to_abs(INTERNAL_WL)); // CONTEXT 
+		m[u].putInt(0*sCELL, to_abs(FORTH_WL)); // CURRENT
+		m[u].putInt(1*sCELL, 2); // #ORDER
+		m[u].putInt(2*sCELL, 0); // LOCALS-WORDLIST
+		m[u].putInt(3*sCELL, to_abs(FORTH_WL)); // CONTEXT 0
+		m[u].putInt(4*sCELL, to_abs(INTERNAL_WL)); // CONTEXT 
 }
 
 	// -- Data stack
@@ -169,7 +173,6 @@ public class Sloth {
 	long msp(long v) { return (v & 0xFFFFFFFF00000000L); }
 	long lsp(long v) { return (v & 0x00000000FFFFFFFFL); }
 	/* Long pop -- takes a 32 bit CELL as a 64 bit value; */
-	/* TODO: Remove it, its just (long)pop(); */
 	long lpop() { return (long)s[--sp]; }
 	/* Unsigned long pop -- takes a signed 32 bit CELL as */
 	/* an unsigned 64 bit value. */
@@ -213,7 +216,7 @@ public class Sloth {
 	int to_abs(int a, int b) { return (b << 24) + a; }
 	int to_abs(int a) { return (d << 24) + a; }
 	int to_rel(int a) { return a & 0x00FFFFFF; }
-	ByteBuffer block(int a) { return (ByteBuffer)(o.get(a >> 24)); }
+	ByteBuffer block(int a) { return m[a >> 24]; }
 
 	void b_store(int a, byte v) { block(a).put(to_rel(a), v); }
 	byte b_fetch(int a) { return block(a).get(to_rel(a)); }
@@ -231,11 +234,10 @@ public class Sloth {
 	// act as a circular buffer and overwrite previous strings
 	// as required.
 	int fromString(String s) {
-		ByteBuffer b = (ByteBuffer)(o.get(ts));
-		if (b.remaining() / suCHAR < s.length()) b.rewind();
-		int addr = to_abs(b.position(), ts);
+		if (m[ts].remaining() / suCHAR < s.length()) m[ts].rewind();
+		int addr = to_abs(m[ts].position(), ts);
 		for (int i = 0; i < s.length(); i++) {
-			b.putChar(s.charAt(i));
+			m[ts].putChar(s.charAt(i));
 		}
 		return addr;
 	}
@@ -246,18 +248,41 @@ public class Sloth {
 		return sb.toString();
 	}
 
-	// Helper to use Java Objects with Sloth API
+	// Helpers to use Java ByteBuffers as memory with Sloth API
 
-	int putObject(Object obj) {
-		// Advance op until finding a free slot
-    while (o.containsKey(op)) { op++; }
-    int idx = op++; // Claim this slot and advance op for next time
-    o.put(idx, obj);
-    return idx;
+	int putByteBuffer(ByteBuffer b) {
+		for (int i = 0; i < 256; i++) {
+			if (m[i] == null) {
+				m[i] = b;
+				return i;
+			}
+		}
+		// No free slots
+		return -1;
 	}
 
-	void removeObject(int idx) {
-		o.remove(idx);	
+	void removeByteBuffer(int i) {
+		m[i] = null;
+	}
+
+	// Helpers to use Java Objects with Sloth API
+
+	int putObject(Object obj) {
+		// 0 is reserved because SOURCE_ID = 0 means user
+		// input device and having a file with index 0 will
+		// make it complicated.
+		for (int i = 1; i < o.length; i++) {
+			if (o[i] == null) {
+				o[i] = obj;
+				return i;
+			}
+		}
+		// No free slots
+		return -1;
+	}
+
+	void removeObject(int i) {
+		o[i] = null;
 	}
 
 	// -- Inner interpreter
@@ -275,31 +300,10 @@ public class Sloth {
 	protected void inner() { 
 		int t = rp; 
 		while (t <= rp && ip >= 0) {
-			// int inst = op();
-			// System.out.printf("INST: %d %s\n", inst, wordForXT(inst));
 			execute(op()); 
-			// execute(inst);
 		}
 	}
 	public void eval(int q) { execute(q); if (q > 0) inner(); }
-
-	// DEBUGGING
-	protected String wordForXT(int xt) {
-		for (int i = -1; i < user_get(ORDER); i++) {
-			int wl = user_get(CONTEXT + i*sCELL);
-			if (wl != 0) {
-				int w = fetch(wl);
-				while (w > 0) {
-					if (get_xt(w) == xt) {
-						return toString(get_name_addr(w), get_namelen(w));
-					}
-					w = get_link(w);
-				}
-			}
-		}
-		return "[[UNKNOWN WORD]]";
-	
-	}
 
 	// -- Tracing interpreter
 
@@ -364,11 +368,8 @@ public class Sloth {
 	}
 
 	public void _throw(int v) {
-		// TODO In C, when executing the tests the prints do not
-		// appear because there is a CATCH in place. Check how to
-		// do that in Java.
 		if (v != 0) {
-			// TODO Print only if there is no exception frame
+			// Print only if there is no exception frame
 			// in the exception stack.
 			if (ep == 0) {
 				System.out.printf("EXCEPTION: %d\n", v);
@@ -392,10 +393,10 @@ public class Sloth {
 
 	// User area set/get.
 	void user_set(int rel_a, int v) { 
-		((ByteBuffer)(o.get(u))).putInt(to_rel(rel_a), v); 
+		m[u].putInt(to_rel(rel_a), v);
 	}
 	int user_get(int rel_a) { 
-		return ((ByteBuffer)(o.get(u))).getInt(to_rel(rel_a)); 
+		return m[u].getInt(to_rel(rel_a));
 	}
 
 	// Memory management
@@ -566,7 +567,7 @@ public class Sloth {
 
 	public void _file_position_() {
 		try {
-			RandomAccessFile file = (RandomAccessFile)(o.get(pop()));
+			RandomAccessFile file = (RandomAccessFile)(o[pop()]);
 			if (file != null) {
 				try {
 					long pos = file.getFilePointer();
@@ -591,7 +592,7 @@ public class Sloth {
 	// characters in memory.
 	public void _read_line_() {
 		try {
-			RandomAccessFile file = (RandomAccessFile)(o.get(pop()));	
+			RandomAccessFile file = (RandomAccessFile)(o[pop()]);	
 			int u1 = pop();
 			int caddr = pop();
 			try {
@@ -603,7 +604,6 @@ public class Sloth {
 					String buf = file.readLine();
 					int i;
 					for (i = 0; i < buf.length() && i < u1; i++) {
-						// b_store(caddr + i, (byte)buf.charAt(i));
 						c_store(caddr + i*suCHAR, buf.charAt(i));
 					}
 					push(i);
@@ -829,7 +829,7 @@ public class Sloth {
 			add_to_included_files_list(name);
 
 			user_set(SOURCE_ID, putObject(raf));
-			int buf_idx = putObject(ByteBuffer.allocate(1024*suCHAR));
+			int buf_idx = putByteBuffer(ByteBuffer.allocate(1024*suCHAR));
 			user_set(IBUF, to_abs(0, buf_idx));
 			user_set(IPOS, 0);
 			user_set(ILEN, 1024);
@@ -860,8 +860,8 @@ public class Sloth {
 
 			raf.close();
 
-			o.remove(buf_idx);
-			o.remove(user_get(SOURCE_ID));
+			removeByteBuffer(buf_idx);
+			removeObject(user_get(SOURCE_ID));
 
 			restore_input_and_path();
 		} catch (IOException e) {
@@ -997,10 +997,7 @@ public class Sloth {
 	// -- Require words to bootstrap
 
 	void _bye_() { System.out.println(); System.exit(0); }
-	void _unused_() { 
-		push(((ByteBuffer)(o.get(d))).capacity() - here()); 
-	}
-
+	void _unused_() { push(m[d].capacity() - here()); }
 	void _move_() {
 		int u = pop();
 		int addr2 = pop();
@@ -1325,26 +1322,25 @@ public class Sloth {
 	}
 
 	void repl() {
-		ByteBuffer bb = ByteBuffer.allocate(80*suCHAR);
-		int block = putObject(bb);
+		int block = putByteBuffer(ByteBuffer.allocate(80*suCHAR));
 		user_set(IBUF, to_abs(0, block));
 		user_set(IPOS, 0);
 		user_set(ILEN, 80);
 		eval(get_xt(find_word("QUIT")));
-		removeObject(block);
+		removeByteBuffer(block);
 	}
 
 	void evaluate(String c) {
-		// TODO use putObject ?
 		ByteBuffer buf = ByteBuffer.allocate(256);
 		buf.clear();
-		o.put(op++, buf);
+		int bidx = putByteBuffer(buf);
 		for(int i = 0; i < c.length(); i++) {
 			buf.putChar(c.charAt(i));
 		}
-		push(to_abs(0, op - 1));
+		push(to_abs(0, bidx));
 		push(c.length());
 		_evaluate_();
+		removeByteBuffer(bidx);
 	}
 
 	int include(String f) {

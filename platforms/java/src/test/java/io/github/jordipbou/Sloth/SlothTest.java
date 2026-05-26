@@ -43,15 +43,14 @@ public class SlothTest {
 		assertEquals(0, sloth.d);
 		assertEquals(1, sloth.u);
 		assertEquals(2, sloth.ts);
-		assertEquals(3, sloth.op);
-		assertEquals(32767, ((ByteBuffer)(sloth.o.get(sloth.d))).capacity());
-		assertEquals(1024, ((ByteBuffer)(sloth.o.get(sloth.u))).capacity());
-		assertEquals(2048, ((ByteBuffer)(sloth.o.get(sloth.ts))).capacity());
-		assertEquals(3*sCELL, ((ByteBuffer)(sloth.o.get(0))).getInt(0*sCELL));
-		assertEquals(0, ((ByteBuffer)(sloth.o.get(0))).getInt(1*sCELL));
-		assertEquals(0, ((ByteBuffer)(sloth.o.get(0))).getInt(2*sCELL));
-		assertEquals(0, ((ByteBuffer)(sloth.o.get(0))).getInt(3*sCELL));
-		assertEquals(2*sCELL, ((ByteBuffer)(sloth.o.get(1))).getInt(0*sCELL));
+		assertEquals(32767, sloth.m[0].capacity());
+		assertEquals(1024, sloth.m[1].capacity());
+		assertEquals(2048, sloth.m[2].capacity());
+		assertEquals(3*sCELL, sloth.m[0].getInt(0*sCELL));
+		assertEquals(0, sloth.m[0].getInt(1*sCELL));
+		assertEquals(0, sloth.m[0].getInt(2*sCELL));
+		assertEquals(0, sloth.m[0].getInt(3*sCELL));
+		assertEquals(2*sCELL, sloth.m[1].getInt(0*sCELL));
 	}
 
 	/* -- Data and return stack ---------------------------- */
@@ -180,7 +179,7 @@ public class SlothTest {
 
 		sloth._unused_();
 		assertEquals(1, sloth.sp);
-		assertEquals(((ByteBuffer)(sloth.o.get(0))).capacity() - sloth.here(), sloth.pop());
+		assertEquals(sloth.m[0].capacity() - sloth.here(), sloth.pop());
 	}
 
 	@Test
@@ -1549,8 +1548,7 @@ public class SlothTest {
 		try {
 			Path f = Files.createTempFile(null, null);
 			RandomAccessFile raf = new RandomAccessFile(f.toFile(), "rw");
-			int idx = sloth.op++;
-			sloth.o.put(idx, raf);
+			int idx = sloth.putObject(raf);
 
 			raf.writeBytes("abc");
 
@@ -1560,6 +1558,7 @@ public class SlothTest {
 			assertEquals(0, sloth.pop());
 			assertEquals(0, sloth.pop());
 			assertEquals(3, sloth.pop());
+			sloth.removeObject(idx);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -1567,14 +1566,12 @@ public class SlothTest {
 
 	@Test
 	public void test_read_line() {
-		int buf_idx = sloth.op++;
-		sloth.o.put(buf_idx, ByteBuffer.allocate(16));
+		int buf_idx = sloth.putByteBuffer(ByteBuffer.allocate(16));
 		int buf = sloth.to_abs(0, buf_idx);
 		try {
 			Path f = Files.createTempFile(null, null);
 			RandomAccessFile raf = new RandomAccessFile(f.toFile(), "rw");
-			int file_idx = sloth.op++;
-			sloth.o.put(file_idx, raf);
+			int file_idx = sloth.putObject(raf);
 
 			raf.writeBytes("abc");
 
@@ -1608,6 +1605,9 @@ public class SlothTest {
 			assertEquals('a', sloth.c_fetch(buf + 0*suCHAR));
 			assertEquals('b', sloth.c_fetch(buf + 1*suCHAR));
 			assertEquals('c', sloth.c_fetch(buf + 2*suCHAR));
+
+			sloth.removeObject(file_idx);
+			sloth.removeByteBuffer(buf_idx);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -1617,8 +1617,7 @@ public class SlothTest {
 
 	@Test
 	public void test_refill() {
-		int buf_idx = sloth.op++;
-		sloth.o.put(buf_idx, ByteBuffer.allocate(16));
+		int buf_idx = sloth.putByteBuffer(ByteBuffer.allocate(16));
 		int buf = sloth.to_abs(0, buf_idx);
 
 		sloth.user_set(Sloth.SOURCE_ID, -1);
@@ -1633,19 +1632,19 @@ public class SlothTest {
 		assertEquals(ibuf, sloth.user_get(Sloth.IBUF));
 		assertEquals(15, sloth.user_get(Sloth.ILEN));
 		assertEquals(0, sloth.user_get(Sloth.IPOS));
+
+		sloth.removeByteBuffer(buf_idx);
 	}
 
 	@Test
 	public void test_refill_file() {
-		int buf_idx = sloth.op++;
-		sloth.o.put(buf_idx, ByteBuffer.allocate(16));
+		int buf_idx = sloth.putByteBuffer(ByteBuffer.allocate(16));
 		int buf = sloth.to_abs(0, buf_idx);
 
 		try {
 			Path f = Files.createTempFile(null, null);
 			RandomAccessFile raf = new RandomAccessFile(f.toFile(), "rw");
-			int file_idx = sloth.op++;
-			sloth.o.put(file_idx, raf);
+			int file_idx = sloth.putObject(raf);
 
 			sloth.user_set(Sloth.IBUF, buf);
 			sloth.user_set(Sloth.IPOS, 0);
@@ -1684,9 +1683,12 @@ public class SlothTest {
 			sloth.pop();
 			sloth.pop();
 			assertEquals(8, sloth.pop());
+
+			sloth.removeObject(file_idx);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		sloth.removeByteBuffer(buf_idx);
 	}
 
 	/* Portable temp file creation code */
@@ -1712,8 +1714,7 @@ public class SlothTest {
 	@Test
 	public void test_included_absolute_path() {
 		// Set PATH_START and PATH_END pointing to an empty buffer
-		int path_idx = sloth.op++;
-		sloth.o.put(path_idx, ByteBuffer.allocate(256));
+		int path_idx = sloth.putByteBuffer(ByteBuffer.allocate(256));
 		int path = sloth.to_abs(0, path_idx);
 
 		sloth.user_set(Sloth.PATH_START, path);
@@ -1750,12 +1751,13 @@ public class SlothTest {
 		assertNotEquals(saved_incl, new_head);
 		assertEquals(tmppath.length(), sloth.fetch(new_head + sCELL));
 		assertEquals(tmppath, sloth.toString(new_head + 2*sCELL, tmppath.length()));
+
+		sloth.removeByteBuffer(path_idx);
 	}
 
 	@Test
 	public void test_included_file_not_found() {
-		int path_idx = sloth.op++;
-		sloth.o.put(path_idx, ByteBuffer.allocate(256));
+		int path_idx = sloth.putByteBuffer(ByteBuffer.allocate(256));
 		int path = sloth.to_abs(0, path_idx);
 
 		sloth.user_set(Sloth.PATH_START, path);
@@ -1772,6 +1774,8 @@ public class SlothTest {
 		/* After throwing, the stack is restored to */
 		/* the depth previous to the catch. */
 		assertEquals(2, sloth.sp);
+
+		sloth.removeByteBuffer(path_idx);
 	}
 
 	void included_relative_path_interpret(Sloth vm) {
