@@ -1284,7 +1284,7 @@ public class SlothTest {
 		sloth._c_string_();
 		assertEquals(1, sloth.sp);
 		assertEquals(sloth.to_abs(100), sloth.pop());
-		assertEquals(sloth.aligned(sloth.to_abs(100 + 6*suCHAR)), sloth.ip);
+		assertEquals(sloth.aligned(sloth.to_abs(100 + 7*suCHAR)), sloth.ip);
 	}
 
 	void do_test_move(int b, int a1, int a2, int u, int v1, int v2, int v3) {

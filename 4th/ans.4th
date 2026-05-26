@@ -226,11 +226,21 @@ INTERNAL-WORDLIST SET-CURRENT
 \ Displacement for Buffers allocated after HERE. 
 \ If HERE moves the buffers addresses are not longer valid.
 
+\ The buffers are:
+\ counted string buffer - 64 chars from HERE - 256 chars size
+\ two strings buffer - 256 chars from cbuf - 256 chars size
+\ numeric output buffer - 256 chars from sbuf - 200 chars size
+\ pad - 200 chars from nbuf - size dependant on free space
+
 64 \ Starting address, 64 bytes ahead of HERE,
    \ no need to multiply by CHAR
 ?CONSTANT (CBUF-DISPLACEMENT)	\ Counted string buffer
 
-(CBUF-DISPLACEMENT) 64 CHARS +
+\ The maximum length of a counted string as per the standard
+\ must be at least 255, so we use 256 chars for the counted
+\ strings buffer.
+
+(CBUF-DISPLACEMENT) 256 CHARS +
 ?CONSTANT (SBUF-DISPLACEMENT)	\ String buffer
 
 ?VARIABLE (SBUF-POS) \ String buffer cursor position
@@ -1132,13 +1142,13 @@ SET-CURRENT
 ?\		34 PARSE STATE @ IF 
 ?\			POSTPONE SLITERAL 
 ?\		ELSE
-\ Copy the string to the end of the string buffer it it
+\ Copy the string to the end of the string buffer if it
 \ fits, if not copy to the beginning overwriting the content.
 \ The buffer has enough space for two 80 characters strings, 
 \ as required by the standard.
 ?\			HERE (SBUF-DISPLACEMENT) +
 ?\			OVER (SBUF-MAX-LENGTH) (SBUF-POS) @ - < IF
-?\				(SBUF-POS) CHARS @ +
+?\				(SBUF-POS) @ CHARS +
 ?\				OVER (SBUF-POS) @ + (SBUF-POS) !
 ?\			ELSE
 ?\				0 (SBUF-POS) !

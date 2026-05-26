@@ -54,7 +54,7 @@ allowing immediate feedback and iteration.
 **Why the name Sloth?**  
 Sloths are beautiful animals. And I liked the play on words:
 **“SLOw forTH.”**  
-Later, I thought of **“Scripting Language Of The Hell/Heavens”** —  
+Later, I also thought of **“Scripting Language Of The Hell/Heavens”** —  
 and it stuck.
 
 **Why Forth?**  

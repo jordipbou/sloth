@@ -356,16 +356,6 @@ public class Sloth {
 			// environment. Its up to the user to decide if the
 			// exception is sever enough to restart the system.
 			e.printStackTrace();
-			System.out.printf("IP: %d\n", ip);
-			System.out.printf("STACK: <%d> ", sp);
-			for (int i = 0; i < sp; i++) {
-				System.out.printf("%d ", s[i]);
-			}
-			System.out.printf("\nRETURN STACK: <%d> ", rp);
-			for (int i = 0; i < rp; i++) {
-				System.out.printf("%d ", r[i]);
-			}
-			System.out.printf("\n");
 			sp = tsp;
 			rp = trp;
 			push(-1000);
@@ -857,17 +847,6 @@ public class Sloth {
 				// ---
 				_catch(user_get(INTERPRET));
 				int e = pop();
-				// Debug
-				// At the end of the line try to find :
-				// There must be some moment that the linked list
-				// goes boom
-				try {
-					try_to_break_search();
-				} catch (Exception ex) {
-					System.out.printf("BROKE!!!\n");
-					e = -2000;
-				}
-				// \Debug
 				if (e != 0) {
 					int pathstart = user_get(PATH_START);
 					int pathend = user_get(PATH_END);
@@ -1223,70 +1202,6 @@ public class Sloth {
 
 	// Bootstrapping
 
-	// Temporal for testing...
-	protected void _accept_() {
-		int l = pop();
-		int a = pop();
-		int n = 0;
-		do {
-			_key_();
-			int key = pop();
-			switch (key) {
-				case 13: case 10: push(n); return;
-				case 8: case 127: 
-					push(8); _emit_(); push(32); _emit_(); push(8); _emit_();
-					n--;
-					break;
-				default:
-					if (key > 31) {	
-						push(key);
-						_emit_();
-						c_store(a + n*suCHAR, (char)key);
-						n++;
-					}
-					break;
-			}
-		} while (true);
-	}
-
-	protected void _quit_() {
-		rp = 0; // Empty the return stack
-		user_set(SOURCE_ID, 0); // Set source to user input device
-		user_set(STATE, 0); // Ensure we're in interpretate state
-		do {
-			_refill_();	if (pop() == 0) return;
-			_catch(user_get(INTERPRET));
-			int v = pop();
-			switch (v) {
-				case 0:
-					if (user_get(STATE) == 0) {
-						System.out.printf(" OK");
-						if (sp > 0) {
-							System.out.printf(" <%d> ", sp);
-							for (int i = 0; i < sp; i++) {
-								System.out.printf("%d ", s[i]);
-							}
-						}
-					} else {
-						System.out.printf("Compiling");
-					}
-					System.out.printf("\n");
-					break;
-				case -1:
-					// TODO Aborted
-					user_set(STATE, 0);
-					break;
-				case -2:
-					// TODO Display message from Abort"	
-					user_set(STATE, 0);
-					break;
-				default:
-					System.out.printf("Exception # %d\n", v);
-					break;
-			}
-		} while (true);
-	}
-
 	void bootstrap() {
 		// Basic primitives
 		code("EXIT", primitive((vm) -> vm._exit_()));
@@ -1407,11 +1322,6 @@ public class Sloth {
 		// Primitives I don't like too much
 		code("DICT", primitive((vm) -> vm.push(to_abs(0))));
 		code("(EMPTY-RETURN-STACK)", primitive((vm) -> vm.rp = 0));
-
-		// -- DEBUGGING
-		code("BREAKPOINT", primitive((vm) -> _breakpoint_()));
-		// code("ACCEPT", primitive((vm) -> _accept_()));
-		// code("QUIT", primitive((vm) -> _quit_()));
 	}
 
 	void repl() {
@@ -1420,7 +1330,6 @@ public class Sloth {
 		user_set(IBUF, to_abs(0, block));
 		user_set(IPOS, 0);
 		user_set(ILEN, 80);
-		System.out.printf("REPL::IBUF:%d::IPOS:%d::ILEN:%d\n", user_get(IBUF), user_get(IPOS), user_get(ILEN));
 		eval(get_xt(find_word("QUIT")));
 		removeObject(block);
 	}
@@ -1455,42 +1364,5 @@ public class Sloth {
 		user_set(ROOT_PATH_LENGTH, path.length());
 		user_set(PATH_START, paths + path.length()*suCHAR);
 		user_set(PATH_END, paths + path.length()*suCHAR);
-	}
-
-	// -- Debugging 
-
-	void _breakpoint_() {
-		System.out.printf("BREAKPOINT\n");
-		// TODO Just stop until a key is pressed or something
-		// happens
-		do {
-			_key_();
-			int key = pop();
-			switch (key) {
-			case 13: case 10: return;
-			case 27: _bye_(); break;
-			case 115:
-				System.out.printf("\n<%d> ");
-				for (int i = 0; i < sp; i++) {
-					System.out.printf("%d ", s[i]);
-				}
-				System.out.printf("\n");
-				break;
-			}
-		} while (true);
-	} 
-
-	void try_to_break_search() {
-		int t = 0;
-		for (int i = -1; i < user_get(ORDER); i++) {
-			int wl = user_get(CONTEXT + i*sCELL);
-			if (wl != 0) {
-				int w = fetch(wl);
-				while (w > 0) {
-					if (has_flag(w, HIDDEN)) { /* Do nothing */ t = 1; }
-					w = get_link(w);
-				}
-			}
-		}
 	}
 }
