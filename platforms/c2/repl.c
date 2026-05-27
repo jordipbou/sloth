@@ -1,4 +1,3 @@
-#define SLOTH_IMPLEMENTATION
 #include "sloth.h"
 #include "cpnbi.h"
 
@@ -22,10 +21,14 @@ int main(int argc, char**argv) {
 		sloth_repl(x);
 	} else if (strcmp(argv[1], "--test") == 0 
 					|| strcmp(argv[1], "-t") == 0) {
+		// Standard tests
 		sloth_include(x, ROOT_PATH "forth2012-test-suite/src/runtests.fth");
-		/*
+		#ifdef SLOTH_FLOATING_POINT
+
+		// Floating point tests
 		sloth_include(x, ROOT_PATH "forth2012-test-suite/src/fp/runfptests.fth");
-		*/
+
+		#endif
 	} else {
 		sloth_include(x, argv[1]);
 	}
@@ -34,4 +37,3 @@ int main(int argc, char**argv) {
 
 	cpnbi_shutdown();
 }
-

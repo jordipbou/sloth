@@ -6,6 +6,10 @@
 #include<assert.h>
 #include<limits.h> /* for CHAR_BIT */
 
+#ifdef SLOTH_FOATING_POINT
+#include<math.h>
+#endif
+
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 #define WINDOWS
 #endif
@@ -40,8 +44,21 @@ typedef int8_t BYTE; /* BYTEs are needed for MOVE */
 typedef uint8_t uCHAR; /* CHARs are always unsigned */
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
-
 #define suCHAR sizeof(uCHAR)
+
+#ifdef SLOTH_FLOATING_POINT
+
+	typedef double FCELL;
+	typedef float SFCELL;
+	typedef double DFCELL;
+
+	#define sFCELL sizeof(FCELL)
+	#define sSFCELL sizeof(SFCELL)
+	#define sDFCELL sizeof(DFCELL)
+	
+	#define sFCELL_BITS sFCELL*8
+
+#endif
 
 #define ALIGNED(a, t) (((a) + ((t) - 1)) & ~((t) - 1))
 
@@ -94,6 +111,13 @@ typedef struct sloth_VM {
 
 	CELL s[SLOTH_STACK_SIZE], sp;
 	CELL r[SLOTH_RETURN_STACK_SIZE], rp;
+
+	#ifdef SLOTH_FLOATING_POINT
+
+		FCELL f[SLOTH_FLOAT_STACK_SIZE]; 
+		CELL fp;
+
+	#endif
 
 	/* Jump buffers used for exceptions */
 	jmp_buf jmpbuf[8];
@@ -150,7 +174,16 @@ typedef struct sloth_VM {
 
 #define SLOTH_INCLUDED_FILES		95*sCELL
 
-#define SLOTH_LAST_USER_VAR			96*sCELL
+#ifdef SLOTH_FLOATING_POINT
+
+	#define SLOTH_PRECISION				96*sCELL
+	#define SLOTH_LAST_USER_VAR		97*sCELL
+
+#else
+
+	#define SLOTH_LAST_USER_VAR		96*sCELL
+
+#endif
 
 /* -- Flags for word status ---------------------------- */
 
@@ -171,6 +204,16 @@ void sloth_swap_(X* x);
 void sloth_to_r_(X* x);
 void sloth_r_from_(X* x);
 
+#ifdef SLOTH_FLOATING_POINT
+
+	/* -- Floating point stack ----------------------------- */
+
+	void sloth_fpush(X* x, FCELL v);
+	FCELL sloth_fpop(X* x);
+	FCELL sloth_fpick(X* x, CELL a);
+
+#endif
+
 /* -- Memory management -------------------------------- */
 
 /* Transform from relative to absolute addresses. */
@@ -185,6 +228,17 @@ void sloth_c_store(X* x, CELL a, uCHAR v);
 uCHAR sloth_c_fetch(X* x, CELL a);
 void sloth_store(X* x, CELL a, CELL v);
 CELL sloth_fetch(X* x, CELL a);
+
+#ifdef SLOTH_FLOATING_POINT
+
+	void sloth_fstore(X* x, CELL a, FCELL v);
+	FCELL sloth_ffetch(X* x, CELL a);
+	void sloth_sfstore(X* x, CELL a, SFCELL v);
+	SFCELL sloth_sffetch(X* x, CELL a);
+	void sloth_dfstore(X* x, CELL a, DFCELL v);
+	DFCELL sloth_dffetch(X* x, CELL a);
+
+#endif
 
 /* Setting and getting cells in memory */
 
@@ -222,6 +276,12 @@ void sloth_unused_(X* x);
 
 void sloth_comma(X* x, CELL v);
 void sloth_c_comma(X* x, uCHAR v);
+
+#ifdef SLOTH_FLOATING_POINT
+
+	void sloth_fcomma(X* x, FCELL v);
+
+#endif
 
 /* -- Headers ------------------------------------------ */
 
@@ -267,6 +327,12 @@ void sloth__inner(X* x);
 
 void sloth_eval(X* x, CELL q);
 
+#ifdef SLOTH_FLOATING_POINT
+
+	FCELL sloth_fop(X* x);
+
+#endif
+
 /* -- Tracing inner interpreter ------------------------ */
 
 void sloth__debug(X* x, CELL debug_xt);
@@ -280,6 +346,12 @@ void sloth_exit_(X* x);
 
 void sloth_lit_(X* x);
 void sloth_rip_(X* x);
+
+#ifdef SLOTH_FLOATING_POINT
+	
+	void sloth_flit_(X* x);
+
+#endif
 
 void sloth_branch_(X* x);
 void sloth_zbranch_(X* x);
@@ -337,6 +409,12 @@ void sloth_find_(X* x);
 
 void sloth_compile(X* x, CELL xt);
 void sloth_literal(X* x, CELL n);
+
+#ifdef SLOTH_FLOATING_POINT
+
+	void sloth_fliteral(X* x, FCELL n);
+
+#endif
 
 /* -- Quotations --------------------------------------- */
 
@@ -423,6 +501,107 @@ void sloth_interpret_(X* x);
 
 void sloth_environment_(X* x);
 
+/* -- Floating point word set ------------------------- */
+
+/* Constructing compiler and interpreter system extensions */
+
+void sloth_f_align_(X* x);
+void sloth_f_aligned_(X* x);
+void sloth_f_literal_(X* x);
+void sloth_floats_(X* x);
+void sloth_float_plus_(X* x);
+
+void sloth_s_f_aligned_(X* x);
+void sloth_d_f_aligned_(X* x);
+
+void sloth_s_floats_(X* x);
+void sloth_d_floats_(X* x);
+
+/* Manipulating stack items */
+
+void sloth_f_depth_(X* x);
+void sloth_f_drop_(X* x);
+void sloth_f_dup_(X* x);
+void sloth_f_over_(X* x);
+void sloth_f_rot_(X* x);
+void sloth_f_swap_(X* x);
+
+/* Comparison operations */
+
+void sloth_f_less_than_(X* x);
+void sloth_f_zero_less_than_(X* x);
+void sloth_f_zero_equals_(X* x);
+
+/* Memory-stack transfer operations */
+
+void sloth_f_fetch_(X* x);
+void sloth_f_store_(X* x);
+void sloth_s_f_fetch_(X* x);
+void sloth_s_f_store_(X* x);
+void sloth_d_f_fetch_(X* x);
+void sloth_d_f_store_(X* x);
+
+/* Commands to define data structures */
+
+void sloth_f_constant_(X* x);
+void sloth_f_variable_(X* x);
+
+/* Number-type conversion operators */
+
+void sloth_d_to_f_(X* x);
+void sloth_f_to_d_(X* x);
+
+/* Arithmetic and logical operations */
+
+void sloth_f_abs_(X* x);
+void sloth_f_plus_(X* x);
+void sloth_f_minus_(X* x);
+void sloth_f_star_(X* x);
+void sloth_f_star_star_(X* x);
+void sloth_f_slash_(X* x);
+void sloth_floor_(X* x);
+void sloth_f_max_(X* x);
+void sloth_f_min_(X* x);
+void sloth_f_negate_(X* x);
+void sloth_f_round_(X* x);
+void sloth_f_proximate_(X* x);
+void sloth_f_atan2_(X* x);
+void sloth_f_sqrt_(X* x);
+void sloth_f_l_n_(X* x);
+void sloth_f_sine_(X* x);
+void sloth_f_cos_(X* x);
+void sloth_f_sine_cos_(X* x);
+void sloth_f_tan_(X* x);
+void sloth_f_a_sine_(X* x);
+void sloth_f_a_cos_(X* x);
+void sloth_f_a_tan_(X* x);
+void sloth_f_exp_(X* x);
+void sloth_f_exp_m_one_(X* x);
+void sloth_f_log_ten_(X* x);
+void sloth_f_l_n_p_one_(X* x);
+void sloth_f_a_log_(X* x);
+void sloth_f_sin_h_(X* x);
+void sloth_f_cos_h_(X* x);
+void sloth_f_tan_h_(X* x);
+void sloth_f_a_sine_h_(X* x);
+void sloth_f_a_cos_h_(X* x);
+
+/* String/numeric conversion */
+
+void sloth_to_float_(X* x);
+void sloth_represent_(X* x);
+
+/* Output operations */
+
+void sloth_f_dot_(X* x);
+void sloth_f_s_dot_(X* x);
+void sloth_f_e_dot_(X* x);
+
+/* Non ANS floating point helpers */
+
+void sloth_f_dot_s_(X* x);
+
+
 /* -- Primitives that I don't like too much ------------ */
 
 void sloth_dict_(X* x);
@@ -436,6 +615,7 @@ void sloth_user_variable(X* x, char* name, CELL d, CELL v);
 
 /* -- Bootstrapping ------------------------------------ */
 
+void sloth_bootstrap_kernel(X* x);
 void sloth_bootstrap(X* x);
 
 /* -- Context initialization and destruction ----------- */

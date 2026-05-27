@@ -102,7 +102,7 @@ typedef struct sloth_VM {
 	CELL s[SLOTH_STACK_SIZE], sp;
 	CELL r[SLOTH_RETURN_STACK_SIZE], rp;
 
-	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+	#ifdef SLOTH_ADD_FLOATING_POINT
 
 		FCELL f[SLOTH_FLOAT_STACK_SIZE]; 
 		CELL fp;
@@ -476,7 +476,7 @@ void sloth_init(X* x, CELL d, CELL sz, CELL u, CELL uz) {
 	x->u = u;
 	x->uz = uz;
 
-	#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+	#ifdef SLOTH_ADD_FLOATING_POINT
 
 		x->fp = 0;
 
@@ -852,7 +852,7 @@ void sloth_environment_(X* x) {
 		sloth_push(x, SLOTH_STACK_SIZE);
 		break;
 	case 12: /* FLOATING-STACK */
-		#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+		#ifdef SLOTH_ADD_FLOATING_POINT
 			sloth_push(x, SLOTH_FLOAT_STACK_SIZE);
 		#else
 			sloth_push(x, -1);
@@ -860,7 +860,7 @@ void sloth_environment_(X* x) {
 		break;
 	/* Obsolescent queries (but required for tests) */
 	case 100:
-		#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+		#ifdef SLOTH_ADD_FLOATING_POINT
 			sloth_push(x, -1);
 		#else
 			sloth_push(x, 0);
@@ -1068,7 +1068,8 @@ void sloth_interpret_(X* x) {
 						if (is_double) sloth_literal(x, n < 0 ? -1 : 0);
 					}
 				} else {
-				#ifdef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+
+				#ifdef SLOTH_ADD_FLOATING_POINT
 
 					FCELL r;
 					if (sloth_user_area_get(x, SLOTH_BASE) == 10) {
@@ -1920,7 +1921,7 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "(EMPTY-RETURN-STACK)", sloth_primitive(x, &sloth_empty_rs_));
 }
 
-#ifndef SLOTH_FLOATING_POINT_WORD_SET_HEADER
+#ifndef SLOTH_ADD_FLOATING_POINT
 
 	void sloth_bootstrap(X* x) {
 		sloth_bootstrap_kernel(x);

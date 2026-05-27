@@ -10,17 +10,22 @@ target_include_directories(sloth_lib INTERFACE
 
 # terminal SLOTH REPL
 
+set(SLOTH_FLOATING_POINT ON)
+
 add_executable(sloth repl.c sloth.c)
 
 target_compile_definitions(sloth PRIVATE
 	ROOT_PATH="${PROJECT_BINARY_DIR}/../../../../"
+	SLOTH_FLOATING_POINT
 )
 
 target_link_libraries(sloth cpnbi)
 
-if(UNIX)
-	# Only needed if compiling floating point support (and on Linux!)
-	target_link_libraries(sloth m)
+if(SLOTH_FLOATING_POINT)
+    target_compile_definitions(sloth PRIVATE SLOTH_FLOATING_POINT)
+    if(UNIX)
+        target_link_libraries(sloth m)
+    endif()
 endif()
 
 # Unit tests
@@ -31,3 +36,11 @@ add_executable(test_sloth tests/test_sloth.c sloth.c)
 target_link_libraries(test_sloth unity)
 target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_EMIT)
 target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_KEY)
+
+if(SLOTH_FLOATING_POINT)
+    if(UNIX)
+        target_link_libraries(test_sloth m)
+    endif()
+endif()
+
+
