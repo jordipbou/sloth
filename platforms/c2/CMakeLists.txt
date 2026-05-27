@@ -32,15 +32,29 @@ endif()
 
 add_library(unity STATIC tests/unity.c)
 target_include_directories(unity PUBLIC . tests/)
+if(SLOTH_FLOATING_POINT)
+	target_compile_definitions(unity PUBLIC UNITY_INCLUDE_DOUBLE)
+	if(UNIX)
+		target_link_libraries(unity m)
+  endif()
+endif()
+
 add_executable(test_sloth tests/test_sloth.c sloth.c)
 target_link_libraries(test_sloth unity)
 target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_EMIT)
 target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_KEY)
 
 if(SLOTH_FLOATING_POINT)
-    if(UNIX)
-        target_link_libraries(test_sloth m)
-    endif()
+  target_compile_definitions(test_sloth PRIVATE SLOTH_FLOATING_POINT)
+
+ 	add_executable(test_sloth_fp tests/test_sloth_fp.c sloth.c)
+	target_link_libraries(test_sloth_fp unity)
+  target_compile_definitions(test_sloth_fp PRIVATE SLOTH_FLOATING_POINT)
+
+	if(UNIX)
+		target_link_libraries(test_sloth m)
+    target_link_libraries(test_sloth_fp m)
+  endif()
 endif()
 
 

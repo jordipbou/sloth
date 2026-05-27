@@ -2067,6 +2067,9 @@ void sloth_bootstrap(X* x) {
 void sloth__init(X* x, CELL d, CELL dz, CELL u, CELL uz) { 
 	x->sp = 0; 
 	x->rp = 0; 
+#ifdef SLOTH_FLOATING_POINT
+	x->fp = 0;
+#endif
 	x->ip = -1; 
 	x->d = d;
 	x->dz = dz;
