@@ -208,9 +208,9 @@ void sloth_r_from_(X* x);
 
 	/* -- Floating point stack ----------------------------- */
 
-	void sloth_fpush(X* x, FCELL v);
-	FCELL sloth_fpop(X* x);
-	FCELL sloth_fpick(X* x, CELL a);
+	void sloth_f_push(X* x, FCELL v);
+	FCELL sloth_f_pop(X* x);
+	FCELL sloth_f_pick(X* x, CELL a);
 
 #endif
 
@@ -231,12 +231,12 @@ CELL sloth_fetch(X* x, CELL a);
 
 #ifdef SLOTH_FLOATING_POINT
 
-	void sloth_fstore(X* x, CELL a, FCELL v);
-	FCELL sloth_ffetch(X* x, CELL a);
-	void sloth_sfstore(X* x, CELL a, SFCELL v);
-	SFCELL sloth_sffetch(X* x, CELL a);
-	void sloth_dfstore(X* x, CELL a, DFCELL v);
-	DFCELL sloth_dffetch(X* x, CELL a);
+	void sloth_f_store(X* x, CELL a, FCELL v);
+	FCELL sloth_f_fetch(X* x, CELL a);
+	void sloth_s_f_store(X* x, CELL a, SFCELL v);
+	SFCELL sloth_s_f_fetch(X* x, CELL a);
+	void sloth_d_f_store(X* x, CELL a, DFCELL v);
+	DFCELL sloth_d_f_fetch(X* x, CELL a);
 
 #endif
 
@@ -279,7 +279,7 @@ void sloth_c_comma(X* x, uCHAR v);
 
 #ifdef SLOTH_FLOATING_POINT
 
-	void sloth_fcomma(X* x, FCELL v);
+	void sloth_f_comma(X* x, FCELL v);
 
 #endif
 
@@ -329,7 +329,7 @@ void sloth_eval(X* x, CELL q);
 
 #ifdef SLOTH_FLOATING_POINT
 
-	FCELL sloth_fop(X* x);
+	FCELL sloth_f_op(X* x);
 
 #endif
 

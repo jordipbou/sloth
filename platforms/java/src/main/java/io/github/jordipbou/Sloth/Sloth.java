@@ -35,6 +35,8 @@ public class Sloth {
 	public static final int hCELL_MASK = 0xFFFF;
 	public static final int hCELL_BITS = 16;
 	public static final int sFCELL = 4;
+	public static final int sSFCELL = 4;
+	public static final int sDFCELL = 8;
 
 	protected static final int STACK_SIZE = 64;
 	protected static final int RETURN_STACK_SIZE = 64;
@@ -199,8 +201,9 @@ public class Sloth {
 
 	// -- Float stack
 
-	void fpush(float v) { f[fp++] = v; }
-	float fpop() { return f[--fp]; }
+	void f_push(float v) { f[fp++] = v; }
+	float f_pop() { return f[--fp]; }
+	float f_pick(int a) { return f[fp - a - 1]; }
 
 	// -- Memory
 
@@ -226,6 +229,10 @@ public class Sloth {
 	int fetch(int a) { return block(a).getInt(to_rel(a)); }
 	void f_store(int a, float v) { block(a).putFloat(to_rel(a), v); }
 	float f_fetch(int a) { return block(a).getFloat(to_rel(a)); }
+	void s_f_store(int a, float v) { block(a).putFloat(to_rel(a), v); }
+	float s_f_fetch(int a) { return block(a).getFloat(to_rel(a)); }
+	void d_f_store(int a, double v) { block(a).putDouble(to_rel(a), v); }
+	double d_f_fetch(int a) { return block(a).getDouble(to_rel(a)); }
 
 	// Helpers to use Java Strings with Sloth API
 
@@ -288,6 +295,7 @@ public class Sloth {
 	// -- Inner interpreter
 
 	int op() { int o = fetch(ip); ip += sCELL; return o; }
+	float f_op() { float n = f_fetch(ip); ip += sFCELL;	return n; }
 	protected void do_prim(int q) { p.get(-1 - q).accept(this); }
 	protected void call(int q) { 
 		if (ip >= 0 || rp > 0) rpush(ip); 
@@ -305,7 +313,7 @@ public class Sloth {
 	}
 	public void eval(int q) { execute(q); if (q > 0) inner(); }
 
-	// -- Tracing interpreter
+// -- Tracing interpreter
 
 	protected void debug(int debug_xt) { push(ip); eval(debug_xt); }
 	protected void debug_inner(int debug_xt) {
@@ -402,7 +410,8 @@ public class Sloth {
 	// Memory management
 	int here() { return get(HERE); }
 	void allot(int v) { set(HERE, here() + v); }
-	int aligned(int a) { return ((a + (sCELL - 1)) & ~(sCELL - 1)); }
+	int aligned(int a, int sz) { return ((a + (sz - 1)) & ~(sz - 1)); }
+	int aligned(int a) { return aligned(a, sCELL); }
 	void _align_() { set(HERE, aligned(here())); }
 
 	// Compilation
@@ -414,7 +423,7 @@ public class Sloth {
 		comma(get_xt(find_word("(LIT)")));
 		comma(n);
 	}
-	void fliteral(float f) {
+	void f_literal(float f) {
 		comma(get_xt(find_word("(FLIT)")));
 		f_comma(f);
 	}
@@ -465,6 +474,7 @@ public class Sloth {
 	void _exit_() { ip = (rp > 0) ? rpop() : -1; }
 	void _lit_() { push(op()); }
 	void _rip_() { int tip = ip; int o = op(); push(tip + o - sCELL); }
+	void _f_lit_() { f_push(f_op()); }
 	void _branch_() { ip += op() ; }
 	void _zbranch_() { ip += pop() == 0 ? op() : sCELL ; }
 	void _string_() { 
@@ -981,9 +991,9 @@ public class Sloth {
 						try {
 							float r = Float.parseFloat(buf.toString());
 							if (user_get(STATE) == 0) {
-								fpush(r);
+								f_push(r);
 							} else {
-								fliteral(r);
+								f_literal(r);
 							}
 						} catch(NumberFormatException e2) {
 							_throw(-13);
@@ -1176,7 +1186,56 @@ public class Sloth {
 	}
 	void _source_() { push(user_get(IBUF)); push(user_get(ILEN)); }
 
-	// Helpers for bootstrapping
+	// -- Floating point word set --------------------------
+	
+	// Constructing compiler and interpreter system extensions
+	
+	public void _f_align_() { set(HERE, aligned(get(HERE), sFCELL)); }
+	public void _f_aligned_() { push(aligned(pop(), sFCELL)); }
+	public void _s_f_aligned_() {	push(aligned(pop(), sSFCELL)); }
+	public void _d_f_aligned_() { push(aligned(pop(), sDFCELL)); }
+	
+	public void _floats_() { push(pop() * sFCELL); }
+	public void _s_floats_() { push(pop() * sSFCELL); }
+	public void _d_floats_() { push(pop() * sDFCELL); }
+
+	// Manipulating stack items
+
+	public void _f_depth_() { push(fp); }
+	public void _f_drop_() { f_pop(); }
+	public void _f_dup_() { f_push(f_pick(0)); }
+	public void _f_over_() { f_push(f_pick(1)); }
+	public void _f_rot_() { 
+		float c = f_pop();
+		float b = f_pop();
+		float a = f_pop();
+		f_push(b);
+		f_push(c);
+		f_push(a);
+	}
+	public void _f_swap_() { 
+		float b = f_pop();
+		float a = f_pop();
+		f_push(b);
+		f_push(a);
+	}
+	
+	// Comparison operations
+	
+	public void _f_less_than_() { 
+		float b = f_pop();
+		float a = f_pop();
+		push(a < b ? -1 : 0);
+	}
+	public void _f_zero_less_than_() { 
+		push(f_pop() < 0.0 ? -1 : 0); 
+	}
+	public void _f_zero_equals_() {
+		push(f_pop() == 0.0 ? -1 : 0);
+	}
+
+
+	// -- Helpers for bootstrapping -------------------------
 
 	int primitive(Consumer<Sloth> c) {
 		p.add(c);
