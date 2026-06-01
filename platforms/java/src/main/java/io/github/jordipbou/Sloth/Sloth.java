@@ -34,7 +34,7 @@ public class Sloth {
 	public static final int CELL_BITS = 32;
 	public static final int hCELL_MASK = 0xFFFF;
 	public static final int hCELL_BITS = 16;
-	public static final int sFCELL = 4;
+	public static final int sFCELL = 8;
 	public static final int sSFCELL = 4;
 	public static final int sDFCELL = 8;
 
@@ -55,7 +55,7 @@ public class Sloth {
 	protected int sp; // Data stack pointer
 	protected int r[]; // Return stack
 	protected int rp; // Return stack pointer
-	protected float f[]; // Floating point stack
+	protected double f[]; // Floating point stack
 	protected int fp; // Floating point stack pointer
 
 	protected int ip; // Instruction pointer
@@ -133,7 +133,7 @@ public class Sloth {
 		sp = 0;
 		r = new int[RETURN_STACK_SIZE];
 		rp = 0;
-		f = new float[FLOAT_STACK_SIZE];
+		f = new double[FLOAT_STACK_SIZE];
 		fp = 0;
 
 		ip = -1;
@@ -201,9 +201,9 @@ public class Sloth {
 
 	// -- Float stack
 
-	void f_push(float v) { f[fp++] = v; }
-	float f_pop() { return f[--fp]; }
-	float f_pick(int a) { return f[fp - a - 1]; }
+	void f_push(double v) { f[fp++] = v; }
+	double f_pop() { return f[--fp]; }
+	double f_pick(int a) { return f[fp - a - 1]; }
 
 	// -- Memory
 
@@ -227,8 +227,8 @@ public class Sloth {
 	char c_fetch(int a) { return block(a).getChar(to_rel(a)); }
 	void store(int a, int v) { block(a).putInt(to_rel(a), v); }
 	int fetch(int a) { return block(a).getInt(to_rel(a)); }
-	void f_store(int a, float v) { block(a).putFloat(to_rel(a), v); }
-	float f_fetch(int a) { return block(a).getFloat(to_rel(a)); }
+	void f_store(int a, double v) { block(a).putDouble(to_rel(a), v); }
+	double f_fetch(int a) { return block(a).getDouble(to_rel(a)); }
 	void s_f_store(int a, float v) { block(a).putFloat(to_rel(a), v); }
 	float s_f_fetch(int a) { return block(a).getFloat(to_rel(a)); }
 	void d_f_store(int a, double v) { block(a).putDouble(to_rel(a), v); }
@@ -295,7 +295,7 @@ public class Sloth {
 	// -- Inner interpreter
 
 	int op() { int o = fetch(ip); ip += sCELL; return o; }
-	float f_op() { float n = f_fetch(ip); ip += sFCELL;	return n; }
+	double f_op() { double n = f_fetch(ip); ip += sFCELL;	return n; }
 	protected void do_prim(int q) { p.get(-1 - q).accept(this); }
 	protected void call(int q) { 
 		if (ip >= 0 || rp > 0) rpush(ip); 
@@ -1206,16 +1206,16 @@ public class Sloth {
 	public void _f_dup_() { f_push(f_pick(0)); }
 	public void _f_over_() { f_push(f_pick(1)); }
 	public void _f_rot_() { 
-		float c = f_pop();
-		float b = f_pop();
-		float a = f_pop();
+		double c = f_pop();
+		double b = f_pop();
+		double a = f_pop();
 		f_push(b);
 		f_push(c);
 		f_push(a);
 	}
 	public void _f_swap_() { 
-		float b = f_pop();
-		float a = f_pop();
+		double b = f_pop();
+		double a = f_pop();
 		f_push(b);
 		f_push(a);
 	}
@@ -1223,8 +1223,8 @@ public class Sloth {
 	// Comparison operations
 	
 	public void _f_less_than_() { 
-		float b = f_pop();
-		float a = f_pop();
+		double b = f_pop();
+		double a = f_pop();
 		push(a < b ? -1 : 0);
 	}
 	public void _f_zero_less_than_() { 
@@ -1234,6 +1234,14 @@ public class Sloth {
 		push(f_pop() == 0.0 ? -1 : 0);
 	}
 
+	// Memory-stack transfer operations
+	
+	public void _f_fetch_() { f_push(f_fetch(pop())); }
+	public void _f_store_() {	f_store(pop(), f_pop()); }
+	public void _s_f_fetch_() { f_push(s_f_fetch(pop())); }
+	public void _s_f_store_() { s_f_store(pop(), (float)f_pop()); }
+	public void _d_f_fetch_() { f_push(d_f_fetch(pop())); }
+	public void _d_f_store_() { d_f_store(pop(), f_pop()); }
 
 	// -- Helpers for bootstrapping -------------------------
 

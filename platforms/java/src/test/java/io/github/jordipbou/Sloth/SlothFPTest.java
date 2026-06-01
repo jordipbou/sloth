@@ -303,4 +303,48 @@ public class SlothFPTest {
 		sloth._f_zero_equals_();
 		assertEquals(-1, sloth.pop());
 	}
+
+	// Memory/stack transfer
+
+	@Test
+	public void test_f_fetch_store_() {
+		int addr = sloth.to_abs(1000);
+		sloth.f_push(9.99f);
+		sloth.push(addr);
+		sloth._f_store_();
+		assertEquals(0, sloth.fp);
+	
+		sloth.push(addr);
+		sloth._f_fetch_();
+		assertEquals(1, sloth.fp);
+		assertTrue(within(9.99f, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_s_f_fetch_store_() {
+		int addr = sloth.to_abs(1000);
+		sloth.f_push(3.14);
+		sloth.push(addr);
+		sloth._s_f_store_();
+		assertEquals(0, sloth.fp);
+	
+		sloth.push(addr);
+		sloth._s_f_fetch_();
+		assertEquals(1, sloth.fp);
+		assertTrue(within(3.14f, (float)sloth.f_pop(), FLOAT_EPSILON));
+	}
+
+	@Test
+	public void test_d_f_fetch_store_() {
+		int addr = sloth.to_abs(1000);
+		sloth.f_push(2.71828182845);
+		sloth.push(addr);
+		sloth._d_f_store_();
+		assertEquals(0, sloth.fp);
+	
+		sloth.push(addr);
+		sloth._d_f_fetch_();
+		assertEquals(1, sloth.fp);
+		assertTrue(within(2.71828182845, sloth.f_pop(), EPSILON));
+	}
 }
