@@ -347,4 +347,216 @@ public class SlothFPTest {
 		assertEquals(1, sloth.fp);
 		assertTrue(within(2.71828182845, sloth.f_pop(), EPSILON));
 	}
+
+	// Conversion
+
+	@Test
+	public void test_d_to_f_positive() {
+		/* D>F: 3. ( lo=3 hi=0 ) -> 3.0 */
+		sloth.push(3);
+		sloth.push(0);
+		sloth._d_to_f_();
+		assertEquals(0, sloth.sp);
+		assertEquals(1, sloth.fp);
+		assertTrue(within(3.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_d_to_f_negative() {
+		/* D>F: -3. ( lo=-3 hi=-1 ) -> -3.0 */
+		sloth.push(-3);
+		sloth.push(-1);
+		sloth._d_to_f_();
+		assertEquals(0, sloth.sp);
+		assertTrue(within(-3.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_d_to_f_zero() {
+		sloth.push(0);
+		sloth.push(0);
+		sloth._d_to_f_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_to_d_positive() {
+		/* F>D: 3.7 -> lo=3 hi=0 (truncates toward zero) */
+		sloth.f_push(3.7);
+		sloth._f_to_d_();
+		assertEquals(0, sloth.fp);
+		assertEquals(2, sloth.sp);
+		assertEquals(0, sloth.pop());  /* hi */
+		assertEquals(3, sloth.pop());  /* lo */
+	}
+
+	@Test
+	public void test_f_to_d_negative() {
+		/* F>D: -3.7 -> lo=-3 hi=-1 */
+		sloth.f_push(-3.7);
+		sloth._f_to_d_();
+		assertEquals(-1, sloth.pop()); /* hi */
+		assertEquals(-3, sloth.pop()); /* lo */
+	}
+
+	@Test
+	public void test_f_to_d_zero() {
+		sloth.f_push(0.0);
+		sloth._f_to_d_();
+		assertEquals(0, sloth.pop());
+		assertEquals(0, sloth.pop());
+	}
+	
+	// Arithmetic
+
+	@Test
+	public void test_f_plus_() {
+		sloth.f_push(1.5);
+		sloth.f_push(2.5);
+		sloth._f_plus_();
+		assertEquals(1, sloth.fp);
+		assertTrue(within(4.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_minus_() {
+		sloth.f_push(5.0);
+		sloth.f_push(1.5);
+		sloth._f_minus_();
+		assertTrue(within(3.5, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_star_() {
+		sloth.f_push(3.0);
+		sloth.f_push(4.0);
+		sloth._f_star_();
+		assertTrue(within(12.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_slash_() {
+		sloth.f_push(10.0);
+		sloth.f_push(4.0);
+		sloth._f_slash_();
+		assertTrue(within(2.5, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_star_star_() {
+		sloth.f_push(2.0);
+		sloth.f_push(10.0);
+		sloth._f_star_star_();
+		assertTrue(within(1024.0, sloth.f_pop(), EPSILON));
+	
+		/* 9.0 ** 0.5 = 3.0 */
+		sloth.f_push(9.0);
+		sloth.f_push(0.5);
+		sloth._f_star_star_();
+		assertTrue(within(3.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_abs_() {
+		sloth.f_push(-3.5);
+		sloth._f_abs_();
+		assertTrue(within(3.5, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(3.5);
+		sloth._f_abs_();
+		assertTrue(within(3.5, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(0.0);
+		sloth._f_abs_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_negate_() {
+		sloth.f_push(3.5);
+		sloth._f_negate_();
+		assertTrue(within(-3.5, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(-2.0);
+		sloth._f_negate_();
+		assertTrue(within(2.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(0.0);
+		sloth._f_negate_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_max_() {
+		sloth.f_push(3.0);
+		sloth.f_push(5.0);
+		sloth._f_max_();
+		assertTrue(within(5.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(5.0);
+		sloth.f_push(3.0);
+		sloth._f_max_();
+		assertTrue(within(5.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(-1.0);
+		sloth.f_push(-2.0);
+		sloth._f_max_();
+		assertTrue(within(-1.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_min_() {
+		sloth.f_push(3.0);
+		sloth.f_push(5.0);
+		sloth._f_min_();
+		assertTrue(within(3.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(5.0);
+		sloth.f_push(3.0);
+		sloth._f_min_();
+		assertTrue(within(3.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(-1.0);
+		sloth.f_push(-2.0);
+		sloth._f_min_();
+		assertTrue(within(-2.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_floor_() {
+		sloth.f_push(2.7);
+		sloth._floor_();
+		assertTrue(within(2.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(-2.7);
+		sloth._floor_();
+		assertTrue(within(-3.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(2.0);
+		sloth._floor_();
+		assertTrue(within(2.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_round_() {
+		sloth.f_push(0.5);
+		sloth._f_round_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(-0.5);
+		sloth._f_round_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(1.5);
+		sloth._f_round_();
+		assertTrue(within(2.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(-1.5);
+		sloth._f_round_();
+		assertTrue(within(-2.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(2.4);
+		sloth._f_round_();
+		assertTrue(within(2.0, sloth.f_pop(), EPSILON));
+	}
 }

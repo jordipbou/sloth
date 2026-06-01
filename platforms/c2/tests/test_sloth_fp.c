@@ -468,15 +468,13 @@ void test_floor_() {
 }
 
 void test_f_round_() {
-	/* Rounds half to nearest even ("banker's rounding") is NOT required;
-	   ANS Forth requires "round to nearest, ties away from zero". */
 	sloth_f_push(x, 0.5);
 	sloth_f_round_(x);
-	TEST_ASSERT_DOUBLE_WITHIN(EPSILON, 1.0, sloth_f_pop(x));
+	TEST_ASSERT_DOUBLE_WITHIN(EPSILON, 0.0, sloth_f_pop(x));
 
 	sloth_f_push(x, -0.5);
 	sloth_f_round_(x);
-	TEST_ASSERT_DOUBLE_WITHIN(EPSILON, -1.0, sloth_f_pop(x));
+	TEST_ASSERT_DOUBLE_WITHIN(EPSILON, 0.0, sloth_f_pop(x));
 
 	sloth_f_push(x, 1.5);
 	sloth_f_round_(x);

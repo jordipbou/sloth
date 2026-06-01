@@ -1471,16 +1471,19 @@ void sloth_f_negate_(X* x) {
 	sloth_f_push(x, -sloth_f_pop(x));
 }
 void sloth_f_round_(X* x) {
-	FCELL r = sloth_f_pop(x);
-	if (r >= 0.0) {
-		/* floor(x + 0.5) works for non-negative x */
-		sloth_f_push(x, floor(r + 0.5));
-	} else {
-		/* for negative x, ties away from zero: ceil(x - 0.5)
-		 * but many C89 libs lack ceil(), so use -floor(0.5 - x)
-		 */
-		sloth_f_push(x, -floor(0.5 - r));
-	}
+    FCELL r = sloth_f_pop(x);
+    FCELL fl = floor(r);
+    FCELL diff = r - fl;
+
+    if (diff < 0.5) {
+        sloth_f_push(x, fl);
+    } else if (diff > 0.5) {
+        sloth_f_push(x, fl + 1.0);
+    } else {
+        /* Exact tie: pick the even one (least significant bit = 0) */
+        FCELL even = (floor(fl / 2.0) == fl / 2.0) ? fl : fl + 1.0;
+        sloth_f_push(x, even);
+    }
 }
 void sloth_f_proximate_(X* x) {
 	FCELL r3 = sloth_f_pop(x);

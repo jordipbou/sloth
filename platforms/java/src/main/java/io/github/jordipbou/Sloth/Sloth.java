@@ -1243,6 +1243,42 @@ public class Sloth {
 	public void _d_f_fetch_() { f_push(d_f_fetch(pop())); }
 	public void _d_f_store_() { d_f_store(pop(), f_pop()); }
 
+	// Number-type conversion operators
+
+	public void _d_to_f_() { f_push((double)dpop()); }
+	public void _f_to_d_() { dpush((long)f_pop()); }
+
+	// Arithmetic and logical operations
+
+	public void _f_abs_() { f_push(Math.abs(f_pop())); }
+	public void _f_plus_() { f_push(f_pop() + f_pop()); }
+	public void _f_minus_() { 
+		double b = f_pop();
+		f_push(f_pop() - b);
+	}
+	public void _f_star_() { f_push(f_pop() * f_pop()); }
+	public void _f_star_star_() {
+		double b = f_pop();
+		f_push(Math.pow(f_pop(), b));
+	}
+	public void _f_slash_() {
+		double b = f_pop();
+		f_push(f_pop() / b);
+	}
+	public void _floor_() { f_push(Math.floor(f_pop())); }
+	public void _f_round_() { f_push(Math.rint(f_pop())); }
+	public void _f_max_() { 
+		double b = f_pop();
+		double a = f_pop();
+		f_push(a > b ? a : b);
+	}
+	public void _f_min_() { 
+		double b = f_pop();
+		double a = f_pop();
+		f_push(a < b ? a : b);
+	}
+	public void _f_negate_() { f_push(-f_pop()); }
+
 	// -- Helpers for bootstrapping -------------------------
 
 	int primitive(Consumer<Sloth> c) {
