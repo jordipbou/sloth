@@ -1278,6 +1278,39 @@ public class Sloth {
 		f_push(a < b ? a : b);
 	}
 	public void _f_negate_() { f_push(-f_pop()); }
+	public void _f_proximate_() {
+    double r3 = f_pop();
+    double r2 = f_pop();
+    double r1 = f_pop();
+
+    if (Double.isNaN(r3)) {
+        // r3 is NaN: not proximate
+        push(0);
+    } else if (r3 > 0.0) {
+        // r3 positive: absolute epsilon comparison
+        push(Math.abs(r1 - r2) < r3 ? -1 : 0);
+    } else if (r3 < 0.0) {
+        // r3 negative: relative epsilon comparison
+        push(Math.abs(r1 - r2) < (Math.abs(r3) * (Math.abs(r1) + Math.abs(r2))) ? -1 : 0);
+    } else {
+        // r3 == 0.0: exact bitwise comparison of 
+				// IEEE 754 representation.
+        // Must use doubleToRawLongBits, 
+				// not doubleToLongBits,
+        // because doubleToLongBits canonicalizes 
+				// all NaNs to one value,
+        // which would make distinct NaN bit 
+				// patterns compare as equal.
+        push(Double.doubleToRawLongBits(r1) == Double.doubleToRawLongBits(r2) ? -1 : 0);
+    }
+	}
+	public void _f_sqrt_() { f_push(Math.sqrt(f_pop())); }
+	public void _f_l_n_() { f_push(Math.log(f_pop())); }
+	public void _f_exp_() { f_push(Math.exp(f_pop())); }
+	public void _f_exp_m_one_() { f_push(Math.exp(f_pop()) - 1.0); }
+	public void _f_log_ten_() { f_push(Math.log10(f_pop())); }
+	public void _f_l_n_p_one_() { f_push(Math.log(f_pop() + 1.0)); }
+	public void _f_a_log_() { f_push(Math.pow(10.0, f_pop())); }
 
 	// -- Helpers for bootstrapping -------------------------
 

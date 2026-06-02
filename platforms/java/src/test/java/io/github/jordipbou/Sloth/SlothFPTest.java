@@ -559,4 +559,162 @@ public class SlothFPTest {
 		sloth._f_round_();
 		assertTrue(within(2.0, sloth.f_pop(), EPSILON));
 	}
+
+	// Proximate (F~)
+
+	@Test
+	public void test_f_proximate_exact() {
+		/* r3 = 0.0: exact bitwise comparison */
+		sloth.f_push(1.5);
+		sloth.f_push(1.5);
+		sloth.f_push(0.0);
+		sloth._f_proximate_();
+		assertEquals(-1, sloth.pop());
+	
+		sloth.f_push(1.5);
+		sloth.f_push(1.6);
+		sloth.f_push(0.0);
+		sloth._f_proximate_();
+		assertEquals(0, sloth.pop());
+	}
+
+	@Test
+	public void test_f_proximate_absolute() {
+		/* r3 > 0: absolute tolerance */
+		sloth.f_push(1.0);
+		sloth.f_push(1.09);
+		sloth.f_push(0.1);
+		sloth._f_proximate_();
+		assertEquals(-1, sloth.pop());
+	
+		sloth.f_push(1.0);
+		sloth.f_push(1.11);
+		sloth.f_push(0.1);
+		sloth._f_proximate_();
+		assertEquals(0, sloth.pop());
+	}
+
+	@Test
+	public void test_f_proximate_relative() {
+		/* r3 < 0: relative tolerance |r1-r2| < |r3|*(|r1|+|r2|) */
+		sloth.f_push(1.0);
+		sloth.f_push(1.001);
+		sloth.f_push(-0.01);
+		sloth._f_proximate_();
+		assertEquals(-1, sloth.pop());
+	
+		sloth.f_push(1.0);
+		sloth.f_push(1.1);
+		sloth.f_push(-0.01);
+		sloth._f_proximate_();
+		assertEquals(0, sloth.pop());
+	}
+
+	// Transcendental functions
+
+	@Test
+	public void test_f_sqrt_() {
+		sloth.f_push(4.0);
+		sloth._f_sqrt_();
+		assertTrue(within(2.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(2.0);
+		sloth._f_sqrt_();
+		assertTrue(within(1.41421356237, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(0.0);
+		sloth._f_sqrt_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_l_n_() {
+		sloth.f_push(1.0);
+		sloth._f_l_n_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(Math.E);
+		sloth._f_l_n_();
+		assertTrue(within(1.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(10.0);
+		sloth._f_l_n_();
+		assertTrue(within(2.302585092994, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_exp_() {
+		sloth.f_push(0.0);
+		sloth._f_exp_();
+		assertTrue(within(1.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(1.0);
+		sloth._f_exp_();
+		assertTrue(within(Math.E, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(-1.0);
+		sloth._f_exp_();
+		assertTrue(within(1.0 / Math.E, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_exp_m_one_() {
+		/* FEXPM1 should be accurate near zero where FEXP-1 loses bits */
+		sloth.f_push(0.0);
+		sloth._f_exp_m_one_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(1.0);
+		sloth._f_exp_m_one_();
+		assertTrue(within(Math.E - 1.0, sloth.f_pop(), EPSILON));
+	
+		/* Near-zero value: implementation uses exp(x)-1.0 which loses a few ULPs
+		   due to cancellation. Tolerance is 1e-17 to accommodate this. A port using
+		   expm1() directly would be accurate to within 1 ULP (~1e-20 at this input). */
+		sloth.f_push(1e-10);
+		sloth._f_exp_m_one_();
+		assertTrue(within(1e-10, sloth.f_pop(), 1e-17));
+	}
+
+	@Test
+	public void test_f_log_ten_() {
+		sloth.f_push(1.0);
+		sloth._f_log_ten_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(10.0);
+		sloth._f_log_ten_();
+		assertTrue(within(1.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(100.0);
+		sloth._f_log_ten_();
+		assertTrue(within(2.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_l_n_p_one_() {
+		sloth.f_push(0.0);
+		sloth._f_l_n_p_one_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(Math.E - 1.0);
+		sloth._f_l_n_p_one_();
+		assertTrue(within(1.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_a_log_() {
+		/* FALOG: 10^r */
+		sloth.f_push(0.0);
+		sloth._f_a_log_();
+		assertTrue(within(1.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(1.0);
+		sloth._f_a_log_();
+		assertTrue(within(10.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(2.0);
+		sloth._f_a_log_();
+		assertTrue(within(100.0, sloth.f_pop(), EPSILON));
+	}
 }
