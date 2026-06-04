@@ -717,4 +717,178 @@ public class SlothFPTest {
 		sloth._f_a_log_();
 		assertTrue(within(100.0, sloth.f_pop(), EPSILON));
 	}
+
+	// Trig
+
+	@Test
+	public void test_f_sine_() {
+		sloth.f_push(0.0);
+		sloth._f_sine_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(Math.PI / 2.0);
+		sloth._f_sine_();
+		assertTrue(within(1.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(Math.PI);
+		sloth._f_sine_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_cos_() {
+		sloth.f_push(0.0);
+		sloth._f_cos_();
+		assertTrue(within(1.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(Math.PI / 2.0);
+		sloth._f_cos_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(Math.PI);
+		sloth._f_cos_();
+		assertTrue(within(-1.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_sine_cos_() {
+		sloth.f_push(0.0);
+		sloth._f_sine_cos_();
+		/* ANS: F: r -- r1(sin) r2(cos), TOS = cos */
+		assertEquals(2, sloth.fp);
+		assertTrue(within(1.0, sloth.f_pop(), EPSILON));
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_tan_() {
+		sloth.f_push(0.0);
+		sloth._f_tan_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(Math.PI / 4.0);
+		sloth._f_tan_();
+		assertTrue(within(1.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_atan2_() {
+		/* atan2(0, 1) = 0 */
+		sloth.f_push(0.0);
+		sloth.f_push(1.0);
+		sloth._f_atan2_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		/* atan2(1, 1) = pi/4 */
+		sloth.f_push(1.0);
+		sloth.f_push(1.0);
+		sloth._f_atan2_();
+		assertTrue(within(Math.PI / 4.0, sloth.f_pop(), EPSILON));
+	
+		/* atan2(1, 0) = pi/2 */
+		sloth.f_push(1.0);
+		sloth.f_push(0.0);
+		sloth._f_atan2_();
+		assertTrue(within(Math.PI / 2.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_a_sine_() {
+		sloth.f_push(0.0);
+		sloth._f_a_sine_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(1.0);
+		sloth._f_a_sine_();
+		assertTrue(within(Math.PI / 2.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_a_cos_() {
+		sloth.f_push(1.0);
+		sloth._f_a_cos_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(0.0);
+		sloth._f_a_cos_();
+		assertTrue(within(Math.PI / 2.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_a_tan_() {
+		sloth.f_push(0.0);
+		sloth._f_a_tan_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(1.0);
+		sloth._f_a_tan_();
+		assertTrue(within(Math.PI / 4.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_sin_h_() {
+		sloth.f_push(0.0);
+		sloth._f_sin_h_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(1.0);
+		sloth._f_sin_h_();
+		assertTrue(within(Math.sinh(1.0), sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_cos_h_() {
+		sloth.f_push(0.0);
+		sloth._f_cos_h_();
+		assertTrue(within(1.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(1.0);
+		sloth._f_cos_h_();
+		assertTrue(within(Math.cosh(1.0), sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_tan_h_() {
+		sloth.f_push(0.0);
+		sloth._f_tan_h_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(1.0);
+		sloth._f_tan_h_();
+		assertTrue(within(Math.tanh(1.0), sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_a_sine_h_() {
+		sloth.f_push(0.0);
+		sloth._f_a_sine_h_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(1.0);
+		sloth._f_a_sine_h_();
+		assertTrue(within(Math.log(1.0 + Math.sqrt(2.0)), sloth.f_pop(), EPSILON));
+	
+		/* Negative input */
+		sloth.f_push(-1.0);
+		sloth._f_a_sine_h_();
+		assertTrue(within(-Math.log(1.0 + Math.sqrt(2.0)), sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_f_a_cos_h_() {
+		sloth.f_push(1.0);
+		sloth._f_a_cos_h_();
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	
+		sloth.f_push(2.0);
+		sloth._f_a_cos_h_();
+		assertTrue(within(Math.log(2.0 + Math.sqrt(3.0)), sloth.f_pop(), EPSILON));
+	
+		/* Domain error: r < 1.0 should produce NaN */
+		sloth.f_push(0.5);
+		sloth._f_a_cos_h_();
+		assertTrue(Double.isNaN(sloth.f_pop()));
+	}
+
+
 }

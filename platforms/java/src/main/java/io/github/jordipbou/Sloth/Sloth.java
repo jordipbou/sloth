@@ -1312,6 +1312,50 @@ public class Sloth {
 	public void _f_l_n_p_one_() { f_push(Math.log(f_pop() + 1.0)); }
 	public void _f_a_log_() { f_push(Math.pow(10.0, f_pop())); }
 
+	// Trigonometric functions
+
+	public void _f_sine_() { f_push(Math.sin(f_pop())); }
+	public void _f_a_sine_() { f_push(Math.asin(f_pop())); }
+	public void _f_cos_() { f_push(Math.cos(f_pop()));	}
+	public void _f_a_cos_() { f_push(Math.acos(f_pop())); }
+	public void _f_sine_cos_() {
+		double r = f_pop();
+		f_push(Math.sin(r));
+		f_push(Math.cos(r));
+	}
+	public void _f_tan_() { f_push(Math.tan(f_pop())); }
+	public void _f_a_tan_() { f_push(Math.atan(f_pop())); }
+	public void _f_atan2_() { 
+		double b = f_pop();
+		f_push(Math.atan2(f_pop(), b));
+	}
+
+	// Hyperbolic functions
+
+	public void _f_sin_h_() { f_push(Math.sinh(f_pop())); }
+	public void _f_cos_h_() { f_push(Math.cosh(f_pop())); }
+	public void _f_tan_h_() { f_push(Math.tanh(f_pop())); }
+	// There are no asinh/acosh functions in Math.
+	public void _f_a_sine_h_() {
+		double r = f_pop();
+		if (r == 0) {
+			f_push(0.0);
+		} else if (r > 0) {
+			f_push(Math.log(r + Math.sqrt(r * r + 1.0)));
+		} else {
+			f_push(-Math.log(-r + Math.sqrt(r * r + 1.0)));
+		}
+	}
+	public void _f_a_cos_h_() {
+		double r = f_pop();
+		if (r < 1.0) {
+			/* undefined, push NaN */
+			f_push(Double.NaN);
+		} else {
+			f_push(Math.log(r + Math.sqrt(r * r - 1.0)));
+		}
+	}
+
 	// -- Helpers for bootstrapping -------------------------
 
 	int primitive(Consumer<Sloth> c) {
