@@ -1356,6 +1356,30 @@ public class Sloth {
 		}
 	}
 
+	// String/numeric conversion
+	
+	public void _to_float_() {
+		int tlen = pop();
+		int tok = pop();
+		String s = toString(tok, tlen);
+		try {
+			// A string with trailing spaces must fail
+			if (s.endsWith(" ")) { throw new NumberFormatException(); }
+			f_push(Double.parseDouble(s));
+			push(-1);
+		} catch (NumberFormatException e) {
+			// Double.parseDouble will not convert an empty
+			// string or a string of blanks to a 0.0, but
+			// the Forth standard requires it.
+			if (s.trim().isEmpty()) {
+				push(-1);
+				f_push(0.0);
+			} else {
+				push(0);
+			}
+		}
+	}
+
 	// -- Helpers for bootstrapping -------------------------
 
 	int primitive(Consumer<Sloth> c) {

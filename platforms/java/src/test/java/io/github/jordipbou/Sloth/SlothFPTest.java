@@ -890,5 +890,77 @@ public class SlothFPTest {
 		assertTrue(Double.isNaN(sloth.f_pop()));
 	}
 
+	// String/numeric conversion
 
+	@Test
+	public void test_to_float_integer() {
+		String s = "42";
+		sloth.push(sloth.fromString(s));
+		sloth.push(2);
+		sloth._to_float_();
+		assertEquals(-1, sloth.pop()); /* success flag */
+		assertTrue(within(42.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_to_float_decimal() {
+		String s = "3.14";
+		sloth.push(sloth.fromString(s));
+		sloth.push(4);
+		sloth._to_float_();
+		assertEquals(-1, sloth.pop());
+		assertTrue(within(3.14, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_to_float_exponent() {
+		String s = "1E3";
+		sloth.push(sloth.fromString(s));
+		sloth.push(3);
+		sloth._to_float_();
+		assertEquals(-1, sloth.pop());
+		assertTrue(within(1000.0, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_to_float_negative() {
+		String s = "-2.5";
+		sloth.push(sloth.fromString(s));
+		sloth.push(4);
+		sloth._to_float_();
+		assertEquals(-1, sloth.pop());
+		assertTrue(within(-2.5, sloth.f_pop(), EPSILON));
+	}
+
+	@Test
+	public void test_to_float_blanks_are_zero() {
+		/* A string of blanks represents 0E per ANS */
+		String s = "   ";
+		sloth.push(sloth.fromString(s));
+		sloth.push(3);
+		sloth._to_float_();
+		assertEquals(-1, sloth.pop());
+		assertTrue(within(0.0, sloth.f_pop(), EPSILON));
+	}
+	
+	@Test
+	public void test_to_float_trailing_space_fails() {
+		/* Trailing space must fail */
+		String s = "1.0 ";
+		sloth.push(sloth.fromString(s));
+		sloth.push(4);
+		sloth._to_float_();
+		assertEquals(0, sloth.pop());
+		assertEquals(0, sloth.fp);
+	}
+	
+	@Test
+	public void test_to_float_invalid_fails() {
+		String s = "abc";
+		sloth.push(sloth.fromString(s));
+		sloth.push(3);
+		sloth._to_float_();
+		assertEquals(0, sloth.pop());
+		assertEquals(0, sloth.fp);
+	}
 }
