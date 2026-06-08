@@ -1,70 +1,60 @@
 cmake_minimum_required(VERSION 3.16)
 project(sloth-repl LANGUAGES C)
 
-add_subdirectory(libs/facility)
-add_subdirectory(libs/file)
-add_subdirectory(libs/locals)
-add_subdirectory(libs/memory)
-# add_subdirectory(libs/sqlite)
-# add_subdirectory(libs/plibsys)
-# add_subdirectory(libs/systray)
-# add_subdirectory(libs/osdialog)
-add_subdirectory(libs/geninput)
-# add_subdirectory(libs/sdl3)
+add_subdirectory(libs/cpnbi)
 
 add_library(sloth_lib INTERFACE)
-
 target_include_directories(sloth_lib INTERFACE
 	${CMAKE_CURRENT_SOURCE_DIR}/
 )
 
 # terminal SLOTH REPL
 
-add_executable(sloth repl.c)
+set(SLOTH_FLOATING_POINT ON)
+
+add_executable(sloth repl.c sloth.c)
 
 target_compile_definitions(sloth PRIVATE
 	ROOT_PATH="${PROJECT_BINARY_DIR}/../../../../"
+	SLOTH_FLOATING_POINT
 )
 
-if(UNIX)
-	# Only needed if compiling floating point support (and on Linux!)
-	target_link_libraries(sloth m)
+target_link_libraries(sloth cpnbi)
+
+if(SLOTH_FLOATING_POINT)
+    target_compile_definitions(sloth PRIVATE SLOTH_FLOATING_POINT)
+    if(UNIX)
+        target_link_libraries(sloth m)
+    endif()
 endif()
-
-target_link_libraries(sloth sloth_facility_wordset)
-target_link_libraries(sloth sloth_file_wordset)
-target_link_libraries(sloth sloth_locals_wordset)
-target_link_libraries(sloth sloth_memory_wordset)
-# target_link_libraries(sloth sloth_sqlite)
-# target_link_libraries(sloth sloth_plibsys)
-# target_link_libraries(sloth sloth_systray)
-# target_link_libraries(sloth sloth_osdialog)
-# target_link_libraries(sloth sloth_geninput)
-
-# SDL3 based SLOTH executable
-
-# if(UNIX)
-# 	add_executable(sdl3_sloth sdl3_repl.c)
-# 	target_link_libraries(sdl3_sloth m pthread)
-# else()
-# 	# add_executable(sdl3_sloth WIN32 sdl3_repl.c)
-# 	add_executable(sdl3_sloth sdl3_repl.c)
-# endif()
-# 	
-# target_compile_definitions(sdl3_sloth PRIVATE
-# 	ROOT_PATH="${PROJECT_BINARY_DIR}/../../"
-# )
-# 
-# target_link_libraries(sdl3_sloth sloth_sdl3)
-# target_link_libraries(sdl3_sloth sloth_facility_wordset)
-# target_link_libraries(sdl3_sloth sloth_file_wordset)
-# target_link_libraries(sdl3_sloth sloth_locals_wordset)
-# target_link_libraries(sdl3_sloth sloth_memory_wordset)
-# 
 
 # Unit tests
 
 add_library(unity STATIC tests/unity.c)
 target_include_directories(unity PUBLIC . tests/)
-add_executable(test_sloth tests/test_sloth.c)
+if(SLOTH_FLOATING_POINT)
+	target_compile_definitions(unity PUBLIC UNITY_INCLUDE_DOUBLE)
+	if(UNIX)
+		target_link_libraries(unity m)
+  endif()
+endif()
+
+add_executable(test_sloth tests/test_sloth.c sloth.c)
 target_link_libraries(test_sloth unity)
+target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_EMIT)
+target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_KEY)
+
+if(SLOTH_FLOATING_POINT)
+  target_compile_definitions(test_sloth PRIVATE SLOTH_FLOATING_POINT)
+
+ 	add_executable(test_sloth_fp tests/test_sloth_fp.c sloth.c)
+	target_link_libraries(test_sloth_fp unity)
+  target_compile_definitions(test_sloth_fp PRIVATE SLOTH_FLOATING_POINT)
+
+	if(UNIX)
+		target_link_libraries(test_sloth m)
+    target_link_libraries(test_sloth_fp m)
+  endif()
+endif()
+
+
