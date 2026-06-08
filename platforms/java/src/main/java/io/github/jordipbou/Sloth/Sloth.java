@@ -1380,6 +1380,75 @@ public class Sloth {
 		}
 	}
 
+	public void _represent_() {
+		// Stack: ( c-addr u -- n flag1 flag2 )  FStack: ( r -- )
+		int u    = pop();
+		int addr = pop();
+		double r = f_pop();
+ 
+		// Handle non-finite values (NaN, Infinity)
+		if (Double.isNaN(r) || Double.isInfinite(r)) {
+			String marker = Double.isNaN(r) ? "nan" : (r > 0 ? "+infinity" : "-infinity");
+			for (int i = 0; i < u; i++) {
+				char ch = i < marker.length() ? marker.charAt(i) : ' ';
+				c_store(addr + i * suCHAR, ch);
+			}
+			push(0);   // n: implementation-defined
+			push(0);   // flag1: implementation-defined
+			push(0);   // flag2: false — out of valid range
+			return;
+		}
+ 
+		// Determine sign; treat -0.0 as negative per IEEE convention
+		boolean negative = r < 0.0 || (r == 0.0 && (1.0 / r) == Double.NEGATIVE_INFINITY);
+		double  abs      = Math.abs(r);
+ 
+		int    n;
+		String digits;
+ 
+		if (abs == 0.0) {
+			// Zero: exponent is 0, all digit characters are '0'
+			n      = 0;
+			digits = "0".repeat(Math.max(u, 1));
+		} else {
+			// Use BigDecimal + HALF_EVEN to get the correctly rounded u-digit significand.
+			// HALF_EVEN ("banker's rounding") matches the ANS Forth "round to nearest" rule.
+			java.math.BigDecimal bd = new java.math.BigDecimal(abs)
+				.round(new java.math.MathContext(u, java.math.RoundingMode.HALF_EVEN));
+ 
+			// Compute decimal exponent n: abs == 0.digits * 10^n, so n = floor(log10(abs)) + 1.
+			// We derive n from the rounded value to account for carry-out (e.g. 9.999 -> 10.00).
+			n = (int) Math.floor(Math.log10(bd.doubleValue())) + 1;
+ 
+			// Shift to an integer with exactly u digits: significand = bd * 10^(u-n)
+			java.math.BigDecimal shifted =
+				bd.scaleByPowerOfTen(u - n).setScale(0, java.math.RoundingMode.HALF_EVEN);
+			String digitStr = shifted.toPlainString();
+ 
+			// Carry-out guard: rounding may produce u+1 digits (e.g. "10000" instead of "9999")
+			if (digitStr.length() > u) {
+				n      += 1;
+				shifted = shifted.scaleByPowerOfTen(-1).setScale(0, java.math.RoundingMode.HALF_EVEN);
+				digitStr = shifted.toPlainString();
+			}
+ 
+			// Ensure exactly u characters (pad with trailing zeros if needed)
+			while (digitStr.length() < u) digitStr += "0";
+			if (digitStr.length() > u)    digitStr  = digitStr.substring(0, u);
+ 
+			digits = digitStr;
+		}
+ 
+		// Write digit characters into the Sloth character buffer at c-addr
+		for (int i = 0; i < u; i++) {
+			c_store(addr + i * suCHAR, i < digits.length() ? digits.charAt(i) : '0');
+		}
+ 
+		push(n);                  // decimal exponent
+		push(negative ? -1 : 0); // flag1: true (-1) if r is negative
+		push(-1);                 // flag2: true (-1) — valid finite result
+	}
+
 	// -- Helpers for bootstrapping -------------------------
 
 	int primitive(Consumer<Sloth> c) {

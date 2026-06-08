@@ -963,4 +963,24 @@ public class SlothFPTest {
 		assertEquals(0, sloth.pop());
 		assertEquals(0, sloth.fp);
 	}
+
+	// REPRESENT
+
+	@Test
+	public void test_represent_positive() {
+		int addr = sloth.fromString(" ".repeat(32));
+		sloth.f_push(1.5);
+		sloth.push(addr);
+		sloth.push(6);
+		sloth._represent_();
+		/* Stack: n sign flag */
+		int flag = sloth.pop();
+		int sign = sloth.pop();
+		int n = sloth.pop();
+		assertEquals(-1, flag);
+		assertEquals(0, sign);
+		assertEquals(1, n);
+		assertEquals('1', sloth.c_fetch(addr));
+		assertEquals('5', sloth.c_fetch(addr + suCHAR));
+	}
 }
