@@ -14,8 +14,12 @@ set(SLOTH_FLOATING_POINT ON)
 
 add_executable(sloth repl.c sloth.c)
 
+if(NOT DEFINED SLOTH_ROOT_PATH)
+	set(SLOTH_ROOT_PATH "${PROJECT_BINARY_DIR}/../../../../")
+endif()
+
 target_compile_definitions(sloth PRIVATE
-	ROOT_PATH="${PROJECT_BINARY_DIR}/../../../../"
+	ROOT_PATH="${SLOTH_ROOT_PATH}"
 	SLOTH_FLOATING_POINT
 )
 
