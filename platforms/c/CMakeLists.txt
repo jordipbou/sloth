@@ -3,16 +3,18 @@ project(sloth-repl LANGUAGES C)
 
 add_subdirectory(libs/cpnbi)
 
-add_library(sloth_lib INTERFACE)
-target_include_directories(sloth_lib INTERFACE
-	${CMAKE_CURRENT_SOURCE_DIR}/
+add_library(sloth_lib STATIC sloth.c)
+target_include_directories(sloth_lib
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
+        $<INSTALL_INTERFACE:>  # for install(EXPORT ...) scenarios
 )
 
 # terminal SLOTH REPL
 
 set(SLOTH_FLOATING_POINT ON)
 
-add_executable(sloth repl.c sloth.c)
+add_executable(sloth repl.c)
 
 if(NOT DEFINED SLOTH_ROOT_PATH)
 	set(SLOTH_ROOT_PATH "${PROJECT_BINARY_DIR}/../../../../")
@@ -23,7 +25,7 @@ target_compile_definitions(sloth PRIVATE
 	SLOTH_FLOATING_POINT
 )
 
-target_link_libraries(sloth cpnbi)
+target_link_libraries(sloth sloth_lib cpnbi_lib)
 
 if(SLOTH_FLOATING_POINT)
     target_compile_definitions(sloth PRIVATE SLOTH_FLOATING_POINT)
@@ -44,7 +46,7 @@ if(SLOTH_FLOATING_POINT)
 endif()
 
 add_executable(test_sloth tests/test_sloth.c sloth.c)
-target_link_libraries(test_sloth unity)
+target_link_libraries(test_sloth sloth_lib unity)
 target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_EMIT)
 target_compile_definitions(test_sloth PRIVATE SLOTH_CUSTOM_KEY)
 
@@ -52,7 +54,7 @@ if(SLOTH_FLOATING_POINT)
   target_compile_definitions(test_sloth PRIVATE SLOTH_FLOATING_POINT)
 
  	add_executable(test_sloth_fp tests/test_sloth_fp.c sloth.c)
-	target_link_libraries(test_sloth_fp unity)
+	target_link_libraries(test_sloth_fp sloth_lib unity)
   target_compile_definitions(test_sloth_fp PRIVATE SLOTH_FLOATING_POINT)
 
 	if(UNIX)
