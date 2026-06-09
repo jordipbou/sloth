@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 project(sloth-repl LANGUAGES C)
 
+# Check the SLOTH_FLOATING_POINT thing, I don't like
+# how it's done.
+# Also, I think it should be ON by default, not the 
+# opposite.
+
 add_subdirectory(libs/cpnbi)
 
 add_library(sloth_lib STATIC sloth.c)
@@ -9,6 +14,9 @@ target_include_directories(sloth_lib
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
         $<INSTALL_INTERFACE:>  # for install(EXPORT ...) scenarios
 )
+if (SLOTH_FLOATING_POINT)
+	target_compile_definitions(sloth_lib PRIVATE SLOTH_FLOATING_POINT)
+endif()
 
 # terminal SLOTH REPL
 
