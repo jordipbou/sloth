@@ -65,7 +65,7 @@ void sloth_r_from_(X* x) {
 	sloth_push(x, a);
 }
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 /* -- Floating point stack ----------------------------- */
 
@@ -90,7 +90,7 @@ uCHAR sloth_c_fetch(X* x, CELL a) { return *((uCHAR*)a); }
 void sloth_store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
 CELL sloth_fetch(X* x, CELL a) { return *((CELL*)a); }
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 void sloth_f_store(X* x, CELL a, FCELL v) { *((FCELL*)a) = v; }
 FCELL sloth_f_fetch(X* x, CELL a) { return *((FCELL*)a); }
@@ -167,7 +167,7 @@ void sloth_c_comma(X* x, uCHAR v) {
 	sloth_store(x, x->d, sloth_here(x) + suCHAR);
 }
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 void sloth_f_comma(X* x, FCELL v) { 
 	sloth_f_store(x, sloth_here(x), v);
@@ -255,7 +255,7 @@ CELL sloth_op(X* x) {
 	return o; 
 }
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 FCELL sloth_f_op(X* x) {
 	FCELL n = sloth_f_fetch(x, x->ip);
@@ -326,7 +326,7 @@ void sloth_rip_(X* x) {
 	sloth_push(x, ip + o - sCELL);
 }
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 void sloth_f_lit_(X* x) { sloth_f_push(x, sloth_f_op(x)); }
 
@@ -602,7 +602,7 @@ void sloth_literal(X* x, CELL n) {
 	sloth_comma(x, n); 
 }
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 void sloth_fliteral(X* x, FCELL n) {
 	sloth_comma(x, sloth_get_xt(x, sloth_find_word(x, "(FLIT)")));
@@ -1203,7 +1203,7 @@ void sloth_interpret_(X* x) {
 						if (is_double) sloth_literal(x, n < 0 ? -1 : 0);
 					}
 				} else {
-				#ifdef SLOTH_FLOATING_POINT
+				#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 					FCELL r;
 					if (sloth_user_get(x, SLOTH_BASE) == 10) {
@@ -1266,7 +1266,7 @@ void sloth_environment_(X* x) {
 		sloth_push(x, SLOTH_STACK_SIZE);
 		break;
 	case 12: /* FLOATING-STACK */
-		#ifdef SLOTH_FLOATING_POINT
+		#ifndef SLOTH_WITHOUT_FLOATING_POINT
 			sloth_push(x, SLOTH_FLOAT_STACK_SIZE);
 		#else
 			sloth_push(x, -1);
@@ -1274,7 +1274,7 @@ void sloth_environment_(X* x) {
 		break;
 	/* Obsolescent queries (but required for tests) */
 	case 100:
-		#ifdef SLOTH_FLOATING_POINT
+		#ifndef SLOTH_WITHOUT_FLOATING_POINT
 			sloth_push(x, -1);
 		#else
 			sloth_push(x, 0);
@@ -1314,7 +1314,7 @@ void sloth_environment_(X* x) {
 	}
 }
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 /* == Floating point word set ========================== */
 
@@ -1943,7 +1943,7 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "(EMPTY-RETURN-STACK)", sloth_primitive(x, &sloth_empty_return_stack_));
 }
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 void sloth_bootstrap_floating_point_word_set(X* x) {
 
@@ -2070,7 +2070,7 @@ void sloth_bootstrap(X* x) {
 void sloth__init(X* x, CELL d, CELL dz, CELL u, CELL uz) { 
 	x->sp = 0; 
 	x->rp = 0; 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 	x->fp = 0;
 #endif
 	x->ip = -1; 

@@ -1,4 +1,4 @@
-#define UNITY_INCLUDE_DOUBLE
+// #define UNITY_INCLUDE_DOUBLE
 #define UNITY_DOUBLE_PRECISION 1e-10
 #include "sloth.h"
 #include "unity.h"

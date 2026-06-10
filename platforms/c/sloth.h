@@ -6,7 +6,7 @@
 #include<assert.h>
 #include<limits.h> /* for CHAR_BIT */
 
-#ifdef SLOTH_FOATING_POINT
+#ifndef SLOTH_WITHOUT_FOATING_POINT
 #include<math.h>
 #endif
 
@@ -46,7 +46,7 @@ typedef intptr_t CELL;
 typedef uintptr_t uCELL;
 #define suCHAR sizeof(uCHAR)
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 	typedef double FCELL;
 	typedef float SFCELL;
@@ -112,7 +112,7 @@ typedef struct sloth_VM {
 	CELL s[SLOTH_STACK_SIZE], sp;
 	CELL r[SLOTH_RETURN_STACK_SIZE], rp;
 
-	#ifdef SLOTH_FLOATING_POINT
+	#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 		FCELL f[SLOTH_FLOAT_STACK_SIZE]; 
 		CELL fp;
@@ -174,7 +174,7 @@ typedef struct sloth_VM {
 
 #define SLOTH_INCLUDED_FILES		95*sCELL
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 	#define SLOTH_PRECISION				96*sCELL
 	#define SLOTH_LAST_USER_VAR		97*sCELL
@@ -204,7 +204,7 @@ void sloth_swap_(X* x);
 void sloth_to_r_(X* x);
 void sloth_r_from_(X* x);
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 	/* -- Floating point stack ----------------------------- */
 
@@ -229,7 +229,7 @@ uCHAR sloth_c_fetch(X* x, CELL a);
 void sloth_store(X* x, CELL a, CELL v);
 CELL sloth_fetch(X* x, CELL a);
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 	void sloth_f_store(X* x, CELL a, FCELL v);
 	FCELL sloth_f_fetch(X* x, CELL a);
@@ -277,7 +277,7 @@ void sloth_unused_(X* x);
 void sloth_comma(X* x, CELL v);
 void sloth_c_comma(X* x, uCHAR v);
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 	void sloth_f_comma(X* x, FCELL v);
 
@@ -327,7 +327,7 @@ void sloth__inner(X* x);
 
 void sloth_eval(X* x, CELL q);
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 	FCELL sloth_f_op(X* x);
 
@@ -347,9 +347,9 @@ void sloth_exit_(X* x);
 void sloth_lit_(X* x);
 void sloth_rip_(X* x);
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 	
-	void sloth_flit_(X* x);
+	void sloth_f_lit_(X* x);
 
 #endif
 
@@ -410,7 +410,7 @@ void sloth_find_(X* x);
 void sloth_compile(X* x, CELL xt);
 void sloth_literal(X* x, CELL n);
 
-#ifdef SLOTH_FLOATING_POINT
+#ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 	void sloth_fliteral(X* x, FCELL n);
 
