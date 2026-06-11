@@ -3,7 +3,8 @@ project(sloth LANGUAGES C)
 
 option(DISTRIBUTION_BUILD "Build copying 4th files" ON)
 
-# add_subdirectory(platforms/c term)
+add_subdirectory(platforms/c)
+
 # add_subdirectory(platforms/c/libs/sdl3 gui)
 # 
 # add_custom_target(copy_4th_files_for_c_target ALL
