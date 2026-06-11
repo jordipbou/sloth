@@ -16,6 +16,8 @@ if(SLOTH_WITHOUT_FLOATING_POINT)
 		SLOTH_WITHOUT_FLOATING_POINT)
 endif()
 
+add_library(sloth::sloth_lib ALIAS sloth_lib)
+
 # terminal SLOTH REPL
 
 add_executable(sloth repl.c)
