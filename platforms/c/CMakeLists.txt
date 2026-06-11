@@ -16,8 +16,6 @@ if(SLOTH_WITHOUT_FLOATING_POINT)
 		SLOTH_WITHOUT_FLOATING_POINT)
 endif()
 
-add_library(sloth::sloth_lib ALIAS sloth_lib)
-
 # terminal SLOTH REPL
 
 add_executable(sloth repl.c)
@@ -26,7 +24,7 @@ target_compile_definitions(sloth PRIVATE
 	SLOTH_WITHOUT_FLOATING_POINT
 )
 
-target_link_libraries(sloth sloth_lib cpnbi::cpnbi_lib)
+target_link_libraries(sloth sloth_lib cpnbi_lib)
 
 # Unit tests
 
