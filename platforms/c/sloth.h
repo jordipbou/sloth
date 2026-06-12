@@ -1,3 +1,6 @@
+#ifndef SLOTH_LIB
+#define SLOTH_LIB
+
 #include<stdint.h>
 #include<setjmp.h>
 #include<stdlib.h>
@@ -634,3 +637,5 @@ void sloth_evaluate(X* x, char* s);
 /* -- Helper REPL -------------------------------------- */
 
 void sloth_repl(X* x);
+
+#endif
