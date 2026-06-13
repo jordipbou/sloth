@@ -1777,7 +1777,7 @@ void sloth_f_dot_s_(X* x) {
 
 void sloth_dict_(X* x) { sloth_push(x, (CELL)x->d); }
 void sloth_empty_return_stack_(X* x) { x->rp = 0; }
-void sloth_ints_(X* x) { sloth_push(x, sizeof(int)); }
+void sloth_ints_(X* x) { sloth_push(x, sloth_pop(x)*sizeof(int)); }
 
 /* -- Primitive, word and user variable creation ------- */
 
