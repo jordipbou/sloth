@@ -1773,10 +1773,11 @@ void sloth_f_dot_s_(X* x) {
 
 #endif
 
-/* -- Primitives that I don't like too much ------------ */
+/* Non ANS helpers */
 
 void sloth_dict_(X* x) { sloth_push(x, (CELL)x->d); }
 void sloth_empty_return_stack_(X* x) { x->rp = 0; }
+void sloth_ints_(X* x) { sloth_push(x, sizeof(int)); }
 
 /* -- Primitive, word and user variable creation ------- */
 
@@ -2047,8 +2048,9 @@ void sloth_bootstrap_floating_point_word_set(X* x) {
 	sloth_code(x, "FS.", sloth_primitive(x, &sloth_f_s_dot_));
 	sloth_code(x, "FE.", sloth_primitive(x, &sloth_f_e_dot_));
 
-	/* Non ANS floating point helpers */
+	/* Non ANS helpers */
 
+	sloth_code(x, "INTS", sloth_primitive(x, &sloth_ints_));
 	sloth_code(x, "F.S", sloth_primitive(x, &sloth_f_dot_s_));
 }
 
