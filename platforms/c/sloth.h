@@ -361,7 +361,7 @@ void sloth_zbranch_(X* x);
 
 /* -- Exceptions --------------------------------------- */
 
-void sloth_catch(X* x, CELL q);
+CELL sloth_catch(X* x, CELL q);
 void sloth_throw(X* x, CELL e);
 
 void sloth_catch_(X* x);

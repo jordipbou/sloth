@@ -10,9 +10,8 @@ target_include_directories(sloth_lib
         $<INSTALL_INTERFACE:>
 )
 
-if(SLOTH_WITHOUT_FLOATING_POINT)
-	target_compile_definitions(sloth_lib 
-		PRIVATE 
+if(DEFINED SLOTH_WITHOUT_FLOATING_POINT)
+	target_compile_definitions(sloth_lib PRIVATE 
 		SLOTH_WITHOUT_FLOATING_POINT)
 endif()
 
@@ -21,8 +20,13 @@ endif()
 add_executable(sloth repl.c)
 target_compile_definitions(sloth PRIVATE
 	ROOT_PATH="${PROJECT_BINARY_DIR}/../../../../"
-	SLOTH_WITHOUT_FLOATING_POINT
 )
+
+if(DEFINED SLOTH_WITHOUT_FLOATING_POINT)
+	target_compile_definitions(sloth PRIVATE
+		SLOTH_WITHOUT_FLOATING_POINT
+	)
+endif()
 
 target_link_libraries(sloth sloth_lib cpnbi_lib)
 

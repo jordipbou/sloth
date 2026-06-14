@@ -12,10 +12,8 @@ int main(int argc, char**argv) {
 
 	sloth_bootstrap(x);
 
-	sloth_include(x, ROOT_PATH "4th/ans.4th");
-
-	/* Set ROOT PATH */
 	sloth_set_root_path(x, ROOT_PATH "4th/");
+	sloth_include(x, "ans.4th");
 
 	if (argc == 1) {
 		sloth_repl(x);
@@ -23,8 +21,9 @@ int main(int argc, char**argv) {
 					|| strcmp(argv[1], "-t") == 0) {
 		// Standard tests
 		sloth_include(x, ROOT_PATH "forth2012-test-suite/src/runtests.fth");
-		#ifdef SLOTH_FLOATING_POINT
 
+		#ifndef SLOTH_WITHOUT_FLOATING_POINT
+		
 		// Floating point tests
 		sloth_include(x, ROOT_PATH "forth2012-test-suite/src/fp/runfptests.fth");
 

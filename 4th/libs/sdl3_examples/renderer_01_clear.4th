@@ -1,5 +1,8 @@
 \ App initialization
 
+variable (renderer)
+variable (window)
+
 s" Example Renderer Clear" 
 s" 1.0" 
 s" com.example.renderer-clear"

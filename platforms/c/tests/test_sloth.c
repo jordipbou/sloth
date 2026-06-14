@@ -425,17 +425,17 @@ void throw_42_prim(X* x) { sloth_throw(x, 42); }
 
 void test_catch_no_throw() {
 	CELL p = sloth_primitive(x, my_primitive);
-	sloth_catch(x, p);
-	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	CELL e = sloth_catch(x, p);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(0, e);
 	TEST_ASSERT_EQUAL(-1, x->jmpbuf_idx);
 }
 
 void test_catch_throw() {
 	CELL p = sloth_primitive(x, throw_42_prim);
-	sloth_catch(x, p);
-	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL(42, sloth_pop(x));
+	CELL e = sloth_catch(x, p);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(42, e);
 	TEST_ASSERT_EQUAL(-1, x->jmpbuf_idx);
 }
 
@@ -443,9 +443,9 @@ void test_catch_restores_stack() {
 	sloth_push(x, 1);
 	sloth_push(x, 2);
 	CELL p = sloth_primitive(x, throw_42_prim);
-	sloth_catch(x, p);
-	TEST_ASSERT_EQUAL(3, x->sp);
-	TEST_ASSERT_EQUAL(42, sloth_pop(x));
+	CELL e = sloth_catch(x, p);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(42, e);
 	TEST_ASSERT_EQUAL(2, sloth_pop(x));
 	TEST_ASSERT_EQUAL(1, sloth_pop(x));
 	TEST_ASSERT_EQUAL(-1, x->jmpbuf_idx);
@@ -453,14 +453,14 @@ void test_catch_restores_stack() {
 
 void nested_throw_test_prim(X* x) {
 	CELL p = sloth_primitive(x, throw_42_prim);
-	sloth_catch(x, p);
+	sloth_push(x, sloth_catch(x, p));
 }
 
 void test_nested_catch() {
 	CELL p = sloth_primitive(x, nested_throw_test_prim);
-	sloth_catch(x, p);
-	TEST_ASSERT_EQUAL(2, x->sp);
-	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	CELL e =sloth_catch(x, p);
+	TEST_ASSERT_EQUAL(1, x->sp);
+	TEST_ASSERT_EQUAL(0, e);
 	TEST_ASSERT_EQUAL(42, sloth_pop(x));
 	TEST_ASSERT_EQUAL(-1, x->jmpbuf_idx);
 }

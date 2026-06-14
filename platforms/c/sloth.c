@@ -341,23 +341,26 @@ void sloth_zbranch_(X* x) {
 
 /* -- Exceptions --------------------------------------- */
 
-void sloth_catch(X* x, CELL q) {
+CELL sloth_catch(X* x, CELL q) {
 	volatile int tsp = x->sp;
 	volatile int trp = x->rp;
 	volatile CELL tip = x->ip;
 	volatile int e;
+	volatile CELL err;
 
 	if (!(e = setjmp(x->jmpbuf[++x->jmpbuf_idx]))) {
 		sloth_eval(x, q);
-		sloth_push(x, 0);
+		err = 0;
 	} else {
 		x->sp = tsp;
 		x->rp = trp;
 		x->ip = tip;
-		sloth_push(x, (CELL)e);
+		err = e;
 	}
 
 	x->jmpbuf_idx--;
+
+	return err;
 }
 
 void sloth_throw(X* x, CELL e) {
@@ -380,7 +383,7 @@ void sloth_throw(X* x, CELL e) {
 	}
 }
 
-void sloth_catch_(X* x) { sloth_catch(x, sloth_pop(x)); }
+void sloth_catch_(X* x) { sloth_push(x, sloth_catch(x, sloth_pop(x))); }
 void sloth_throw_(X* x){ 
 	CELL e = sloth_pop(x); 
 	if (e) sloth_throw(x, e); 
@@ -986,8 +989,7 @@ void sloth_included_(X* x) {
 		do {
 			sloth_refill_(x);
 			if (!sloth_pop(x)) break;
-			sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
-			e = sloth_pop(x);
+			e = sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
 			if (e != 0) {
 				printf("File: %s\n", (char*)sloth_user_get(x, SLOTH_PATH_START));
 				printf("Line (%ld): %s\n", linenumber, linebuf);	
@@ -1125,15 +1127,14 @@ void sloth_evaluate_(X* x) {
 	/* To ensure that the input buffer is restored correctly */
 	/* even in case of a throw, I catch any possible throw */
 	/* here and rethrow it after restoring the input buffer. */
-	sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
-		
+	e = sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
+	
 	sloth_user_set(x, SLOTH_SOURCE_ID, prevsourceid);
 
 	sloth_user_set(x, SLOTH_IBUF, previbuf);
 	sloth_user_set(x, SLOTH_IPOS, previpos);
 	sloth_user_set(x, SLOTH_ILEN, previlen);
-	
-	e = sloth_pop(x);
+
 	if (e != 0) {
 		sloth_throw(x, e);
 	}
@@ -2137,8 +2138,15 @@ void sloth_set_root_path(X* x, char* s) {
 int sloth_include(X* x, char* f) {
 	sloth_push(x, (CELL)f);
 	sloth_push(x, strlen(f));
-	sloth_catch(x, sloth_get_xt(x, sloth_find_word(x, "INCLUDED")));
-	return sloth_pop(x);
+	CELL e = sloth_catch(x, sloth_get_xt(x, sloth_find_word(x, "INCLUDED")));
+	if (e) {
+		/* If an exception has been thrown the stack will */
+		/* be at its previous position and the address and */
+		/* length of the filename has to be removed. */
+		sloth_pop(x);
+		sloth_pop(x);
+	}
+	return e;
 }
 
 void sloth_evaluate(X* x, char* s) {
