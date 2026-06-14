@@ -1899,6 +1899,8 @@ void sloth_bootstrap_kernel(X* x) {
 	sloth_code(x, "SAVE-INPUT", sloth_primitive(x, &sloth_save_input_));
 	sloth_code(x, "RESTORE-INPUT", sloth_primitive(x, &sloth_restore_input_));
 #ifndef SLOTH_NO_FILES
+	sloth_code(x, "FILE-POSITION", sloth_primitive(x, &sloth_file_position_));
+	sloth_code(x, "READ-LINE", sloth_primitive(x, &sloth_read_line_));
 	sloth_code(x, "INCLUDED", sloth_primitive(x, &sloth_included_));
 #endif
 

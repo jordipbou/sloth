@@ -1,5 +1,9 @@
 #include "sloth.h"
 #include "cpnbi.h"
+#ifndef SLOTH_WITHOUT_FILE_WORD_SET
+	#include "file.h"
+#endif
+
 
 #ifndef ROOT_PATH
 #define ROOT_PATH "../../"
@@ -11,6 +15,9 @@ int main(int argc, char**argv) {
 	X* x = sloth_new();
 
 	sloth_bootstrap(x);
+#ifndef SLOTH_WITHOUT_FILE_WORD_SET
+	sloth_bootstrap_file_word_set(x);
+#endif
 
 	sloth_set_root_path(x, ROOT_PATH "4th/");
 	sloth_include(x, "ans.4th");
