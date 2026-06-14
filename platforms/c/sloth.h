@@ -9,12 +9,15 @@
 #include<assert.h>
 #include<limits.h> /* for CHAR_BIT */
 
-#ifndef SLOTH_WITHOUT_FOATING_POINT
-#include<math.h>
-#endif
-
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 #define WINDOWS
+#endif
+
+#ifndef SLOTH_WITHOUT_FOATING_POINT
+	#ifdef WINDOWS
+		#define _USE_MATH_DEFINES
+	#endif
+	#include<math.h>
 #endif
 
 /* -- getch multiplatform definition and implementation  */
@@ -43,7 +46,7 @@
 
 /* -- Virtual Machine constants ------------------------ */
 
-typedef int8_t BYTE; /* BYTEs are needed for MOVE */
+typedef int8_t BYTE_; /* BYTEs are needed for MOVE */
 typedef uint8_t uCHAR; /* CHARs are always unsigned */
 typedef intptr_t CELL;
 typedef uintptr_t uCELL;
@@ -225,8 +228,8 @@ CELL sloth_to_rel(X* x, CELL a);
 
 /* STORE/FETCH/CSTORE/cfetch work on absolute address units, */
 /* not just inside SLOTH dictionary (memory block). */
-void sloth_b_store(X* x, CELL a, BYTE v);
-BYTE sloth_b_fetch(X* x, CELL a);
+void sloth_b_store(X* x, CELL a, BYTE_ v);
+BYTE_ sloth_b_fetch(X* x, CELL a);
 void sloth_c_store(X* x, CELL a, uCHAR v);
 uCHAR sloth_c_fetch(X* x, CELL a);
 void sloth_store(X* x, CELL a, CELL v);

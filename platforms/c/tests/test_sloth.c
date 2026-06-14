@@ -1049,9 +1049,9 @@ void do_test_move(X* x, CELL b, CELL a1, CELL a2, CELL u, CELL v1, CELL v2, CELL
 	sloth_push(x, u);
 	sloth_move_(x);
 	TEST_ASSERT_EQUAL(0, x->sp);
-	TEST_ASSERT_EQUAL(v1, *((BYTE*)sloth_to_abs(x, b + 0)));
-	TEST_ASSERT_EQUAL(v2, *((BYTE*)sloth_to_abs(x, b + 1)));
-	TEST_ASSERT_EQUAL(v3, *((BYTE*)sloth_to_abs(x, b + 2)));
+	TEST_ASSERT_EQUAL(v1, *((BYTE_*)sloth_to_abs(x, b + 0)));
+	TEST_ASSERT_EQUAL(v2, *((BYTE_*)sloth_to_abs(x, b + 1)));
+	TEST_ASSERT_EQUAL(v3, *((BYTE_*)sloth_to_abs(x, b + 2)));
 }
 
 void test_move_() {
@@ -1059,13 +1059,13 @@ void test_move_() {
 	int fbuf = 100;
 	int sbuf = 103;
 
-	*((BYTE*)x->d + fbuf + 0) = 20;
-	*((BYTE*)x->d + fbuf + 1) = 20;
-	*((BYTE*)x->d + fbuf + 2) = 20;
+	*((BYTE_*)x->d + fbuf + 0) = 20;
+	*((BYTE_*)x->d + fbuf + 1) = 20;
+	*((BYTE_*)x->d + fbuf + 2) = 20;
 
-	*((BYTE*)x->d + sbuf + 0) = 12;
-	*((BYTE*)x->d + sbuf + 1) = 34;
-	*((BYTE*)x->d + sbuf + 2) = 56;
+	*((BYTE_*)x->d + sbuf + 0) = 12;
+	*((BYTE_*)x->d + sbuf + 1) = 34;
+	*((BYTE_*)x->d + sbuf + 2) = 56;
 
 	do_test_move(x, fbuf, fbuf, fbuf, 3, 20, 20, 20);
 	do_test_move(x, fbuf, sbuf, fbuf, 0, 20, 20, 20);

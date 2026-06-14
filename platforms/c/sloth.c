@@ -83,8 +83,8 @@ CELL sloth_to_rel(X* x, CELL a) { return a - x->d; }
 
 /* STORE/FETCH/CSTORE/cfetch work on absolute address units, */
 /* not just inside SLOTH dictionary (memory block). */
-void sloth_b_store(X* x, CELL a, BYTE v) { *((BYTE*)a) = v; }
-BYTE sloth_b_fetch(X* x, CELL a) { return *((BYTE*)a); }
+void sloth_b_store(X* x, CELL a, BYTE_ v) { *((BYTE_*)a) = v; }
+BYTE_ sloth_b_fetch(X* x, CELL a) { return *((BYTE_*)a); }
 void sloth_c_store(X* x, CELL a, uCHAR v) { *((uCHAR*)a) = v; }
 uCHAR sloth_c_fetch(X* x, CELL a) { return *((uCHAR*)a); }
 void sloth_store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
