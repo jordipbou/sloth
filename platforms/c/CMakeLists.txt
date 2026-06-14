@@ -28,6 +28,17 @@ if(NOT DEFINED SLOTH_WITHOUT_FILE_WORD_SET)
 	target_link_libraries(sloth_lib sloth_file_word_set)
 endif()
 
+if(NOT DEFINED SLOTH_WITHOUT_MEMORY_WORD_SET)
+	add_library(sloth_memory_word_set STATIC memory.c)
+	target_include_directories(sloth_memory_word_set
+		PUBLIC
+			$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
+			$<INSTALL_INTERFACE:>
+	)
+
+	target_link_libraries(sloth_lib sloth_memory_word_set)
+endif()
+
 # terminal SLOTH REPL
 
 add_executable(sloth repl.c)
@@ -41,9 +52,15 @@ if(DEFINED SLOTH_WITHOUT_FLOATING_POINT)
 	)
 endif()
 
-if(DEFINED SLOTH_WIHTOUT_FILE_WORD_SET)
+if(DEFINED SLOTH_WITHOUT_FILE_WORD_SET)
 	target_compile_definitions(sloth PRIVATE
 		SLOTH_WITHOUT_FILE_WORD_SET
+	)
+endif()
+
+if(DEFINED SLOTH_WITHOUT_MEMORY_WORD_SET)
+	target_compile_definitions(sloth PRIVATE
+		SLOTH_WITHOUT_MEMORY_WORD_SET
 	)
 endif()
 

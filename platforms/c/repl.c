@@ -3,6 +3,9 @@
 #ifndef SLOTH_WITHOUT_FILE_WORD_SET
 	#include "file.h"
 #endif
+#ifndef SLOTH_WITHOUT_MEMORY_WORD_SET
+	#include "memory.h"
+#endif
 
 
 #ifndef ROOT_PATH
@@ -17,6 +20,9 @@ int main(int argc, char**argv) {
 	sloth_bootstrap(x);
 #ifndef SLOTH_WITHOUT_FILE_WORD_SET
 	sloth_bootstrap_file_word_set(x);
+#endif
+#ifndef SLOTH_WITHOUT_MEMORY_WORD_SET
+	sloth_bootstrap_memory_word_set(x);
 #endif
 
 	sloth_set_root_path(x, ROOT_PATH "4th/");
