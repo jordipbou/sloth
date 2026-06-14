@@ -86,8 +86,8 @@ DROP
 \ -- Variables shared with the host -----------------------
 
 \ HERE is defined in address 0 in the dictionary
-?: INTERNAL-WORDLIST	DICT 1 CELLS + ;
-?: FORTH-WORDLIST		DICT 2 CELLS + ;
+?: INTERNAL-WORDLIST	(DICT) 1 CELLS + ;
+?: FORTH-WORDLIST		(DICT) 2 CELLS + ;
 
 FORTH-WORDLIST SET-CURRENT
 

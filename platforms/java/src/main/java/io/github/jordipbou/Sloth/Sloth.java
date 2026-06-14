@@ -1590,7 +1590,7 @@ public class Sloth {
 		code("(ENVIRONMENT)", primitive((vm) -> vm._environment_()));
 
 		// Primitives I don't like too much
-		code("DICT", primitive((vm) -> vm.push(to_abs(0))));
+		code("(DICT)", primitive((vm) -> vm.push(to_abs(0))));
 		code("(EMPTY-RETURN-STACK)", primitive((vm) -> vm.rp = 0));
 	}
 

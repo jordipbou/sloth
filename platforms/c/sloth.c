@@ -1776,6 +1776,7 @@ void sloth_f_dot_s_(X* x) {
 
 /* Non ANS helpers */
 
+void sloth_self_(X* x) { sloth_push(x, (CELL)x); }
 void sloth_dict_(X* x) { sloth_push(x, (CELL)x->d); }
 void sloth_empty_return_stack_(X* x) { x->rp = 0; }
 void sloth_ints_(X* x) { sloth_push(x, sloth_pop(x)*sizeof(int)); }
@@ -1941,9 +1942,10 @@ void sloth_bootstrap_kernel(X* x) {
 
 	sloth_code(x, "(ENVIRONMENT)", sloth_primitive(x, &sloth_environment_));
 
-	/* Primitives I don't like too much */
+	/* Non ANS helpers */
 
-	sloth_code(x, "DICT", sloth_primitive(x, &sloth_dict_));
+	sloth_code(x, "(SELF)", sloth_primitive(x, &sloth_self_));
+	sloth_code(x, "(DICT)", sloth_primitive(x, &sloth_dict_));
 	sloth_code(x, "(EMPTY-RETURN-STACK)", sloth_primitive(x, &sloth_empty_return_stack_));
 }
 
