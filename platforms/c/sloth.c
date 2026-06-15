@@ -1940,6 +1940,7 @@ void sloth_bootstrap_kernel(X* x) {
 
 	sloth_code(x, "EVALUATE", sloth_primitive(x, &sloth_evaluate_));
 	sloth_code(x, "EXECUTE", sloth_primitive(x, &sloth_execute_));
+	sloth_code(x, "DEBUG", sloth_primitive(x, &sloth_debug_));
 
 	/* Environment queries */
 
