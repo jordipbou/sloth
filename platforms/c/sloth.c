@@ -914,8 +914,9 @@ FILE* sloth__open_included_file(X* x, char* a, int l) {
 	} else {
 		/* Trying as relative to previous path. */
 		f = fopen(pathstart, "rb+");
-		if (f) pathend = pathend + l;
-		else {
+		if (f) {
+			pathend = pathend + l;
+		}	else {
 			/* Trying as relative to root path. */
 			strncpy(pathend, (char*)(x->u + SLOTH_PATHS), sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH));
 			strncpy(pathend + sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH), a, l);
@@ -976,7 +977,7 @@ void sloth_included_(X* x) {
 	char* a = (char*)sloth_pop(x);
 	sloth__save_input_and_path(x);
 
-	if (f = sloth__open_included_file(x, a, l)) {
+	if ((f = sloth__open_included_file(x, a, l))) {
 		CELL linenumber = 0;
 		sloth__add_to_included_files_list(x, a, l);
 
@@ -992,7 +993,11 @@ void sloth_included_(X* x) {
 			e = sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
 			if (e != 0) {
 				printf("File: %s\n", (char*)sloth_user_get(x, SLOTH_PATH_START));
-				printf("Line (%ld): %s\n", linenumber, linebuf);	
+				#ifdef WINDOWS
+					printf("Line (%lld): %s\n", linenumber, linebuf);	
+				#else
+					printf("Line (%ld): %s\n", linenumber, linebuf);	
+				#endif
 				sloth_throw(x, e);
 			}
 			linenumber++;
@@ -2113,8 +2118,8 @@ X* sloth_create(int psize, int dsize, int usize) {
 	x->p->p = malloc(sizeof(F) * psize);
 	x->p->last = 0;
 	x->p->pz = psize;
-	x->d = (CELL)malloc(dsize);
-	x->u = (CELL)malloc(usize);
+	x->d = (CELL)calloc(1, dsize);
+	x->u = (CELL)calloc(1, usize);
 
 	sloth__init(x, x->d, dsize, x->u, usize);
 

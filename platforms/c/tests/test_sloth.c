@@ -1,3 +1,12 @@
+#ifdef _WIN32
+#  include <windows.h>
+#else
+#  include <unistd.h>
+#  ifndef MAX_PATH
+#    define MAX_PATH 260
+#  endif
+#endif
+
 #include "sloth.h"
 #include "unity.h"
 
@@ -8,15 +17,6 @@ void sloth_emit_(X* x) { emitted_char = (char)sloth_pop(x); }
 /* Custom KEY for testing */
 int mock_key_char = 0;
 void sloth_key_(X* x) { sloth_push(x, mock_key_char); }
-
-#ifdef _WIN32
-#  include <windows.h>
-#else
-#  include <unistd.h>
-#  ifndef MAX_PATH
-#    define MAX_PATH 260
-#  endif
-#endif
 
 X* x;
 char ibuf[1024];
@@ -536,11 +536,11 @@ void test_zbranch_() {
 
 /* These words implement ANS Forth tests adapted to C */
 
-#define MAXUINT				((uCELL)~0)
-#define MAXINT				(((uCELL)~0)>>1)
-#define MININT				(~(((uCELL)~0)>>1))
-#define MIDUINT				((((uCELL)~0))>>1)
-#define MIDUINTplus1  (~(((uCELL)~0)>>1))
+#define SLOTH_MAXUINT				((uCELL)~0)
+#define SLOTH_MAXINT				(((uCELL)~0)>>1)
+#define SLOTH_MININT				(~(((uCELL)~0)>>1))
+#define SLOTH_MIDUINT				((((uCELL)~0))>>1)
+#define SLOTH_MIDUINTplus1  (~(((uCELL)~0)>>1))
 
 #define S0						0
 #define S1						((uCELL)~0)
@@ -663,9 +663,9 @@ void test_minus_() {
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
 
-	sloth_push(x, MIDUINTplus1); sloth_push(x, 1); sloth_minus_(x);
+	sloth_push(x, SLOTH_MIDUINTplus1); sloth_push(x, 1); sloth_minus_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL(MIDUINT, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_MIDUINT, sloth_pop(x));
 }
 
 void test_plus_() {
@@ -705,9 +705,9 @@ void test_plus_() {
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
-	sloth_push(x, MIDUINT); sloth_push(x, 1); sloth_plus_(x);
+	sloth_push(x, SLOTH_MIDUINT); sloth_push(x, 1); sloth_plus_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL(MIDUINTplus1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_MIDUINTplus1, sloth_pop(x));
 }
 
 void test_r_shift_() {
@@ -778,21 +778,21 @@ void test_star_() {
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(9, sloth_pop(x));
 
-	sloth_push(x, MIDUINTplus1); sloth_push(x, 1);
+	sloth_push(x, SLOTH_MIDUINTplus1); sloth_push(x, 1);
 	sloth_r_shift_(x); sloth_push(x, 2); sloth_star_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL(MIDUINTplus1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_MIDUINTplus1, sloth_pop(x));
 
-	sloth_push(x, MIDUINTplus1); sloth_push(x, 2);
+	sloth_push(x, SLOTH_MIDUINTplus1); sloth_push(x, 2);
 	sloth_r_shift_(x); sloth_push(x, 4); sloth_star_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL(MIDUINTplus1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_MIDUINTplus1, sloth_pop(x));
 
-	sloth_push(x, MIDUINTplus1); sloth_push(x, 1);
-	sloth_r_shift_(x); sloth_push(x, MIDUINTplus1 | sloth_pop(x)); 
+	sloth_push(x, SLOTH_MIDUINTplus1); sloth_push(x, 1);
+	sloth_r_shift_(x); sloth_push(x, SLOTH_MIDUINTplus1 | sloth_pop(x)); 
 	sloth_push(x, 2); sloth_star_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL(MIDUINTplus1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_MIDUINTplus1, sloth_pop(x));
 }
 
 void test_two_slash_() {
@@ -853,19 +853,19 @@ void test_u_m_star_() {
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 	TEST_ASSERT_EQUAL(9, sloth_pop(x));
 
-	sloth_push(x, MIDUINTplus1>>1); sloth_push(x, 2);
+	sloth_push(x, SLOTH_MIDUINTplus1>>1); sloth_push(x, 2);
 	sloth_u_m_star_(x);
 	TEST_ASSERT_EQUAL(2, x->sp);
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
-	TEST_ASSERT_EQUAL(MIDUINTplus1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_MIDUINTplus1, sloth_pop(x));
 
-	sloth_push(x, MIDUINTplus1); sloth_push(x, 2);
+	sloth_push(x, SLOTH_MIDUINTplus1); sloth_push(x, 2);
 	sloth_u_m_star_(x);
 	TEST_ASSERT_EQUAL(2, x->sp);
 	TEST_ASSERT_EQUAL(1, sloth_pop(x));
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
-	sloth_push(x, MIDUINTplus1); sloth_push(x, 4);
+	sloth_push(x, SLOTH_MIDUINTplus1); sloth_push(x, 4);
 	sloth_u_m_star_(x);
 	TEST_ASSERT_EQUAL(2, x->sp);
 	TEST_ASSERT_EQUAL(2, sloth_pop(x));
@@ -877,7 +877,7 @@ void test_u_m_star_() {
 	TEST_ASSERT_EQUAL(1, sloth_pop(x));
 	TEST_ASSERT_EQUAL(S1<<1, sloth_pop(x));
 
-	sloth_push(x, MAXUINT); sloth_push(x, MAXUINT);
+	sloth_push(x, SLOTH_MAXUINT); sloth_push(x, SLOTH_MAXUINT);
 	sloth_u_m_star_(x);
 	TEST_ASSERT_EQUAL(2, x->sp);
 	TEST_ASSERT_EQUAL(~1, sloth_pop(x));
@@ -903,23 +903,23 @@ void test_u_m_slash_mod_() {
 	TEST_ASSERT_EQUAL(1, sloth_pop(x));
 	TEST_ASSERT_EQUAL(1, sloth_pop(x));
 
-	sloth_push(x, MAXUINT); sloth_push(x, 2); sloth_u_m_star_(x);
+	sloth_push(x, SLOTH_MAXUINT); sloth_push(x, 2); sloth_u_m_star_(x);
 	sloth_push(x, 2);	sloth_u_m_slash_mod_(x);
 	TEST_ASSERT_EQUAL(2, x->sp);
-	TEST_ASSERT_EQUAL(MAXUINT, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_MAXUINT, sloth_pop(x));
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
-	sloth_push(x, MAXUINT); sloth_push(x, 2); sloth_u_m_star_(x);
-	sloth_push(x, MAXUINT);	sloth_u_m_slash_mod_(x);
+	sloth_push(x, SLOTH_MAXUINT); sloth_push(x, 2); sloth_u_m_star_(x);
+	sloth_push(x, SLOTH_MAXUINT);	sloth_u_m_slash_mod_(x);
 	TEST_ASSERT_EQUAL(2, x->sp);
 	TEST_ASSERT_EQUAL(2, sloth_pop(x));
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
-	sloth_push(x, MAXUINT); sloth_push(x, MAXUINT); 
+	sloth_push(x, SLOTH_MAXUINT); sloth_push(x, SLOTH_MAXUINT); 
 	sloth_u_m_star_(x);	
-	sloth_push(x, MAXUINT);	sloth_u_m_slash_mod_(x);
+	sloth_push(x, SLOTH_MAXUINT);	sloth_u_m_slash_mod_(x);
 	TEST_ASSERT_EQUAL(2, x->sp);
-	TEST_ASSERT_EQUAL(MAXUINT, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_MAXUINT, sloth_pop(x));
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
 }
@@ -973,15 +973,15 @@ void test_less_than_() {
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
 
-	sloth_push(x, MININT); sloth_push(x, 0); sloth_less_than_(x);
+	sloth_push(x, SLOTH_MININT); sloth_push(x, 0); sloth_less_than_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
 
-	sloth_push(x, MININT); sloth_push(x, MAXINT); sloth_less_than_(x);
+	sloth_push(x, SLOTH_MININT); sloth_push(x, SLOTH_MAXINT); sloth_less_than_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
 
-	sloth_push(x, 0); sloth_push(x, MAXINT); sloth_less_than_(x);
+	sloth_push(x, 0); sloth_push(x, SLOTH_MAXINT); sloth_less_than_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
 
@@ -1009,15 +1009,15 @@ void test_less_than_() {
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
-	sloth_push(x, 0); sloth_push(x, MININT); sloth_less_than_(x);
+	sloth_push(x, 0); sloth_push(x, SLOTH_MININT); sloth_less_than_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
-	sloth_push(x, MAXINT); sloth_push(x, MININT); sloth_less_than_(x);
+	sloth_push(x, SLOTH_MAXINT); sloth_push(x, SLOTH_MININT); sloth_less_than_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
-	sloth_push(x, MAXINT); sloth_push(x, 0); sloth_less_than_(x);
+	sloth_push(x, SLOTH_MAXINT); sloth_push(x, 0); sloth_less_than_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 }
@@ -1486,7 +1486,7 @@ void test_included_file_not_found() {
 	char path[256];
 	char missing[] = "sloth_test_no_such_file.4th";
 	CELL throw_prim;
-	
+
 	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
 	sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
 	

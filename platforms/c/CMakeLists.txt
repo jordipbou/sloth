@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 project(sloth-repl LANGUAGES C)
 
+if (WIN32)
+	add_compile_definitions(	
+		_CRT_SECURE_NO_WARNINGS 
+		_CRT_NONSTDC_NO_DEPRECATE)
+endif()
+
 include(cmake/dependencies.cmake)
 
 add_library(sloth_lib STATIC sloth.c)
