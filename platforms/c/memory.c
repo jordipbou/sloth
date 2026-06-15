@@ -73,6 +73,21 @@ void sloth_x_store_(X* x) {
 	*((int64_t*)a) = v;
 }
 
+/* -- Memory words to interface with C code ------------ */
+
+void sloth_ints_(X* x) { 
+	sloth_push(x, sloth_pop(x)*sizeof(int)); 
+}
+void sloth_int_fetch_(X* x) {
+	CELL a = sloth_pop(x);
+	sloth_push(x, (CELL)*((int*)a));
+}
+void sloth_int_store_(X* x) {
+	CELL a = sloth_pop(x);
+	int v = (int)sloth_pop(x);
+	*((int*)a) = v;
+}
+
 /* == Bootstrapping ==================================== */
 
 void sloth_bootstrap_memory_word_set(X* x) {
@@ -93,4 +108,10 @@ void sloth_bootstrap_memory_word_set(X* x) {
 	sloth_code(x, "L!", sloth_primitive(x, &sloth_l_store_));
 	sloth_code(x, "X@", sloth_primitive(x, &sloth_x_fetch_));
 	sloth_code(x, "X!", sloth_primitive(x, &sloth_x_store_));
+
+	/* -- Memory words to interface with C code ---------- */
+
+	sloth_code(x, "INTS", sloth_primitive(x, &sloth_ints_));
+	sloth_code(x, "INT@", sloth_primitive(x, &sloth_int_fetch_));
+	sloth_code(x, "INT!", sloth_primitive(x, &sloth_int_store_));
 }

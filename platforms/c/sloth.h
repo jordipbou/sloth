@@ -612,7 +612,6 @@ void sloth_f_dot_s_(X* x);
 
 void sloth_dict_(X* x);
 void sloth_empty_return_stack_(X* x);
-void sloth_ints_(X* x);
 
 /* -- Primitive, word and user variable creation ------- */
 

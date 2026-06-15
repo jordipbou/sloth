@@ -1784,8 +1784,6 @@ void sloth_f_dot_s_(X* x) {
 void sloth_self_(X* x) { sloth_push(x, (CELL)x); }
 void sloth_dict_(X* x) { sloth_push(x, (CELL)x->d); }
 void sloth_empty_return_stack_(X* x) { x->rp = 0; }
-void sloth_ints_(X* x) { sloth_push(x, sloth_pop(x)*sizeof(int)); }
-
 /* -- Primitive, word and user variable creation ------- */
 
 CELL sloth_primitive(X* x, F f) { 
@@ -2060,7 +2058,6 @@ void sloth_bootstrap_floating_point_word_set(X* x) {
 
 	/* Non ANS helpers */
 
-	sloth_code(x, "INTS", sloth_primitive(x, &sloth_ints_));
 	sloth_code(x, "F.S", sloth_primitive(x, &sloth_f_dot_s_));
 }
 
