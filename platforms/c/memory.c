@@ -31,6 +31,18 @@ void sloth_resize_(X* x) {
 	}
 }
 
+/* -- Special memory access words proposal ------------- */
+
+void sloth_b_fetch_(X* x) { 
+	CELL a = sloth_pop(x);
+	sloth_push(x, (CELL)*((BYTE_*)a));
+}
+void sloth_b_store_(X* x) {
+	CELL a = sloth_pop(x);
+	BYTE_ v = (BYTE_)sloth_pop(x);
+	*((BYTE_*)a) = v;
+}
+
 void sloth_w_fetch_(X* x) { 
 	CELL a = sloth_pop(x);
 	sloth_push(x, (CELL)*((int16_t*)a));
@@ -73,6 +85,8 @@ void sloth_bootstrap_memory_word_set(X* x) {
 
 	/* -- Special memory proposal words ------------------ */
 
+	sloth_code(x, "B@", sloth_primitive(x, &sloth_b_fetch_));
+	sloth_code(x, "B!", sloth_primitive(x, &sloth_b_store_));
 	sloth_code(x, "W@", sloth_primitive(x, &sloth_w_fetch_));
 	sloth_code(x, "W!", sloth_primitive(x, &sloth_w_store_));
 	sloth_code(x, "L@", sloth_primitive(x, &sloth_l_fetch_));

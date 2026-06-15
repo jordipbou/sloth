@@ -9,6 +9,8 @@ void sloth_resize_(X* x);
 
 /* -- Special memory access words proposal ------------- */
 
+void sloth_b_fetch_(X* x);
+void sloth_b_store_(X* x);
 void sloth_w_fetch_(X* x);
 void sloth_w_store_(X* x);
 void sloth_l_fetch_(X* x);
