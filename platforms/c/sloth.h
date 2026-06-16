@@ -492,6 +492,7 @@ void sloth_immediate_(X* x);
 void sloth_postpone_(X* x);
 
 void sloth_compile_comma_(X* x);
+void sloth_create_name_(X* x);
 void sloth_create_(X* x);
 void sloth_do_does_(X* x);
 void sloth_does_(X* x);
