@@ -5,6 +5,23 @@ if (WIN32)
 	add_compile_definitions(	
 		_CRT_SECURE_NO_WARNINGS 
 		_CRT_NONSTDC_NO_DEPRECATE)
+
+	set(
+		CMAKE_MSVC_RUNTIME_LIBRARY 
+		"MultiThreaded$<$<CONFIG:Debug>:Debug>" 
+		CACHE STRING "" FORCE)
+
+	set(
+		CMAKE_C_FLAGS 
+		"${CMAKE_C_FLAGS} -Xclang --dependent-lib=libcmt" 
+		CACHE STRING "" FORCE)
+
+	set(
+		CMAKE_C_FLAGS_DEBUG 
+		"${CMAKE_C_FLAGS_DEBUG} -Xclang --dependent-lib=libcmtd" 
+		CACHE STRING "" FORCE)
+
+	add_compile_definitions(_MT)
 endif()
 
 include(cmake/dependencies.cmake)
@@ -48,9 +65,15 @@ endif()
 # terminal SLOTH REPL
 
 add_executable(sloth repl.c)
-target_compile_definitions(sloth PRIVATE
-	ROOT_PATH="${PROJECT_BINARY_DIR}/../../../../"
-)
+if (WIN32)
+	target_compile_definitions(sloth PRIVATE
+		ROOT_PATH="${PROJECT_BINARY_DIR}/"
+	)
+else()
+	target_compile_definitions(sloth PRIVATE
+		ROOT_PATH="${PROJECT_BINARY_DIR}/../../../../"
+	)
+endif()
 
 if(DEFINED SLOTH_WITHOUT_FLOATING_POINT)
 	target_compile_definitions(sloth PRIVATE
