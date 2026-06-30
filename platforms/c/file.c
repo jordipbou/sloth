@@ -87,9 +87,9 @@ void sloth_file_size_(X* x) {
 	FILE *fptr = (FILE*)sloth_pop(x);
 	int pos, size;
 	pos = ftell(fptr);	
-	fseek(fptr, 0, SEEK_END); // seek to end of file
-	size = ftell(fptr); // get current file pointer
-	fseek(fptr, pos, SEEK_SET); // seek back to beginning of file
+	fseek(fptr, 0, SEEK_END); /* seek to end of file */
+	size = ftell(fptr); /* get current file pointer */
+	fseek(fptr, pos, SEEK_SET); /* seek back to beginning of file */
 	/* FIXME This will simulate a double number for now */
 	sloth_push(x, size);
 	sloth_push(x, 0);

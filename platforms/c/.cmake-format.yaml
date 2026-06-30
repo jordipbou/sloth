@@ -1,0 +1,27 @@
+# Configuration for cmake-format / cmake-lint
+# https://github.com/cheshirekow/cmake_format
+#
+# Install: pip install cmakelang
+# Format:  cmake-format -i CMakeLists.txt
+# Lint:    cmake-lint CMakeLists.txt
+
+format:
+  line_width: 60
+  tab_size: 2
+  use_tabchars: true
+  # One argument per line once a command no longer fits on one line —
+  # matches the existing target_* / set() style in this repo.
+  max_subgroups_hwrap: 2
+  max_pargs_hwrap: 4
+  separate_ctrl_name_with_space: false
+  separate_fn_name_with_space: false
+  dangle_parens: false
+  command_case: lower
+  keyword_case: upper
+
+lint:
+  disabled_codes: []
+  # Allow short, well-known CMake variable names without a length warning
+  # (e.g. loop vars, short option flags).
+  min_statement_spacing: 1
+  max_statement_spacing: 2
