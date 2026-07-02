@@ -46,6 +46,4 @@ int main(int argc, char**argv) {
 	}
 
 	sloth_free(x);
-
-	cpnbi_shutdown();
 }

@@ -27,8 +27,8 @@ include(FetchContent)
 FetchContent_Declare(
 	cpnbi 
   GIT_REPOSITORY https://github.com/jordipbou/CPNBI.git
-	GIT_TAG d71eb9f32bfbc918b76ee56ba45ae77d482f347f 
-)
+	GIT_TAG f042520793f85a7592cd2ff2993176a043c41dfc
+	)
 
 # ThrowTheSwitch/Unity is the test suite used by Sloth
 FetchContent_Declare(
