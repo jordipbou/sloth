@@ -27,7 +27,7 @@ include(FetchContent)
 FetchContent_Declare(
 	cpnbi 
   GIT_REPOSITORY https://github.com/jordipbou/CPNBI.git
-	GIT_TAG f042520793f85a7592cd2ff2993176a043c41dfc
+	GIT_TAG f0ad5dfb66e5d3d56d48b7aa5b4443eb7c8b98e9
 	)
 
 # ThrowTheSwitch/Unity is the test suite used by Sloth
@@ -152,10 +152,6 @@ target_link_libraries(sloth sloth_lib cpnbi_lib)
 
 add_executable(test_sloth tests/test_sloth.c sloth.c)
 target_link_libraries(test_sloth sloth_lib unity::framework)
-target_compile_definitions(test_sloth
-													 PRIVATE SLOTH_CUSTOM_EMIT)
-target_compile_definitions(test_sloth
-													 PRIVATE SLOTH_CUSTOM_KEY)
 
 if(NOT DEFINED SLOTH_WITHOUT_FLOATING_POINT)
 	add_executable(test_sloth_fp tests/test_sloth_fp.c

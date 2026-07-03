@@ -22,6 +22,9 @@
 
 /* -- getch multiplatform definition and implementation  */
 
+/* TODO Shouldn't CPNBI be used here directly? That's
+	 exactly why it has been created!! */
+
 #ifdef WINDOWS
 #include <conio.h>
 #else
@@ -435,10 +438,14 @@ void sloth_bye_(X* x);
 
 /* -- Input/output and parsing operations -------------- */
 
-/* Unicode does not work correctly on Windows cmd.exe or */
-/* Windows Terminal because Windows uses UTF-16 by default. */
-void sloth_emit_(X* x);
-void sloth_key_(X* x);
+void sloth_default_emit_(X* x);
+void sloth_default_e_key_(X* x);
+
+F sloth_emit_;
+F sloth_e_key_;
+
+void sloth_set_emit(F fn);
+void sloth_set_e_key(F fn);
 
 void sloth_source_(X* x);
 void sloth_word_(X* x);

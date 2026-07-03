@@ -684,7 +684,7 @@ FORTH-WORDLIST SET-CURRENT
 ?\		2DUP - >R
 ?\		BEGIN ( c-addr2 c-addr1 )
 ?\			2DUP <> WHILE
-?\			KEY DUP (RETURN-KEY) <> WHILE
+?\			EKEY DUP (RETURN-KEY) <> WHILE
 ?\			DUP (DELETE-KEY) = IF
 ?\				2DUP - R@ <> IF
 ?\					DROP

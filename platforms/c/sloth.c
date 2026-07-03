@@ -1,6 +1,6 @@
 #include "sloth.h"
 
-/* -- getch multiplatform definition and implementation  */
+/* -- getch simple multiplatform definition and implementation  */
 
 #ifndef WINDOWS
 int getch() {
@@ -663,14 +663,39 @@ void sloth_bye_(X* x) { printf("\n"); exit(0); }
 
 /* -- Input/output and parsing operations -------------- */
 
-#ifndef SLOTH_CUSTOM_EMIT
 /* Unicode does not work correctly on Windows cmd.exe or */
 /* Windows Terminal because Windows uses UTF-16 by default. */
+/*
+#ifndef SLOTH_CUSTOM_EMIT
 void sloth_emit_(X* x) { printf("%c", (uCHAR)sloth_pop(x)); }
 #endif
 #ifndef SLOTH_CUSTOM_KEY
 void sloth_key_(X* x) { sloth_push(x, getch()); }
 #endif
+*/
+void 
+sloth_default_emit_(X* x) {
+	printf("%c", (uCHAR)sloth_pop(x));
+}
+void
+sloth_default_e_key_(X* x) {
+	sloth_push(x, getch());
+}
+
+F sloth_emit_ = sloth_default_emit_;
+F sloth_e_key_ = sloth_default_e_key_;
+
+void 
+sloth_set_emit(F fn) { 
+	sloth_emit_ = fn ? fn : sloth_default_emit_;
+}
+
+void
+sloth_set_e_key(F fn) {
+	sloth_e_key_ = fn ? fn : sloth_default_e_key_;
+}
+
+/* -- */
 
 void sloth_source_(X* x) { 
 	sloth_push(x, sloth_user_get(x, SLOTH_IBUF)); 
@@ -1904,8 +1929,8 @@ void sloth_bootstrap_kernel(X* x) {
 
 	/* Input/output and parsing operations */
 
-	sloth_code(x, "EMIT", sloth_primitive(x, &sloth_emit_));
-	sloth_code(x, "KEY", sloth_primitive(x, &sloth_key_));
+	sloth_code(x, "EMIT", sloth_primitive(x, sloth_emit_));
+	sloth_code(x, "EKEY", sloth_primitive(x, sloth_e_key_));
 	sloth_code(x, "SOURCE", sloth_primitive(x, &sloth_source_));
 	sloth_code(x, "WORD", sloth_primitive(x, &sloth_word_));
 	sloth_code(x, "REFILL", sloth_primitive(x, &sloth_refill_));
