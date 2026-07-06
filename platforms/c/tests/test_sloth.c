@@ -263,7 +263,7 @@ void test_name_and_len() {
 /* -- Primitive and word creation ---------------------- */
 
 int my_var = 11;
-void my_primitive(X* x) { my_var = 17; }
+void my_primitive(X* x) { (void)x; my_var = 17; }
 
 void test_primitive_and_word_creation() {
 	TEST_ASSERT_EQUAL(0, x->p->last);
@@ -365,7 +365,7 @@ void test_eval() {
 	TEST_ASSERT_EQUAL(17, my_var);
 }
 
-void my_debug(X* x) { my_var = 23; }
+void my_debug(X* x) { (void)x; my_var = 23; }
 
 void test_debug_inner() {
 	sloth_set(x, 3*sCELL, sloth_primitive(x, my_primitive));
@@ -380,11 +380,11 @@ void test_debug_inner() {
 }
 
 int pre_var = 11;
-void pre_xt(X* x) { pre_var = 13; }
+void pre_xt(X* x) { (void)x; pre_var = 13; }
 int inner_var = 17;
-void inner_xt(X* x) { inner_var = 19; }
+void inner_xt(X* x) { (void)x; inner_var = 19; }
 int post_var = 23;
-void post_xt(X* x) { post_var = 27; }
+void post_xt(X* x) { (void)x; post_var = 27; }
 
 void test_debug_() {
 	sloth_primitive(x, my_exit);
@@ -442,10 +442,11 @@ void test_catch_throw() {
 }
 
 void test_catch_restores_stack() {
+	CELL p, e;
 	sloth_push(x, 1);
 	sloth_push(x, 2);
-	CELL p = sloth_primitive(x, throw_42_prim);
-	CELL e = sloth_catch(x, p);
+	p = sloth_primitive(x, throw_42_prim);
+	e = sloth_catch(x, p);
 	TEST_ASSERT_EQUAL(2, x->sp);
 	TEST_ASSERT_EQUAL(42, e);
 	TEST_ASSERT_EQUAL(2, sloth_pop(x));
@@ -473,7 +474,7 @@ void test_catch_throw_prim() {
 	sloth_catch_(x);
 	TEST_ASSERT_EQUAL(42, sloth_pop(x));
 	
-	sloth_push(x, 0); // No error
+	sloth_push(x, 0); /* No error */
 	sloth_throw_(x);
 	TEST_ASSERT_EQUAL(0, x->sp);
 }
@@ -481,13 +482,13 @@ void test_catch_throw_prim() {
 /* -- Inner interpreter primitives -------------------- */
 
 void test_exit_() {
-	// Test rp > 0
+	/* Test rp > 0 */
 	sloth_rpush(x, 100);
 	sloth_exit_(x);
 	TEST_ASSERT_EQUAL(100, x->ip);
 	TEST_ASSERT_EQUAL(0, x->rp);
 	
-	// Test rp == 0
+	/* Test rp == 0 */
 	sloth_exit_(x);
 	TEST_ASSERT_EQUAL(-1, x->ip);
 }
@@ -502,7 +503,7 @@ void test_lit_() {
 
 void test_rip_() {
 	CELL base_ip = sloth_to_abs(x, 3*sCELL);
-	sloth_set(x, 3*sCELL, 10 * sCELL); // offset
+	sloth_set(x, 3*sCELL, 10 * sCELL); /* offset */
 	x->ip = base_ip;
 	sloth_rip_(x);
 	TEST_ASSERT_EQUAL(base_ip + 9*sCELL, sloth_pop(x));
@@ -511,7 +512,7 @@ void test_rip_() {
 
 void test_branch_() {
 	CELL base_ip = sloth_to_abs(x, 3*sCELL);
-	sloth_set(x, 3*sCELL, 10 * sCELL); // offset
+	sloth_set(x, 3*sCELL, 10 * sCELL); /* offset */
 	x->ip = base_ip;
 	sloth_branch_(x);
 	TEST_ASSERT_EQUAL(base_ip + 10*sCELL, x->ip);
@@ -521,13 +522,13 @@ void test_zbranch_() {
 	CELL base_ip = sloth_to_abs(x, 3*sCELL);
 	sloth_set(x, 3*sCELL, 10 * sCELL);
 	
-	// Case 0: TOS is 0 (should branch)
+	/* Case 0: TOS is 0 (should branch) */
 	x->ip = base_ip;
 	sloth_push(x, 0);
 	sloth_zbranch_(x);
 	TEST_ASSERT_EQUAL(base_ip + 10*sCELL, x->ip);
 	
-	// Case 1: TOS is NOT 0 (should NOT branch)
+	/* Case 1: TOS is NOT 0 (should NOT branch) */
 	x->ip = base_ip;
 	sloth_push(x, 1);
 	sloth_zbranch_(x);
@@ -1081,8 +1082,10 @@ void test_move_() {
 
 void test_searching() {
 	char name[] = "FIND-ME";
+	CELL w, cstring;
+	size_t i;
 
-	CELL w = sloth_header(x, (CELL)name, (CELL)strlen(name));
+	w = sloth_header(x, (CELL)name, (CELL)strlen(name));
 	sloth_set_xt(x, w, 123);
 	
 	TEST_ASSERT_TRUE(sloth__compare(x, (CELL)name, strlen(name), (CELL)"find-me", strlen("find-me")));
@@ -1091,31 +1094,33 @@ void test_searching() {
 	TEST_ASSERT_EQUAL(w, sloth__search_word(x, (CELL)name, strlen(name)));
 	TEST_ASSERT_EQUAL(w, sloth_find_word(x, name));
 	
-	// Test sloth_find_ (primitive)
-	CELL cstring = sloth_here(x);
+	/* Test sloth_find_ (primitive) */
+	cstring = sloth_here(x);
 	sloth_c_comma(x, strlen(name));
-	for(int i=0; i<strlen(name); i++) sloth_c_comma(x, name[i]);
+	for(i=0; i<strlen(name); i++) sloth_c_comma(x, name[i]);
 	
 	sloth_push(x, cstring);
 	sloth_find_(x);
-	TEST_ASSERT_EQUAL(-1, sloth_pop(x)); // Not immediate
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x)); /* Not immediate */
 	TEST_ASSERT_EQUAL(123, sloth_pop(x));
 	
 	sloth_immediate_(x);
 	sloth_push(x, cstring);
 	sloth_find_(x);
-	TEST_ASSERT_EQUAL(1, sloth_pop(x)); // Immediate
+	TEST_ASSERT_EQUAL(1, sloth_pop(x)); /* Immediate */
 	TEST_ASSERT_EQUAL(123, sloth_pop(x));
 }
 
 /* -- Compile and literal ------------------------------ */
 
 void test_compile_and_literal() {
+	CELL h;
+
 	/* Create (LIT) to ensure it's correctly compiled */
 	sloth_code(x, "(LIT)", 999);
 
 	sloth_literal(x, 42);
-	CELL h = sloth_here(x);
+	h = sloth_here(x);
 	TEST_ASSERT_EQUAL(999, sloth_fetch(x, h - 2*sCELL));
 	TEST_ASSERT_EQUAL(42, sloth_fetch(x, h - sCELL));
 	
@@ -1134,9 +1139,11 @@ void test_quotation_primitive() {
 }
 
 void test_start_quotation_interpret_mode() {
+	CELL here;
+
 	sloth_code(x, "(QUOTATION)", 111);
 
-	CELL here = sloth_here(x);
+	here = sloth_here(x);
 	sloth_user_set(x, SLOTH_STATE, 0);
 	sloth_start_quotation_(x);
 	TEST_ASSERT_EQUAL(111, sloth_fetch(x, here));
@@ -1149,9 +1156,11 @@ void test_start_quotation_interpret_mode() {
 }
 
 void test_start_nested_quotation_interpret_mode() {
+	CELL here;
+
 	sloth_code(x, "(QUOTATION)", 111);
 
-	CELL here = sloth_here(x);
+	here = sloth_here(x);
 	sloth_user_set(x, SLOTH_STATE, 0);
 	sloth_start_quotation_(x);
 	sloth_start_quotation_(x);
@@ -1169,9 +1178,11 @@ void test_start_nested_quotation_interpret_mode() {
 }
 
 void test_start_quotation_compile_mode() {
+	CELL here;
+
 	sloth_code(x, "(QUOTATION)", 111);
 
-	CELL here = sloth_here(x);
+	here = sloth_here(x);
 	sloth_user_set(x, SLOTH_STATE, 1);
 	sloth_start_quotation_(x);
 	TEST_ASSERT_EQUAL(111, sloth_fetch(x, here));
@@ -1183,9 +1194,11 @@ void test_start_quotation_compile_mode() {
 }
 
 void test_start_nested_quotation_compile_mode() {
+	CELL here;
+
 	sloth_code(x, "(QUOTATION)", 111);
 
-	CELL here = sloth_here(x);
+	here = sloth_here(x);
 	sloth_user_set(x, SLOTH_STATE, 1);
 	sloth_start_quotation_(x);
 	sloth_start_quotation_(x);
@@ -1202,10 +1215,12 @@ void test_start_nested_quotation_compile_mode() {
 }
 
 void test_end_quotation_interpret_mode() {
+	CELL here;
+
 	sloth_code(x, "(QUOTATION)", 111);
 	sloth_code(x, "EXIT", 222);
 
-	CELL here = sloth_here(x);
+	here = sloth_here(x);
 	sloth_user_set(x, SLOTH_STATE, 0);
 	sloth_start_quotation_(x);
 	sloth_end_quotation_(x);
@@ -1219,10 +1234,12 @@ void test_end_quotation_interpret_mode() {
 }
 
 void test_end_nested_quotation_interpret_mode() {
+	CELL here;
+
 	sloth_code(x, "(QUOTATION)", 111);
 	sloth_code(x, "EXIT", 222);
 
-	CELL here = sloth_here(x);
+	here = sloth_here(x);
 	sloth_user_set(x, SLOTH_STATE, 0);
 	sloth_start_quotation_(x);
 	sloth_start_quotation_(x);
@@ -1239,10 +1256,12 @@ void test_end_nested_quotation_interpret_mode() {
 }
 
 void test_end_quotation_compile_mode() {
+	CELL here;
+
 	sloth_code(x, "(QUOTATION)", 111);
 	sloth_code(x, "EXIT", 222);
 
-	CELL here = sloth_here(x);
+	here = sloth_here(x);
 	sloth_user_set(x, SLOTH_STATE, 1);
 	sloth_start_quotation_(x);
 	sloth_end_quotation_(x);
@@ -1255,10 +1274,12 @@ void test_end_quotation_compile_mode() {
 }
 
 void test_end_nested_quotation_compile_mode() {
+	CELL here;
+
 	sloth_code(x, "(QUOTATION)", 111);
 	sloth_code(x, "EXIT", 222);
 
-	CELL here = sloth_here(x);
+	here = sloth_here(x);
 	sloth_user_set(x, SLOTH_STATE, 1);
 	sloth_start_quotation_(x);
 	sloth_start_quotation_(x);
@@ -1275,7 +1296,6 @@ void test_end_nested_quotation_compile_mode() {
 /* -- User variable creation --------------------------- */
 
 void test_user_variable_creation() {
-	CELL h;
 	sloth_code(x, "EXIT", 111);
 	sloth_code(x, "(LIT)", 222);
 	sloth_user_variable(x, "TEST-VAR", 8, 13);
@@ -1348,14 +1368,14 @@ void test_read_line() {
 void my_accept(X* x) { sloth_push(x, 15); }
 
 void test_refill() {
-	char buf[16];
+	CELL ibuf;
 
 	sloth_user_set(x, SLOTH_SOURCE_ID, -1);
 	sloth_refill_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 
-	CELL ibuf = sloth_user_get(x, SLOTH_IBUF);
+	ibuf = sloth_user_get(x, SLOTH_IBUF);
 	sloth_code(x, "ACCEPT", sloth_primitive(x, &my_accept));
 	sloth_user_set(x, SLOTH_SOURCE_ID, 0);
 	sloth_refill_(x);	
@@ -1414,27 +1434,21 @@ void test_refill_file() {
 /* Portable temp file creation code */
 
 static int write_temp_file(char *pathbuf, const char *content, size_t len) {
-#ifdef _WIN32
-    char tmpdir[MAX_PATH];
-    if (GetTempPathA(MAX_PATH, tmpdir) == 0) return -1;
-    if (GetTempFileNameA(tmpdir, "slo", 0, pathbuf) == 0) return -1;
-    FILE *f = fopen(pathbuf, "wb");
-    if (!f) return -1;
-#else
-    strcpy(pathbuf, "/tmp/sloth_test_XXXXXX");
-    int fd = mkstemp(pathbuf);
-    if (fd == -1) return -1;
-    FILE *f = fdopen(fd, "wb");
-    if (!f) { close(fd); return -1; }
-#endif
-    fwrite(content, 1, len, f);
-    fclose(f);
-    return 0;
+	FILE *f;
+	/* tmpnam is C89 but not thread-safe — acceptable */
+	/* for single-threaded tests */
+	if (!tmpnam(pathbuf)) return -1;
+	f = fopen(pathbuf, "wb");
+	if (!f) return -1;
+	fwrite(content, 1, len, f);
+	fclose(f);
+	return 0;
 }
 
 int interpret_calls;
 
 void noop_interpret(X* x) {
+	(void)x;
 	interpret_calls++;
 }
 
@@ -1508,7 +1522,6 @@ void test_included_relative_path() {
 	char path[256];
 	char *filename, *sep;
 	size_t dirlen;
-	CELL ibuf, ipos, ilen, source, source_pos;
 	
 	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &noop_interpret));
 	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 0);
@@ -1539,12 +1552,6 @@ void test_included_relative_path() {
 	
 	TEST_ASSERT_EQUAL(0, x->sp);
 	TEST_ASSERT_EQUAL(2, interpret_calls);
-	
-	ibuf = sloth_user_get(x, SLOTH_IBUF);
-	ipos = sloth_user_get(x, SLOTH_IPOS);
-	ilen = sloth_user_get(x, SLOTH_ILEN);
-	source = sloth_user_get(x, SLOTH_SOURCE_ID);
-	source_pos = sloth_user_get(x, SLOTH_SOURCE_POS);
 	
 	remove(tmppath);
 } 
@@ -1828,8 +1835,8 @@ void test_interpret_number_literals_compile_mode() {
 
 CELL p1 = 0, p2 = 0;
 
-void primitive1(X* x) { p1 = 1; }
-void primitive2(X* x) { p2 = 1; }
+void primitive1(X* x) { (void)x; p1 = 1; }
+void primitive2(X* x) { (void)x; p2 = 1; }
 
 void test_interpret_() {
 	char *ibuf = "11 PRIM1 13 PRIM2";
@@ -1908,7 +1915,6 @@ void test_colon_() {
 }
 
 void test_colon_no_name_() {
-	CELL here = sloth_here(x);
 	sloth_colon_no_name_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL(sloth_here(x), sloth_user_get(x, SLOTH_LATESTXT));
@@ -1917,7 +1923,6 @@ void test_colon_no_name_() {
 
 void test_semicolon_() {
 	char *name = "TEST";
-	CELL here = sloth_here(x);
 	sloth_user_set(x, SLOTH_IBUF, (CELL)name);
 	sloth_user_set(x, SLOTH_IPOS, 0);
 	sloth_user_set(x, SLOTH_ILEN, 11);
@@ -1945,6 +1950,7 @@ void test_immediate_() {
 
 CELL postpone_p1;
 void postpone_primitive1(X* x) {
+	(void)x;
 	postpone_p1 = 1;
 }
 
@@ -2045,7 +2051,6 @@ void test_does_() {
 
 void test_evaluate_() {
 	char *buf = "11 12 +";
-	CELL i;
 	sloth_push(x, (CELL)buf);
 	sloth_push(x, 7);
 	sloth_code(x, "+", sloth_primitive(x, &sloth_plus_));
@@ -2057,7 +2062,7 @@ void test_evaluate_() {
 
 CELL p0;
 
-void primitive0(X* x) { p0 = 1; }
+void primitive0(X* x) { (void)x; p0 = 1; }
 
 void test_execute_() {
 	p0 = 0;

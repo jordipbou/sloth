@@ -1,4 +1,3 @@
-// #define UNITY_INCLUDE_DOUBLE
 #define UNITY_DOUBLE_PRECISION 1e-10
 #include "sloth.h"
 #include "unity.h"
@@ -99,28 +98,28 @@ void test_f_align_() {
 }
 
 void test_f_aligned_() {
-	CELL unaligned = sloth_to_abs(x, 3);
+	CELL result, unaligned = sloth_to_abs(x, 3);
 	sloth_push(x, unaligned);
 	sloth_f_aligned_(x);
-	CELL result = sloth_pop(x);
+	result = sloth_pop(x);
 	TEST_ASSERT_EQUAL(0, result % sFCELL);
 	TEST_ASSERT_TRUE(result >= unaligned);
 }
 
 void test_s_f_aligned_() {
-	CELL unaligned = sloth_to_abs(x, 3);
+	CELL result, unaligned = sloth_to_abs(x, 3);
 	sloth_push(x, unaligned);
 	sloth_s_f_aligned_(x);
-	CELL result = sloth_pop(x);
+	result = sloth_pop(x);
 	TEST_ASSERT_EQUAL(0, result % sSFCELL);
 	TEST_ASSERT_TRUE(result >= unaligned);
 }
 
 void test_d_f_aligned_() {
-	CELL unaligned = sloth_to_abs(x, 3);
+	CELL result, unaligned = sloth_to_abs(x, 3);
 	sloth_push(x, unaligned);
 	sloth_d_f_aligned_(x);
-	CELL result = sloth_pop(x);
+	result = sloth_pop(x);
 	TEST_ASSERT_EQUAL(0, result % sDFCELL);
 	TEST_ASSERT_TRUE(result >= unaligned);
 }
@@ -795,7 +794,7 @@ void test_f_a_cos_h_() {
 	/* Domain error: r < 1.0 should produce NaN */
 	sloth_f_push(x, 0.5);
 	sloth_f_a_cos_h_(x);
-	TEST_ASSERT_TRUE(isnan(sloth_f_pop(x)));
+	TEST_ASSERT_TRUE(SLOTH_F_ISNAN(sloth_f_pop(x)));
 }
 
 /* -- String/numeric conversion --------------------------- */
@@ -869,15 +868,15 @@ void test_to_float_invalid_fails() {
 
 void test_represent_positive() {
 	char buf[32] = {0};
-	CELL addr = (CELL)buf;
+	CELL flag, sign, n, addr = (CELL)buf;
 	sloth_f_push(x, 1.5);
 	sloth_push(x, addr);
 	sloth_push(x, 6); /* 6 significant digits */
 	sloth_represent_(x);
 	/* Stack: n sign flag */
-	CELL flag = sloth_pop(x);
-	CELL sign = sloth_pop(x);
-	CELL n    = sloth_pop(x);
+	flag = sloth_pop(x);
+	sign = sloth_pop(x);
+	n    = sloth_pop(x);
 	TEST_ASSERT_EQUAL(-1, flag);          /* valid number */
 	TEST_ASSERT_EQUAL(0, sign);           /* positive */
 	TEST_ASSERT_EQUAL(1, n);              /* decimal point after first digit: 1.5e0 -> n=1 */
@@ -887,14 +886,14 @@ void test_represent_positive() {
 
 void test_represent_negative() {
 	char buf[32] = {0};
-	CELL addr = (CELL)buf;
+	CELL flag, sign, n, addr = (CELL)buf;
 	sloth_f_push(x, -1.5);
 	sloth_push(x, addr);
 	sloth_push(x, 6);
 	sloth_represent_(x);
-	CELL flag = sloth_pop(x);
-	CELL sign = sloth_pop(x);
-	CELL n    = sloth_pop(x);
+	flag = sloth_pop(x);
+	sign = sloth_pop(x);
+	n    = sloth_pop(x);
 	TEST_ASSERT_EQUAL(-1, flag);
 	TEST_ASSERT_EQUAL(-1, sign);   /* negative */
 	TEST_ASSERT_EQUAL(1, n);
@@ -902,14 +901,14 @@ void test_represent_negative() {
 
 void test_represent_large_exponent() {
 	char buf[32] = {0};
-	CELL addr = (CELL)buf;
+	CELL flag, sign, n, addr = (CELL)buf;
 	sloth_f_push(x, 1000.0);
 	sloth_push(x, addr);
 	sloth_push(x, 4);
 	sloth_represent_(x);
-	CELL flag = sloth_pop(x);
-	CELL sign = sloth_pop(x);
-	CELL n    = sloth_pop(x);
+	flag = sloth_pop(x);
+	sign = sloth_pop(x);
+	n    = sloth_pop(x);
 	TEST_ASSERT_EQUAL(-1, flag);
 	TEST_ASSERT_EQUAL(0, sign);
 	TEST_ASSERT_EQUAL(4, n);  /* 1000 -> digits "1000", decimal after position 4 */

@@ -1,5 +1,4 @@
 #include "sloth.h"
-#include "cpnbi.h"
 #ifndef SLOTH_WITHOUT_FILE_WORD_SET
 	#include "file.h"
 #endif
@@ -12,8 +11,6 @@
 #endif
 
 int main(int argc, char**argv) {
-	/* cpnbi_init(); */
-
 	X* x = sloth_new();
 
 	sloth_bootstrap(x);
@@ -31,12 +28,12 @@ int main(int argc, char**argv) {
 		sloth_repl(x);
 	} else if (strcmp(argv[1], "--test") == 0 
 					|| strcmp(argv[1], "-t") == 0) {
-		// Standard tests
+		/* Standard tests */
 		sloth_include(x, ROOT_PATH "forth2012-test-suite/src/runtests.fth");
 
 		#ifndef SLOTH_WITHOUT_FLOATING_POINT
 		
-		// Floating point tests
+		/* Floating point tests */
 		sloth_include(x, ROOT_PATH "forth2012-test-suite/src/fp/runfptests.fth");
 
 		#endif
@@ -45,4 +42,6 @@ int main(int argc, char**argv) {
 	}
 
 	sloth_free(x);
+
+	return 0;
 }

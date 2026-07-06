@@ -8,6 +8,15 @@
 #define access _access
 #else
 #include<unistd.h>
+/* TODO This forward declarations are for allowing temporal
+	 compilation of code. The existence of this makes the
+	 code non C89. The functions using this must change
+	 to allow a full C89 implementation. */
+
+/* POSIX extensions — declared explicitly under strict C89
+   where feature test macros may hide them from system headers. */
+int fileno(FILE *);
+int ftruncate(int, long);
 #endif
 
 /* -- File access methods ------------------------------ */

@@ -18,6 +18,12 @@
 		#define _USE_MATH_DEFINES
 	#endif
 	#include<math.h>
+#ifndef M_E
+#define M_E    2.71828182845904523536
+#endif
+#ifndef M_PI
+#define M_PI   3.14159265358979323846
+#endif
 #endif
 
 /* -- getch multiplatform definition and implementation  */
@@ -66,6 +72,11 @@ typedef uintptr_t uCELL;
 	#define sDFCELL sizeof(DFCELL)
 	
 	#define sFCELL_BITS sFCELL*8
+
+/* C89 NaN/Inf detection (IEEE 754 assumed) */
+#define SLOTH_F_NAN()    (0.0 / 0.0)
+#define SLOTH_F_ISNAN(x) ((x) != (x))
+#define SLOTH_F_ISINF(x) (!SLOTH_F_ISNAN(x) && (x) - (x) != 0.0)
 
 #endif
 

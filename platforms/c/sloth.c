@@ -83,21 +83,63 @@ CELL sloth_to_rel(X* x, CELL a) { return a - x->d; }
 
 /* STORE/FETCH/CSTORE/cfetch work on absolute address units, */
 /* not just inside SLOTH dictionary (memory block). */
-void sloth_b_store(X* x, CELL a, BYTE_ v) { *((BYTE_*)a) = v; }
-BYTE_ sloth_b_fetch(X* x, CELL a) { return *((BYTE_*)a); }
-void sloth_c_store(X* x, CELL a, uCHAR v) { *((uCHAR*)a) = v; }
-uCHAR sloth_c_fetch(X* x, CELL a) { return *((uCHAR*)a); }
-void sloth_store(X* x, CELL a, CELL v) { *((CELL*)a) = v; }
-CELL sloth_fetch(X* x, CELL a) { return *((CELL*)a); }
+void sloth_b_store(X* x, CELL a, BYTE_ v) { 
+	(void)x;
+	*((BYTE_*)a) = v; 
+}
+BYTE_ sloth_b_fetch(X* x, CELL a) { 
+	(void)x;
+	return *((BYTE_*)a); 
+}
+void sloth_c_store(X* x, CELL a, uCHAR v) { 
+	(void)x;
+	*((uCHAR*)a) = v; 
+}
+uCHAR sloth_c_fetch(X* x, CELL a) { 
+	(void)x;
+	return *((uCHAR*)a); 
+}
+void sloth_store(X* x, CELL a, CELL v) { 
+	(void)x;
+	*((CELL*)a) = v; 
+}
+CELL sloth_fetch(X* x, CELL a) { 
+	(void)x;
+	return *((CELL*)a); 
+}
 
 #ifndef SLOTH_WITHOUT_FLOATING_POINT
 
-void sloth_f_store(X* x, CELL a, FCELL v) { *((FCELL*)a) = v; }
-FCELL sloth_f_fetch(X* x, CELL a) { return *((FCELL*)a); }
-void sloth_s_f_store(X* x, CELL a, SFCELL v) { *((SFCELL*)a) = v; }
-SFCELL sloth_s_f_fetch(X* x, CELL a) { return *((SFCELL*)a); }
-void sloth_d_f_store(X* x, CELL a, DFCELL v) { *((DFCELL*)a) = v; }
-DFCELL sloth_d_f_fetch(X* x, CELL a) { return *((DFCELL*)a); }
+void 
+sloth_f_store(X* x, CELL a, FCELL v) { 
+	(void)x;
+	*((FCELL*)a) = v; 
+}
+FCELL 
+sloth_f_fetch(X* x, CELL a) { 
+	(void)x;
+	return *((FCELL*)a); 
+}
+void 
+sloth_s_f_store(X* x, CELL a, SFCELL v) { 
+	(void)x;
+	*((SFCELL*)a) = v; 
+}
+SFCELL 
+sloth_s_f_fetch(X* x, CELL a) { 
+	(void)x;
+	return *((SFCELL*)a); 
+}
+void 
+sloth_d_f_store(X* x, CELL a, DFCELL v) { 
+	(void)x;
+	*((DFCELL*)a) = v; 
+}
+DFCELL 
+sloth_d_f_fetch(X* x, CELL a) { 
+	(void)x;
+	return *((DFCELL*)a); 
+}
 
 #endif
 
@@ -148,7 +190,7 @@ void sloth_store_(X* x) {
 }
 
 void sloth_cells_(X* x) { sloth_push(x, sloth_pop(x)*sCELL); }
-void sloth_chars_(X* x) { /* Does nothing */ }
+void sloth_chars_(X* x) { /* Does nothing */ (void)x; }
 
 /* Inspecting memory */
 
@@ -221,6 +263,7 @@ uCHAR sloth_get_namelen(X* x, CELL w) {
 }
 
 CELL sloth_get_name_addr(X* x, CELL w) {
+	(void)x;
 	return w + 2*sCELL + 2*suCHAR;
 }
 
@@ -538,7 +581,7 @@ void sloth_move_(X* x) {
 /* -- Searching for words ------------------------------ */
 
 int sloth__compare(X* x, CELL a1, uCELL u1, CELL a2, uCELL u2) {
-	int i;
+	uCELL i;
 	if (u1 != u2) return 0;
 	for (i = 0; i < u2; i++) {
 		uCHAR a = sloth_c_fetch(x, a1 + i);
@@ -659,7 +702,11 @@ void sloth_end_quotation_(X* x) {
 
 /* -- End work session --------------------------------- */
 
-void sloth_bye_(X* x) { printf("\n"); exit(0); }
+void sloth_bye_(X* x) { 
+	(void)x;
+	printf("\n"); 
+	exit(0); 
+}
 
 /* -- Input/output and parsing operations -------------- */
 
@@ -761,8 +808,7 @@ void sloth_read_line_(X* x) {
 	FILE *fptr = (FILE*)sloth_pop(x);
 	int u1 = (int)sloth_pop(x);
 	char *caddr = (char*)sloth_pop(x);
-	int u2, l;
-	char *res;
+	int u2;
 	/* Read at most u1 characters */
 	if (u1 == 0) {
 		sloth_push(x, 0);
@@ -772,7 +818,7 @@ void sloth_read_line_(X* x) {
 		/* We need to read u1 + 1 because fgets counts the */
 		/* zero at the end. */
 		if (fgets(buf, u1 + 1, fptr)) {
-			l = u2 = strlen(buf);
+			u2 = strlen(buf);
 			/* Detect CR/LF to substract it from counted chars */
 			if (buf[u2 - 1] == 10 || buf[u2 - 1] == 13) u2--;
 			/* In case of CRLF, substract one again */
@@ -864,7 +910,6 @@ void sloth_save_input_(X* x) {
 }
 
 void sloth_restore_input_(X* x) {
-	CELL source_id, source_pos;
 	char* res;
 	sloth_pop(x); /* Just drop count */
 	sloth_user_set(x, SLOTH_ILEN, sloth_pop(x));
@@ -912,7 +957,6 @@ FILE* sloth__open_included_file(X* x, char* a, int l) {
 	/* reuse current path if possible. */
 	char* pathstart = (char*)sloth_user_get(x, SLOTH_PATH_START);
 	char* pathend = (char*)sloth_user_get(x, SLOTH_PATH_END);
-	char* path_pos;
 
 	/* Copy pathname/filename to end of current path */
 	strncpy(pathend, a, l);
@@ -988,7 +1032,7 @@ void sloth__add_to_included_files_list(X* x, char* a, int l) {
 void sloth_included_(X* x) {
 	FILE *f;
 	char linebuf[1024];
-	CELL e, here;
+	CELL e;
 	size_t l = (size_t)sloth_pop(x);
 	char* a = (char*)sloth_pop(x);
 	sloth__save_input_and_path(x);
@@ -1061,9 +1105,8 @@ void sloth_immediate_(X* x) {
 	sloth_set_flag(x, sloth_get_latest(x), SLOTH_IMMEDIATE); 
 }
 void sloth_postpone_(X* x) { 
-	CELL i, xt, tok, tlen;
+	CELL i, xt, tlen;
 	sloth_push(x, 32); sloth_word_(x);
-	tok = TOS(x) + suCHAR;
 	tlen = sloth_c_fetch(x, TOS(x));
 	if (tlen == 0) { sloth_pop(x); return; }
 	sloth_find_(x); 
@@ -1176,7 +1219,7 @@ void sloth_execute_(X* x) { sloth_eval(x, sloth_pop(x)); }
 
 /* INTERPRET is not an ANS word ??!! */
 void sloth_interpret_(X* x) {
-	CELL nt, flag, n;
+	CELL flag, n;
 	char* tok;
 	int tlen;
 	char buf[128]; char *endptr;
@@ -1224,7 +1267,7 @@ void sloth_interpret_(X* x) {
 				}
 				strncpy(buf, tok, tlen);
 				buf[tlen] = 0;
-				n = strtoll(buf, &endptr, temp_base);	
+				n = strtol(buf, &endptr, temp_base);
 				if (*endptr == '\0') {
 					if (sloth_user_get(x, SLOTH_STATE) == 0) {
 						sloth_push(x, n);
@@ -1360,9 +1403,9 @@ void sloth_f_align_(X* x) {
 void sloth_f_aligned_(X* x) { 
 	sloth_push(x, ALIGNED(sloth_pop(x), sFCELL)); 
 }
-void sloth_f_literal_(X* x) { /* TODO */ }
+void sloth_f_literal_(X* x) { /* TODO */ (void)x; }
 void sloth_floats_(X* x) { sloth_push(x, sloth_pop(x) * sFCELL); }
-void sloth_float_plus_(X* x) { /* TODO */ }
+void sloth_float_plus_(X* x) { /* TODO */ (void)x; }
 
 void sloth_s_f_aligned_(X* x) { 
 	sloth_push(x, ALIGNED(sloth_pop(x), sSFCELL)); 
@@ -1434,8 +1477,8 @@ void sloth_d_f_store_(X* x) {
 
 /* Commands to define data structures */
 
-void sloth_f_constant_(X* x) { /* TODO */}
-void sloth_f_variable_(X* x) { /* TODO */}
+void sloth_f_constant_(X* x) { /* TODO */ (void)x; }
+void sloth_f_variable_(X* x) { /* TODO */ (void)x; }
 
 /* Number-type conversion operators */
 
@@ -1520,7 +1563,7 @@ void sloth_f_proximate_(X* x) {
 	FCELL r3 = sloth_f_pop(x);
 	FCELL r2 = sloth_f_pop(x);
 	FCELL r1 = sloth_f_pop(x);
-	if (isnan(r3)) {
+	if (SLOTH_F_ISNAN(r3)) {
 		sloth_push(x, 0);
 	} else if (r3 > 0.0) {
 		sloth_push(x, fabs(r1 - r2) < r3 ? -1 : 0);
@@ -1606,7 +1649,7 @@ void sloth_f_a_cos_h_(X* x) {
 	FCELL r = sloth_f_pop(x);
 	if (r < 1.0) {
 		/* undefined, push NaN */
-		sloth_f_push(x, nan(""));
+		sloth_f_push(x, SLOTH_F_NAN());
 	} else {
 		sloth_f_push(x, log(r + sqrt(r * r - 1.0)));
 	}
@@ -1700,7 +1743,8 @@ void sloth_represent_(X* x) {
 	/* This implementation uses the algorithm found in */
 	/* represent_in_c.zip in Taygeta FTP. */
 	/* I'm ignoring the REPRESENT-CHARS part */
-	int i, j;
+	int i;
+	size_t j, k;
 	char buf[64], *endptr;
 	/* 1. Fill buffer at caddr with n blanks (space chars) */
 	/* where n is the greater of n1 or REPRESENT-CHARS. */
@@ -1709,10 +1753,10 @@ void sloth_represent_(X* x) {
 	/* MAX-FLOAT-DIGITS less 1. */
 	sprintf(buf, "%#.*E", (int)(u - 1), r);
 	/* 3. Check if its a non-number representation. */
-	for (i = 0; i < strlen(buf); i++) {
-		if (buf[i] == 'n' || buf[i] == 'N') {
-			for (j = 0; j < strlen(buf); j++) {
-				sloth_c_store(x, addr + j, buf[j]);
+	for (j = 0; j < strlen(buf); j++) {
+		if (buf[j] == 'n' || buf[j] == 'N') {
+			for (k = 0; k < strlen(buf); k++) {
+				sloth_c_store(x, addr + k, buf[k]);
 				sloth_push(x, 0);
 				sloth_push(x, 0);
 				return;
@@ -1721,13 +1765,13 @@ void sloth_represent_(X* x) {
 	}
 	/* 4. r was a finite number. */
 	for (i = 0; i < u; i++) sloth_c_store(x, addr + i, '0');
-	for (i = 0, j = 0; i < strlen(buf); i++) {
-		if (buf[i] == 'E') {
-			sloth_push(x, (strtol(buf + i + 1, &endptr, 10)) + 1);
+	for (j = 0, k = 0; j < strlen(buf); j++) {
+		if (buf[j] == 'E') {
+			sloth_push(x, (strtol(buf + j + 1, &endptr, 10)) + 1);
 			break;
-		} else if (buf[i] != '-' && buf[i] != '.') {
-			sloth_c_store(x, addr + j, buf[i]);
-			j++;
+		} else if (buf[j] != '-' && buf[j] != '.') {
+			sloth_c_store(x, addr + k, buf[j]);
+			k++;
 		}
 	}
 	sloth_push(x, r < 0.0 ? -1 : 0);
@@ -1762,12 +1806,12 @@ void sloth_f_e_dot_(X* x) {
 	int exp;
 	double scaled;
 
-	if (isnan(r)) {
+	if (SLOTH_F_ISNAN(r)) {
 		printf("NaN ");
 		return;
 	}
 	
-	if (isinf(r)) {
+	if (SLOTH_F_ISINF(r)) {
 		if (r > 0) {
 			printf("Inf ");
 		} else {
@@ -2169,9 +2213,10 @@ void sloth_set_root_path(X* x, char* s) {
 }
 
 int sloth_include(X* x, char* f) {
+	CELL e;
 	sloth_push(x, (CELL)f);
 	sloth_push(x, strlen(f));
-	CELL e = sloth_catch(x, sloth_get_xt(x, sloth_find_word(x, "INCLUDED")));
+	e = sloth_catch(x, sloth_get_xt(x, sloth_find_word(x, "INCLUDED")));
 	if (e) {
 		/* If an exception has been thrown the stack will */
 		/* be at its previous position and the address and */

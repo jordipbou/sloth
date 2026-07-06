@@ -102,9 +102,20 @@ void sloth_file_size_(X* x) {
 
 void sloth_reposition_file_(X* x) {
 	FILE *fptr = (FILE*)sloth_pop(x);
+	/* If the size of a long allows using two cells as a
+		 double number, combine them to represent the offset */
+#if ULONG_MAX / UINTPTR_MAX >= UINTPTR_MAX
 	uCELL udh = (uCELL)sloth_pop(x);
 	uCELL udl = (uCELL)sloth_pop(x);
-	fseek(fptr, udl, SEEK_SET);
+	long offset = (long)(((unsigned long)udh << CELL_BITS)
+	                   | (unsigned long)udl);
+#else
+	/* in any other case, just ignore the high part */
+	long offset;
+	(void)sloth_pop(x);
+	offset = (long)sloth_pop(x);
+#endif
+	fseek(fptr, offset, SEEK_SET);
 	if (ferror(fptr)) {
 		sloth_push(x, -37);
 	} else {
@@ -119,17 +130,28 @@ void sloth_flush_file_(X* x) {
 
 void sloth_resize_file_(X* x) {
 	FILE *fptr = (FILE*)sloth_pop(x);
+	int fd = fileno(fptr);
+	/* If the size of a long allows using two cells as a
+		 double number, combine them to represent the offset */
+#if ULONG_MAX / UINTPTR_MAX >= UINTPTR_MAX
 	uCELL udh = (uCELL)sloth_pop(x);
 	uCELL udl = (uCELL)sloth_pop(x);
-	int fd = fileno(fptr);
+	long size = (long)(((unsigned long)udh << CELL_BITS)
+	                 | (unsigned long)udl);
+#else
+	/* in any other case, just ignore the high part */
+	long size;
+	(void)sloth_pop(x);
+	size = (long)sloth_pop(x);
+#endif
 	if (fd < 0) {
 		sloth_push(x, -37);
 	} else {
-		#if defined(WINDOWS)
-		sloth_push(x, _chsize(fd, udl) ? -37 : 0);
-		#else
-		sloth_push(x, ftruncate(fd, udl) ? -37 : 0);
-		#endif
+#if defined(WINDOWS)
+		sloth_push(x, _chsize(fd, size) ? -37 : 0);
+#else
+		sloth_push(x, ftruncate(fd, size) ? -37 : 0);
+#endif
 	}
 }
 
@@ -192,7 +214,7 @@ void sloth_write_line_(X* x) {
 	FILE *fptr = (FILE*)sloth_pop(x);
 	int l = (int)sloth_pop(x);
 	char *caddr = (char*)sloth_pop(x);
-	int count = fwrite(caddr, suCHAR, l, fptr);
+	(void)fwrite(caddr, suCHAR, l, fptr);
 	fprintf(fptr, "\n");
 	if (ferror(fptr)) {
 		sloth_push(x, -37);
@@ -205,7 +227,7 @@ void sloth_write_file_(X* x) {
 	FILE *fptr = (FILE*)sloth_pop(x);
 	int l = (int)sloth_pop(x);
 	char *caddr = (char*)sloth_pop(x);
-	int count = fwrite(caddr, suCHAR, l, fptr);
+	(void)fwrite(caddr, suCHAR, l, fptr);
 	if (ferror(fptr)) {
 		sloth_push(x, -37);
 	} else {

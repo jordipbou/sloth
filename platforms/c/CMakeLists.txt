@@ -1,6 +1,18 @@
 cmake_minimum_required(VERSION 3.16)
 project(sloth-repl LANGUAGES C)
 
+# Enforce C89 compatibility to allow as more targets as
+# possible.
+set(CMAKE_C_STANDARD 90)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+
+# Make compilation fail if the standard is not enforced
+# (GCC/Clang-specific flag, not portable syntax).
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+	add_compile_options(-pedantic-errors -Wall -Wextra)
+endif()
+
 # Not declaring a global variable as extern in the header
 # gives a linker error if the -fcommon flag is not used.
 # That flag was changed to -fno-common as default in GCC 10.
@@ -32,13 +44,6 @@ endif()
 
 include(FetchContent)
 
-# CPNBI is used for non-blocking input in terminal
-FetchContent_Declare(
-	cpnbi 
-  GIT_REPOSITORY https://github.com/jordipbou/CPNBI.git
-	GIT_TAG f0ad5dfb66e5d3d56d48b7aa5b4443eb7c8b98e9
-	)
-
 # ThrowTheSwitch/Unity is the test suite used by Sloth
 FetchContent_Declare(
 	unity
@@ -46,7 +51,7 @@ FetchContent_Declare(
 	GIT_TAG bbf8f3728a937c7627b8094de7ae13559d220ed5	
 )
 
-FetchContent_MakeAvailable(cpnbi unity)
+FetchContent_MakeAvailable(unity)
 
 # -- Set default build type --------------------------------
 
@@ -155,7 +160,7 @@ if(DEFINED SLOTH_WITHOUT_MEMORY_WORD_SET)
 		sloth PRIVATE SLOTH_WITHOUT_MEMORY_WORD_SET)
 endif()
 
-target_link_libraries(sloth sloth_lib cpnbi_lib)
+target_link_libraries(sloth sloth_lib)
 
 # Unit tests
 
