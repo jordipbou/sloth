@@ -76,3 +76,40 @@ Continuous address space in all the implementations. C uses
 real native pointers and direct memory access. Java implementation
 uses memory "blocks" and addresses have two parts, one to 
 index the block and another as the address inside the block.
+
+---
+
+## Building
+
+### Prerequisites
+
+- **CMake 3.16+**
+- **A C89-compatible compiler** (GCC, Clang, MSVC)
+
+### Build the REPL
+
+From the sloth repository root:
+
+```sh
+cmake -S platforms/c -B build
+cmake --build build
+```
+
+This produces the `sloth` REPL executable and the `sloth_lib`
+static library.
+
+### Build options
+
+Options are passed as `-D<flag>=ON` during configuration:
+
+| Option                            | Description                       |
+|-----------------------------------|-----------------------------------|
+| `SLOTH_WITHOUT_FLOATING_POINT`   | Disable floating point support    |
+| `SLOTH_WITHOUT_FILE_WORD_SET`    | Disable the FILE word set         |
+| `SLOTH_WITHOUT_MEMORY_WORD_SET`  | Disable the MEMORY word set       |
+
+Example:
+
+```sh
+cmake -S platforms/c -B build -DSLOTH_WITHOUT_FLOATING_POINT=ON
+```

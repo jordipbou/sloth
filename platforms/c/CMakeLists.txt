@@ -57,11 +57,11 @@ FetchContent_MakeAvailable(unity)
 
 # For single-config generators (Makefiles, Ninja)
 # CMAKE_BUILD_TYPE must be set for the Debug/Release
-# ROOT_PATH selection below to work; default to Debug if the
+# ROOT_PATH selection below to work; default to Release if the
 # user didn't choose one explicitly.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 	set(CMAKE_BUILD_TYPE
-			"Debug"
+			"Release"
 			CACHE STRING "Build type" FORCE)
 endif()
 
