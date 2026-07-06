@@ -134,8 +134,8 @@ target_compile_definitions(
 # straight from the source tree (see ROOT_PATH above), 
 # so this copy is skipped there.
 add_custom_command(TARGET sloth POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,true,copy_directory>
-		$<$<NOT:$<CONFIG:Debug>>:${CMAKE_SOURCE_DIR}/../../4th>
+	COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,echo,copy_directory>
+	$<$<NOT:$<CONFIG:Debug>>:${CMAKE_CURRENT_SOURCE_DIR}/../../4th>
 		$<$<NOT:$<CONFIG:Debug>>:$<TARGET_FILE_DIR:sloth>/4th>
 	COMMENT "Copying 4th/ next to the sloth executable (release only)"
 )
