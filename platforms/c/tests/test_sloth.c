@@ -16,7 +16,7 @@ void custom_emit_(X* x) { emitted_char = (char)sloth_pop(x); }
 
 /* Custom KEY for testing */
 int mock_key_char = 0;
-void custom_e_key_(X* x) { sloth_push(x, mock_key_char); }
+void custom_key_(X* x) { sloth_push(x, mock_key_char); }
 
 X* x;
 char ibuf[1024];
@@ -26,7 +26,7 @@ void setUp() {
 	/* of dictionary. */
 	x = sloth_create(256, 32767, 1024);
 	sloth_set_emit(custom_emit_);
-	sloth_set_e_key(custom_e_key_);
+	sloth_set_key(custom_key_);
 }
 
 void tearDown() {
@@ -1661,31 +1661,31 @@ void test_emit() {
 	TEST_ASSERT_EQUAL('Z', emitted_char);
 }
 
-void test_e_key_pushes_char_onto_stack() {
+void test_key_pushes_char_onto_stack() {
 	mock_key_char = 'Q';
-	custom_e_key_(x);
+	custom_key_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL('Q', sloth_pop(x));
 	TEST_ASSERT_EQUAL(0, x->sp);
 
-	/* Ensure that our custom e_key is being used */
+	/* Ensure that our custom key is being used */
 	mock_key_char = 'Q';
-	sloth_primitive(x, custom_e_key_);
+	sloth_primitive(x, custom_key_);
 	sloth__do_prim(x, -1);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL('Q', sloth_pop(x));
 	TEST_ASSERT_EQUAL(0, x->sp);
 }
 
-void test_e_key_handles_zero() {
+void test_key_handles_zero() {
 	mock_key_char = 0;
-	custom_e_key_(x);
+	custom_key_(x);
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 }
 
-void test_e_key_handles_max_uchar() {
+void test_key_handles_max_uchar() {
 	mock_key_char = 255;
-	custom_e_key_(x);
+	custom_key_(x);
 	TEST_ASSERT_EQUAL(255, sloth_pop(x));
 }
 
@@ -2191,9 +2191,9 @@ int main() {
 	RUN_TEST(test_included_and_refill);
 	/* Input/output and parsing */
 	RUN_TEST(test_emit);
-	RUN_TEST(test_e_key_pushes_char_onto_stack);
-	RUN_TEST(test_e_key_handles_zero);
-	RUN_TEST(test_e_key_handles_max_uchar);
+	RUN_TEST(test_key_pushes_char_onto_stack);
+	RUN_TEST(test_key_handles_zero);
+	RUN_TEST(test_key_handles_max_uchar);
 	RUN_TEST(test_source_);
 	RUN_TEST(test_word_);
 	/* Defining words */

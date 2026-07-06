@@ -439,10 +439,10 @@ void sloth_bye_(X* x);
 /* -- Input/output and parsing operations -------------- */
 
 void sloth_default_emit_(X* x);
-void sloth_default_e_key_(X* x);
+void sloth_default_key_(X* x);
 
 void sloth_set_emit(F fn);
-void sloth_set_e_key(F fn);
+void sloth_set_key(F fn);
 
 void sloth_source_(X* x);
 void sloth_word_(X* x);

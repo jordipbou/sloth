@@ -11,13 +11,10 @@
 #define ROOT_PATH "../../"
 #endif
 
-void custom_e_key_(X* x) { sloth_push(x, cpnbi_get_event()); }
-
 int main(int argc, char**argv) {
-	cpnbi_init();
+	/* cpnbi_init(); */
 
 	X* x = sloth_new();
-	sloth_set_e_key(custom_e_key_);
 
 	sloth_bootstrap(x);
 #ifndef SLOTH_WITHOUT_FILE_WORD_SET
