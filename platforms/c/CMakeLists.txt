@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 3.16)
 project(sloth-repl LANGUAGES C)
 
+# Not declaring a global variable as extern in the header
+# gives a linker error if the -fcommon flag is not used.
+# That flag was changed to -fno-common as default in GCC 10.
+# As my current GCC is older than that, it uses -fcommon by
+# default and does not report the error.
+# Enforcing -fno-common to all builds to ensure this type
+# of errors do not pass thru again.
+add_compile_options(-fno-common)
+
 # -- Required flags for Windows builds --------------------
 
 # Must be before FetchContent to ensure CPNBI and Unity

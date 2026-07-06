@@ -663,16 +663,6 @@ void sloth_bye_(X* x) { printf("\n"); exit(0); }
 
 /* -- Input/output and parsing operations -------------- */
 
-/* Unicode does not work correctly on Windows cmd.exe or */
-/* Windows Terminal because Windows uses UTF-16 by default. */
-/*
-#ifndef SLOTH_CUSTOM_EMIT
-void sloth_emit_(X* x) { printf("%c", (uCHAR)sloth_pop(x)); }
-#endif
-#ifndef SLOTH_CUSTOM_KEY
-void sloth_key_(X* x) { sloth_push(x, getch()); }
-#endif
-*/
 void 
 sloth_default_emit_(X* x) {
 	printf("%c", (uCHAR)sloth_pop(x));
@@ -682,8 +672,9 @@ sloth_default_e_key_(X* x) {
 	sloth_push(x, getch());
 }
 
-F sloth_emit_ = sloth_default_emit_;
-F sloth_e_key_ = sloth_default_e_key_;
+/* TODO: Should this be part of the context instead of globals? */
+static F sloth_emit_ = sloth_default_emit_;
+static F sloth_e_key_ = sloth_default_e_key_;
 
 void 
 sloth_set_emit(F fn) { 
