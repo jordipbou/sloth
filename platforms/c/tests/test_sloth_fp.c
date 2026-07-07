@@ -7,6 +7,8 @@
 #define EPSILON 1e-10
 #define FLOAT_EPSILON 1e-6
 
+#define SLOTH_F_ISNAN(x) ((x) != (x))
+
 X* x;
 
 void setUp() {

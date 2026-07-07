@@ -73,11 +73,6 @@ typedef uintptr_t uCELL;
 	
 	#define sFCELL_BITS sFCELL*8
 
-/* C89 NaN/Inf detection (IEEE 754 assumed) */
-#define SLOTH_F_NAN()    (0.0 / 0.0)
-#define SLOTH_F_ISNAN(x) ((x) != (x))
-#define SLOTH_F_ISINF(x) (!SLOTH_F_ISNAN(x) && (x) - (x) != 0.0)
-
 #endif
 
 #define ALIGNED(a, t) (((a) + ((t) - 1)) & ~((t) - 1))

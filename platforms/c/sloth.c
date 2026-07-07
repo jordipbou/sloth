@@ -1,5 +1,10 @@
 #include "sloth.h"
 
+/* C89 NaN/Inf detection (IEEE 754 assumed) */
+#define SLOTH_F_NAN()    (0.0 / 0.0)
+#define SLOTH_F_ISNAN(x) ((x) != (x))
+#define SLOTH_F_ISINF(x) (!SLOTH_F_ISNAN(x) && (x) - (x) != 0.0)
+
 /* -- getch simple multiplatform definition and implementation  */
 
 #ifndef WINDOWS
