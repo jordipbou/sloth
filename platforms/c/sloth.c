@@ -13,7 +13,9 @@ int getch() {
 	int ch;
 	tcgetattr(STDIN_FILENO, &oldt);
 	newt = oldt;
-	newt.c_lflag &= ~(ICANON|ECHO);
+	newt.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHONL);
+	newt.c_cc[VMIN] = 1;
+	newt.c_cc[VTIME] = 0;
 	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
 	ch = getchar();
 	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
