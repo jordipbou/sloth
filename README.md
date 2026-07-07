@@ -98,6 +98,12 @@ cmake --build build
 This produces the `sloth` REPL executable and the `sloth_lib`
 static library.
 
+### Executing the REPL
+
+```
+./build/sloth
+```
+
 ### Build options
 
 Options are passed as `-D<flag>=ON` during configuration:
