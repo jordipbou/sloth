@@ -119,26 +119,41 @@
 	REQUIRE DEBUG.4TH
 	
 	: SEE ( "<spaces>name" -- )
-	 	BL WORD DUP FIND
+	 	BL WORD DUP FIND \ caddr xt flag
 	 	DUP IF
 			CR
 	 		ROT ." NAME: " COUNT TYPE CR
 	 		0< IF ." NON " THEN ." IMMEDIATE" CR
-	 		DUP ." XT: " . CR
-	 		DUP 0> IF
-	 			BEGIN
+	 		DUP ." XT: " .
+			DUP 0< IF
+				." (C PRIMITIVE)" CR
+			ELSE
+	 			CR BEGIN
 	 				DUP @ ['] EXIT <> WHILE
-	 				DUP @ DUP XT>NAME IF 
-						NIP NAME>STRING TYPE 
-					ELSE
-						.
-					THEN
+					DUP @ CASE
+						['] (LIT) OF ." #" CELL+ DUP @ . ENDOF
+						['] (?BRANCH) OF CR ." (?BRANCH)" CELL+ ENDOF
+						['] (BRANCH) OF CR ." (BRANCH)" CELL+ ENDOF
+						['] (STRING) OF 
+							[CHAR] S EMIT [CHAR] " EMIT SPACE
+							CELL+ DUP @ SWAP CELL+ SWAP 0 DO
+								DUP C@ EMIT CHAR+
+							LOOP
+							CHAR+ ALIGNED CELL-
+							[CHAR] " EMIT
+						ENDOF
+						\ DEFAULT
+		 				DUP XT>NAME IF 
+							NAME>STRING TYPE 
+						ELSE
+							.
+						THEN
+					ENDCASE
 					."  "
 	 				CELL+
 	 			REPEAT
 	 			." ;" CR
-	 		ELSE
-	 			DROP
+				DROP
 	 		THEN
 	 	ELSE
 	 		." WORD NOT FOUND" CR DROP DROP DROP
