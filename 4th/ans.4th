@@ -581,15 +581,13 @@ FORTH-WORDLIST SET-CURRENT
 ?\		(LOOP-STACK-PUSH)
 ?\		(QX) ! (IX) ! (LX) !
 ?\		0 (LEAVE) !
-?\		(IX) @ (LX) @ - 0 <> IF
-?\			BEGIN
-?\				(QX) @ EXECUTE			( delta )
-?\				(LEAVE) @ 0= WHILE		( delta )
-?\				(IX) @ (LX) @ -			( delta oldDiff )
-?\				OVER (IX) @ + (IX) !	( delta oldDiff ) 
-?\				(LOOPCHECK) WHILE
-?\			REPEAT THEN
-?\		THEN
+?\		BEGIN
+?\			(QX) @ EXECUTE			( delta )
+?\			(LEAVE) @ 0= WHILE		( delta )
+?\			(IX) @ (LX) @ -			( delta oldDiff )
+?\			OVER (IX) @ + (IX) !	( delta oldDiff ) 
+?\			(LOOPCHECK) WHILE
+?\		REPEAT THEN
 ?\		(LEAVE) @ 0< IF
 ?\			(LEAVE) @ 1+ (LEAVE) !
 ?\			R> DROP
