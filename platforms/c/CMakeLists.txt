@@ -1,27 +1,5 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.17)
 project(sloth-repl LANGUAGES C)
-
-# -- Set default build type --------------------------------
-
-# For single-config generators (Makefiles, Ninja)
-# CMAKE_BUILD_TYPE must be set for the Debug/Release
-# ROOT_PATH selection below to work; default to Release if the
-# user didn't choose one explicitly.
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    set(CMAKE_BUILD_TYPE
-            "Release"
-            CACHE STRING "Build type" FORCE)
-endif()
-
-# For multi-config generators (Visual Studio, Ninja Multi-Config)
-# default to Release too: put Release first in
-# CMAKE_CONFIGURATION_TYPES (used as the default by Visual Studio)
-# and set CMAKE_DEFAULT_BUILD_TYPE (used by Ninja Multi-Config).
-# Debug remains available via --config Debug.
-if(CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_DEFAULT_BUILD_TYPE)
-    set(CMAKE_CONFIGURATION_TYPES "Release;Debug" CACHE STRING "Build types" FORCE)
-    set(CMAKE_DEFAULT_BUILD_TYPE "Release" CACHE STRING "Default build type" FORCE)
-endif()
 
 # Apply strict C90 only to sloth's own targets:
 function(sloth_strict_c target)
