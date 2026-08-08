@@ -639,7 +639,7 @@ void sloth_bootstrap(X* x);
 
 void sloth__init(X* x, CELL d, CELL dz, CELL u, CELL uz);
 X* sloth_create(int psize, int dsize, int usize);
-X* sloth_new();
+X* sloth_new(void);
 void sloth_free(X* x);
 
 /* -- Helpers to work with files from C ---------------- */

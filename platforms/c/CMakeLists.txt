@@ -1,11 +1,37 @@
 cmake_minimum_required(VERSION 3.16)
 project(sloth-repl LANGUAGES C)
 
-# Enforce C89 compatibility to allow as more targets as
-# possible.
-set(CMAKE_C_STANDARD 90)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS OFF)
+# -- Set default build type --------------------------------
+
+# For single-config generators (Makefiles, Ninja)
+# CMAKE_BUILD_TYPE must be set for the Debug/Release
+# ROOT_PATH selection below to work; default to Release if the
+# user didn't choose one explicitly.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE
+            "Release"
+            CACHE STRING "Build type" FORCE)
+endif()
+
+# For multi-config generators (Visual Studio, Ninja Multi-Config)
+# default to Release too: put Release first in
+# CMAKE_CONFIGURATION_TYPES (used as the default by Visual Studio)
+# and set CMAKE_DEFAULT_BUILD_TYPE (used by Ninja Multi-Config).
+# Debug remains available via --config Debug.
+if(CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_DEFAULT_BUILD_TYPE)
+    set(CMAKE_CONFIGURATION_TYPES "Release;Debug" CACHE STRING "Build types" FORCE)
+    set(CMAKE_DEFAULT_BUILD_TYPE "Release" CACHE STRING "Default build type" FORCE)
+endif()
+
+# Apply strict C90 only to sloth's own targets:
+function(sloth_strict_c target)
+  set_target_properties(${target} PROPERTIES
+    C_STANDARD 90
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF)
+  target_compile_options(${target} PRIVATE
+    $<$<COMPILE_LANGUAGE:C>:-pedantic-errors -Wall -Wextra -fno-common>)
+endfunction()
 
 # Make compilation fail if the standard is not enforced
 # (GCC/Clang-specific flag, not portable syntax).
@@ -52,18 +78,6 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(unity)
-
-# -- Set default build type --------------------------------
-
-# For single-config generators (Makefiles, Ninja)
-# CMAKE_BUILD_TYPE must be set for the Debug/Release
-# ROOT_PATH selection below to work; default to Release if the
-# user didn't choose one explicitly.
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-	set(CMAKE_BUILD_TYPE
-			"Release"
-			CACHE STRING "Build type" FORCE)
-endif()
 
 target_compile_definitions(unity PUBLIC UNITY_INCLUDE_DOUBLE)
 if(UNIX)
@@ -131,7 +145,7 @@ add_executable(sloth repl.c)
 target_compile_definitions(
 	sloth 
 	PRIVATE
-	ROOT_PATH="$<IF:$<CONFIG:Debug>,${CMAKE_CURRENT_SOURCE_DIR}/../../,./>"
+	ROOT_PATH="$<IF:$<CONFIG:Debug>,${CMAKE_CURRENT_SOURCE_DIR}/../../,$<TARGET_FILE_DIR:sloth>/>"
 )
 
 # Make sure 4th/ is available next to the executable for 
@@ -179,3 +193,9 @@ if(NOT DEFINED SLOTH_WITHOUT_FLOATING_POINT)
 		target_link_libraries(test_sloth_fp m)
 	endif()
 endif()
+
+# Apply strict C90 to sloth's targets
+sloth_strict_c(sloth)
+sloth_strict_c(sloth_lib)
+sloth_strict_c(sloth_memory_word_set)
+sloth_strict_c(sloth_file_word_set)

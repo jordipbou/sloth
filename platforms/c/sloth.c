@@ -8,7 +8,7 @@
 /* -- getch simple multiplatform definition and implementation  */
 
 #ifndef WINDOWS
-int getch() {
+int getch(void) {
 	struct termios oldt, newt;
 	int ch;
 	tcgetattr(STDIN_FILENO, &oldt);
@@ -2201,7 +2201,7 @@ X* sloth_create(int psize, int dsize, int usize) {
 	return x;
 }
 
-X* sloth_new() { return sloth_create(512, 524288, 1024); }
+X* sloth_new(void) { return sloth_create(512, 524288, 1024); }
 
 void sloth_free(X* x) {
 	free((void*)x->d);
