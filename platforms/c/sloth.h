@@ -1,3 +1,13 @@
+/* Must be defined before any system header is included so */
+/* that glibc exposes POSIX declarations (e.g. readlink, */ 
+/* getcwd) under the strict -std=c90 flag used to build */
+/* Sloth. */
+/* TODO Check this and c90 flag for different platforms */
+#if !defined(_POSIX_C_SOURCE) \
+	&& !defined(WIN32) && !defined(_WIN32) && !defined(_WIN64)
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #ifndef SLOTH_LIB
 #define SLOTH_LIB
 
@@ -9,8 +19,11 @@
 #include<assert.h>
 #include<limits.h> /* for CHAR_BIT */
 
+/* TODO This needs more platforms and ensure works ok */
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 #define WINDOWS
+#else
+#define LINUX
 #endif
 
 #ifndef SLOTH_WITHOUT_FOATING_POINT
@@ -36,6 +49,10 @@
 #else
 #include <termios.h>
 #include <unistd.h>
+#endif
+
+#ifdef WINDOWS
+#include <libloaderapi.h>
 #endif
 
 /* ----------------------------------------------------- */

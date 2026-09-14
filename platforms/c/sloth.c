@@ -2183,6 +2183,10 @@ void sloth__init(X* x, CELL d, CELL dz, CELL u, CELL uz) {
 	*((CELL*)(x->u + 3*sCELL)) = sloth_to_abs(x, SLOTH_FORTH_WL);
 	/* CONTEXT 1 */
 	*((CELL*)(x->u + 4*sCELL)) = sloth_to_abs(x, SLOTH_INTERNAL_WL);
+
+	sloth_user_set(x, SLOTH_PATH_START, x->u + SLOTH_PATHS);
+	sloth_user_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS);
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 0);
 }
 
 X* sloth_create(int psize, int dsize, int usize) {
@@ -2212,15 +2216,75 @@ void sloth_free(X* x) {
 
 /* Helpers to work with files from C */
 
-void sloth_set_root_path(X* x, char* s) {
-	memcpy((char*)(x->u + SLOTH_PATHS), s, strlen(s));
-	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, strlen(s));
-	sloth_user_set(x, SLOTH_PATH_START, x->u + SLOTH_PATHS + strlen(s));
-	sloth_user_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS + strlen(s));
+int sloth__get_exe_dir(char* buf, int size) {
+#ifdef WINDOWS
+	DWORD n = GetModuleFileNameA(NULL, buf, (DWORD)size);
+	int i;
+	if (n == 0 || (DWORD)n >= (DWORD)size) {
+		return 0;
+	}
+	for (i = (int)n - 1; i >= 0; --i) {
+		if (buf[i] == '\\' || buf[i] == '/') {
+			buf[i + 1] = 0;
+			return i + 1;
+		}
+	}
+#else
+	ssize_t n = readlink("/proc/self/exe", buf, size - 1);
+	int i;
+	if (n <= 0) {
+		return 0;
+	}
+	buf[n] = 0;
+	for (i = (int)n - 1; i >= 0; --i) {
+		if (buf[i] == '/') {
+			buf[i + 1] = 0;
+			return i + 1;
+		}
+	}
+#endif
+	return 0;
 }
+
+void sloth_set_root_path(X* x, char* s) {
+	char *buffer;
+	char buf[1024];
+	int l = 0;
+	if (strlen(s) == 0) {
+		l = sloth__get_exe_dir(buf, 1024);
+		s = buf;	
+	} else {
+		l = strlen(s);
+	}
+
+	/* Copy ROOT PATH to the beginning of SLOTH_PATHS buffer */
+	memcpy((char*)(x->u + SLOTH_PATHS), s, l);
+	/* Add /4th/ at the end. */
+	memcpy((char*)(x->u + SLOTH_PATHS + l), "/4th/", 5);
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, l + 5);
+	sloth_user_set(x, SLOTH_PATH_START, x->u + SLOTH_PATHS + l + 5);
+#ifdef WINDOWS
+	buffer = _getcwd(NULL, 0);
+#else
+	buffer = getcwd(NULL, 0);
+#endif
+	if (buffer) {
+		sloth_user_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS + l + 5 + strlen(buffer));
+		memcpy((char*)sloth_user_get(x, SLOTH_PATH_START), buffer, strlen(buffer));
+		free(buffer);
+	} else {
+		sloth_user_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS + strlen(s) + 5);
+	}
+}
+
 
 int sloth_include(X* x, char* f) {
 	CELL e;
+	/* Check if sloth_set_root_path has been set */
+	if (sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH) == 0) {
+		sloth_set_root_path(x, 0);
+	}
+
 	sloth_push(x, (CELL)f);
 	sloth_push(x, strlen(f));
 	e = sloth_catch(x, sloth_get_xt(x, sloth_find_word(x, "INCLUDED")));

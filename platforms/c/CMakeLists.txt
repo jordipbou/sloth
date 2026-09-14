@@ -123,7 +123,8 @@ add_executable(sloth repl.c)
 target_compile_definitions(
 	sloth 
 	PRIVATE
-	ROOT_PATH="$<IF:$<CONFIG:Debug>,${CMAKE_CURRENT_SOURCE_DIR}/../../,$<TARGET_FILE_DIR:sloth>/>"
+	$<$<CONFIG:Debug>:ROOT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../../">
+	$<$<CONFIG:Release>:ROOT_PATH="">
 )
 
 # Make sure 4th/ is available next to the executable for 

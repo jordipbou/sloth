@@ -21,7 +21,7 @@ int main(int argc, char**argv) {
 	sloth_bootstrap_memory_word_set(x);
 #endif
 
-	sloth_set_root_path(x, ROOT_PATH "4th/");
+	sloth_set_root_path(x, ROOT_PATH);
 	sloth_include(x, "ans.4th");
 
 	if (argc == 1) {
