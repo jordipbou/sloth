@@ -1282,21 +1282,32 @@ void sloth_interpret_(X* x) {
 					sloth_literal(x, *(tok + suCHAR));
 			} else {
 				is_double = 0;
-				if (*tok == '#') {
+				/* A trailing . marks a double number. It must be */
+				/* detected independently of any base prefix so */
+				/* that e.g. #12346789. is a double in base 10 and */
+				/* not a single-cell float. */
+				if (tlen > 0 && *(tok + (tlen - 1)*suCHAR) == '.') {
+					tlen--;
+					is_double = 1;
+				}
+				if (tlen > 0 && *tok == '#') {
 					temp_base = 10;
 					tlen--;
 					tok++;
-				}	else if (*tok == '$') {
+				}	else if (tlen > 0 && *tok == '$') {
 					temp_base = 16;
 					tlen--;
 					tok++;
-				} else if (*tok == '%') {
+				} else if (tlen > 0 && *tok == '%') {
 					temp_base = 2;
 					tlen--;
 					tok++;
-				} else if (*(tok + tlen - 1) == '.') {
-					tlen--;
-					is_double = 1;
+				}
+				if (tlen > (int)sizeof(buf) - 1) {
+					if (sloth_user_get(x, SLOTH_SOURCE_ID) != -1) {
+						printf("%.*s ?\n", tlen, tok);
+					}
+					sloth_throw(x, -13);
 				}
 				strncpy(buf, tok, tlen);
 				buf[tlen] = 0;

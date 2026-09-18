@@ -2316,6 +2316,90 @@ void test_interpret_number_literals_compile_mode(void) {
 
 /* TODO Tests for floating point literals */
 
+/* Reads ibuf (length len) in interpret mode and checks that it left a */
+/* double number (low, high) on the stack, in that order. */
+static void assert_interpret_double(
+	const char *ibuf, int len, CELL low, CELL high) {
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, len);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(2, x->sp);
+	TEST_ASSERT_EQUAL(high, sloth_pop(x));
+	TEST_ASSERT_EQUAL(low, sloth_pop(x));
+}
+
+void test_interpret_double_literals_interpret_mode(void) {
+	sloth_user_set(x, SLOTH_BASE, 10);
+
+	assert_interpret_double("1.", 2, 1, 0);
+	assert_interpret_double("-2.", 3, -2, -1);
+
+	TEST_ASSERT_EQUAL(10, sloth_user_get(x, SLOTH_BASE));
+}
+
+void test_interpret_prefixed_double_literals(void) {
+	sloth_user_set(x, SLOTH_BASE, 10);
+
+	assert_interpret_double("#12346789.", 10, 12346789, 0);
+	assert_interpret_double("#-12346789.", 11, -12346789, -1);
+	assert_interpret_double("$12aBcDeF.", 10, 0x12aBcDeF, 0);
+	assert_interpret_double("$-12AbCdEf.", 11, -0x12AbCdEf, -1);
+	assert_interpret_double("%10010110.", 10, 150, 0);
+	assert_interpret_double("%-10010110.", 11, -150, -1);
+
+	/* Any base prefix must not change BASE */
+	TEST_ASSERT_EQUAL(10, sloth_user_get(x, SLOTH_BASE));
+}
+
+void test_interpret_prefixed_double_literals_hex_base(void) {
+	/* # always means decimal, even when BASE is hex */
+	sloth_user_set(x, SLOTH_BASE, 16);
+	assert_interpret_double("#12346789.", 10, 0xBC65A5, 0);
+	assert_interpret_double("#-12346789.", 11, -0xBC65A5, -1);
+
+	TEST_ASSERT_EQUAL(16, sloth_user_get(x, SLOTH_BASE));
+	sloth_user_set(x, SLOTH_BASE, 10);
+}
+
+void test_interpret_double_literals_compile_mode(void) {
+	char *ibuf = "3. #15.";
+	CELL here;
+	sloth_user_set(x, SLOTH_BASE, 10);
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 7);
+	sloth_user_set(x, SLOTH_STATE, 1);
+	sloth_code(x, "(LIT)", -2);
+	here = sloth_here(x);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(0, x->sp);
+	/* Two (LIT) pairs: 3. then #15. */
+	TEST_ASSERT_EQUAL(3, sloth_fetch(x, here + sCELL));
+	TEST_ASSERT_EQUAL(0, sloth_fetch(x, here + 3*sCELL));
+	TEST_ASSERT_EQUAL(15, sloth_fetch(x, here + 5*sCELL));
+	TEST_ASSERT_EQUAL(0, sloth_fetch(x, here + 7*sCELL));
+}
+
+void test_interpret_token_too_long_for_buffer(void) {
+	char ibuf[200];
+	CELL throw_prim;
+	int i;
+
+	for (i = 0; i < 199; i++) ibuf[i] = '9';
+	ibuf[199] = 0;
+
+	sloth_user_set(x, SLOTH_BASE, 10);
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 199);
+
+	throw_prim = sloth_primitive(x, &sloth_interpret_);
+	sloth_push(x, throw_prim);
+	sloth_catch_(x);
+	TEST_ASSERT_EQUAL(-13, sloth_pop(x));
+}
+
 CELL p1 = 0, p2 = 0;
 
 void primitive1(X* x) { (void)x; p1 = 1; }
@@ -2714,6 +2798,11 @@ int main(void) {
 	RUN_TEST(test_interpret_character_literals_compile_mode);
 	RUN_TEST(test_interpret_number_literals_interpret_mode);
 	RUN_TEST(test_interpret_number_literals_compile_mode);
+	RUN_TEST(test_interpret_double_literals_interpret_mode);
+	RUN_TEST(test_interpret_prefixed_double_literals);
+	RUN_TEST(test_interpret_prefixed_double_literals_hex_base);
+	RUN_TEST(test_interpret_double_literals_compile_mode);
+	RUN_TEST(test_interpret_token_too_long_for_buffer);
 	RUN_TEST(test_interpret_);
 	RUN_TEST(test_interpret_compile_mode);
 	RUN_TEST(test_interpret_immediate_words_compile_mode);
