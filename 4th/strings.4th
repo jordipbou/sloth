@@ -1,4 +1,4 @@
-REQUIRE TRANSIENT.4TH
+REQUIRE transient.4th
 
 [UNDEFINED] -TRAILING [IF]
 : -TRAILING ( c-addr u1 -- c-addr u2 )

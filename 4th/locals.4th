@@ -2,7 +2,7 @@
 
 \ The word LOCALS| has not been implemented as is obsolescent.
 
-REQUIRE THEFORTH.NET/STACK/1.0.0/STACK.4TH
+REQUIRE theforth.net/stack/1.0.0/Stack.4th
 
 \ The theforth.net stacks library does not include
 \ a word to update any item in the stack, so I define
@@ -16,7 +16,7 @@ REQUIRE THEFORTH.NET/STACK/1.0.0/STACK.4TH
 \ Transient memory is used to compile the code of locals
 \ and free that memory on semicolon.
 
-REQUIRE TRANSIENT.4TH
+REQUIRE transient.4th
 
 GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
 
