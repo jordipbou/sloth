@@ -1941,6 +1941,59 @@ void test_open_included_file_root_does_not_update_path(void) {
 	sloth_rmdir(dir);
 }
 
+/* Same as above but with a non-empty previous path stored in the */
+/* path region. A root-path open must still not touch PATH_START / */
+/* PATH_END, so the remembered directory is preserved. */
+void test_open_included_file_root_keeps_nonempty_previous_path(void) {
+	char dir[MAX_PATH];
+	char elsewhere[MAX_PATH];
+	char cwd[MAX_PATH];
+	char filepath[MAX_PATH];
+	char name[] = "only_root2.4th";
+	int dirlen, prevlen;
+	char *root, *prev;
+	FILE *f;
+	CELL saved_start, saved_end;
+
+	TEST_ASSERT_EQUAL(0, make_temp_dir(dir));
+	TEST_ASSERT_EQUAL(0, make_temp_dir(elsewhere));
+	TEST_ASSERT_EQUAL(0, write_temp_file_in(filepath, dir, name, "x", 1));
+
+	TEST_ASSERT_EQUAL(0, save_cwd(cwd));
+	TEST_ASSERT_EQUAL(0, sloth_chdir(elsewhere));
+
+	/* Store the root path at the start of the region. */
+	root = (char*)(x->u + SLOTH_PATHS);
+	dirlen = (int)strlen(dir);
+	memcpy(root, dir, dirlen);
+	root[dirlen] = PATH_SEP;
+	root[dirlen + 1] = 0;
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, dirlen + 1);
+
+	/* Store a non-empty previous directory right after the root */
+	/* path, as sloth_set_root_path would leave the cwd there. */
+	prev = root + dirlen + 1;
+	prevlen = (int)strlen(cwd);
+	memcpy(prev, cwd, prevlen);
+	prev[prevlen] = 0;
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)prev);
+	sloth_user_set(x, SLOTH_PATH_END, (CELL)(prev + prevlen));
+
+	saved_start = sloth_user_get(x, SLOTH_PATH_START);
+	saved_end = sloth_user_get(x, SLOTH_PATH_END);
+
+	f = sloth__open_included_file(x, name, (int)strlen(name));
+	TEST_ASSERT_NOT_NULL(f);
+	fclose(f);
+	TEST_ASSERT_EQUAL(saved_start, sloth_user_get(x, SLOTH_PATH_START));
+	TEST_ASSERT_EQUAL(saved_end, sloth_user_get(x, SLOTH_PATH_END));
+
+	sloth_chdir(cwd);
+	join_path(filepath, dir, "only_root2.4th"); remove(filepath);
+	sloth_rmdir(elsewhere);
+	sloth_rmdir(dir);
+}
+
 /* sloth_set_root_path must leave "<dir>/4th/" in SLOTH_PATHS and */
 /* remember the current directory right after it. */
 void test_set_root_path_places_paths(void) {
@@ -2051,11 +2104,15 @@ void test_set_root_path_long_path_is_bounded(void) {
 /* is rejected, and neither case touches the user variables. */
 void test_set_root_path_at_capacity(void) {
 	char root[1024];
+	char cwd[MAX_PATH];
 	CELL sentinel = (CELL)0x0BADF00D;
-	int l;
+	int l, cwd_len;
 
-	/* root + "/4th/" + NUL == SLOTH_PATHS_SIZE */
-	l = SLOTH_PATHS_SIZE - 6;
+	TEST_ASSERT_EQUAL(0, save_cwd(cwd));
+	cwd_len = (int)strlen(cwd);
+
+	/* root + "/4th/" + NUL + cwd == SLOTH_PATHS_SIZE (exact fit) */
+	l = SLOTH_PATHS_SIZE - 6 - cwd_len;
 	memset(root, 'd', l);
 	root[l] = 0;
 	sloth_user_set(x, SLOTH_INCLUDED_FILES, sentinel);
@@ -2067,7 +2124,7 @@ void test_set_root_path_at_capacity(void) {
 		"/4th/", (char*)(x->u + SLOTH_PATHS + l), 5);
 
 	/* One more byte cannot fit */
-	l = SLOTH_PATHS_SIZE - 4;
+	l = SLOTH_PATHS_SIZE - 4 - cwd_len;
 	memset(root, 'd', l);
 	root[l] = 0;
 	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 12345);
@@ -2625,6 +2682,7 @@ int main(void) {
 	RUN_TEST(test_included_nested_from_root_path);
 	RUN_TEST(test_included_with_set_root_path);
 	RUN_TEST(test_open_included_file_root_does_not_update_path);
+	RUN_TEST(test_open_included_file_root_keeps_nonempty_previous_path);
 	RUN_TEST(test_set_root_path_places_paths);
 	RUN_TEST(test_included_read_only_file);
 	RUN_TEST(test_open_included_file_long_name_is_bounded);

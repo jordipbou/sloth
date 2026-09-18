@@ -959,44 +959,70 @@ void sloth__restore_input_and_path(X* x) {
 
 FILE* sloth__open_included_file(X* x, char* a, int l) {
 	FILE* f;
+	CELL root_len;
+	/* Whether the opened file came from the current path (strategies */
+	/* 1 or 2). Only then the remembered path must be updated. */
+	int remember = 0;
 
 	/* Variables for working with path, initialized to */
 	/* reuse current path if possible. */
 	char* pathstart = (char*)sloth_user_get(x, SLOTH_PATH_START);
 	char* pathend = (char*)sloth_user_get(x, SLOTH_PATH_END);
 
-	/* Copy pathname/filename to end of current path */
-	strncpy(pathend, a, l);
-	*(pathend + l) = 0;
-	/* Try to use it as absolute path filename or relative to */
-	/* current directory (as has been copied to the end of */
-	/* previous path). */
-	/* TODO explain that rb+ is needed for fopen to be */
-	/* compatible both in Linux and on Windows */
-	f = fopen(pathend, "rb+");
-	if (f) {
-		/* Storing path as absolute or relative to cwd */
-		pathstart = pathend;
-		pathend = pathend + l;
-	} else {
-		/* Trying as relative to previous path. */
-		f = fopen(pathstart, "rb+");
+	/* End of the continuous path region. Paths must fit */
+	/* between SLOTH_PATHS (or the current path position) */
+	/* and this limit. */
+	CELL path_start_addr = (CELL)(x->u + SLOTH_PATHS);
+	CELL path_end = (CELL)(x->u + SLOTH_INCLUDED_FILES);
+	/* The bound only applies when the path is stored in */
+	/* the path region. Tests and callers may use an */
+	/* external buffer (e.g. on the stack), which is left */
+	/* unchecked. */
+	int in_region = (CELL)pathend >= path_start_addr
+								 && (CELL)pathend < path_end;
+
+	f = 0;
+
+	/* Try to use it as absolute path filename or relative */
+	/* to current directory (as has been copied to the end */
+	/* of previous path). */
+	if (!in_region || (CELL)pathend + l + 1 <= path_end) {
+		/* Copy pathname/filename to end of current path */
+		strncpy(pathend, a, l);
+		*(pathend + l) = 0;
+		f = fopen(pathend, "rb");
 		if (f) {
+			/* Storing path as absolute or relative to cwd */
+			pathstart = pathend;
 			pathend = pathend + l;
-		}	else {
-			/* Trying as relative to root path. */
-			strncpy(pathend, (char*)(x->u + SLOTH_PATHS), sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH));
-			strncpy(pathend + sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH), a, l);
-			*(pathend + sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH) + l) = 0;
-			f = fopen(pathend, "rb+");
-			/* Opening a file from the root path must not change */
-			/* pathstart or pathend as everytime a file is opened */
-			/* it can be checked against root, no need to remember it */
-			/* and it's better to just remember previous dirs. */
+			remember = 1;
 		}
 	}
 
-	if (f) {
+	if (!f) {
+		/* Trying as relative to previous path. */
+		f = fopen(pathstart, "rb");
+		if (f) {
+			pathend = pathend + l;
+			remember = 1;
+		}	else {
+			/* Trying as relative to root path. */
+			root_len = sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH);
+			if (!in_region || (CELL)pathend + root_len + l + 1 <= path_end) {
+				strncpy(pathend, (char*)(x->u + SLOTH_PATHS), root_len);
+				strncpy(pathend + root_len, a, l);
+				*(pathend + root_len + l) = 0;
+				f = fopen(pathend, "rb");
+				/* Opening a file from the root path must not */
+				/* change pathstart or pathend as everytime a */
+				/* file is opened it can be checked against root, */
+				/* no need to remember it and it's better to */
+				/* just remember previous dirs. */
+			}
+		}
+	}
+
+	if (f && remember) {
 		/* Remove filename from path... */
 		while (pathend > pathstart) {
 			if (*pathend == '/' || *pathend == '\\') {
@@ -2250,11 +2276,37 @@ void sloth_set_root_path(X* x, char* s) {
 	char *buffer;
 	char buf[1024];
 	int l = 0;
+	int cwd_len = 0;
+	CELL cap;
 	if (strlen(s) == 0) {
 		l = sloth__get_exe_dir(buf, 1024);
 		s = buf;	
 	} else {
 		l = strlen(s);
+	}
+
+	/* Total space reserved to store paths between SLOTH_PATHS */
+	/* and SLOTH_INCLUDED_FILES. */
+	cap = (CELL)(x->u + SLOTH_INCLUDED_FILES) - (CELL)(x->u + SLOTH_PATHS);
+
+#ifdef WINDOWS
+	buffer = _getcwd(NULL, 0);
+#else
+	buffer = getcwd(NULL, 0);
+#endif
+	if (buffer) {
+		cwd_len = strlen(buffer);
+	}
+
+	/* The root path (plus "/4th/") and the current directory must */
+	/* fit in the path region. If they don't, leave root unset */
+	/* instead of overflowing into the user variables. */
+	if (l + 5 + cwd_len > (int)cap) {
+		if (buffer) free(buffer);
+		sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 0);
+		sloth_user_set(x, SLOTH_PATH_START, x->u + SLOTH_PATHS);
+		sloth_user_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS);
+		return;
 	}
 
 	/* Copy ROOT PATH to the beginning of SLOTH_PATHS buffer */
@@ -2263,17 +2315,12 @@ void sloth_set_root_path(X* x, char* s) {
 	memcpy((char*)(x->u + SLOTH_PATHS + l), "/4th/", 5);
 	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, l + 5);
 	sloth_user_set(x, SLOTH_PATH_START, x->u + SLOTH_PATHS + l + 5);
-#ifdef WINDOWS
-	buffer = _getcwd(NULL, 0);
-#else
-	buffer = getcwd(NULL, 0);
-#endif
 	if (buffer) {
-		sloth_user_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS + l + 5 + strlen(buffer));
-		memcpy((char*)sloth_user_get(x, SLOTH_PATH_START), buffer, strlen(buffer));
+		sloth_user_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS + l + 5 + cwd_len);
+		memcpy((char*)sloth_user_get(x, SLOTH_PATH_START), buffer, cwd_len);
 		free(buffer);
 	} else {
-		sloth_user_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS + strlen(s) + 5);
+		sloth_user_set(x, SLOTH_PATH_END, x->u + SLOTH_PATHS + l + 5);
 	}
 }
 
