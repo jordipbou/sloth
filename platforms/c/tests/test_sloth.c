@@ -1,14 +1,30 @@
 #ifdef _WIN32
 #  include <windows.h>
+#  include <direct.h>
+#  define PATH_SEP '\\'
+#  define sloth_mkdir(p) _mkdir(p)
+#  define sloth_rmdir(p) _rmdir(p)
+#  define sloth_chdir(p) _chdir(p)
+#  define sloth_getcwd(b, n) _getcwd((b), (n))
 #else
 #  include <unistd.h>
+#  include <sys/stat.h>
 #  ifndef MAX_PATH
 #    define MAX_PATH 260
 #  endif
+#  define PATH_SEP '/'
+#  define sloth_mkdir(p) mkdir((p), 0777)
+#  define sloth_rmdir(p) rmdir(p)
+#  define sloth_chdir(p) chdir(p)
+#  define sloth_getcwd(b, n) getcwd((b), (n))
 #endif
 
 #include "sloth.h"
 #include "unity.h"
+
+/* Size of the continuous path region between SLOTH_PATHS and */
+/* SLOTH_INCLUDED_FILES. */
+#define SLOTH_PATHS_SIZE (SLOTH_INCLUDED_FILES - SLOTH_PATHS)
 
 /* Custom EMIT for testing — replaces the default printf one */
 char emitted_char = 0;
@@ -1445,11 +1461,80 @@ static int write_temp_file(char *pathbuf, const char *content, size_t len) {
 	return 0;
 }
 
+/* Portable temp directory helpers */
+
+static void join_path(char *buf, const char *dir, const char *name) {
+	int dirlen = (int)strlen(dir);
+	if (dirlen > 0 && dir[dirlen - 1] != '/' && dir[dirlen - 1] != '\\') {
+		memcpy(buf, dir, dirlen);
+		buf[dirlen] = PATH_SEP;
+		strcpy(buf + dirlen + 1, name);
+	} else {
+		memcpy(buf, dir, dirlen);
+		strcpy(buf + dirlen, name);
+	}
+}
+
+static int make_temp_dir(char *pathbuf) {
+	/* tmpnam is C89 but not thread-safe — acceptable */
+	/* for single-threaded tests */
+	if (!tmpnam(pathbuf)) return -1;
+	remove(pathbuf); /* tmpnam only proposes a name */
+	if (sloth_mkdir(pathbuf) != 0) return -1;
+	return 0;
+}
+
+static int write_temp_file_in(
+	char *pathbuf, const char *dir, const char *name,
+	const char *content, size_t len) {
+	FILE *f;
+	join_path(pathbuf, dir, name);
+	f = fopen(pathbuf, "wb");
+	if (!f) return -1;
+	fwrite(content, 1, len, f);
+	fclose(f);
+	return 0;
+}
+
+static int save_cwd(char *buf) {
+	return sloth_getcwd(buf, MAX_PATH) ? 0 : -1;
+}
+
+static int make_file_read_only(const char *path) {
+#ifdef _WIN32
+	return SetFileAttributesA(path, FILE_ATTRIBUTE_READONLY) ? 0 : -1;
+#else
+	return chmod(path, 0444);
+#endif
+}
+
+static int make_file_writable(const char *path) {
+#ifdef _WIN32
+	return SetFileAttributesA(path, FILE_ATTRIBUTE_NORMAL) ? 0 : -1;
+#else
+	return chmod(path, 0644);
+#endif
+}
+
 int interpret_calls;
 
 void noop_interpret(X* x) {
 	(void)x;
 	interpret_calls++;
+}
+
+/* INTERPRET hook that includes a sibling file exactly once. */
+static char nested_include_name[MAX_PATH];
+static int nested_include_done;
+
+void nested_include_interpret(X* x) {
+	interpret_calls++;
+	if (!nested_include_done) {
+		nested_include_done = 1;
+		sloth_push(x, (CELL)nested_include_name);
+		sloth_push(x, (CELL)strlen(nested_include_name));
+		sloth_included_(x);
+	}
 }
 
 void test_included_absolute_path(void) {
@@ -1649,6 +1734,347 @@ void test_included_and_refill(void) {
 	TEST_ASSERT_EQUAL_MEMORY(tmppath, (char*)(new_head + 2*sCELL), strlen(tmppath)); /* name */
 
 	remove(tmppath);
+}
+
+/* A file opened by a name relative to the current directory. */
+void test_included_cwd_relative_path(void) {
+	char dir[MAX_PATH];
+	char cwd[MAX_PATH];
+	char path[256];
+	char filepath[MAX_PATH];
+
+	TEST_ASSERT_EQUAL(0, make_temp_dir(dir));
+	TEST_ASSERT_EQUAL(0, save_cwd(cwd));
+	TEST_ASSERT_EQUAL(0, sloth_chdir(dir));
+	TEST_ASSERT_EQUAL(0, write_temp_file_in(
+		filepath, dir, "cwd_rel.4th", "line one\nline two", 17));
+
+	path[0] = 0;
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+	sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 0);
+	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &noop_interpret));
+	interpret_calls = 0;
+
+	sloth_push(x, (CELL)"cwd_rel.4th");
+	sloth_push(x, (CELL)strlen("cwd_rel.4th"));
+	sloth_included_(x);
+
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(2, interpret_calls);
+
+	sloth_chdir(cwd);
+	remove(filepath);
+	sloth_rmdir(dir);
+}
+
+/* A file that includes a sibling which can only be found relative */
+/* to the directory of the first file (the current one from cwd). */
+void test_included_relative_to_last_on_cwd(void) {
+	char dir[MAX_PATH];
+	char sub[MAX_PATH];
+	char cwd[MAX_PATH];
+	char filepath[MAX_PATH];
+	char path[256];
+
+	TEST_ASSERT_EQUAL(0, make_temp_dir(dir));
+	join_path(sub, dir, "sub");
+	TEST_ASSERT_EQUAL(0, sloth_mkdir(sub));
+	TEST_ASSERT_EQUAL(0, save_cwd(cwd));
+	TEST_ASSERT_EQUAL(0, sloth_chdir(dir));
+	TEST_ASSERT_EQUAL(0, write_temp_file_in(filepath, sub, "a.4th", "one", 3));
+	TEST_ASSERT_EQUAL(0, write_temp_file_in(filepath, sub, "b.4th", "two", 3));
+
+	strcpy(nested_include_name, "b.4th");
+	nested_include_done = 0;
+	interpret_calls = 0;
+
+	path[0] = 0;
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+	sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 0);
+	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &nested_include_interpret));
+
+	/* Relative to cwd so the first file sets PATH_START/END to sub/ */
+	sloth_push(x, (CELL)"sub/a.4th");
+	sloth_push(x, (CELL)strlen("sub/a.4th"));
+	sloth_included_(x);
+
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(2, interpret_calls);
+	TEST_ASSERT_EQUAL(1, nested_include_done);
+
+	sloth_chdir(cwd);
+	join_path(filepath, sub, "a.4th"); remove(filepath);
+	join_path(filepath, sub, "b.4th"); remove(filepath);
+	sloth_rmdir(sub);
+	sloth_rmdir(dir);
+}
+
+/* A file included from ROOT_PATH that includes a sibling which is */
+/* only reachable through ROOT_PATH again. */
+void test_included_nested_from_root_path(void) {
+	char dir[MAX_PATH];
+	char elsewhere[MAX_PATH];
+	char cwd[MAX_PATH];
+	char filepath[MAX_PATH];
+	char path[256];
+	int dirlen;
+	char *root;
+
+	TEST_ASSERT_EQUAL(0, make_temp_dir(dir));
+	TEST_ASSERT_EQUAL(0, make_temp_dir(elsewhere));
+	TEST_ASSERT_EQUAL(0, write_temp_file_in(filepath, dir, "a.4th", "one", 3));
+	TEST_ASSERT_EQUAL(0, write_temp_file_in(filepath, dir, "b.4th", "two", 3));
+
+	/* cwd has none of the files so only ROOT_PATH can resolve them */
+	TEST_ASSERT_EQUAL(0, save_cwd(cwd));
+	TEST_ASSERT_EQUAL(0, sloth_chdir(elsewhere));
+
+	strcpy(nested_include_name, "b.4th");
+	nested_include_done = 0;
+	interpret_calls = 0;
+
+	path[0] = 0;
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+	sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
+
+	root = (char*)(x->u + SLOTH_PATHS);
+	dirlen = (int)strlen(dir);
+	memcpy(root, dir, dirlen);
+	root[dirlen] = PATH_SEP;
+	root[dirlen + 1] = 0;
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, dirlen + 1);
+
+	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &nested_include_interpret));
+
+	sloth_push(x, (CELL)"a.4th");
+	sloth_push(x, (CELL)strlen("a.4th"));
+	sloth_included_(x);
+
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(2, interpret_calls);
+	TEST_ASSERT_EQUAL(1, nested_include_done);
+
+	sloth_chdir(cwd);
+	join_path(filepath, dir, "a.4th"); remove(filepath);
+	join_path(filepath, dir, "b.4th"); remove(filepath);
+	sloth_rmdir(elsewhere);
+	sloth_rmdir(dir);
+}
+
+/* Same as test_included_root_path but going through sloth_set_root_path */
+void test_included_with_set_root_path(void) {
+	char dir[MAX_PATH];
+	char fourth[MAX_PATH];
+	char cwd[MAX_PATH];
+	char filepath[MAX_PATH];
+
+	TEST_ASSERT_EQUAL(0, make_temp_dir(dir));
+	join_path(fourth, dir, "4th");
+	TEST_ASSERT_EQUAL(0, sloth_mkdir(fourth));
+	TEST_ASSERT_EQUAL(0, write_temp_file_in(
+		filepath, fourth, "root_rel.4th", "line one\nline two", 17));
+	TEST_ASSERT_EQUAL(0, save_cwd(cwd));
+
+	sloth_set_root_path(x, dir);
+
+	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &noop_interpret));
+	interpret_calls = 0;
+
+	sloth_push(x, (CELL)"root_rel.4th");
+	sloth_push(x, (CELL)strlen("root_rel.4th"));
+	sloth_included_(x);
+
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(2, interpret_calls);
+
+	join_path(filepath, fourth, "root_rel.4th"); remove(filepath);
+	sloth_rmdir(fourth);
+	sloth_rmdir(dir);
+}
+
+/* Opening from ROOT_PATH must not change PATH_START/PATH_END so */
+/* the remembered directory keeps being the previous real one. */
+void test_open_included_file_root_does_not_update_path(void) {
+	char dir[MAX_PATH];
+	char elsewhere[MAX_PATH];
+	char cwd[MAX_PATH];
+	char filepath[MAX_PATH];
+	char path[256];
+	char name[] = "only_root.4th";
+	int dirlen;
+	char *root;
+	FILE *f;
+	CELL saved_start, saved_end;
+
+	TEST_ASSERT_EQUAL(0, make_temp_dir(dir));
+	TEST_ASSERT_EQUAL(0, make_temp_dir(elsewhere));
+	TEST_ASSERT_EQUAL(0, write_temp_file_in(filepath, dir, name, "x", 1));
+
+	TEST_ASSERT_EQUAL(0, save_cwd(cwd));
+	TEST_ASSERT_EQUAL(0, sloth_chdir(elsewhere));
+
+	path[0] = 0;
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+	sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
+
+	root = (char*)(x->u + SLOTH_PATHS);
+	dirlen = (int)strlen(dir);
+	memcpy(root, dir, dirlen);
+	root[dirlen] = PATH_SEP;
+	root[dirlen + 1] = 0;
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, dirlen + 1);
+
+	saved_start = sloth_user_get(x, SLOTH_PATH_START);
+	saved_end = sloth_user_get(x, SLOTH_PATH_END);
+
+	f = sloth__open_included_file(x, name, (int)strlen(name));
+	TEST_ASSERT_NOT_NULL(f);
+	fclose(f);
+	TEST_ASSERT_EQUAL(saved_start, sloth_user_get(x, SLOTH_PATH_START));
+	TEST_ASSERT_EQUAL(saved_end, sloth_user_get(x, SLOTH_PATH_END));
+
+	sloth_chdir(cwd);
+	join_path(filepath, dir, "only_root.4th"); remove(filepath);
+	sloth_rmdir(elsewhere);
+	sloth_rmdir(dir);
+}
+
+/* sloth_set_root_path must leave "<dir>/4th/" in SLOTH_PATHS and */
+/* remember the current directory right after it. */
+void test_set_root_path_places_paths(void) {
+	char dir[MAX_PATH];
+	char cwd[MAX_PATH];
+	char *stored;
+	CELL root_len, path_start, path_end;
+
+	TEST_ASSERT_EQUAL(0, make_temp_dir(dir));
+	TEST_ASSERT_EQUAL(0, save_cwd(cwd));
+
+	sloth_set_root_path(x, dir);
+
+	root_len = sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH);
+	TEST_ASSERT_EQUAL((CELL)strlen(dir) + 5, root_len);
+
+	stored = (char*)(x->u + SLOTH_PATHS);
+	TEST_ASSERT_EQUAL_STRING_LEN(dir, stored, strlen(dir));
+	TEST_ASSERT_EQUAL_STRING_LEN("/4th/", stored + strlen(dir), 5);
+
+	path_start = sloth_user_get(x, SLOTH_PATH_START);
+	path_end = sloth_user_get(x, SLOTH_PATH_END);
+	TEST_ASSERT_EQUAL((CELL)(x->u + SLOTH_PATHS + root_len), path_start);
+	TEST_ASSERT_EQUAL((CELL)strlen(cwd), path_end - path_start);
+	TEST_ASSERT_EQUAL_MEMORY(cwd, (char*)path_start, strlen(cwd));
+
+	sloth_rmdir(dir);
+}
+
+/* INCLUDED must open files read-only, as it only reads them. */
+void test_included_read_only_file(void) {
+	char dir[MAX_PATH];
+	char cwd[MAX_PATH];
+	char path[256];
+	char filepath[MAX_PATH];
+	CELL throw_prim;
+
+	TEST_ASSERT_EQUAL(0, make_temp_dir(dir));
+	TEST_ASSERT_EQUAL(0, save_cwd(cwd));
+	TEST_ASSERT_EQUAL(0, sloth_chdir(dir));
+	TEST_ASSERT_EQUAL(0, write_temp_file_in(
+		filepath, dir, "ro.4th", "line one\nline two", 17));
+	TEST_ASSERT_EQUAL(0, make_file_read_only(filepath));
+
+	path[0] = 0;
+	sloth_user_set(x, SLOTH_PATH_START, (CELL)path);
+	sloth_user_set(x, SLOTH_PATH_END, (CELL)path);
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 0);
+	sloth_user_set(x, SLOTH_INTERPRET, sloth_primitive(x, &noop_interpret));
+	interpret_calls = 0;
+
+	throw_prim = sloth_primitive(x, &sloth_included_);
+	sloth_push(x, (CELL)"ro.4th");
+	sloth_push(x, (CELL)strlen("ro.4th"));
+	sloth_push(x, throw_prim);
+	sloth_catch_(x);
+
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(2, interpret_calls);
+
+	TEST_ASSERT_EQUAL(0, make_file_writable(filepath));
+	sloth_chdir(cwd);
+	remove(filepath);
+	sloth_rmdir(dir);
+}
+
+/* An include name that does not fit in the path region must be */
+/* rejected instead of overflowing into the user variables. */
+void test_open_included_file_long_name_is_bounded(void) {
+	char name[600];
+	CELL sentinel = (CELL)0x5A5A5A5A;
+	FILE *f;
+	int i;
+
+	for (i = 0; i < 599; i++) name[i] = 'a';
+	name[599] = 0;
+
+	/* PATH_START/PATH_END already point into SLOTH_PATHS from init */
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 0);
+	sloth_user_set(x, SLOTH_INCLUDED_FILES, sentinel);
+
+	f = sloth__open_included_file(x, name, 599);
+
+	TEST_ASSERT_NULL(f);
+	TEST_ASSERT_EQUAL(sentinel, sloth_user_get(x, SLOTH_INCLUDED_FILES));
+}
+
+/* A root path too long for the path region must leave root unset */
+/* instead of overflowing into the user variables. */
+void test_set_root_path_long_path_is_bounded(void) {
+	char root[1024];
+	CELL sentinel = (CELL)0x12345678;
+	int i;
+
+	for (i = 0; i < 599; i++) root[i] = 'd';
+	root[599] = 0;
+
+	sloth_user_set(x, SLOTH_INCLUDED_FILES, sentinel);
+
+	sloth_set_root_path(x, root);
+
+	TEST_ASSERT_EQUAL(sentinel, sloth_user_get(x, SLOTH_INCLUDED_FILES));
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH));
+}
+
+/* Boundary: a root path that just fits is accepted, one byte more */
+/* is rejected, and neither case touches the user variables. */
+void test_set_root_path_at_capacity(void) {
+	char root[1024];
+	CELL sentinel = (CELL)0x0BADF00D;
+	int l;
+
+	/* root + "/4th/" + NUL == SLOTH_PATHS_SIZE */
+	l = SLOTH_PATHS_SIZE - 6;
+	memset(root, 'd', l);
+	root[l] = 0;
+	sloth_user_set(x, SLOTH_INCLUDED_FILES, sentinel);
+	sloth_set_root_path(x, root);
+
+	TEST_ASSERT_EQUAL((CELL)l + 5, sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH));
+	TEST_ASSERT_EQUAL(sentinel, sloth_user_get(x, SLOTH_INCLUDED_FILES));
+	TEST_ASSERT_EQUAL_STRING_LEN(
+		"/4th/", (char*)(x->u + SLOTH_PATHS + l), 5);
+
+	/* One more byte cannot fit */
+	l = SLOTH_PATHS_SIZE - 4;
+	memset(root, 'd', l);
+	root[l] = 0;
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 12345);
+	sloth_set_root_path(x, root);
+
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH));
+	TEST_ASSERT_EQUAL(sentinel, sloth_user_get(x, SLOTH_INCLUDED_FILES));
 }
 
 /* -- Input/Output and parsing ------------------------- */
@@ -2194,6 +2620,16 @@ int main(void) {
 	RUN_TEST(test_included_relative_path);
 	RUN_TEST(test_included_root_path);
 	RUN_TEST(test_included_and_refill);
+	RUN_TEST(test_included_cwd_relative_path);
+	RUN_TEST(test_included_relative_to_last_on_cwd);
+	RUN_TEST(test_included_nested_from_root_path);
+	RUN_TEST(test_included_with_set_root_path);
+	RUN_TEST(test_open_included_file_root_does_not_update_path);
+	RUN_TEST(test_set_root_path_places_paths);
+	RUN_TEST(test_included_read_only_file);
+	RUN_TEST(test_open_included_file_long_name_is_bounded);
+	RUN_TEST(test_set_root_path_long_path_is_bounded);
+	RUN_TEST(test_set_root_path_at_capacity);
 	/* Input/output and parsing */
 	RUN_TEST(test_emit);
 	RUN_TEST(test_key_pushes_char_onto_stack);
