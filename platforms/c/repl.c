@@ -22,7 +22,10 @@ int main(int argc, char**argv) {
 #endif
 
 	sloth_set_root_path(x, ROOT_PATH);
-	sloth_include(x, "ans.4th");
+	if (sloth_include(x, "ans.4th")) {
+		printf("Fatal error: ans.4th can not be included.\n");
+		exit(-1);
+	}
 
 	if (argc == 1) {
 		sloth_repl(x);
