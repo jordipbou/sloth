@@ -52,6 +52,7 @@
 #endif
 
 #ifdef WINDOWS
+#include <direct.h>
 #include <libloaderapi.h>
 #endif
 

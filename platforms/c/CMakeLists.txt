@@ -24,7 +24,9 @@ endif()
 # default and does not report the error.
 # Enforcing -fno-common to all builds to ensure this type
 # of errors do not pass thru again.
-add_compile_options(-fno-common)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+	add_compile_options(-fno-common)
+endif()
 
 # -- Required flags for Windows builds --------------------
 
@@ -35,7 +37,11 @@ if (WIN32)
 	add_compile_definitions(	
 		_CRT_SECURE_NO_WARNINGS 
 		_CRT_NONSTDC_NO_DEPRECATE)
- 
+
+	if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
+		add_compile_definitions(_AMD64_)
+	endif()
+
 	set(
 		CMAKE_MSVC_RUNTIME_LIBRARY 
 		"MultiThreaded$<$<CONFIG:Debug>:Debug>" 
