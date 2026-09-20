@@ -2283,6 +2283,27 @@ int sloth__get_exe_dir(char* buf, int size) {
 	return 0;
 }
 
+/* root path is where Sloth will find for the 4th/ */
+/* directory. There are the Forth files needed by this */
+/* implementation. */
+/* Parameters: */
+/* s -> it can point to a zero ended string or be null. */
+/*      If it is null, the directory where the Sloth */
+/*      executable lives will be set as the root path. */
+/*      (The main use of passing here the directory */
+/*       is to allow setting the Sloth repository as the */
+/*       root path when developing, allowing doing */
+/*       changes in the Forth files without the need to */
+/*       rebuild the project or copy those files next to */
+/*       the executable). */
+/* In the buffer SLOTH_PATHS the following information */
+/* is stored: */
+/* ROOT_PATH + '/4th/' | CURRENT WORKING DIRECTORY */
+/* This information will be used by sloth_included_ to */
+/* find files following these rules: */
+/* - Relative to last opened file (this includes cwd when */
+/*                                 Sloth was started) */
+/* - Relative to root path */
 void sloth_set_root_path(X* x, char* s) {
 	char *buffer;
 	char buf[1024];
@@ -2296,8 +2317,8 @@ void sloth_set_root_path(X* x, char* s) {
 		l = strlen(s);
 	}
 
-	/* Total space reserved to store paths between SLOTH_PATHS */
-	/* and SLOTH_INCLUDED_FILES. */
+	/* Total space reserved to store paths between */
+	/* SLOTH_PATHS and SLOTH_INCLUDED_FILES. */
 	cap = (CELL)(x->u + SLOTH_INCLUDED_FILES) - (CELL)(x->u + SLOTH_PATHS);
 
 #ifdef WINDOWS
@@ -2309,9 +2330,10 @@ void sloth_set_root_path(X* x, char* s) {
 		cwd_len = strlen(buffer);
 	}
 
-	/* The root path (plus "/4th/") and the current directory must */
-	/* fit in the path region. If they don't, leave root unset */
-	/* instead of overflowing into the user variables. */
+	/* The root path (plus "/4th/") and the current */
+	/* directory must fit in the path region. If they */
+	/* don't, leave root unset instead of overflowing */
+	/* into the user variables. */
 	if (l + 5 + cwd_len > (int)cap) {
 		if (buffer) free(buffer);
 		sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 0);
