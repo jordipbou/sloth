@@ -27,48 +27,68 @@ int getch(void) {
 
 #define TOS(x) x->s[x->sp - 1]
 
+static int sloth__check_data_stack(X* x, CELL n, CELL r) {
+	if (x->sp < n) {
+		sloth_throw(x, SLOTH_STACK_UNDERFLOW);
+		return 0;
+	}
+	if (x->sp - n + r > SLOTH_STACK_SIZE) {
+		sloth_throw(x, SLOTH_STACK_OVERFLOW);
+		return 0;
+	}
+	return 1;
+}
+
 void sloth_push(X* x, CELL v) { x->s[x->sp] = v; x->sp++; }
 CELL sloth_pop(X* x) { x->sp--; return x->s[x->sp]; }
 void sloth_rpush(X* x, CELL v) { x->r[x->rp] = v; x->rp++; }
 CELL sloth_rpop(X* x) { x->rp--; return x->r[x->rp]; }
 
 void sloth_dup_(X* x) { 
-	CELL a = sloth_pop(x); 
+	CELL a;
+	if (!sloth__check_data_stack(x, 1, 2)) return;
+	a = sloth_pop(x); 
 	sloth_push(x, a); 
 	sloth_push(x, a); 
 }
-void sloth_drop_(X* x) { sloth_pop(x); }
+void sloth_drop_(X* x) {
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	sloth_pop(x);
+}
 void sloth_over_(X* x) { 
-	CELL b = sloth_pop(x); 
-	CELL a = sloth_pop(x); 
+	CELL a, b;
+	if (!sloth__check_data_stack(x, 2, 3)) return;
+	b = sloth_pop(x); 
+	a = sloth_pop(x); 
 	sloth_push(x, a); 
 	sloth_push(x, b); 
 	sloth_push(x, a);
 }
 void sloth_swap_(X* x) { 
-	if (x->sp < 2) {
-		sloth_throw(x, SLOTH_STACK_UNDERFLOW);
-	} else {
-		CELL a = sloth_pop(x); 
-		CELL b = sloth_pop(x);
-		sloth_push(x, a);
-		sloth_push(x, b);
-	}
+	CELL a, b;
+	if (!sloth__check_data_stack(x, 2, 2)) return;
+	a = sloth_pop(x); 
+	b = sloth_pop(x);
+	sloth_push(x, a);
+	sloth_push(x, b);
 }
-/*
-void sloth_swap_(X* x) { 
-	CELL b = sloth_pop(x); 
-	CELL a = sloth_pop(x); 
-	sloth_push(x, b); 
-	sloth_push(x, a); 
-}
-*/
+ 
 void sloth_to_r_(X* x) { 
-	CELL a = sloth_pop(x); 
+	CELL a;
+	if (x->rp >= SLOTH_RETURN_STACK_SIZE) {
+		sloth_throw(x, SLOTH_RETURN_STACK_OVERFLOW);
+		return;
+	}
+	a = sloth_pop(x); 
 	sloth_rpush(x, a); 
 }
 void sloth_r_from_(X* x) { 
-	CELL a = sloth_rpop(x); 
+	CELL a;
+	if (x->rp < 1) {
+		sloth_throw(x, SLOTH_RETURN_STACK_UNDERFLOW);
+		return;
+	}
+	a = sloth_rpop(x); 
 	sloth_push(x, a);
 }
 
@@ -441,53 +461,72 @@ void sloth_throw_(X* x){
 
 /* -- Arithmetic and logical operations ---------------- */
 
-void sloth_invert_(X* x) { sloth_push(x, ~sloth_pop(x)); }
+void sloth_invert_(X* x) {
+	if (!sloth__check_data_stack(x, 1, 1)) return;
+	sloth_push(x, ~sloth_pop(x));
+}
 void sloth_and_(X* x) { 
-	CELL v = sloth_pop(x); 
+	CELL v;
+	if (!sloth__check_data_stack(x, 2, 1)) return;
+	v = sloth_pop(x); 
 	sloth_push(x, sloth_pop(x) & v); 
 }
 void sloth_l_shift_(X* x) { 
-	CELL n = sloth_pop(x); 
+	CELL n;
+	if (!sloth__check_data_stack(x, 2, 1)) return;
+	n = sloth_pop(x); 
 	sloth_push(x, sloth_pop(x) << n); 
 }
 void sloth_minus_(X* x) { 
-	CELL a = sloth_pop(x); 
+	CELL a;
+	if (!sloth__check_data_stack(x, 2, 1)) return;
+	a = sloth_pop(x); 
 	sloth_push(x, sloth_pop(x) - a); 
 }
 void sloth_plus_(X* x) { 
-	CELL a = sloth_pop(x); 
+	CELL a;
+	if (!sloth__check_data_stack(x, 2, 1)) return;
+	a = sloth_pop(x); 
 	sloth_push(x, sloth_pop(x) + a); 
 }
 void sloth_r_shift_(X* x) { 
-	CELL n = sloth_pop(x); 
+	CELL n;
+	if (!sloth__check_data_stack(x, 2, 1)) return;
+	n = sloth_pop(x); 
 	sloth_push(x, ((uCELL)sloth_pop(x)) >> n); 
 }
 void sloth_star_(X* x) { 
-	CELL b = sloth_pop(x); 
+	CELL b;
+	if (!sloth__check_data_stack(x, 2, 1)) return;
+	b = sloth_pop(x); 
 	sloth_push(x, sloth_pop(x) * b); 
 }
 void sloth_two_slash_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 1)) return;
 	sloth_push(x, sloth_pop(x) >> 1); 
 }
 void sloth_u_m_star_(X* x) {
-	uCELL b = (uCELL)sloth_pop(x), a = (uCELL)sloth_pop(x), high, low;
+	uCELL a, b, high, low, a_low, a_high, b_low, b_high;
+	uCELL low_low, low_high, high_low, high_high, carry, mid;
+
+	if (!sloth__check_data_stack(x, 2, 2)) return;
+	b = (uCELL)sloth_pop(x);
+	a = (uCELL)sloth_pop(x);
 
 	/* Split each 64-bit integer into 32-bit pieces for multiplication */
-	uCELL a_low = a & hCELL_MASK;
-	uCELL a_high = a >> hCELL_BITS;
-	uCELL b_low = b & hCELL_MASK;
-	uCELL b_high = b >> hCELL_BITS;
+	a_low = a & hCELL_MASK;
+	a_high = a >> hCELL_BITS;
+	b_low = b & hCELL_MASK;
+	b_high = b >> hCELL_BITS;
 	
 	/* Multiply the 32-bit components */
-	uCELL low_low = a_low * b_low;
-	uCELL low_high = a_low * b_high;
-	uCELL high_low = a_high * b_low;
-	uCELL high_high = a_high * b_high;
-
-	uCELL carry; /* Pre-definition */
+	low_low = a_low * b_low;
+	low_high = a_low * b_high;
+	high_low = a_high * b_low;
+	high_high = a_high * b_high;
 
 	/* Intermediate values for calculating the carries */
-	uCELL mid = low_low >> hCELL_BITS;
+	mid = low_low >> hCELL_BITS;
 	mid += low_high & hCELL_MASK;
 	mid += high_low & hCELL_MASK;
 	
@@ -507,10 +546,12 @@ void sloth_u_m_star_(X* x) {
 #define DULT(du1l,du1h,du2l,du2h) ( (du2h<du1h) ? 0 : ( (du2h==du1h) ? (du1l<du2l) : 1) )
 void sloth_u_m_slash_mod_(X* x) {
 	uCELL ah, al, q, di, bl, bh, sl, sh;
+	if (!sloth__check_data_stack(x, 3, 2)) return;
 	bh = (uCELL)sloth_pop(x);
 	bl = 0;
 	ah = (uCELL)sloth_pop(x);
 	al = (uCELL)sloth_pop(x);
+	if (bh == 0) sloth_throw(x, SLOTH_DIVISION_BY_ZERO);
 	q = 0;
 	for( di=0; di<CELL_BITS; di++ )
 	{
@@ -540,11 +581,15 @@ void sloth_u_m_slash_mod_(X* x) {
 /* -- Comparison operations ---------------------------- */
 
 void sloth_equals_(X* x) { 
-	CELL a = sloth_pop(x); 
+	CELL a;
+	if (!sloth__check_data_stack(x, 2, 1)) return;
+	a = sloth_pop(x); 
 	sloth_push(x, sloth_pop(x) == a ? -1 : 0); 
 }
 void sloth_less_than_(X* x) { 
-	CELL a = sloth_pop(x); 
+	CELL a;
+	if (!sloth__check_data_stack(x, 2, 1)) return;
+	a = sloth_pop(x); 
 	sloth_push(x, sloth_pop(x) < a ? -1 : 0); 
 }
 

@@ -495,6 +495,53 @@ void test_catch_throw_prim(void) {
 	TEST_ASSERT_EQUAL(0, x->sp);
 }
 
+void test_throw_data_stack_underflow(void) {
+	F prims[] = {
+		&sloth_dup_, &sloth_drop_, &sloth_over_, &sloth_swap_,
+		&sloth_plus_, &sloth_minus_, &sloth_star_, &sloth_two_slash_,
+		&sloth_equals_, &sloth_less_than_, &sloth_invert_, &sloth_and_,
+		&sloth_l_shift_, &sloth_r_shift_, &sloth_u_m_star_,
+		&sloth_u_m_slash_mod_
+	};
+	int i;
+	for (i = 0; i < 16; i++) {
+		CELL p = sloth_primitive(x, prims[i]);
+		TEST_ASSERT_EQUAL(SLOTH_STACK_UNDERFLOW, sloth_catch(x, p));
+		TEST_ASSERT_EQUAL(0, x->sp);
+	}
+}
+
+void test_throw_data_stack_overflow(void) {
+	CELL p = sloth_primitive(x, &sloth_dup_);
+	CELL i;
+	for (i = 0; i < SLOTH_STACK_SIZE; i++) sloth_push(x, i);
+	TEST_ASSERT_EQUAL(SLOTH_STACK_OVERFLOW, sloth_catch(x, p));
+	TEST_ASSERT_EQUAL(SLOTH_STACK_SIZE, x->sp);
+}
+
+void test_throw_return_stack_overflow(void) {
+	CELL p = sloth_primitive(x, &sloth_to_r_);
+	CELL i;
+	for (i = 0; i < SLOTH_RETURN_STACK_SIZE; i++) sloth_rpush(x, i);
+	TEST_ASSERT_EQUAL(SLOTH_RETURN_STACK_OVERFLOW, sloth_catch(x, p));
+	TEST_ASSERT_EQUAL(SLOTH_RETURN_STACK_SIZE, x->rp);
+}
+
+void test_throw_return_stack_underflow(void) {
+	CELL p = sloth_primitive(x, &sloth_r_from_);
+	TEST_ASSERT_EQUAL(SLOTH_RETURN_STACK_UNDERFLOW, sloth_catch(x, p));
+	TEST_ASSERT_EQUAL(0, x->rp);
+}
+
+void test_throw_division_by_zero(void) {
+	CELL p = sloth_primitive(x, &sloth_u_m_slash_mod_);
+	sloth_push(x, 0);
+	sloth_push(x, 0);
+	sloth_push(x, 0);
+	TEST_ASSERT_EQUAL(SLOTH_DIVISION_BY_ZERO, sloth_catch(x, p));
+	TEST_ASSERT_EQUAL(3, x->sp);
+}
+
 /* -- Inner interpreter primitives -------------------- */
 
 void test_exit_(void) {
@@ -2710,6 +2757,11 @@ int main(void) {
 	RUN_TEST(test_catch_restores_stack);
 	RUN_TEST(test_nested_catch);
 	RUN_TEST(test_catch_throw_prim);
+	RUN_TEST(test_throw_data_stack_underflow);
+	RUN_TEST(test_throw_data_stack_overflow);
+	RUN_TEST(test_throw_return_stack_overflow);
+	RUN_TEST(test_throw_return_stack_underflow);
+	RUN_TEST(test_throw_division_by_zero);
 	/* Inner interpreter primitives */
 	RUN_TEST(test_exit_);
 	RUN_TEST(test_lit_);

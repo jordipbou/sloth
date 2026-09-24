@@ -166,6 +166,7 @@ typedef struct sloth_VM {
 #define SLOTH_STACK_UNDERFLOW					-4
 #define SLOTH_RETURN_STACK_OVERFLOW		-5
 #define SLOTH_RETURN_STACK_UNDERFLOW	-6
+#define SLOTH_DIVISION_BY_ZERO				-10
 
 /* -- Displacement of counted string buffer from here -- */
 
