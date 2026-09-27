@@ -16,7 +16,7 @@ It’s built on the idea that **Forth itself** — simple, extensible, and close
 
 ## Layout
 
-- `4th/` — Forth sources (`ans.4th`, `sloth.4th`, `tools.4th`, `libs/`, ...). Most of Sloth is written here.
+- `4th/` — Forth sources (`ans.4th`, `tools.4th`, ...). Most of Sloth is written here.
 - `platforms/c/` — C implementation (C89).
 - `platforms/java/` — Java implementation.
 - `platforms/js/` — JavaScript implementation (planned; see `~/hub/org/proj.sloth.org`).
