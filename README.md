@@ -14,6 +14,15 @@ It’s built on the idea that **Forth itself** — simple, extensible, and close
 
 ---
 
+## Layout
+
+- `4th/` — Forth sources (`ans.4th`, `sloth.4th`, `tools.4th`, `libs/`, ...). Most of Sloth is written here.
+- `platforms/c/` — C implementation (C89).
+- `platforms/java/` — Java implementation.
+- `platforms/js/` — JavaScript implementation (planned; see `~/hub/org/proj.sloth.org`).
+
+---
+
 ## Key Features
 
 - **Based on Forth:** Utilizes Forth’s dual-stack, linear memory virtual machine for efficient computation from microcontrollers to large computers.  
@@ -227,3 +236,9 @@ cmake -S platforms/c -B build -G "Ninja Multi-Config" \
 ```
 
 [CMake]: https://cmake.org/
+
+## Testing
+
+- C unit tests: `test_sloth` and `test_sloth_fp`.
+- ANS Forth suite: `sloth --test` runs `forth2012-test-suite/src/runtests.fth` (and the
+  floating-point suite).
