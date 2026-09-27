@@ -1347,19 +1347,6 @@ SET-CURRENT
 ?\		1 CHARS +FIELD 
 ?\ ;
 
-[DEFINED] INTS [IF]
-?: INTALIGNED ( addr -- a-addr )
-?\		1 INTS + 1- 1 INTS 1- INVERT AND
-?\ ;
-
-\ Fields with exact C datatype sizes
-\ Not an ANS word, but it helps interfacing with C
-\ libraries.
-?: INTFIELD: ( n1 "name" -- n2 ; addr1 -- addr2 )
-?\		INTALIGNED 1 INTS +FIELD
-?\ ;
-[THEN]
-
 S" FLOATING-STACK" ENVIRONMENT? [IF] DROP
 
 \ Floating point fields
