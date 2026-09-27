@@ -167,6 +167,15 @@ typedef struct sloth_VM {
 #define SLOTH_RETURN_STACK_OVERFLOW		-5
 #define SLOTH_RETURN_STACK_UNDERFLOW	-6
 #define SLOTH_DIVISION_BY_ZERO				-10
+#define SLOTH_UNDEFINED_WORD					-13
+#define SLOTH_COMPILE_ONLY_WORD				-14
+#define SLOTH_ZERO_LENGTH_NAME				-16
+#define SLOTH_PARSED_STRING_OVERFLOW	-18
+#define SLOTH_NAME_TOO_LONG						-19
+#define SLOTH_INVALID_NUMERIC_ARGUMENT	-24
+#define SLOTH_COMPILER_NESTING				-29
+#define SLOTH_FLOAT_STACK_OVERFLOW		-44
+#define SLOTH_FLOAT_STACK_UNDERFLOW		-45
 
 /* -- Displacement of counted string buffer from here -- */
 
@@ -226,6 +235,8 @@ typedef struct sloth_VM {
 
 /* -- Data and return stack ---------------------------- */
 
+int sloth__check_data_stack(X* x, CELL n, CELL r);
+
 void sloth_push(X* x, CELL v);
 CELL sloth_pop(X* x);
 void sloth_rpush(X* x, CELL v);
@@ -241,6 +252,8 @@ void sloth_r_from_(X* x);
 #ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 	/* -- Floating point stack ----------------------------- */
+
+	int sloth__check_float_stack(X* x, CELL n, CELL r);
 
 	void sloth_f_push(X* x, FCELL v);
 	FCELL sloth_f_pop(X* x);
@@ -640,6 +653,7 @@ void sloth_f_dot_s_(X* x);
 
 /* -- Primitives that I don't like too much ------------ */
 
+void sloth_self_(X* x);
 void sloth_dict_(X* x);
 void sloth_empty_return_stack_(X* x);
 

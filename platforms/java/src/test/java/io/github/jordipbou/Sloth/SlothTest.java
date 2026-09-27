@@ -499,6 +499,66 @@ public class SlothTest {
 		assertEquals(0, sloth.sp);
 	}
 
+	private int catchValue(Runnable r) {
+		try {
+			r.run();
+		} catch (Sloth.SlothException e) {
+			return e.value;
+		}
+		return 0;
+	}
+
+	@Test
+	public void test_throw_tier1_data_stack_underflow() {
+		Runnable[] prims = {
+			() -> sloth._allot_(), () -> sloth._c_fetch_(),
+			() -> sloth._c_store_(), () -> sloth._fetch_(),
+			() -> sloth._store_(), () -> sloth._cells_(),
+			() -> sloth._debug_(), () -> sloth._move_(),
+			() -> sloth._find_(), () -> sloth._word_(),
+			() -> sloth._compile_comma_(), () -> sloth._create_name_(),
+			() -> sloth._do_does_(), () -> sloth._evaluate_(),
+			() -> sloth._execute_(), () -> sloth._environment_()
+		};
+		for (Runnable p : prims) {
+			assertEquals(Sloth.STACK_UNDERFLOW, catchValue(p));
+			assertEquals(0, sloth.sp);
+		}
+	}
+
+	@Test
+	public void test_throw_tier1_data_stack_overflow() {
+		Runnable[] prims = {
+			() -> sloth._here_(), () -> sloth._find_(),
+			() -> sloth._source_(), () -> sloth._unused_(),
+			() -> sloth._save_input_()
+		};
+		for (Runnable p : prims) {
+			while (sloth.sp < Sloth.STACK_SIZE) sloth.push(0);
+			assertEquals(Sloth.STACK_OVERFLOW, catchValue(p));
+			assertEquals(Sloth.STACK_SIZE, sloth.sp);
+		}
+	}
+
+	@Test
+	public void test_throw_tier1_compiler_nesting() {
+		sloth.user_set(Sloth.STATE, 1);
+		assertEquals(
+			Sloth.COMPILER_NESTING, catchValue(() -> sloth._colon_()));
+		assertEquals(
+			Sloth.COMPILER_NESTING, catchValue(() -> sloth._colon_no_name_()));
+		sloth.user_set(Sloth.STATE, 0);
+	}
+
+	@Test
+	public void test_throw_tier1_zero_length_name() {
+		sloth.push(sloth.fromString("TEST"));
+		sloth.push(0);
+		assertEquals(
+			Sloth.ZERO_LENGTH_NAME, catchValue(() -> sloth._create_name_()));
+		assertEquals(0, sloth.sp);
+	}
+
 	/* -- Inner interpreter primitives -------------------- */
 
 	@Test

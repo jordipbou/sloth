@@ -74,6 +74,15 @@ public class Sloth {
 	public static final int STACK_UNDERFLOW = -4;
 	public static final int RETURN_STACK_OVERFLOW = -5;
 	public static final int RETURN_STACK_UNDERFLOW = -6;
+	public static final int UNDEFINED_WORD = -13;
+	public static final int COMPILE_ONLY_WORD = -14;
+	public static final int ZERO_LENGTH_NAME = -16;
+	public static final int PARSED_STRING_OVERFLOW = -18;
+	public static final int NAME_TOO_LONG = -19;
+	public static final int INVALID_NUMERIC_ARGUMENT = -24;
+	public static final int COMPILER_NESTING = -29;
+	public static final int FLOAT_STACK_OVERFLOW = -44;
+	public static final int FLOAT_STACK_UNDERFLOW = -45;
 
 	// -- Displacement of counted string buffer from here --
 
@@ -167,6 +176,18 @@ public class Sloth {
 
 	// -- Data stack
 
+	boolean check_data_stack(int n, int r) {
+		if (sp < n) {
+			_throw(STACK_UNDERFLOW);
+			return false;
+		}
+		if (sp - n + r > STACK_SIZE) {
+			_throw(STACK_OVERFLOW);
+			return false;
+		}
+		return true;
+	}
+
 	void push(int v) { s[sp++] = v; }
 	int pop() { return s[--sp]; }
 	int pick(int a) { return s[sp - a - 1]; }
@@ -200,6 +221,18 @@ public class Sloth {
 	int rpick(int a) { return r[rp - a - 1]; }
 
 	// -- Float stack
+
+	boolean check_float_stack(int n, int r) {
+		if (fp < n) {
+			_throw(FLOAT_STACK_UNDERFLOW);
+			return false;
+		}
+		if (fp - n + r > FLOAT_STACK_SIZE) {
+			_throw(FLOAT_STACK_OVERFLOW);
+			return false;
+		}
+		return true;
+	}
 
 	void f_push(double v) { f[fp++] = v; }
 	double f_pop() { return f[--fp]; }
@@ -324,6 +357,7 @@ public class Sloth {
 		}
 	}
 	protected void _debug_() {
+		if (!check_data_stack(4, 0)) return;
 		int post_xt = pop(); 
 		int inner_xt = pop();
 		int pre_xt = pop();
@@ -454,6 +488,8 @@ public class Sloth {
 	// Name (CHAR*namelen) @ NT + 2*sCELL + 2*suCHAR
 
 	int header(int n, int l) {
+		if (l <= 0) _throw(ZERO_LENGTH_NAME);
+		if (l > Character.MAX_VALUE) _throw(NAME_TOO_LONG);
 		_align_();
 		int w = here();
 		comma(get_latest());
@@ -474,17 +510,22 @@ public class Sloth {
 	void _exit_() { ip = (rp > 0) ? rpop() : -1; }
 	void _lit_() { push(op()); }
 	void _rip_() { int tip = ip; int o = op(); push(tip + o - sCELL); }
-	void _f_lit_() { f_push(f_op()); }
+	void _f_lit_() { 
+		if (!check_float_stack(0, 1)) return;
+		f_push(f_op()); 
+	}
 	void _branch_() { ip += op() ; }
 	void _zbranch_() { ip += pop() == 0 ? op() : sCELL ; }
 	void _string_() { 
 		int l = op(); 
+		if (!check_data_stack(0, 2)) return;
 		push(ip); 
 		push(l); 
 		ip = aligned(ip + (l + 1) * suCHAR); 
 	}
 	void _c_string_() {
 		char l = c_fetch(ip);
+		if (!check_data_stack(0, 1)) return;
 		push(ip);
 		ip = aligned(ip + (l + 2) * suCHAR);
 	}
@@ -511,6 +552,7 @@ public class Sloth {
 
 	// Environment queries
 	void _environment_() {
+		if (!check_data_stack(1, 1)) return;
 		switch (pop()) {
 		case 0: push(64); break; // /COUNTED-STRING
 		case 1: break; // TODO /HOLD
@@ -538,6 +580,7 @@ public class Sloth {
 	// The region to store WORD generated counted strings
 	// starts at "HERE" + CBUF
 	public void _word_() {
+		if (!check_data_stack(1, 1)) return;
 		char c = (char)pop();
 		int ibuf = user_get(IBUF);
 		int ilen = user_get(ILEN);
@@ -561,6 +604,10 @@ public class Sloth {
 		int end = ibuf + (ipos*suCHAR);
 		// Now, copy the length and the string to the 
 		// counted string buffer
+		if ((end - start) / suCHAR > Character.MAX_VALUE) {
+			_throw(PARSED_STRING_OVERFLOW);
+			return;
+		}
 		c_store(here() + CBUF, (char)((end - start) / suCHAR));
 		for (int i = 0; i < ((end - start) / suCHAR); i++) {
 			c_store(
@@ -576,6 +623,7 @@ public class Sloth {
 	}
 
 	public void _file_position_() {
+		if (!check_data_stack(1, 3)) return;
 		try {
 			RandomAccessFile file = (RandomAccessFile)(o[pop()]);
 			if (file != null) {
@@ -601,6 +649,7 @@ public class Sloth {
 	// reads a byte stream from file but stores it as 2 bytes
 	// characters in memory.
 	public void _read_line_() {
+		if (!check_data_stack(3, 3)) return;
 		try {
 			RandomAccessFile file = (RandomAccessFile)(o[pop()]);	
 			int u1 = pop();
@@ -687,6 +736,7 @@ public class Sloth {
 	}
 
 	void _save_input_() {
+		if (!check_data_stack(0, 6)) return;
 		push(user_get(SOURCE_POS));
 		push(user_get(SOURCE_ID));
 		push(user_get(IBUF));
@@ -911,6 +961,7 @@ public class Sloth {
 	}
 
 	public void _find_() {
+		if (!check_data_stack(1, 2)) return;
 		int cstring = pop();
 		try {
 			int w = search_word(cstring + suCHAR, c_fetch(cstring));
@@ -1007,8 +1058,12 @@ public class Sloth {
 	// -- Require words to bootstrap
 
 	void _bye_() { System.out.println(); System.exit(0); }
-	void _unused_() { push(m[d].capacity() - here()); }
+	void _unused_() { 
+		if (!check_data_stack(0, 1)) return;
+		push(m[d].capacity() - here()); 
+	}
 	void _move_() {
+		if (!check_data_stack(3, 0)) return;
 		int u = pop();
 		int addr2 = pop();
 		int addr1 = pop();
@@ -1043,16 +1098,32 @@ public class Sloth {
 		push((int)Long.divideUnsigned(d, u));
 	}
 
-	void _c_fetch_() { push(c_fetch(pop())); }
-	void _c_store_() { int a = pop(); c_store(a, (char)pop()); }
-	void _fetch_() { push(fetch(pop())); }
-	void _store_() { int a = pop(); store(a, pop()); }
+	void _c_fetch_() { 
+		if (!check_data_stack(1, 1)) return;
+		push(c_fetch(pop())); 
+	}
+	void _c_store_() { 
+		if (!check_data_stack(2, 0)) return;
+		int a = pop(); c_store(a, (char)pop()); 
+	}
+	void _fetch_() { 
+		if (!check_data_stack(1, 1)) return;
+		push(fetch(pop())); 
+	}
+	void _store_() { 
+		if (!check_data_stack(2, 0)) return;
+		int a = pop(); store(a, pop()); 
+	}
 
 	void _equals_() { int n = pop(); push(pop() == n ? -1 : 0); }
 	void _less_than_() { int n = pop(); push(pop() < n ? -1 : 0); }
 
 	// Defining routines
 	void _colon_() {
+		if (user_get(STATE) != 0) {
+			_throw(COMPILER_NESTING);
+			return;
+		}
 		push(32); _word_();
 		int tok = pick(0) + suCHAR;
 		int tlen = c_fetch(pop());
@@ -1062,6 +1133,11 @@ public class Sloth {
 		user_set(STATE, 1);
 	}
 	void _colon_no_name_() {
+		if (user_get(STATE) != 0) {
+			_throw(COMPILER_NESTING);
+			return;
+		}
+		if (!check_data_stack(0, 1)) return;
 		push(here());
 		user_set(LATESTXT, here());
 		user_set(STATE, 1);
@@ -1094,27 +1170,39 @@ public class Sloth {
 
 	// Manipulating stack items
 	void _drop_() { 
-		if (sp <= 0) _throw(STACK_UNDERFLOW); 
-		else pop(); }
+		if (!check_data_stack(1, 0)) return;
+		pop(); }
 	void _dup_() { 
-		if (sp == 0) _throw(STACK_UNDERFLOW);
-		else if (sp == STACK_SIZE) _throw(STACK_OVERFLOW);
-		else push(pick(0));
+		if (!check_data_stack(1, 2)) return;
+		push(pick(0));
 	}
-	void _over_() { push(pick(1)); }
+	void _over_() { 
+		if (!check_data_stack(2, 3)) return;
+		push(pick(1)); 
+	}
 	void _to_r_() { rpush(pop()); }
 	void _r_from_() { push(rpop()); }
 	void _swap_() { 
-		if (sp < 2) throw new SlothException(-4);
+		if (!check_data_stack(2, 2)) return;
 		int a = pop(); int b = pop(); push(a); push(b); 
 	}
 
 	// Constructing compiler and interpreter system extensions
-	void _allot_() { allot(pop()); }
-	void _cells_() { push(pop() * sCELL); }
+	void _allot_() { 
+		if (!check_data_stack(1, 0)) return;
+		allot(pop()); 
+	}
+	void _cells_() { 
+		if (!check_data_stack(1, 1)) return;
+		push(pop() * sCELL); 
+	}
 	void _chars_() { push(pop() * suCHAR); }
-	void _compile_comma_() { compile(pop()); }
+	void _compile_comma_() { 
+		if (!check_data_stack(1, 0)) return;
+		compile(pop()); 
+	}
 	void _create_name_() {
+		if (!check_data_stack(2, 0)) return;
 		int tlen = pop();
 		header(pop(), tlen);
 		compile(get_xt(find_word("(RIP)")));
@@ -1130,13 +1218,17 @@ public class Sloth {
 		_create_name_();
 	}
 	void do_does(int a) { store(get_xt(get_latest()) + 2*sCELL, a); }
-	void _do_does_() { do_does(pop()); }
+	void _do_does_() { 
+		if (!check_data_stack(1, 0)) return;
+		do_does(pop()); 
+	}
 	void _does_() { 
 		literal(here() + 4*sCELL);
 		compile(get_xt(find_word("(DOES)")));
 		compile(get_xt(find_word("EXIT")));
 	}
 	void _evaluate_() {
+		if (!check_data_stack(2, 0)) return;
 		int l = pop();
 		int a = pop();
 
@@ -1164,8 +1256,14 @@ public class Sloth {
 		int e = pop();
 		if (e != 0) _throw(e);
 	}
-	void _execute_() { eval(pop()); }
-	void _here_() { push(here()); }
+	void _execute_() { 
+		if (!check_data_stack(1, 0)) return;
+		eval(pop()); 
+	}
+	void _here_() { 
+		if (!check_data_stack(0, 1)) return;
+		push(here()); 
+	}
 	void _immediate_() { set_flag(get_latest(), IMMEDIATE); }
 	void _postpone_() {
 		push(32); _word_();
@@ -1184,7 +1282,10 @@ public class Sloth {
 			compile(xt);
 		}
 	}
-	void _source_() { push(user_get(IBUF)); push(user_get(ILEN)); }
+	void _source_() { 
+		if (!check_data_stack(0, 2)) return;
+		push(user_get(IBUF)); push(user_get(ILEN)); 
+	}
 
 	// -- Floating point word set --------------------------
 	
@@ -1201,11 +1302,24 @@ public class Sloth {
 
 	// Manipulating stack items
 
-	public void _f_depth_() { push(fp); }
-	public void _f_drop_() { f_pop(); }
-	public void _f_dup_() { f_push(f_pick(0)); }
-	public void _f_over_() { f_push(f_pick(1)); }
+	public void _f_depth_() { 
+		if (!check_data_stack(0, 1)) return;
+		push(fp); 
+	}
+	public void _f_drop_() { 
+		if (!check_float_stack(1, 0)) return;
+		f_pop(); 
+	}
+	public void _f_dup_() { 
+		if (!check_float_stack(1, 2)) return;
+		f_push(f_pick(0)); 
+	}
+	public void _f_over_() { 
+		if (!check_float_stack(2, 3)) return;
+		f_push(f_pick(1)); 
+	}
 	public void _f_rot_() { 
+		if (!check_float_stack(3, 3)) return;
 		double c = f_pop();
 		double b = f_pop();
 		double a = f_pop();
@@ -1214,6 +1328,7 @@ public class Sloth {
 		f_push(a);
 	}
 	public void _f_swap_() { 
+		if (!check_float_stack(2, 2)) return;
 		double b = f_pop();
 		double a = f_pop();
 		f_push(b);
@@ -1223,62 +1338,125 @@ public class Sloth {
 	// Comparison operations
 	
 	public void _f_less_than_() { 
+		if (!check_float_stack(2, 0)) return;
+		if (!check_data_stack(0, 1)) return;
 		double b = f_pop();
 		double a = f_pop();
 		push(a < b ? -1 : 0);
 	}
 	public void _f_zero_less_than_() { 
+		if (!check_float_stack(1, 0)) return;
+		if (!check_data_stack(0, 1)) return;
 		push(f_pop() < 0.0 ? -1 : 0); 
 	}
 	public void _f_zero_equals_() {
+		if (!check_float_stack(1, 0)) return;
+		if (!check_data_stack(0, 1)) return;
 		push(f_pop() == 0.0 ? -1 : 0);
 	}
 
 	// Memory-stack transfer operations
 	
-	public void _f_fetch_() { f_push(f_fetch(pop())); }
-	public void _f_store_() {	f_store(pop(), f_pop()); }
-	public void _s_f_fetch_() { f_push(s_f_fetch(pop())); }
-	public void _s_f_store_() { s_f_store(pop(), (float)f_pop()); }
-	public void _d_f_fetch_() { f_push(d_f_fetch(pop())); }
-	public void _d_f_store_() { d_f_store(pop(), f_pop()); }
+	public void _f_fetch_() { 
+		if (!check_data_stack(1, 0)) return;
+		if (!check_float_stack(0, 1)) return;
+		f_push(f_fetch(pop())); 
+	}
+	public void _f_store_() {	
+		if (!check_data_stack(1, 0)) return;
+		if (!check_float_stack(1, 0)) return;
+		f_store(pop(), f_pop()); 
+	}
+	public void _s_f_fetch_() { 
+		if (!check_data_stack(1, 0)) return;
+		if (!check_float_stack(0, 1)) return;
+		f_push(s_f_fetch(pop())); 
+	}
+	public void _s_f_store_() { 
+		if (!check_data_stack(1, 0)) return;
+		if (!check_float_stack(1, 0)) return;
+		s_f_store(pop(), (float)f_pop()); 
+	}
+	public void _d_f_fetch_() { 
+		if (!check_data_stack(1, 0)) return;
+		if (!check_float_stack(0, 1)) return;
+		f_push(d_f_fetch(pop())); 
+	}
+	public void _d_f_store_() { 
+		if (!check_data_stack(1, 0)) return;
+		if (!check_float_stack(1, 0)) return;
+		d_f_store(pop(), f_pop()); 
+	}
 
 	// Number-type conversion operators
 
-	public void _d_to_f_() { f_push((double)dpop()); }
-	public void _f_to_d_() { dpush((long)f_pop()); }
+	public void _d_to_f_() { 
+		if (!check_data_stack(2, 0)) return;
+		if (!check_float_stack(0, 1)) return;
+		f_push((double)dpop()); 
+	}
+	public void _f_to_d_() { 
+		if (!check_float_stack(1, 0)) return;
+		if (!check_data_stack(0, 2)) return;
+		dpush((long)f_pop()); 
+	}
 
 	// Arithmetic and logical operations
 
-	public void _f_abs_() { f_push(Math.abs(f_pop())); }
-	public void _f_plus_() { f_push(f_pop() + f_pop()); }
+	public void _f_abs_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.abs(f_pop())); 
+	}
+	public void _f_plus_() { 
+		if (!check_float_stack(2, 1)) return;
+		f_push(f_pop() + f_pop()); 
+	}
 	public void _f_minus_() { 
+		if (!check_float_stack(2, 1)) return;
 		double b = f_pop();
 		f_push(f_pop() - b);
 	}
-	public void _f_star_() { f_push(f_pop() * f_pop()); }
+	public void _f_star_() { 
+		if (!check_float_stack(2, 1)) return;
+		f_push(f_pop() * f_pop()); 
+	}
 	public void _f_star_star_() {
+		if (!check_float_stack(2, 1)) return;
 		double b = f_pop();
 		f_push(Math.pow(f_pop(), b));
 	}
 	public void _f_slash_() {
+		if (!check_float_stack(2, 1)) return;
 		double b = f_pop();
 		f_push(f_pop() / b);
 	}
-	public void _floor_() { f_push(Math.floor(f_pop())); }
-	public void _f_round_() { f_push(Math.rint(f_pop())); }
+	public void _floor_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.floor(f_pop())); 
+	}
+	public void _f_round_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.rint(f_pop())); 
+	}
 	public void _f_max_() { 
+		if (!check_float_stack(2, 1)) return;
 		double b = f_pop();
 		double a = f_pop();
 		f_push(a > b ? a : b);
 	}
 	public void _f_min_() { 
+		if (!check_float_stack(2, 1)) return;
 		double b = f_pop();
 		double a = f_pop();
 		f_push(a < b ? a : b);
 	}
-	public void _f_negate_() { f_push(-f_pop()); }
+	public void _f_negate_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(-f_pop()); 
+	}
 	public void _f_proximate_() {
+    if (!check_float_stack(3, 0)) return;
+    if (!check_data_stack(0, 1)) return;
     double r3 = f_pop();
     double r2 = f_pop();
     double r1 = f_pop();
@@ -1304,39 +1482,90 @@ public class Sloth {
         push(Double.doubleToRawLongBits(r1) == Double.doubleToRawLongBits(r2) ? -1 : 0);
     }
 	}
-	public void _f_sqrt_() { f_push(Math.sqrt(f_pop())); }
-	public void _f_l_n_() { f_push(Math.log(f_pop())); }
-	public void _f_exp_() { f_push(Math.exp(f_pop())); }
-	public void _f_exp_m_one_() { f_push(Math.exp(f_pop()) - 1.0); }
-	public void _f_log_ten_() { f_push(Math.log10(f_pop())); }
-	public void _f_l_n_p_one_() { f_push(Math.log(f_pop() + 1.0)); }
-	public void _f_a_log_() { f_push(Math.pow(10.0, f_pop())); }
+	public void _f_sqrt_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.sqrt(f_pop())); 
+	}
+	public void _f_l_n_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.log(f_pop())); 
+	}
+	public void _f_exp_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.exp(f_pop())); 
+	}
+	public void _f_exp_m_one_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.exp(f_pop()) - 1.0); 
+	}
+	public void _f_log_ten_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.log10(f_pop())); 
+	}
+	public void _f_l_n_p_one_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.log(f_pop() + 1.0)); 
+	}
+	public void _f_a_log_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.pow(10.0, f_pop())); 
+	}
 
 	// Trigonometric functions
 
-	public void _f_sine_() { f_push(Math.sin(f_pop())); }
-	public void _f_a_sine_() { f_push(Math.asin(f_pop())); }
-	public void _f_cos_() { f_push(Math.cos(f_pop()));	}
-	public void _f_a_cos_() { f_push(Math.acos(f_pop())); }
+	public void _f_sine_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.sin(f_pop())); 
+	}
+	public void _f_a_sine_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.asin(f_pop())); 
+	}
+	public void _f_cos_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.cos(f_pop()));	
+	}
+	public void _f_a_cos_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.acos(f_pop())); 
+	}
 	public void _f_sine_cos_() {
+		if (!check_float_stack(1, 2)) return;
 		double r = f_pop();
 		f_push(Math.sin(r));
 		f_push(Math.cos(r));
 	}
-	public void _f_tan_() { f_push(Math.tan(f_pop())); }
-	public void _f_a_tan_() { f_push(Math.atan(f_pop())); }
+	public void _f_tan_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.tan(f_pop())); 
+	}
+	public void _f_a_tan_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.atan(f_pop())); 
+	}
 	public void _f_atan2_() { 
+		if (!check_float_stack(2, 1)) return;
 		double b = f_pop();
 		f_push(Math.atan2(f_pop(), b));
 	}
 
 	// Hyperbolic functions
 
-	public void _f_sin_h_() { f_push(Math.sinh(f_pop())); }
-	public void _f_cos_h_() { f_push(Math.cosh(f_pop())); }
-	public void _f_tan_h_() { f_push(Math.tanh(f_pop())); }
+	public void _f_sin_h_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.sinh(f_pop())); 
+	}
+	public void _f_cos_h_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.cosh(f_pop())); 
+	}
+	public void _f_tan_h_() { 
+		if (!check_float_stack(1, 1)) return;
+		f_push(Math.tanh(f_pop())); 
+	}
 	// There are no asinh/acosh functions in Math.
 	public void _f_a_sine_h_() {
+		if (!check_float_stack(1, 1)) return;
 		double r = f_pop();
 		if (r == 0) {
 			f_push(0.0);
@@ -1347,6 +1576,7 @@ public class Sloth {
 		}
 	}
 	public void _f_a_cos_h_() {
+		if (!check_float_stack(1, 1)) return;
 		double r = f_pop();
 		if (r < 1.0) {
 			/* undefined, push NaN */
@@ -1359,6 +1589,8 @@ public class Sloth {
 	// String/numeric conversion
 	
 	public void _to_float_() {
+		if (!check_data_stack(2, 1)) return;
+		if (!check_float_stack(0, 1)) return;
 		int tlen = pop();
 		int tok = pop();
 		String s = toString(tok, tlen);
@@ -1382,6 +1614,8 @@ public class Sloth {
 
 	public void _represent_() {
 		// Stack: ( c-addr u -- n flag1 flag2 )  FStack: ( r -- )
+		if (!check_float_stack(1, 0)) return;
+		if (!check_data_stack(2, 3)) return;
 		int u    = pop();
 		int addr = pop();
 		double r = f_pop();

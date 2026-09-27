@@ -916,12 +916,86 @@ void test_represent_large_exponent(void) {
 	TEST_ASSERT_EQUAL(4, n);  /* 1000 -> digits "1000", decimal after position 4 */
 }
 
+/* -- Float stack exceptions ------------------------------ */
+
+void test_throw_float_stack_underflow(void) {
+	F prims[] = {
+		&sloth_f_drop_, &sloth_f_dup_, &sloth_f_over_, &sloth_f_rot_,
+		&sloth_f_swap_, &sloth_f_less_than_, &sloth_f_zero_less_than_,
+		&sloth_f_zero_equals_, &sloth_f_abs_, &sloth_f_plus_,
+		&sloth_f_minus_, &sloth_f_star_, &sloth_f_star_star_, &sloth_f_slash_,
+		&sloth_floor_, &sloth_f_round_, &sloth_f_max_, &sloth_f_min_,
+		&sloth_f_negate_, &sloth_f_sqrt_, &sloth_f_l_n_, &sloth_f_exp_,
+		&sloth_f_exp_m_one_, &sloth_f_log_ten_, &sloth_f_l_n_p_one_,
+		&sloth_f_a_log_, &sloth_f_sine_, &sloth_f_a_sine_, &sloth_f_cos_,
+		&sloth_f_a_cos_, &sloth_f_tan_, &sloth_f_a_tan_, &sloth_f_atan2_,
+		&sloth_f_sin_h_, &sloth_f_cos_h_, &sloth_f_tan_h_,
+		&sloth_f_a_sine_h_, &sloth_f_a_cos_h_
+	};
+	int i;
+	for (i = 0; i < 38; i++) {
+		CELL p = sloth_primitive(x, prims[i]);
+		TEST_ASSERT_EQUAL(SLOTH_FLOAT_STACK_UNDERFLOW, sloth_catch(x, p));
+		TEST_ASSERT_EQUAL(0, x->fp);
+		TEST_ASSERT_EQUAL(0, x->sp);
+	}
+}
+
+void test_throw_float_dependent_stack_underflow(void) {
+	F prims[] = {
+		&sloth_f_store_, &sloth_s_f_store_, &sloth_d_f_store_,
+		&sloth_f_fetch_, &sloth_s_f_fetch_, &sloth_d_f_fetch_
+	};
+	int i;
+	/* Store words need a data address plus a float to consume. */
+	for (i = 0; i < 3; i++) {
+		CELL p = sloth_primitive(x, prims[i]);
+		sloth_push(x, sloth_to_abs(x, 1000));
+		TEST_ASSERT_EQUAL(SLOTH_FLOAT_STACK_UNDERFLOW, sloth_catch(x, p));
+		TEST_ASSERT_EQUAL(0, x->fp);
+		TEST_ASSERT_EQUAL(1, x->sp);
+		sloth_pop(x);
+	}
+	/* Fetch words with an empty float stack only push, so no */
+	/* underflow is possible: they must succeed. */
+	for (i = 3; i < 6; i++) {
+		CELL p = sloth_primitive(x, prims[i]);
+		sloth_push(x, sloth_to_abs(x, 1000));
+		TEST_ASSERT_EQUAL(0, sloth_catch(x, p));
+		TEST_ASSERT_EQUAL(1, x->fp);
+		TEST_ASSERT_EQUAL(0, x->sp);
+		sloth_f_pop(x);
+	}
+}
+
+void test_throw_float_stack_overflow(void) {
+	CELL p = sloth_primitive(x, &sloth_f_dup_);
+	CELL i;
+	for (i = 0; i < SLOTH_FLOAT_STACK_SIZE; i++) sloth_f_push(x, (FCELL)i);
+	TEST_ASSERT_EQUAL(SLOTH_FLOAT_STACK_OVERFLOW, sloth_catch(x, p));
+	TEST_ASSERT_EQUAL(SLOTH_FLOAT_STACK_SIZE, x->fp);
+}
+
+void test_represent_underflow(void) {
+	char buf[32] = {0};
+	CELL p = sloth_primitive(x, &sloth_represent_);
+	sloth_push(x, (CELL)buf);
+	sloth_push(x, 4);
+	TEST_ASSERT_EQUAL(SLOTH_FLOAT_STACK_UNDERFLOW, sloth_catch(x, p));
+}
+
 int main(void) {
 	UNITY_BEGIN();
 
 	/* Float stack */
 	RUN_TEST(test_f_push_f_pop);
 	RUN_TEST(test_f_pick);
+
+	/* Float stack exceptions */
+	RUN_TEST(test_throw_float_stack_underflow);
+	RUN_TEST(test_throw_float_dependent_stack_underflow);
+	RUN_TEST(test_throw_float_stack_overflow);
+	RUN_TEST(test_represent_underflow);
 
 	/* Float memory */
 	RUN_TEST(test_f_store_f_fetch);

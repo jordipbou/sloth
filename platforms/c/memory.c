@@ -3,7 +3,9 @@
 /* -- Locals words ------------------------------------- */
 
 void sloth_allocate_(X* x) {
-	void *ptr = malloc(sloth_pop(x));
+	void *ptr;
+	if (!sloth__check_data_stack(x, 1, 1)) return;
+	ptr = malloc(sloth_pop(x));
 	if (ptr) {
 		sloth_push(x, (CELL)ptr);
 		sloth_push(x, 0);
@@ -14,14 +16,18 @@ void sloth_allocate_(X* x) {
 }
 
 void sloth_free_(X* x) {
+	if (!sloth__check_data_stack(x, 1, 1)) return;
 	free((void *)sloth_pop(x));
 	sloth_push(x, 0);
 }
 
 void sloth_resize_(X* x) {
-	CELL u = sloth_pop(x);
-	void *addr = (void *)sloth_pop(x);
-	void *ptr = realloc(addr, u);
+	CELL u;
+	void *addr, *ptr;
+	if (!sloth__check_data_stack(x, 2, 1)) return;
+	u = sloth_pop(x);
+	addr = (void *)sloth_pop(x);
+	ptr = realloc(addr, u);
 	if (ptr) {
 		sloth_push(x, (CELL)ptr);
 		sloth_push(x, 0);
@@ -34,57 +40,83 @@ void sloth_resize_(X* x) {
 /* -- Special memory access words proposal ------------- */
 
 void sloth_b_fetch_(X* x) { 
-	CELL a = sloth_pop(x);
+	CELL a;
+	if (!sloth__check_data_stack(x, 1, 1)) return;
+	a = sloth_pop(x);
 	sloth_push(x, (CELL)*((BYTE_*)a));
 }
 void sloth_b_store_(X* x) {
-	CELL a = sloth_pop(x);
-	BYTE_ v = (BYTE_)sloth_pop(x);
+	CELL a;
+	BYTE_ v;
+	if (!sloth__check_data_stack(x, 2, 0)) return;
+	a = sloth_pop(x);
+	v = (BYTE_)sloth_pop(x);
 	*((BYTE_*)a) = v;
 }
 
 void sloth_w_fetch_(X* x) { 
-	CELL a = sloth_pop(x);
+	CELL a;
+	if (!sloth__check_data_stack(x, 1, 1)) return;
+	a = sloth_pop(x);
 	sloth_push(x, (CELL)*((int16_t*)a));
 }
 void sloth_w_store_(X* x) {
-	CELL a = sloth_pop(x);
-	int16_t v = (int16_t)sloth_pop(x);
+	CELL a;
+	int16_t v;
+	if (!sloth__check_data_stack(x, 2, 0)) return;
+	a = sloth_pop(x);
+	v = (int16_t)sloth_pop(x);
 	*((int16_t*)a) = v;
 }
 
 void sloth_l_fetch_(X* x) {
-	CELL a = sloth_pop(x);
+	CELL a;
+	if (!sloth__check_data_stack(x, 1, 1)) return;
+	a = sloth_pop(x);
 	sloth_push(x, (CELL)*((int32_t*)a));
 }
 void sloth_l_store_(X* x) {
-	CELL a = sloth_pop(x);
-	int32_t v = (int32_t)sloth_pop(x);
+	CELL a;
+	int32_t v;
+	if (!sloth__check_data_stack(x, 2, 0)) return;
+	a = sloth_pop(x);
+	v = (int32_t)sloth_pop(x);
 	*((int32_t*)a) = v;
 }
 
 void sloth_x_fetch_(X* x) {
-	CELL a = sloth_pop(x);
+	CELL a;
+	if (!sloth__check_data_stack(x, 1, 1)) return;
+	a = sloth_pop(x);
 	sloth_push(x, (CELL)*((int64_t*)a));
 }
 void sloth_x_store_(X* x) {
-	CELL a = sloth_pop(x);
-	int64_t v = (int64_t)sloth_pop(x);
+	CELL a;
+	int64_t v;
+	if (!sloth__check_data_stack(x, 2, 0)) return;
+	a = sloth_pop(x);
+	v = (int64_t)sloth_pop(x);
 	*((int64_t*)a) = v;
 }
 
 /* -- Memory words to interface with C code ------------ */
 
 void sloth_ints_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 1)) return;
 	sloth_push(x, sloth_pop(x)*sizeof(int)); 
 }
 void sloth_int_fetch_(X* x) {
-	CELL a = sloth_pop(x);
+	CELL a;
+	if (!sloth__check_data_stack(x, 1, 1)) return;
+	a = sloth_pop(x);
 	sloth_push(x, (CELL)*((int*)a));
 }
 void sloth_int_store_(X* x) {
-	CELL a = sloth_pop(x);
-	int v = (int)sloth_pop(x);
+	CELL a;
+	int v;
+	if (!sloth__check_data_stack(x, 2, 0)) return;
+	a = sloth_pop(x);
+	v = (int)sloth_pop(x);
 	*((int*)a) = v;
 }
 

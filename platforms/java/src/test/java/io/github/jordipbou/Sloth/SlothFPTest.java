@@ -983,4 +983,81 @@ public class SlothFPTest {
 		assertEquals('1', sloth.c_fetch(addr));
 		assertEquals('5', sloth.c_fetch(addr + suCHAR));
 	}
+
+	// Float stack exceptions
+
+	private int catchValue(Runnable r) {
+		try {
+			r.run();
+		} catch (Sloth.SlothException e) {
+			return e.value;
+		}
+		return 0;
+	}
+
+	@Test
+	public void test_throw_float_stack_underflow() {
+		Runnable[] prims = {
+			() -> sloth._f_drop_(), () -> sloth._f_dup_(),
+			() -> sloth._f_over_(), () -> sloth._f_rot_(),
+			() -> sloth._f_swap_(), () -> sloth._f_less_than_(),
+			() -> sloth._f_zero_less_than_(), () -> sloth._f_zero_equals_(),
+			() -> sloth._f_abs_(), () -> sloth._f_plus_(),
+			() -> sloth._f_minus_(), () -> sloth._f_star_(),
+			() -> sloth._f_star_star_(), () -> sloth._f_slash_(),
+			() -> sloth._floor_(), () -> sloth._f_round_(),
+			() -> sloth._f_max_(), () -> sloth._f_min_(),
+			() -> sloth._f_negate_(), () -> sloth._f_sqrt_(),
+			() -> sloth._f_l_n_(), () -> sloth._f_exp_(),
+			() -> sloth._f_exp_m_one_(), () -> sloth._f_log_ten_(),
+			() -> sloth._f_l_n_p_one_(), () -> sloth._f_a_log_(),
+			() -> sloth._f_sine_(), () -> sloth._f_a_sine_(),
+			() -> sloth._f_cos_(), () -> sloth._f_a_cos_(),
+			() -> sloth._f_tan_(), () -> sloth._f_a_tan_(),
+			() -> sloth._f_atan2_(), () -> sloth._f_sin_h_(),
+			() -> sloth._f_cos_h_(), () -> sloth._f_tan_h_(),
+			() -> sloth._f_a_sine_h_(), () -> sloth._f_a_cos_h_()
+		};
+		for (Runnable p : prims) {
+			assertEquals(
+				Sloth.FLOAT_STACK_UNDERFLOW, catchValue(p));
+			assertEquals(0, sloth.fp);
+			assertEquals(0, sloth.sp);
+		}
+	}
+
+	@Test
+	public void test_throw_float_store_underflow() {
+		Runnable[] prims = {
+			() -> sloth._f_store_(), () -> sloth._s_f_store_(),
+			() -> sloth._d_f_store_()
+		};
+		for (Runnable p : prims) {
+			sloth.push(sloth.to_abs(1000));
+			assertEquals(
+				Sloth.FLOAT_STACK_UNDERFLOW, catchValue(p));
+			assertEquals(0, sloth.fp);
+			assertEquals(1, sloth.sp);
+			sloth.pop();
+		}
+	}
+
+	@Test
+	public void test_throw_float_stack_overflow() {
+		for (int i = 0; i < Sloth.FLOAT_STACK_SIZE; i++) sloth.f_push(i);
+		assertEquals(
+			Sloth.FLOAT_STACK_OVERFLOW,
+			catchValue(() -> sloth._f_dup_()));
+		assertEquals(Sloth.FLOAT_STACK_SIZE, sloth.fp);
+	}
+
+	@Test
+	public void test_represent_underflow() {
+		int addr = sloth.fromString(" ".repeat(8));
+		sloth.push(addr);
+		sloth.push(4);
+		assertEquals(
+			Sloth.FLOAT_STACK_UNDERFLOW,
+			catchValue(() -> sloth._represent_()));
+	}
 }

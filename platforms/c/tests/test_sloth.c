@@ -542,6 +542,56 @@ void test_throw_division_by_zero(void) {
 	TEST_ASSERT_EQUAL(3, x->sp);
 }
 
+void test_throw_tier1_data_stack_underflow(void) {
+	F prims[] = {
+		&sloth_allot_, &sloth_c_fetch_, &sloth_c_store_,
+		&sloth_fetch_, &sloth_store_, &sloth_cells_,
+		&sloth_debug_, &sloth_move_, &sloth_find_,
+		&sloth_word_, &sloth_compile_comma_,
+		&sloth_create_name_, &sloth_do_does_, &sloth_evaluate_,
+		&sloth_execute_, &sloth_environment_
+	};
+	int i;
+	for (i = 0; i < 16; i++) {
+		CELL p = sloth_primitive(x, prims[i]);
+		TEST_ASSERT_EQUAL(SLOTH_STACK_UNDERFLOW, sloth_catch(x, p));
+		TEST_ASSERT_EQUAL(0, x->sp);
+	}
+}
+
+void test_throw_tier1_data_stack_overflow(void) {
+	F prims[] = {
+		&sloth_here_, &sloth_find_, &sloth_source_, &sloth_unused_,
+		&sloth_self_, &sloth_dict_, &sloth_save_input_
+	};
+	int j;
+	for (j = 0; j < 7; j++) {
+		CELL p = sloth_primitive(x, prims[j]);
+		while (x->sp < SLOTH_STACK_SIZE) sloth_push(x, 0);
+		TEST_ASSERT_EQUAL(SLOTH_STACK_OVERFLOW, sloth_catch(x, p));
+		TEST_ASSERT_EQUAL(SLOTH_STACK_SIZE, x->sp);
+	}
+}
+
+void test_throw_tier1_compile_only(void) {
+	F prims[] = { &sloth_colon_, &sloth_colon_no_name_ };
+	int i;
+	for (i = 0; i < 2; i++) {
+		CELL p = sloth_primitive(x, prims[i]);
+		sloth_user_set(x, SLOTH_STATE, 1);
+		TEST_ASSERT_EQUAL(SLOTH_COMPILER_NESTING, sloth_catch(x, p));
+		sloth_user_set(x, SLOTH_STATE, 0);
+	}
+}
+
+void test_throw_header_zero_length_name(void) {
+	CELL p = sloth_primitive(x, &sloth_create_name_);
+	sloth_push(x, (CELL)"TEST");
+	sloth_push(x, 0);
+	TEST_ASSERT_EQUAL(SLOTH_ZERO_LENGTH_NAME, sloth_catch(x, p));
+	TEST_ASSERT_EQUAL(2, x->sp);
+}
+
 /* -- Inner interpreter primitives -------------------- */
 
 void test_exit_(void) {
@@ -2762,6 +2812,10 @@ int main(void) {
 	RUN_TEST(test_throw_return_stack_overflow);
 	RUN_TEST(test_throw_return_stack_underflow);
 	RUN_TEST(test_throw_division_by_zero);
+	RUN_TEST(test_throw_tier1_data_stack_underflow);
+	RUN_TEST(test_throw_tier1_data_stack_overflow);
+	RUN_TEST(test_throw_tier1_compile_only);
+	RUN_TEST(test_throw_header_zero_length_name);
 	/* Inner interpreter primitives */
 	RUN_TEST(test_exit_);
 	RUN_TEST(test_lit_);

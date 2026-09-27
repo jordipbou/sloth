@@ -27,7 +27,7 @@ int getch(void) {
 
 #define TOS(x) x->s[x->sp - 1]
 
-static int sloth__check_data_stack(X* x, CELL n, CELL r) {
+int sloth__check_data_stack(X* x, CELL n, CELL r) {
 	if (x->sp < n) {
 		sloth_throw(x, SLOTH_STACK_UNDERFLOW);
 		return 0;
@@ -95,6 +95,18 @@ void sloth_r_from_(X* x) {
 #ifndef SLOTH_WITHOUT_FLOATING_POINT
 
 /* -- Floating point stack ----------------------------- */
+
+int sloth__check_float_stack(X* x, CELL n, CELL r) {
+	if (x->fp < n) {
+		sloth_throw(x, SLOTH_FLOAT_STACK_UNDERFLOW);
+		return 0;
+	}
+	if (x->fp - n + r > SLOTH_FLOAT_STACK_SIZE) {
+		sloth_throw(x, SLOTH_FLOAT_STACK_OVERFLOW);
+		return 0;
+	}
+	return 1;
+}
 
 void sloth_f_push(X* x, FCELL v) { x->f[x->fp] = v; x->fp++; }
 FCELL sloth_f_pop(X* x) { x->fp--; return x->f[x->fp]; }
@@ -193,8 +205,14 @@ void sloth_allot(X* x, CELL v) {
 }
 CELL sloth_aligned(CELL a) { return ALIGNED(a, sCELL); }
 
-void sloth_here_(X* x) { sloth_push(x, sloth_here(x)); }
-void sloth_allot_(X* x) { sloth_allot(x, sloth_pop(x)); }
+void sloth_here_(X* x) { 
+	if (!sloth__check_data_stack(x, 0, 1)) return;
+	sloth_push(x, sloth_here(x)); 
+}
+void sloth_allot_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	sloth_allot(x, sloth_pop(x)); 
+}
 void sloth_align_(X* x) { 
 	sloth_set(x, SLOTH_HERE, ALIGNED(sloth_here(x), sCELL)); 
 }
@@ -202,26 +220,36 @@ void sloth_align_(X* x) {
 /* Moving data from stack to dictionary and viceversa */
 
 void sloth_c_fetch_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 1)) return;
 	sloth_push(x, sloth_c_fetch(x, sloth_pop(x))); 
 }
 void sloth_c_store_(X* x) { 
-	CELL a = sloth_pop(x); 
+	CELL a;
+	if (!sloth__check_data_stack(x, 2, 0)) return;
+	a = sloth_pop(x); 
 	sloth_c_store(x, a, sloth_pop(x)); 
 }
 void sloth_fetch_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 1)) return;
 	sloth_push(x, sloth_fetch(x, sloth_pop(x))); 
 }
 void sloth_store_(X* x) { 
-	CELL a = sloth_pop(x); 
+	CELL a;
+	if (!sloth__check_data_stack(x, 2, 0)) return;
+	a = sloth_pop(x); 
 	sloth_store(x, a, sloth_pop(x)); 
 }
 
-void sloth_cells_(X* x) { sloth_push(x, sloth_pop(x)*sCELL); }
+void sloth_cells_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 1)) return;
+	sloth_push(x, sloth_pop(x)*sCELL); 
+}
 void sloth_chars_(X* x) { /* Does nothing */ (void)x; }
 
 /* Inspecting memory */
 
 void sloth_unused_(X* x) {
+	if (!sloth__check_data_stack(x, 0, 1)) return;
 	sloth_push(x, x->d + x->dz - sloth_get(x, SLOTH_HERE)); 
 }
 
@@ -304,6 +332,8 @@ CELL sloth_get_name_addr(X* x, CELL w) {
 
 CELL sloth_header(X* x, CELL n, CELL l) {
 	CELL w, i;
+	if (l <= 0) sloth_throw(x, SLOTH_ZERO_LENGTH_NAME);
+	if (l > UCHAR_MAX) sloth_throw(x, SLOTH_NAME_TOO_LONG);
 	sloth_align_(x);
 	w = sloth_here(x); /* NT address */
 	sloth_comma(x, sloth_get_latest(x));
@@ -375,10 +405,12 @@ void sloth__debug_inner(X* x, CELL debug_xt) {
 }
 
 void sloth_debug_(X* x) {
-	CELL post_xt = sloth_pop(x); 
-	CELL inner_xt = sloth_pop(x);
-	CELL pre_xt = sloth_pop(x);
-	CELL q = sloth_pop(x);
+	CELL post_xt, inner_xt, pre_xt, q;
+	if (!sloth__check_data_stack(x, 4, 0)) return;
+	post_xt = sloth_pop(x); 
+	inner_xt = sloth_pop(x);
+	pre_xt = sloth_pop(x);
+	q = sloth_pop(x);
 	sloth__debug(x, pre_xt);
 	sloth__execute(x, q);
 	if (q > 0) sloth__debug_inner(x, inner_xt);
@@ -398,7 +430,10 @@ void sloth_rip_(X* x) {
 
 #ifndef SLOTH_WITHOUT_FLOATING_POINT
 
-void sloth_f_lit_(X* x) { sloth_f_push(x, sloth_f_op(x)); }
+void sloth_f_lit_(X* x) { 
+	if (!sloth__check_float_stack(x, 0, 1)) return;
+	sloth_f_push(x, sloth_f_op(x)); 
+}
 
 #endif
 
@@ -615,10 +650,11 @@ void sloth_c_string_(X* x) {
 
 /* MOVE moves address units, not characters */
 void sloth_move_(X* x) {
-	CELL u = sloth_pop(x);
-	CELL addr2 = sloth_pop(x);
-	CELL addr1 = sloth_pop(x);
-	CELL i;
+	CELL u, addr2, addr1, i;
+	if (!sloth__check_data_stack(x, 3, 0)) return;
+	u = sloth_pop(x);
+	addr2 = sloth_pop(x);
+	addr1 = sloth_pop(x);
 	if (addr1 >= addr2) {
 		for (i = 0; i < u; i++) {
 			sloth_b_store(x, addr2 + i, sloth_b_fetch(x, addr1 + i));
@@ -673,8 +709,10 @@ CELL sloth_find_word(X* x, char* name) {
 }
 
 void sloth_find_(X* x) {
-	CELL cstring = sloth_pop(x);
-	CELL w = sloth__search_word(
+	CELL cstring, w;
+	if (!sloth__check_data_stack(x, 1, 2)) return;
+	cstring = sloth_pop(x);
+	w = sloth__search_word(
 		x, 
 		cstring + suCHAR, 
 		sloth_c_fetch(x, cstring)
@@ -788,6 +826,7 @@ sloth_set_key(F fn) {
 /* -- */
 
 void sloth_source_(X* x) { 
+	if (!sloth__check_data_stack(x, 0, 2)) return;
 	sloth_push(x, sloth_user_get(x, SLOTH_IBUF)); 
 	sloth_push(x, sloth_user_get(x, SLOTH_ILEN)); 
 }
@@ -795,11 +834,13 @@ void sloth_source_(X* x) {
 void sloth_word_(X* x) {
 	/* The region to store WORD counted strings starts */
 	/* at here + CBUF. */
-	uCHAR c = (uCHAR)sloth_pop(x);
-	CELL ibuf = sloth_user_get(x, SLOTH_IBUF);
-	CELL ilen = sloth_user_get(x, SLOTH_ILEN);
-	CELL ipos = sloth_user_get(x, SLOTH_IPOS);
-	CELL start, end, i;
+	uCHAR c;
+	CELL ibuf, ilen, ipos, start, end, i;
+	if (!sloth__check_data_stack(x, 1, 1)) return;
+	c = (uCHAR)sloth_pop(x);
+	ibuf = sloth_user_get(x, SLOTH_IBUF);
+	ilen = sloth_user_get(x, SLOTH_ILEN);
+	ipos = sloth_user_get(x, SLOTH_IPOS);
 	/* First, ignore c until not c is found */
 	/* The Forth Standard says that if the control character is */
 	/* the space (hex 20) then control characters may be treated */
@@ -824,6 +865,10 @@ void sloth_word_(X* x) {
 	/* Now, copy it to the counted string buffer */
 	/* TODO Here, end-start must be divided by sCHAR to ensure */
 	/* implementations with char != 1 work well */
+	if (end - start > UCHAR_MAX) {
+		sloth_throw(x, SLOTH_PARSED_STRING_OVERFLOW);
+		return;
+	}
 	sloth_c_store(x, sloth_here(x) + SLOTH_CBUF, end - start);
 
 	for (i = 0; i < (end - start); i++) {
@@ -953,6 +998,7 @@ void sloth_refill_(X* x) {
 /* TODO Could SAVE-INPUT and RESTORE-INPUT be implemented */
 /* in ANS Forth? SAVE-INPUT surely... */
 void sloth_save_input_(X* x) {
+	if (!sloth__check_data_stack(x, 0, 6)) return;
 	sloth_push(x, sloth_user_get(x, SLOTH_SOURCE_POS));
 	sloth_push(x, sloth_user_get(x, SLOTH_SOURCE_ID));
 	sloth_push(x, sloth_user_get(x, SLOTH_IBUF));
@@ -1157,6 +1203,10 @@ void sloth_included_(X* x) {
 
 void sloth_colon_(X* x) {
 	CELL addr;
+	if (sloth_user_get(x, SLOTH_STATE) != 0) {
+		sloth_throw(x, SLOTH_COMPILER_NESTING);
+		return;
+	}
 	sloth_push(x, 32); sloth_word_(x);
 	addr = sloth_pop(x);
 	sloth_header(x, addr + suCHAR, sloth_c_fetch(x, addr));
@@ -1165,6 +1215,11 @@ void sloth_colon_(X* x) {
 	sloth_user_set(x, SLOTH_STATE, 1);
 }
 void sloth_colon_no_name_(X* x) { 
+	if (sloth_user_get(x, SLOTH_STATE) != 0) {
+		sloth_throw(x, SLOTH_COMPILER_NESTING);
+		return;
+	}
+	if (!sloth__check_data_stack(x, 0, 1)) return;
 	sloth_push(x, sloth_here(x));
 	sloth_user_set(x, SLOTH_LATESTXT, sloth_here(x));
 	sloth_user_set(x, SLOTH_STATE, 1);
@@ -1205,11 +1260,16 @@ void sloth_postpone_(X* x) {
 
 
 
-void sloth_compile_comma_(X* x) { sloth_compile(x, sloth_pop(x)); }
+void sloth_compile_comma_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	sloth_compile(x, sloth_pop(x)); 
+}
 
 void sloth_create_name_(X* x) {
-	CELL tlen = sloth_pop(x);
-	CELL tok = sloth_pop(x);
+	CELL tlen, tok;
+	if (!sloth__check_data_stack(x, 2, 0)) return;
+	tlen = sloth_pop(x);
+	tok = sloth_pop(x);
 	sloth_header(x, tok, tlen);
 	sloth_compile(x, sloth_get_xt(x, sloth_find_word(x, "(RIP)")));
 	sloth_compile(x, 4*sCELL);
@@ -1243,6 +1303,7 @@ void sloth_create_(X* x) {
 /* compiled by CREATE on the new created word with a call */
 /* to the code after the DOES> in the CREATE DOES> word */
 void sloth_do_does_(X* x) {
+	if (!sloth__check_data_stack(x, 1, 0)) return;
 	sloth_store(x, 
 		sloth_get_xt(x, sloth_get_latest(x)) + 2*sCELL, 
 		sloth_pop(x));
@@ -1261,13 +1322,16 @@ void sloth_does_(X* x) {
 
 void sloth_evaluate_(X* x) {
 	CELL e;
-	CELL l = sloth_pop(x), a = sloth_pop(x);
+	CELL l, a;
+	CELL previbuf, previpos, previlen, prevsourceid;
+	if (!sloth__check_data_stack(x, 2, 0)) return;
+	l = sloth_pop(x); a = sloth_pop(x);
 
-	CELL previbuf = sloth_user_get(x, SLOTH_IBUF);
-	CELL previpos = sloth_user_get(x, SLOTH_IPOS);
-	CELL previlen = sloth_user_get(x, SLOTH_ILEN);
+	previbuf = sloth_user_get(x, SLOTH_IBUF);
+	previpos = sloth_user_get(x, SLOTH_IPOS);
+	previlen = sloth_user_get(x, SLOTH_ILEN);
 
-	CELL prevsourceid = sloth_user_get(x, SLOTH_SOURCE_ID);
+	prevsourceid = sloth_user_get(x, SLOTH_SOURCE_ID);
 
 	sloth_user_set(x, SLOTH_SOURCE_ID, -1);
 
@@ -1291,7 +1355,10 @@ void sloth_evaluate_(X* x) {
 	}
 }
 
-void sloth_execute_(X* x) { sloth_eval(x, sloth_pop(x)); }
+void sloth_execute_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	sloth_eval(x, sloth_pop(x)); 
+}
 
 /* -- Outer interpreter -------------------------------- */
 
@@ -1407,7 +1474,10 @@ void sloth_interpret_(X* x) {
 /* -- Environment queries ------------------------------ */
 
 void sloth_environment_(X* x) {
-	switch (sloth_pop(x)) {
+	CELL q;
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	q = sloth_pop(x);
+	switch (q) {
 	case 0: /* /COUNTED-STRING */ sloth_push(x, 64); break;
 	case 1: /* /HOLD */	/* TODO */ break;
 	case 2: /* /PAD */ /* TODO */ break;
@@ -1508,21 +1578,37 @@ void sloth_d_floats_(X* x) { sloth_push(x, sloth_pop(x) * sDFCELL); }
 
 /* Manipulating stack items */
 
-void sloth_f_depth_(X* x) { sloth_push(x, x->fp); }
-void sloth_f_drop_(X* x) { sloth_f_pop(x); }
-void sloth_f_dup_(X* x) { sloth_f_push(x, sloth_f_pick(x, 0)); }
-void sloth_f_over_(X* x) { sloth_f_push(x, sloth_f_pick(x, 1)); }
+void sloth_f_depth_(X* x) { 
+	if (!sloth__check_data_stack(x, 0, 1)) return;
+	sloth_push(x, x->fp); 
+}
+void sloth_f_drop_(X* x) { 
+	if (!sloth__check_float_stack(x, 1, 0)) return;
+	sloth_f_pop(x); 
+}
+void sloth_f_dup_(X* x) { 
+	if (!sloth__check_float_stack(x, 1, 2)) return;
+	sloth_f_push(x, sloth_f_pick(x, 0)); 
+}
+void sloth_f_over_(X* x) { 
+	if (!sloth__check_float_stack(x, 2, 3)) return;
+	sloth_f_push(x, sloth_f_pick(x, 1)); 
+}
 void sloth_f_rot_(X* x) { 
-	FCELL c = sloth_f_pop(x);
-	FCELL b = sloth_f_pop(x);
-	FCELL a = sloth_f_pop(x);
+	FCELL c, b, a;
+	if (!sloth__check_float_stack(x, 3, 3)) return;
+	c = sloth_f_pop(x);
+	b = sloth_f_pop(x);
+	a = sloth_f_pop(x);
 	sloth_f_push(x, b);
 	sloth_f_push(x, c);
 	sloth_f_push(x, a);
 }
 void sloth_f_swap_(X* x) { 
-	FCELL b = sloth_f_pop(x);
-	FCELL a = sloth_f_pop(x);
+	FCELL b, a;
+	if (!sloth__check_float_stack(x, 2, 2)) return;
+	b = sloth_f_pop(x);
+	a = sloth_f_pop(x);
 	sloth_f_push(x, b);
 	sloth_f_push(x, a);
 }
@@ -1530,37 +1616,56 @@ void sloth_f_swap_(X* x) {
 /* Comparison operations */
 
 void sloth_f_less_than_(X* x) { 
-	FCELL b = sloth_f_pop(x);
-	FCELL a = sloth_f_pop(x);
+	FCELL b, a;
+	if (!sloth__check_float_stack(x, 2, 0)) return;
+	if (!sloth__check_data_stack(x, 0, 1)) return;
+	b = sloth_f_pop(x);
+	a = sloth_f_pop(x);
 	sloth_push(x, a < b ? -1 : 0);
 }
 void sloth_f_zero_less_than_(X* x) { 
+	if (!sloth__check_float_stack(x, 1, 0)) return;
+	if (!sloth__check_data_stack(x, 0, 1)) return;
 	sloth_push(x, sloth_f_pop(x) < 0.0 ? -1 : 0); 
 }
 void sloth_f_zero_equals_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 0)) return;
+	if (!sloth__check_data_stack(x, 0, 1)) return;
 	sloth_push(x, sloth_f_pop(x) == 0.0 ? -1 : 0);
 }
 
 /* Memory-stack transfer operations */
 
 void sloth_f_fetch_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	if (!sloth__check_float_stack(x, 0, 1)) return;
 	sloth_f_push(x, sloth_f_fetch(x, sloth_pop(x))); 
 }
 void sloth_f_store_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	if (!sloth__check_float_stack(x, 1, 0)) return;
 	sloth_f_store(x, sloth_pop(x), sloth_f_pop(x)); 
 }
 
 void sloth_s_f_fetch_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	if (!sloth__check_float_stack(x, 0, 1)) return;
 	sloth_f_push(x, sloth_s_f_fetch(x, sloth_pop(x))); 
 }
 void sloth_s_f_store_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	if (!sloth__check_float_stack(x, 1, 0)) return;
 	sloth_s_f_store(x, sloth_pop(x), (SFCELL)sloth_f_pop(x));
 }
 
 void sloth_d_f_fetch_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	if (!sloth__check_float_stack(x, 0, 1)) return;
 	sloth_f_push(x, sloth_d_f_fetch(x, sloth_pop(x))); 
 }
 void sloth_d_f_store_(X* x) { 
+	if (!sloth__check_data_stack(x, 1, 0)) return;
+	if (!sloth__check_float_stack(x, 1, 0)) return;
 	sloth_d_f_store(x, sloth_pop(x), sloth_f_pop(x)); 
 }
 
@@ -1572,9 +1677,12 @@ void sloth_f_variable_(X* x) { /* TODO */ (void)x; }
 /* Number-type conversion operators */
 
 void sloth_d_to_f_(X* x) {
-	CELL hi = sloth_pop(x);
-	CELL lo = sloth_pop(x);
+	CELL hi, lo;
 	double r;
+	if (!sloth__check_data_stack(x, 2, 0)) return;
+	if (!sloth__check_float_stack(x, 0, 1)) return;
+	hi = sloth_pop(x);
+	lo = sloth_pop(x);
 	if (hi >= 0) {
 		r = ldexp((double)hi, sFCELL_BITS) + (double)lo;
 	} else {
@@ -1587,6 +1695,8 @@ void sloth_d_to_f_(X* x) {
 }
 void sloth_f_to_d_(X* x) {
 	FCELL i;
+	if (!sloth__check_float_stack(x, 1, 0)) return;
+	if (!sloth__check_data_stack(x, 0, 2)) return;
 	modf(sloth_f_pop(x), &i);
 	sloth_push(x, (CELL)i);
 	sloth_push(x, i < 0 ? -1 : 0);
@@ -1595,48 +1705,67 @@ void sloth_f_to_d_(X* x) {
 /* Arithmetic and logical operations */
 
 void sloth_f_abs_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, fabs(sloth_f_pop(x)));
 }
 void sloth_f_plus_(X* x) { 
-	FCELL b = sloth_f_pop(x);
+	FCELL b;
+	if (!sloth__check_float_stack(x, 2, 1)) return;
+	b = sloth_f_pop(x);
 	sloth_f_push(x, sloth_f_pop(x) + b);
 }
 void sloth_f_minus_(X* x) { 
-	FCELL b = sloth_f_pop(x);
+	FCELL b;
+	if (!sloth__check_float_stack(x, 2, 1)) return;
+	b = sloth_f_pop(x);
 	sloth_f_push(x, sloth_f_pop(x) - b);
 }
 void sloth_f_star_(X* x) { 
-	FCELL b = sloth_f_pop(x);
+	FCELL b;
+	if (!sloth__check_float_stack(x, 2, 1)) return;
+	b = sloth_f_pop(x);
 	sloth_f_push(x, sloth_f_pop(x) * b);
 }
 void sloth_f_star_star_(X* x) {
-	FCELL b = sloth_f_pop(x);
+	FCELL b;
+	if (!sloth__check_float_stack(x, 2, 1)) return;
+	b = sloth_f_pop(x);
 	sloth_f_push(x, pow(sloth_f_pop(x), b));
 }
 void sloth_f_slash_(X* x) { 
-	FCELL b = sloth_f_pop(x);
+	FCELL b;
+	if (!sloth__check_float_stack(x, 2, 1)) return;
+	b = sloth_f_pop(x);
 	sloth_f_push(x, sloth_f_pop(x) / b);
 }
 void sloth_floor_(X* x) { 
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, floor(sloth_f_pop(x)));
 }
 void sloth_f_max_(X* x) { 
-	FCELL b = sloth_f_pop(x);
-	FCELL a = sloth_f_pop(x);
+	FCELL b, a;
+	if (!sloth__check_float_stack(x, 2, 1)) return;
+	b = sloth_f_pop(x);
+	a = sloth_f_pop(x);
 	sloth_f_push(x, a > b ? a : b);
 }
 void sloth_f_min_(X* x) { 
-	FCELL b = sloth_f_pop(x);
-	FCELL a = sloth_f_pop(x);
+	FCELL b, a;
+	if (!sloth__check_float_stack(x, 2, 1)) return;
+	b = sloth_f_pop(x);
+	a = sloth_f_pop(x);
 	sloth_f_push(x, a < b ? a : b);
 }
 void sloth_f_negate_(X* x) { 
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, -sloth_f_pop(x));
 }
 void sloth_f_round_(X* x) {
-    FCELL r = sloth_f_pop(x);
-    FCELL fl = floor(r);
-    FCELL diff = r - fl;
+    FCELL r, fl, diff;
+    if (!sloth__check_float_stack(x, 1, 1)) return;
+    r = sloth_f_pop(x);
+    fl = floor(r);
+    diff = r - fl;
 
     if (diff < 0.5) {
         sloth_f_push(x, fl);
@@ -1649,9 +1778,12 @@ void sloth_f_round_(X* x) {
     }
 }
 void sloth_f_proximate_(X* x) {
-	FCELL r3 = sloth_f_pop(x);
-	FCELL r2 = sloth_f_pop(x);
-	FCELL r1 = sloth_f_pop(x);
+	FCELL r3, r2, r1;
+	if (!sloth__check_float_stack(x, 3, 0)) return;
+	if (!sloth__check_data_stack(x, 0, 1)) return;
+	r3 = sloth_f_pop(x);
+	r2 = sloth_f_pop(x);
+	r1 = sloth_f_pop(x);
 	if (SLOTH_F_ISNAN(r3)) {
 		sloth_push(x, 0);
 	} else if (r3 > 0.0) {
@@ -1666,66 +1798,88 @@ void sloth_f_proximate_(X* x) {
 	}
 }
 void sloth_f_atan2_(X* x) {
-	FCELL b = sloth_f_pop(x);
+	FCELL b;
+	if (!sloth__check_float_stack(x, 2, 1)) return;
+	b = sloth_f_pop(x);
 	sloth_f_push(x, atan2(sloth_f_pop(x), b));
 }
 void sloth_f_sqrt_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, sqrt(sloth_f_pop(x)));
 }
 void sloth_f_l_n_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, log(sloth_f_pop(x)));
 }
 void sloth_f_sine_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, sin(sloth_f_pop(x)));
 }
 void sloth_f_cos_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, cos(sloth_f_pop(x)));
 }
 void sloth_f_sine_cos_(X* x) {
-	FCELL r = sloth_f_pop(x);
+	FCELL r;
+	if (!sloth__check_float_stack(x, 1, 2)) return;
+	r = sloth_f_pop(x);
 	sloth_f_push(x, sin(r));
 	sloth_f_push(x, cos(r));
 }
 void sloth_f_tan_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, tan(sloth_f_pop(x)));
 }
 void sloth_f_a_sine_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, asin(sloth_f_pop(x)));
 }
 void sloth_f_a_cos_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, acos(sloth_f_pop(x)));
 }
 void sloth_f_a_tan_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, atan(sloth_f_pop(x)));
 }
 void sloth_f_exp_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, exp(sloth_f_pop(x)));
 }
 void sloth_f_exp_m_one_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, exp(sloth_f_pop(x)) - 1.0);
 }
 void sloth_f_log_ten_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, log10(sloth_f_pop(x)));
 }
 void sloth_f_l_n_p_one_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, log(sloth_f_pop(x) + 1.0));
 }
 void sloth_f_a_log_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, pow(10.0, sloth_f_pop(x)));
 }
 void sloth_f_sin_h_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, sinh(sloth_f_pop(x)));
 }
 void sloth_f_cos_h_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, cosh(sloth_f_pop(x)));
 }
 void sloth_f_tan_h_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 1)) return;
 	sloth_f_push(x, tanh(sloth_f_pop(x)));
 }
 /* There's no asinh function in math.h in C89. It */
 /* appeared on C99. */
 void sloth_f_a_sine_h_(X* x) {
-	FCELL r = sloth_f_pop(x);
+	FCELL r;
+	if (!sloth__check_float_stack(x, 1, 1)) return;
+	r = sloth_f_pop(x);
 	if (r == 0) {
 		sloth_f_push(x, 0.0);
 	} else if (r > 0) {
@@ -1735,7 +1889,9 @@ void sloth_f_a_sine_h_(X* x) {
 	}
 }
 void sloth_f_a_cos_h_(X* x) {
-	FCELL r = sloth_f_pop(x);
+	FCELL r;
+	if (!sloth__check_float_stack(x, 1, 1)) return;
+	r = sloth_f_pop(x);
 	if (r < 1.0) {
 		/* undefined, push NaN */
 		sloth_f_push(x, SLOTH_F_NAN());
@@ -1752,10 +1908,14 @@ void sloth_f_a_cos_h_(X* x) {
 void sloth_to_float_(X* x) {
 	char buf[64]; 
 	char *endptr;
-	int tlen = (int)sloth_pop(x);
-	char* tok = (char*)sloth_pop(x);
+	int tlen;
+	char* tok;
 	FCELL n;
-	int i, j, nlen, marker;;
+	int i, j, nlen, marker;
+	if (!sloth__check_data_stack(x, 2, 1)) return;
+	if (!sloth__check_float_stack(x, 0, 1)) return;
+	tlen = (int)sloth_pop(x);
+	tok = (char*)sloth_pop(x);
 	/* >FLOAT does not allow trailing spaces (although */
 	/* strtod does). But, at the same time, a string of */
 	/* blanks must be considered as a special case */
@@ -1826,15 +1986,19 @@ void sloth_to_float_(X* x) {
 }
 
 void sloth_represent_(X* x) {
-	FCELL r = sloth_f_pop(x);
-	CELL u = sloth_pop(x);
-	CELL addr = sloth_pop(x);
-	/* This implementation uses the algorithm found in */
-	/* represent_in_c.zip in Taygeta FTP. */
-	/* I'm ignoring the REPRESENT-CHARS part */
+	FCELL r;
+	CELL u, addr;
 	int i;
 	size_t j, k;
 	char buf[64], *endptr;
+	if (!sloth__check_float_stack(x, 1, 0)) return;
+	if (!sloth__check_data_stack(x, 2, 3)) return;
+	r = sloth_f_pop(x);
+	u = sloth_pop(x);
+	addr = sloth_pop(x);
+	/* This implementation uses the algorithm found in */
+	/* represent_in_c.zip in Taygeta FTP. */
+	/* I'm ignoring the REPRESENT-CHARS part */
 	/* 1. Fill buffer at caddr with n blanks (space chars) */
 	/* where n is the greater of n1 or REPRESENT-CHARS. */
 	for (i = 0; i < u; i++) sloth_c_store(x, addr + i, ' ');
@@ -1871,9 +2035,11 @@ void sloth_represent_(X* x) {
 /* Output operations */
 
 void sloth_f_dot_(X* x) {
-	FCELL r = sloth_f_pop(x);
-	int int_digits = (r == 0.0) ? 1 : (int)log10(fabs(r)) + 1;
-	int decimals;
+	FCELL r;
+	int int_digits, decimals;
+	if (!sloth__check_float_stack(x, 1, 0)) return;
+	r = sloth_f_pop(x);
+	int_digits = (r == 0.0) ? 1 : (int)log10(fabs(r)) + 1;
 	if (r == floor(r)) {
 		printf("%.0f. ", r);
 	} else if (floor(r) == 0.0 || floor(r) == -1.0) {
@@ -1885,16 +2051,19 @@ void sloth_f_dot_(X* x) {
 }
 
 void sloth_f_s_dot_(X* x) {
+	if (!sloth__check_float_stack(x, 1, 0)) return;
 	printf("%.*E ", (int)sloth_user_get(x, SLOTH_PRECISION) - 1, sloth_f_pop(x));
 }
 
 /* Engineering notation with special case handling */
 /* by ChatGPT */
 void sloth_f_e_dot_(X* x) {
-	FCELL r = sloth_f_pop(x);
+	FCELL r;
 	int exp;
 	double scaled;
 
+	if (!sloth__check_float_stack(x, 1, 0)) return;
+	r = sloth_f_pop(x);
 	if (SLOTH_F_ISNAN(r)) {
 		printf("NaN ");
 		return;
@@ -1927,6 +2096,7 @@ void sloth_f_e_dot_(X* x) {
 
 void sloth_f_dot_s_(X* x) {
 	int i;
+	(void)sloth__check_data_stack(x, 0, 0);
 #if defined(WINDOWS)
 	printf("F:<%Id> ", x->fp);
 #else
@@ -1939,8 +2109,14 @@ void sloth_f_dot_s_(X* x) {
 
 /* Non ANS helpers */
 
-void sloth_self_(X* x) { sloth_push(x, (CELL)x); }
-void sloth_dict_(X* x) { sloth_push(x, (CELL)x->d); }
+void sloth_self_(X* x) { 
+	if (!sloth__check_data_stack(x, 0, 1)) return;
+	sloth_push(x, (CELL)x); 
+}
+void sloth_dict_(X* x) { 
+	if (!sloth__check_data_stack(x, 0, 1)) return;
+	sloth_push(x, (CELL)x->d); 
+}
 void sloth_empty_return_stack_(X* x) { x->rp = 0; }
 /* -- Primitive, word and user variable creation ------- */
 
