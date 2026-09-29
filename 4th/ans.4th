@@ -654,7 +654,7 @@ FORTH-WORDLIST SET-CURRENT
 ?\		DUP CHAR+ SWAP C@ 
 ?\ ;
 
-?: BOUNDS ( c-addr1 u -- c-addr1 c-addr2 ) CHARS OVER + SWAP ;
+?: BOUNDS ( c-addr1 u -- c-addr2 c-addr1 ) OVER + SWAP ;
 
 ?: PAD ( -- c-addr ) HERE (PAD-DISPLACEMENT) + ;
 
@@ -678,7 +678,7 @@ FORTH-WORDLIST SET-CURRENT
 ?: (DELETE-KEY) ( -- n ) -3 (ENVIRONMENT) ;
 
 ?: ACCEPT ( c-addr +n1 -- +n2 )
-?\		BOUNDS ( c-addr2 c-addr1 )
+?\		CHARS BOUNDS ( c-addr2 c-addr1 )
 ?\		2DUP - >R
 ?\		BEGIN ( c-addr2 c-addr1 )
 ?\			2DUP <> WHILE
@@ -919,7 +919,7 @@ FORTH-WORDLIST SET-CURRENT
 \ Implementation taken from SwapForth, but modified to
 \ use CHARS <> 1
 ?: CMOVE ( c-addr1 c-addr2 u -- )
-?\		BOUNDS ROT >R
+?\		CHARS BOUNDS ROT >R
 ?\		BEGIN
 ?\		    2DUP XOR
 ?\		WHILE
@@ -955,7 +955,7 @@ FORTH-WORDLIST SET-CURRENT
 
 ?: CASE-INSENSITIVE-COMPARE ( c-addr1 u1 c-addr2 u2 -- flag )
 ?\		ROT OVER = IF
-?\			BOUNDS ( c-addr1 c-addr2 c-addr2+u ) DO
+?\			CHARS BOUNDS ( c-addr1 c-addr2 c-addr2+u ) DO
 ?\				I C@ OVER C@ CASE-INSENSITIVE-= 0= IF
 ?\					DROP FALSE UNLOOP EXIT
 ?\				THEN
@@ -1255,13 +1255,13 @@ SET-CURRENT
 GET-CURRENT INTERNAL-WORDLIST SET-CURRENT
 
 ?: COMPARE-SAME? ( c-addr1 c-addr2 u -- -1|0|1 )
-?\		BOUNDS ?DO
+?\		CHARS BOUNDS ?DO
 ?\			I C@ OVER C@ - ?DUP IF
 ?\				0> 2* 1+
 ?\				NIP UNLOOP EXIT
 ?\			THEN
-?\			1+
-?\		LOOP
+?\			CHAR+
+?\		1 CHARS +LOOP
 ?\		DROP 0
 ?\ ;
 

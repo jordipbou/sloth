@@ -3,10 +3,10 @@ REQUIRE transient.4th
 [UNDEFINED] -TRAILING [IF]
 : -TRAILING ( c-addr u1 -- c-addr u2 )
 	BEGIN   
-	    2DUP + CHAR- C@ BL =
+	    2DUP CHARS + CHAR- C@ BL =
 	    OVER AND
 	WHILE   
-	    CHAR-  
+	    1-  
 	REPEAT  
 ;
 [THEN]
@@ -18,8 +18,8 @@ REQUIRE transient.4th
 		DUP
 	WHILE
 		1- >R
-		OVER R@ + C@
-		OVER R@ + C!
+		OVER R@ CHARS + C@
+		OVER R@ CHARS + C!
 		R>
 	REPEAT
 	DROP 2DROP
@@ -46,13 +46,13 @@ REQUIRE transient.4th
 	\ Reference ANS Forth implementation from:
 	\ https://forth-standard.org/standard/string/UNESCAPE
 	: UNESCAPE ( c-addr1 len1 c-addr2 -- c-addr2 len2 )
-		DUP 2SWAP OVER + SWAP ?DO
+		DUP 2SWAP CHARS OVER + SWAP ?DO
 			I C@ [CHAR] % = IF
-				[CHAR] % OVER C! 1+
+				[CHAR] % OVER C! CHAR+
 			THEN
-			I C@ OVER C! 1+
-		LOOP
-		OVER -
+			I C@ OVER C! CHAR+
+		1 CHARS +LOOP
+		OVER - 1 CHARS /
 	;
 [THEN]
 
@@ -124,7 +124,7 @@ REQUIRE transient.4th
 			SOURCE-ADDRESS @ BEGIN 
 				SOURCE-LEN @ 0> WHILE
 				GET-CHAR [CHAR] % = IF
-					DUP SOURCE-ADDRESS @ SWAP - 1-
+					DUP SOURCE-ADDRESS @ SWAP - 1 CHARS / 1-
 					2DUP REPLACEMENTS-WL SEARCH-WORDLIST IF
 						NIP NIP
 						EXECUTE
@@ -153,7 +153,7 @@ REQUIRE transient.4th
 			\ Its necessary to write the string as found,
 			\ from the % to the last char.
 			'%' WRITE-CHAR
-			SOURCE-ADDRESS @ OVER -
+			SOURCE-ADDRESS @ OVER - 1 CHARS /
 			WRITE-REPLACEMENT
 		;
 
@@ -185,7 +185,7 @@ REQUIRE transient.4th
 		\ transient memory first.
 		DUP SOURCE-LEN !
 		TMARK >R
-		DUP TALLOT
+		DUP CHARS TALLOT
 		SWAP CMOVE
 		THERE @ SOURCE-ADDRESS !
 		SUBSTITUTE
