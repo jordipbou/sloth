@@ -12,6 +12,7 @@ package io.github.jordipbou.Sloth;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Locale;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.io.IOException;
@@ -66,9 +67,7 @@ public class Sloth {
 
 	protected ArrayList<Consumer<Sloth>> p; // Array of primitives
 
-	// This array was created by Gemini for the included
-	// implementation, I must re-check it.
-	private ArrayList<java.io.RandomAccessFile> openFiles = new ArrayList<>();
+	private int selfObject = 0;
 
 	public static final int STACK_OVERFLOW = -3;
 	public static final int STACK_UNDERFLOW = -4;
@@ -126,7 +125,10 @@ public class Sloth {
 	
 	public static final int INCLUDED_FILES = 95*sCELL;
 	
-	public static final int LAST_USER_VAR = 96*sCELL;
+	// Floating point significant digits (user variable)
+	public static final int PRECISION = 96*sCELL;
+	
+	public static final int LAST_USER_VAR = 97*sCELL;
 	
 	// -- Flags for word status ----------------------------
 	
@@ -451,13 +453,13 @@ public class Sloth {
 	// Compilation
 	void comma(int v) { store(here(), v); allot(sCELL); }
 	void c_comma(char v) { c_store(here(), v); allot(suCHAR); }
-	void f_comma(float v) { f_store(here(), v); allot(sFCELL); }
+	void f_comma(double v) { f_store(here(), v); allot(sFCELL); }
 	void compile(int xt) { comma(xt); }
 	void literal(int n) { 
 		comma(get_xt(find_word("(LIT)")));
 		comma(n);
 	}
-	void f_literal(float f) {
+	void f_literal(double f) {
 		comma(get_xt(find_word("(FLIT)")));
 		f_comma(f);
 	}
@@ -566,7 +568,7 @@ public class Sloth {
 		case 9: break; // TODO MAX-UD
 		case 10: push(RETURN_STACK_SIZE); break; // RETURN-STACK-CELLS
 		case 11: push(STACK_SIZE); break; // STACK-CELLS
-		case 12: push(-1); break; // push(FLOAT_STACK_SIZE); break; // FLOATING-STACK
+		case 12: push(FLOAT_STACK_SIZE); break; // FLOATING-STACK
 		// Obsolescent queries (required for tests)
 		case 100: push(-1); break;
 		// Non standard queries
@@ -650,32 +652,295 @@ public class Sloth {
 	// characters in memory.
 	public void _read_line_() {
 		if (!check_data_stack(3, 3)) return;
+		int fid = pop();
+		int u1 = pop();
+		int caddr = pop();
+		Object obj = o[fid];
+		if (!(obj instanceof RandomAccessFile)) {
+			push(0);
+			push(0);
+			push(-37);
+			return;
+		}
+		RandomAccessFile file = (RandomAccessFile)obj;
 		try {
-			RandomAccessFile file = (RandomAccessFile)(o[pop()]);	
-			int u1 = pop();
-			int caddr = pop();
-			try {
-				if (file.getFilePointer() >= file.length()) {
-					push(0);
-					push(0);
-					push(0);
-				} else {
-					String buf = file.readLine();
-					int i;
-					for (i = 0; i < buf.length() && i < u1; i++) {
-						c_store(caddr + i*suCHAR, buf.charAt(i));
-					}
-					push(i);
-					push(-1);
-					push(0);
-				}
-			} catch (IOException e) {
-				// TODO
-				e.printStackTrace();
+			if (u1 == 0) {
+				push(0);
+				push(-1);
+				push(0);
+				return;
 			}
-		} catch (ClassCastException e) {
-			// TODO
-			e.printStackTrace();
+			int count = 0;
+			boolean read_any = false;
+			while (count < u1) {
+				int b = file.read();
+				if (b < 0) break;
+				read_any = true;
+				if (b == '\n') break;
+				if (b == '\r') {
+					long p = file.getFilePointer();
+					int n = file.read();
+					if (n != '\n' && n != -1) file.seek(p);
+					break;
+				}
+				c_store(caddr + count*suCHAR, (char)b);
+				count++;
+			}
+			push(count);
+			push(read_any ? -1 : 0);
+			push(0);
+		} catch (IOException e) {
+			push(0);
+			push(0);
+			push(-37);
+		}
+	}
+
+	// -- File word set ------------------------------------
+
+	public static final int FAM_R_O = 1;
+	public static final int FAM_R_W = 2;
+	public static final int FAM_W_O = 3;
+	public static final int FAM_BIN = 16;
+
+	void _bin_() {
+		if (!check_data_stack(1, 1)) return;
+		push(pop() | FAM_BIN);
+	}
+	void _r_slash_o_() { if (!check_data_stack(0, 1)) return; push(FAM_R_O); }
+	void _r_slash_w_() { if (!check_data_stack(0, 1)) return; push(FAM_R_W); }
+	void _w_slash_o_() { if (!check_data_stack(0, 1)) return; push(FAM_W_O); }
+
+	protected RandomAccessFile open_fam(String name, int fam, boolean create)
+			throws IOException {
+		int f = fam & 0x0F;
+		File file = new File(name);
+		if (create) {
+			RandomAccessFile raf = new RandomAccessFile(file, "rw");
+			raf.setLength(0);
+			if (f == FAM_R_O) {
+				raf.close();
+				raf = new RandomAccessFile(file, "r");
+			}
+			return raf;
+		}
+		if (f == FAM_W_O) {
+			RandomAccessFile raf = new RandomAccessFile(file, "rw");
+			raf.setLength(0);
+			return raf;
+		}
+		if (!file.exists()) return null;
+		if (f == FAM_R_O) return new RandomAccessFile(file, "r");
+		return new RandomAccessFile(file, "rw");
+	}
+
+	public void _create_file_() {
+		if (!check_data_stack(3, 2)) return;
+		int fam = pop();
+		int u = pop();
+		int caddr = pop();
+		try {
+			RandomAccessFile raf = open_fam(toString(caddr, u), fam, true);
+			push(putObject(raf));
+			push(0);
+		} catch (IOException e) {
+			push(0);
+			push(-37);
+		}
+	}
+
+	public void _open_file_() {
+		if (!check_data_stack(3, 2)) return;
+		int fam = pop();
+		int u = pop();
+		int caddr = pop();
+		try {
+			RandomAccessFile raf = open_fam(toString(caddr, u), fam, false);
+			if (raf == null) {
+				push(0);
+				push(-37);
+			} else {
+				push(putObject(raf));
+				push(0);
+			}
+		} catch (IOException e) {
+			push(0);
+			push(-37);
+		}
+	}
+
+	public void _close_file_() {
+		if (!check_data_stack(1, 1)) return;
+		int fid = pop();
+		Object obj = o[fid];
+		if (!(obj instanceof RandomAccessFile)) {
+			push(-37);
+			return;
+		}
+		try {
+			((RandomAccessFile)obj).close();
+			removeObject(fid);
+			push(0);
+		} catch (IOException e) {
+			push(-37);
+		}
+	}
+
+	public void _file_size_() {
+		if (!check_data_stack(1, 3)) return;
+		int fid = pop();
+		Object obj = o[fid];
+		if (!(obj instanceof RandomAccessFile)) {
+			dpush(0);
+			push(-37);
+			return;
+		}
+		try {
+			dpush(((RandomAccessFile)obj).length());
+			push(0);
+		} catch (IOException e) {
+			dpush(0);
+			push(-37);
+		}
+	}
+
+	public void _reposition_file_() {
+		if (!check_data_stack(3, 1)) return;
+		int fid = pop();
+		long hi = upop();
+		long lo = upop();
+		Object obj = o[fid];
+		if (!(obj instanceof RandomAccessFile)) {
+			push(-37);
+			return;
+		}
+		try {
+			((RandomAccessFile)obj).seek((hi << 32) | lo);
+			push(0);
+		} catch (IOException e) {
+			push(-37);
+		}
+	}
+
+	public void _flush_file_() {
+		if (!check_data_stack(1, 1)) return;
+		pop();
+		push(0);
+	}
+
+	public void _resize_file_() {
+		if (!check_data_stack(3, 1)) return;
+		int fid = pop();
+		long hi = upop();
+		long lo = upop();
+		Object obj = o[fid];
+		if (!(obj instanceof RandomAccessFile)) {
+			push(-37);
+			return;
+		}
+		try {
+			((RandomAccessFile)obj).setLength((hi << 32) | lo);
+			push(0);
+		} catch (IOException e) {
+			push(-37);
+		}
+	}
+
+	public void _delete_file_() {
+		if (!check_data_stack(2, 1)) return;
+		int u = pop();
+		int caddr = pop();
+		push(new File(toString(caddr, u)).delete() ? 0 : -37);
+	}
+
+	public void _rename_file_() {
+		if (!check_data_stack(4, 1)) return;
+		int u2 = pop();
+		int caddr2 = pop();
+		int u1 = pop();
+		int caddr1 = pop();
+		File f1 = new File(toString(caddr1, u1));
+		File f2 = new File(toString(caddr2, u2));
+		push(f1.renameTo(f2) ? 0 : -37);
+	}
+
+	public void _file_status_() {
+		if (!check_data_stack(2, 2)) return;
+		int u = pop();
+		int caddr = pop();
+		File file = new File(toString(caddr, u));
+		push(0);
+		push(file.exists() ? 0 : -37);
+	}
+
+	public void _read_file_() {
+		if (!check_data_stack(3, 2)) return;
+		int fid = pop();
+		int u1 = pop();
+		int caddr = pop();
+		Object obj = o[fid];
+		if (!(obj instanceof RandomAccessFile)) {
+			push(0);
+			push(-37);
+			return;
+		}
+		try {
+			RandomAccessFile file = (RandomAccessFile)obj;
+			int count = 0;
+			while (count < u1) {
+				int b = file.read();
+				if (b < 0) break;
+				c_store(caddr + count*suCHAR, (char)b);
+				count++;
+			}
+			push(count);
+			push(0);
+		} catch (IOException e) {
+			push(0);
+			push(-37);
+		}
+	}
+
+	public void _write_file_() {
+		if (!check_data_stack(3, 1)) return;
+		int fid = pop();
+		int u = pop();
+		int caddr = pop();
+		Object obj = o[fid];
+		if (!(obj instanceof RandomAccessFile)) {
+			push(-37);
+			return;
+		}
+		try {
+			RandomAccessFile file = (RandomAccessFile)obj;
+			for (int i = 0; i < u; i++) {
+				file.write((byte)c_fetch(caddr + i*suCHAR));
+			}
+			push(0);
+		} catch (IOException e) {
+			push(-37);
+		}
+	}
+
+	public void _write_line_() {
+		if (!check_data_stack(3, 1)) return;
+		int fid = pop();
+		int u = pop();
+		int caddr = pop();
+		Object obj = o[fid];
+		if (!(obj instanceof RandomAccessFile)) {
+			push(-37);
+			return;
+		}
+		try {
+			RandomAccessFile file = (RandomAccessFile)obj;
+			for (int i = 0; i < u; i++) {
+				file.write((byte)c_fetch(caddr + i*suCHAR));
+			}
+			file.write('\n');
+			push(0);
+		} catch (IOException e) {
+			push(-37);
 		}
 	}
 
@@ -754,20 +1019,18 @@ public class Sloth {
 		user_set(SOURCE_POS, pop());
 		if (user_get(SOURCE_ID) > 0) {
 			int sourceId = user_get(SOURCE_ID);
-			if (sourceId <= openFiles.size()) {
-				java.io.RandomAccessFile raf = openFiles.get(sourceId - 1);
+			Object obj = o[sourceId];
+			if (obj instanceof RandomAccessFile) {
 				try {
-					raf.seek(user_get(SOURCE_POS));
-					String line = raf.readLine();
-					if (line != null) {
-						int ibuf = user_get(IBUF);
-						ByteBuffer b = block(ibuf);
-						int rel = to_rel(ibuf);
-						for (int i = 0; i < line.length(); i++) {
-							b.putChar(rel + (i * suCHAR), line.charAt(i));
-						}
-					}
-				} catch (java.io.IOException e) {}
+					((RandomAccessFile)obj).seek(user_get(SOURCE_POS));
+				} catch (IOException e) {}
+				push(user_get(IBUF));
+				push(1024);
+				push(sourceId);
+				_read_line_();
+				pop();
+				pop();
+				pop();
 			}
 		}
 		push(0);
@@ -788,65 +1051,86 @@ public class Sloth {
 		pop();
 	}
 
+	protected void write_path(int addr, String s) {
+		for (int i = 0; i < s.length(); i++) c_store(addr + i*suCHAR, s.charAt(i));
+	}
+
 	protected RandomAccessFile open_included_file(String name) throws IOException {
+		RandomAccessFile f = null;
+		int l = name.length();
+		boolean remember = false;
+
 		// Variables for working with path, initialized to
 		// reuse current path if possible.
 		int pathstart = user_get(PATH_START);
 		int pathend = user_get(PATH_END);
 
-		RandomAccessFile f;
-		String updated_path = "";
-		try {
-			// Absolute or relative to current directory
-			f = new RandomAccessFile(name, "r");
-			updated_path = name;
-			pathstart = pathend;
-		} catch (IOException e) {
+		// End of the continuous path region. Paths must fit
+		// between SLOTH_PATHS (or the current path position)
+		// and this limit.
+		int path_start_addr = to_abs(PATHS, u);
+		int path_end = to_abs(INCLUDED_FILES, u);
+		// The bound only applies when the path is stored in
+		// the path region. Tests and callers may use an
+		// external buffer, which is left unchecked.
+		boolean in_region = pathend >= path_start_addr && pathend < path_end;
+
+		// Try to use it as absolute path filename or relative
+		// to current directory.
+		if (!in_region || pathend + (l + 1)*suCHAR <= path_end) {
+			write_path(pathend, name);
 			try {
-				// Try relative to last included directory
-				updated_path = name;
-				f = 
-					new RandomAccessFile(
-						toString(
-							pathstart, 
-							(pathend - pathstart)/suCHAR
-						).concat(name)
-					, "r");
-				pathend = pathend + name.length()*suCHAR;
-			} catch (IOException ie) {
-				try {
-					// Try relative to ROOT path
-					updated_path = 
-						toString(
-							to_abs(PATHS, u), 
-							user_get(ROOT_PATH_LENGTH)
-						).concat(name);
-					f = new RandomAccessFile(updated_path, "r");
-				} catch (IOException ie2) {
-					throw ie2;
+				f = new RandomAccessFile(toString(pathend, l), "r");
+				pathstart = pathend;
+				pathend = pathend + l*suCHAR;
+				remember = true;
+			} catch (IOException e) {
+				f = null;
+			}
+		}
+
+		if (f == null) {
+			// Trying as relative to previous path. Strategy 1 has
+			// already copied the name right after the remembered
+			// directory in the path buffer, so the candidate is
+			// previous directory plus name.
+			try {
+				f = new RandomAccessFile(
+					toString(pathstart, (pathend - pathstart)/suCHAR) + name, "r");
+				pathend = pathend + l*suCHAR;
+				remember = true;
+			} catch (IOException e) {
+				f = null;
+				// Trying as relative to root path. Opening a
+				// file from the root path must not change
+				// pathstart or pathend as everytime a file is
+				// opened it can be checked against root.
+				int root_len = user_get(ROOT_PATH_LENGTH);
+				if (!in_region || pathend + (root_len + l + 1)*suCHAR <= path_end) {
+					write_path(pathend,
+						toString(to_abs(PATHS, u), root_len) + name);
+					try {
+						f = new RandomAccessFile(toString(pathend, root_len + l), "r");
+					} catch (IOException e2) {
+						f = null;
+					}
 				}
 			}
 		}
 
-		// Update path to allow opening files that their paths
-		// are relative to a previous opened file (in a nested way).
-
-		// Remove the filename from the updated path string
-		updated_path = 
-			updated_path.substring(
-				0, 
-				Math.max(
-					updated_path.lastIndexOf('/'), 
-					updated_path.lastIndexOf('\\')
-				) + 1);
-
-		for (int i = 0; i < updated_path.length(); i++) {
-			c_store(pathend + i*suCHAR, updated_path.charAt(i));
+		if (f != null && remember) {
+			// Remove filename from path...
+			int p = pathend;
+			while (p > pathstart) {
+				p -= suCHAR;
+				char c = c_fetch(p);
+				if (c == '/' || c == '\\') { p += suCHAR; break; }
+			}
+			pathend = p;
+			// ...and store for nested includes.
+			user_set(PATH_START, pathstart);
+			user_set(PATH_END, pathend);
 		}
-		pathend = pathend + updated_path.length()*suCHAR;
-
-		user_set(PATH_START, pathstart);
-		user_set(PATH_END, pathend);
 
 		return f;
 	}
@@ -885,6 +1169,11 @@ public class Sloth {
 		try {
 			RandomAccessFile raf = open_included_file(name);
 
+			if (raf == null) {
+				restore_input_and_path();
+				_throw(-38);
+			}
+
 			int linenumber = 0;
 			add_to_included_files_list(name);
 
@@ -910,7 +1199,7 @@ public class Sloth {
 				if (e != 0) {
 					int pathstart = user_get(PATH_START);
 					int pathend = user_get(PATH_END);
-					String path = toString(pathstart, (pathstart - pathend)/suCHAR);
+					String path = toString(pathstart, (pathend - pathstart)/suCHAR) + name;
 					System.out.printf("File: %s\n", path);
 					System.out.printf("Line (%d): %s\n", linenumber, toString(user_get(IBUF), user_get(ILEN)));
 					_throw(e);
@@ -928,6 +1217,38 @@ public class Sloth {
 			restore_input_and_path();
 			_throw(-38);
 		}
+	}
+
+	// Loading scripts
+
+	protected boolean is_file_included(int a1, int u1) {
+		int name = user_get(INCLUDED_FILES);
+		while (name != 0) {
+			int u2 = fetch(name + sCELL);
+			int a2 = name + 2*sCELL;
+			if (compare(a1, u1, a2, u2)) return true;
+			name = fetch(name);
+		}
+		return false;
+	}
+
+	void _required_() {
+		if (!check_data_stack(2, 0)) return;
+		int u = pop();
+		int caddr = pop();
+		if (!is_file_included(caddr, u)) {
+			push(caddr);
+			push(u);
+			_included_();
+		}
+	}
+
+	void _require_() {
+		push(32); _word_();
+		int addr = pop();
+		push(addr + suCHAR);
+		push(c_fetch(addr));
+		_required_();
 	}
 
 	// Finding words
@@ -980,6 +1301,32 @@ public class Sloth {
 
 	// -- Outer interpreter
 
+	// Parse a number with strtod-like semantics: the longest valid prefix
+	// (optional sign, digits with an optional '.', optional exponent) is
+	// converted, and anything after it is ignored. This mirrors the C
+	// implementation and is used both for source literals and by >FLOAT.
+	// Throws NumberFormatException if no number can be parsed.
+	boolean is_digit(char c) { return c >= '0' && c <= '9'; }
+
+	double parse_float(String s) {
+		int i = 0, n = s.length(), digits = 0;
+		if (i < n && (s.charAt(i) == '+' || s.charAt(i) == '-')) i++;
+		while (i < n && is_digit(s.charAt(i))) { i++; digits++; }
+		if (i < n && s.charAt(i) == '.') {
+			i++;
+			while (i < n && is_digit(s.charAt(i))) { i++; digits++; }
+		}
+		if (digits == 0) throw new NumberFormatException();
+		int end = i;
+		if (i < n && (s.charAt(i) == 'e' || s.charAt(i) == 'E')) {
+			int j = i + 1, exp_digits = 0;
+			if (j < n && (s.charAt(j) == '+' || s.charAt(j) == '-')) j++;
+			while (j < n && is_digit(s.charAt(j))) { j++; exp_digits++; }
+			if (exp_digits > 0) end = j;
+		}
+		return Double.parseDouble(s.substring(0, end));
+	}
+
 	void _interpret_() {
 		int flag;
 		while (user_get(IPOS) < user_get(ILEN)) {
@@ -1010,21 +1357,22 @@ public class Sloth {
 				} else {
 					boolean is_double = false;
 					int temp_base = user_get(BASE);
-					if (c_fetch(tok) == '#') {
+					if (tlen > 0 && c_fetch(tok + (tlen - 1)*suCHAR) == '.') {
+						tlen--;
+						is_double = true;
+					}
+					if (tlen > 0 && c_fetch(tok) == '#') {
 						temp_base = 10;
 						tlen--;
 						tok += suCHAR;
-					} else if (c_fetch(tok) == '$') {
+					} else if (tlen > 0 && c_fetch(tok) == '$') {
 						temp_base = 16;
 						tlen--;
 						tok += suCHAR;
-					} else if (c_fetch(tok) == '%') {
+					} else if (tlen > 0 && c_fetch(tok) == '%') {
 						temp_base = 2;
 						tlen--;
 						tok += suCHAR;
-					} else if (c_fetch(tok + tlen*suCHAR - suCHAR) == '.') {
-						tlen--;
-						is_double = true;
 					}
 					StringBuffer buf = new StringBuffer();
 					for (int i = 0; i < tlen; i++) 
@@ -1040,7 +1388,8 @@ public class Sloth {
 						}
 					} catch(NumberFormatException e1) {
 						try {
-							float r = Float.parseFloat(buf.toString());
+							if (user_get(BASE) != 10) throw new NumberFormatException();
+							double r = parse_float(buf.toString());
 							if (user_get(STATE) == 0) {
 								f_push(r);
 							} else {
@@ -1293,12 +1642,17 @@ public class Sloth {
 	
 	public void _f_align_() { set(HERE, aligned(get(HERE), sFCELL)); }
 	public void _f_aligned_() { push(aligned(pop(), sFCELL)); }
+	public void _f_literal_() { 
+		if (!check_float_stack(1, 0)) return;
+		f_literal(f_pop());
+	}
 	public void _s_f_aligned_() {	push(aligned(pop(), sSFCELL)); }
 	public void _d_f_aligned_() { push(aligned(pop(), sDFCELL)); }
 	
 	public void _floats_() { push(pop() * sFCELL); }
 	public void _s_floats_() { push(pop() * sSFCELL); }
 	public void _d_floats_() { push(pop() * sDFCELL); }
+	public void _float_plus_() { push(pop() + sFCELL); }
 
 	// Manipulating stack items
 
@@ -1593,22 +1947,43 @@ public class Sloth {
 		if (!check_float_stack(0, 1)) return;
 		int tlen = pop();
 		int tok = pop();
-		String s = toString(tok, tlen);
+		// A string of blanks (or the empty string) is the special case
+		// representing zero. A leading space followed by anything else,
+		// like a trailing space, cannot be converted.
+		if (tlen == 0 || (char)c_fetch(tok) == ' ') {
+			for (int i = 0; i < tlen; i++) {
+				if ((char)c_fetch(tok + i*suCHAR) != ' ') { push(0); return; }
+			}
+			push(-1);
+			f_push(0.0);
+			return;
+		}
+		if ((char)c_fetch(tok + (tlen - 1)*suCHAR) == ' ') { push(0); return; }
+		// Forth's >FLOAT is more restrictive than strtod: only the
+		// characters below are allowed, and the exponent marker
+		// (E/e/D/d) may appear at most once.
+		StringBuilder buf = new StringBuilder();
+		int marker = 0;
+		for (int i = 0; i < tlen; i++) {
+			char c = (char)c_fetch(tok + i*suCHAR);
+			if (!is_digit(c) && c != '+' && c != '-' && c != 'D' && c != 'd'
+			 && c != 'E' && c != 'e' && c != '.') { push(0); return; }
+			if (c == 'D' || c == 'd' || c == 'E' || c == 'e') {
+				if (marker == 0) marker = 1; else { push(0); return; }
+			}
+			// An exponent sign may appear without an explicit 'E'
+			// (e.g. "1+1" means 10E, "-350000-2" means -3500E).
+			if (i != 0 && (c == '+' || c == '-')) {
+				char prev = (char)c_fetch(tok + (i - 1)*suCHAR);
+				if (prev != 'E' && prev != 'e') buf.append('E');
+			}
+			buf.append(c);
+		}
 		try {
-			// A string with trailing spaces must fail
-			if (s.endsWith(" ")) { throw new NumberFormatException(); }
-			f_push(Double.parseDouble(s));
+			f_push(parse_float(buf.toString()));
 			push(-1);
 		} catch (NumberFormatException e) {
-			// Double.parseDouble will not convert an empty
-			// string or a string of blanks to a 0.0, but
-			// the Forth standard requires it.
-			if (s.trim().isEmpty()) {
-				push(-1);
-				f_push(0.0);
-			} else {
-				push(0);
-			}
+			push(0);
 		}
 	}
 
@@ -1683,6 +2058,44 @@ public class Sloth {
 		push(-1);                 // flag2: true (-1) — valid finite result
 	}
 
+	// Output operations
+
+	public void _f_dot_() {
+		if (!check_float_stack(1, 0)) return;
+		double r = f_pop();
+		int precision = user_get(PRECISION);
+		int int_digits = (r == 0.0) ? 1 : (int)Math.log10(Math.abs(r)) + 1;
+		if (r == Math.floor(r)) {
+			System.out.print(String.format(Locale.US, "%.0f. ", r));
+		} else if (Math.floor(r) == 0.0 || Math.floor(r) == -1.0) {
+			System.out.print(String.format(Locale.US, "%." + precision + "f ", r));
+		} else {
+			int decimals = precision - int_digits;
+			System.out.print(String.format(Locale.US, "%." + decimals + "f ", r));
+		}
+	}
+	public void _f_s_dot_() {
+		if (!check_float_stack(1, 0)) return;
+		int precision = user_get(PRECISION);
+		System.out.print(String.format(Locale.US, "%." + (precision - 1) + "E ", f_pop()));
+	}
+	public void _f_e_dot_() {
+		if (!check_float_stack(1, 0)) return;
+		double r = f_pop();
+		if (Double.isNaN(r)) { System.out.print("NaN "); return; }
+		if (Double.isInfinite(r)) { System.out.print(r > 0 ? "Inf " : "-Inf "); return; }
+		if (r == 0.0) { System.out.print("0.0E+00 "); return; }
+		int exp = (int)Math.floor(Math.log10(Math.abs(r)) / 3.0) * 3;
+		double scaled = r / Math.pow(10, exp);
+		System.out.print(String.format(Locale.US, "%.3fE%+03d ", scaled, exp));
+	}
+	public void _f_dot_s_() {
+		System.out.print("F:<" + fp + "> ");
+		for (int i = 0; i < fp; i++) {
+			System.out.print(String.format(Locale.US, "%f ", f[i]));
+		}
+	}
+
 	// -- Helpers for bootstrapping -------------------------
 
 	int primitive(Consumer<Sloth> c) {
@@ -1702,11 +2115,16 @@ public class Sloth {
 		store(to_abs(0, u) + d, v);
 	}
 	void _empty_rs_() { rp = 0; }
-	// In C there is _ints_ and _self_, but I don't need it here.
+	void _self_() {
+		if (!check_data_stack(0, 1)) return;
+		if (selfObject == 0) selfObject = putObject(this);
+		push(selfObject);
+	}
+	// In C there is _ints_, but I don't need it here.
 
 	// Bootstrapping
 
-	void bootstrap() {
+	void bootstrap_kernel() {
 		// Basic primitives
 		code("EXIT", primitive((vm) -> vm._exit_()));
 		code("(LIT)", primitive((vm) -> vm._lit_()));
@@ -1812,6 +2230,7 @@ public class Sloth {
 		code("POSTPONE", primitive((vm) -> vm._postpone_())); _immediate_();
 
 		code("COMPILE,", primitive((vm) -> vm._compile_comma_()));
+		code("CREATE-NAME", primitive((vm) -> vm._create_name_()));
 		code("CREATE", primitive((vm) -> vm._create_()));
 		code("(DOES)", primitive((vm) -> vm._do_does_()));
 		code("DOES>", primitive((vm) -> vm._does_())); _immediate_();
@@ -1819,13 +2238,135 @@ public class Sloth {
 		// Executing
 		code("EVALUATE", primitive((vm) -> vm._evaluate_()));
 		code("EXECUTE", primitive((vm) -> vm._execute_()));
+		code("DEBUG", primitive((vm) -> vm._debug_()));
 
 		// Environment queries
 		code("(ENVIRONMENT)", primitive((vm) -> vm._environment_()));
 
 		// Primitives I don't like too much
+		code("(SELF)", primitive((vm) -> vm._self_()));
 		code("(DICT)", primitive((vm) -> vm.push(to_abs(0))));
 		code("(EMPTY-RETURN-STACK)", primitive((vm) -> vm.rp = 0));
+	}
+
+	void bootstrap() {
+		bootstrap_kernel();
+		bootstrap_float();
+	}
+
+	void bootstrap_float() {
+		user_variable("(PRECISION)", PRECISION, 15);
+
+		// Primitives
+		code("(FLIT)", primitive((vm) -> vm._f_lit_()));
+
+		// Constructing compiler and interpreter system extensions
+		code("FALIGN", primitive((vm) -> vm._f_align_()));
+		code("FALIGNED", primitive((vm) -> vm._f_aligned_()));
+		code("FLITERAL", primitive((vm) -> vm._f_literal_())); _immediate_();
+		code("FLOATS", primitive((vm) -> vm._floats_()));
+		code("FLOAT+", primitive((vm) -> vm._float_plus_()));
+
+		code("SFALIGNED", primitive((vm) -> vm._s_f_aligned_()));
+		code("DFALIGNED", primitive((vm) -> vm._d_f_aligned_()));
+
+		code("SFLOATS", primitive((vm) -> vm._s_floats_()));
+		code("DFLOATS", primitive((vm) -> vm._d_floats_()));
+
+		// Manipulating stack items
+		code("FDEPTH", primitive((vm) -> vm._f_depth_()));
+		code("FDROP", primitive((vm) -> vm._f_drop_()));
+		code("FDUP", primitive((vm) -> vm._f_dup_()));
+		code("FOVER", primitive((vm) -> vm._f_over_()));
+		code("FROT", primitive((vm) -> vm._f_rot_()));
+		code("FSWAP", primitive((vm) -> vm._f_swap_()));
+
+		// Comparison operations
+		code("F<", primitive((vm) -> vm._f_less_than_()));
+		code("F0<", primitive((vm) -> vm._f_zero_less_than_()));
+		code("F0=", primitive((vm) -> vm._f_zero_equals_()));
+
+		// Memory-stack transfer operations
+		code("F@", primitive((vm) -> vm._f_fetch_()));
+		code("F!", primitive((vm) -> vm._f_store_()));
+
+		code("SF@", primitive((vm) -> vm._s_f_fetch_()));
+		code("SF!", primitive((vm) -> vm._s_f_store_()));
+
+		code("DF@", primitive((vm) -> vm._d_f_fetch_()));
+		code("DF!", primitive((vm) -> vm._d_f_store_()));
+
+		// Number-type conversion operators
+		code("D>F", primitive((vm) -> vm._d_to_f_()));
+		code("F>D", primitive((vm) -> vm._f_to_d_()));
+
+		// Arithmetic and logical operations
+		code("FABS", primitive((vm) -> vm._f_abs_()));
+		code("F+", primitive((vm) -> vm._f_plus_()));
+		code("F-", primitive((vm) -> vm._f_minus_()));
+		code("F*", primitive((vm) -> vm._f_star_()));
+		code("F**", primitive((vm) -> vm._f_star_star_()));
+		code("F/", primitive((vm) -> vm._f_slash_()));
+		code("FLOOR", primitive((vm) -> vm._floor_()));
+		code("FMAX", primitive((vm) -> vm._f_max_()));
+		code("FMIN", primitive((vm) -> vm._f_min_()));
+		code("FNEGATE", primitive((vm) -> vm._f_negate_()));
+		code("FROUND", primitive((vm) -> vm._f_round_()));
+		code("F~", primitive((vm) -> vm._f_proximate_()));
+		code("FATAN2", primitive((vm) -> vm._f_atan2_()));
+		code("FSQRT", primitive((vm) -> vm._f_sqrt_()));
+		code("FLN", primitive((vm) -> vm._f_l_n_()));
+		code("FSIN", primitive((vm) -> vm._f_sine_()));
+		code("FCOS", primitive((vm) -> vm._f_cos_()));
+		code("FSINCOS", primitive((vm) -> vm._f_sine_cos_()));
+		code("FTAN", primitive((vm) -> vm._f_tan_()));
+		code("FASIN", primitive((vm) -> vm._f_a_sine_()));
+		code("FACOS", primitive((vm) -> vm._f_a_cos_()));
+		code("FATAN", primitive((vm) -> vm._f_a_tan_()));
+		code("FEXP", primitive((vm) -> vm._f_exp_()));
+		code("FEXPM1", primitive((vm) -> vm._f_exp_m_one_()));
+		code("FLOG", primitive((vm) -> vm._f_log_ten_()));
+		code("FLNP1", primitive((vm) -> vm._f_l_n_p_one_()));
+		code("FALOG", primitive((vm) -> vm._f_a_log_()));
+		code("FSINH", primitive((vm) -> vm._f_sin_h_()));
+		code("FCOSH", primitive((vm) -> vm._f_cos_h_()));
+		code("FTANH", primitive((vm) -> vm._f_tan_h_()));
+		code("FASINH", primitive((vm) -> vm._f_a_sine_h_()));
+		code("FACOSH", primitive((vm) -> vm._f_a_cos_h_()));
+
+		// String/numeric conversion
+		code(">FLOAT", primitive((vm) -> vm._to_float_()));
+		code("REPRESENT", primitive((vm) -> vm._represent_()));
+
+		// Output operations
+		code("F.", primitive((vm) -> vm._f_dot_()));
+		code("FS.", primitive((vm) -> vm._f_s_dot_()));
+		code("FE.", primitive((vm) -> vm._f_e_dot_()));
+		code("F.S", primitive((vm) -> vm._f_dot_s_()));
+	}
+
+	void bootstrap_file() {
+		code("BIN", primitive((vm) -> vm._bin_()));
+		code("R/O", primitive((vm) -> vm._r_slash_o_()));
+		code("R/W", primitive((vm) -> vm._r_slash_w_()));
+		code("W/O", primitive((vm) -> vm._w_slash_o_()));
+		code("CREATE-FILE", primitive((vm) -> vm._create_file_()));
+		code("OPEN-FILE", primitive((vm) -> vm._open_file_()));
+		code("CLOSE-FILE", primitive((vm) -> vm._close_file_()));
+		code("FILE-SIZE", primitive((vm) -> vm._file_size_()));
+		code("FILE-POSITION", primitive((vm) -> vm._file_position_()));
+		code("REPOSITION-FILE", primitive((vm) -> vm._reposition_file_()));
+		code("FLUSH-FILE", primitive((vm) -> vm._flush_file_()));
+		code("RESIZE-FILE", primitive((vm) -> vm._resize_file_()));
+		code("DELETE-FILE", primitive((vm) -> vm._delete_file_()));
+		code("RENAME-FILE", primitive((vm) -> vm._rename_file_()));
+		code("FILE-STATUS", primitive((vm) -> vm._file_status_()));
+		code("READ-FILE", primitive((vm) -> vm._read_file_()));
+		code("READ-LINE", primitive((vm) -> vm._read_line_()));
+		code("WRITE-FILE", primitive((vm) -> vm._write_file_()));
+		code("WRITE-LINE", primitive((vm) -> vm._write_line_()));
+		code("REQUIRED", primitive((vm) -> vm._required_()));
+		code("REQUIRE", primitive((vm) -> vm._require_()));
 	}
 
 	void repl() {
@@ -1851,6 +2392,7 @@ public class Sloth {
 	}
 
 	int include(String f) {
+		if (user_get(ROOT_PATH_LENGTH) == 0) set_root_path("");
 		push(fromString(f));
 		push(f.length());
 		_catch(get_xt(find_word("INCLUDED")));
@@ -1860,12 +2402,37 @@ public class Sloth {
 	// --
 
 	void set_root_path(String path) {
-		int paths = to_abs(PATHS, u);
-		for (int i = 0; i < path.length(); i++) {
-			c_store(paths + i*suCHAR, path.charAt(i));	
+		if (path.length() == 0) {
+			path = System.getProperty("user.dir");
 		}
-		user_set(ROOT_PATH_LENGTH, path.length());
-		user_set(PATH_START, paths + path.length()*suCHAR);
-		user_set(PATH_END, paths + path.length()*suCHAR);
+		String cwd = System.getProperty("user.dir");
+
+		// Total space reserved to store paths between
+		// SLOTH_PATHS and SLOTH_INCLUDED_FILES.
+		int cap = (INCLUDED_FILES - PATHS) / suCHAR;
+
+		// The root path (plus "/4th/") and the current
+		// directory must fit in the path region. If they
+		// don't, leave root unset instead of overflowing
+		// into the user variables.
+		int paths = to_abs(PATHS, u);
+		if (path.length() + 5 + cwd.length() > cap) {
+			user_set(ROOT_PATH_LENGTH, 0);
+			user_set(PATH_START, paths);
+			user_set(PATH_END, paths);
+			return;
+		}
+
+		// Copy ROOT PATH to the beginning of the SLOTH_PATHS
+		// buffer and add /4th/ at the end.
+		write_path(paths, path + "/4th/");
+		user_set(ROOT_PATH_LENGTH, path.length() + 5);
+
+		// The remembered current directory starts after the
+		// root path and is used to resolve relative includes.
+		int start = paths + (path.length() + 5)*suCHAR;
+		write_path(start, cwd);
+		user_set(PATH_START, start);
+		user_set(PATH_END, start + cwd.length()*suCHAR);
 	}
 }

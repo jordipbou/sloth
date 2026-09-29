@@ -1907,30 +1907,35 @@ public class SlothTest {
 	}
 
 	// Next test is exact to previous but using set_root_path
-	// function.
+	// function. set_root_path stores ROOT_PATH + "/4th/", so the
+	// file must live under a "4th" subdirectory of the root.
 	@Test
 	public void test_included_with_set_root_path() {
 		sloth.user_set(Sloth.INTERPRET, sloth.primitive((vm) -> noop_interpret(vm)));
 		interpret_calls = 0;
 
-		String tmppath = write_temp_file("line one\nline two");
+		try {
+			Path dir = Files.createTempDirectory(null);
+			Path fourth = Files.createDirectory(dir.resolve("4th"));
+			Path file = Files.writeString(
+				fourth.resolve("root_rel.4th"), "line one\nline two");
 
-		// Split tmppath into directory and filename
-		int sep = tmppath.lastIndexOf(System.getProperty("file.separator"));
-		assertNotEquals(0, sep);
-		int dirlen = sep + 1;
+			sloth.set_root_path(dir.toAbsolutePath().toString());
 
-		sloth.set_root_path(tmppath.substring(0, dirlen));
-		int filename = sloth.fromString(tmppath.substring(dirlen, tmppath.length()));
-		int filelen = tmppath.length() - dirlen;
+			String name = "root_rel.4th";
+			sloth.push(sloth.fromString(name));
+			sloth.push(name.length());
+			sloth._included_();
 
-		// Push only the filename (no directory)
-		sloth.push(filename);
-		sloth.push(filelen);
-		sloth._included_();
-	
-		assertEquals(0, sloth.sp);
-		assertEquals(2, interpret_calls);
+			assertEquals(0, sloth.sp);
+			assertEquals(2, interpret_calls);
+
+			Files.deleteIfExists(file);
+			Files.deleteIfExists(fourth);
+			Files.deleteIfExists(dir);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	void refill_interpret(Sloth vm) {
