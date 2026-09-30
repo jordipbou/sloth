@@ -1423,7 +1423,51 @@ void sloth_interpret_(X* x) {
 				}
 				strncpy(buf, tok, tlen);
 				buf[tlen] = 0;
-				n = strtol(buf, &endptr, temp_base);
+				{
+					uCELL u, b;
+					char* p;
+					int d, neg;
+					u = 0;
+					neg = 0;
+					p = buf;
+					if (*p == '+') {
+						p++;
+					} else if (*p == '-') {
+						neg = 1;
+						p++;
+					}
+					endptr = p;
+					b = temp_base;
+					if (b == 0 || b == 16) {
+						if (*p == '0'
+						&& (*(p + 1) == 'x' || *(p + 1) == 'X')
+						&& (((*(p + 2) >= '0') && (*(p + 2) <= '9'))
+						|| ((*(p + 2) >= 'a') && (*(p + 2) <= 'f'))
+						|| ((*(p + 2) >= 'A') && (*(p + 2) <= 'F')))) {
+							b = 16;
+							p += 2;
+						} else if (b == 0) {
+							b = (*p == '0') ? 8 : 10;
+						}
+					}
+					while (*p != '\0') {
+						if (*p >= '0' && *p <= '9') {
+							d = *p - '0';
+						} else if (*p >= 'a' && *p <= 'f') {
+							d = *p - 'a' + 10;
+						} else if (*p >= 'A' && *p <= 'F') {
+							d = *p - 'A' + 10;
+						} else {
+							break;
+						}
+						if (d >= (int)b) break;
+						u = u * b + (uCELL)d;
+						p++;
+					}
+					if (p == endptr) endptr = buf;
+					else endptr = p;
+					n = neg ? (CELL)(0 - u) : (CELL)u;
+				}
 				if (*endptr == '\0') {
 					if (sloth_user_get(x, SLOTH_STATE) == 0) {
 						sloth_push(x, n);

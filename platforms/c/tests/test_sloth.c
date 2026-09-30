@@ -2378,6 +2378,18 @@ void test_interpret_number_literals_interpret_mode(void) {
 	TEST_ASSERT_EQUAL(15, sloth_pop(x));
 	TEST_ASSERT_EQUAL(15, sloth_pop(x));
 	TEST_ASSERT_EQUAL(15, sloth_pop(x));
+
+#if CELL_BITS >= 32
+	ibuf = "$ffffffff $80000000 $bff00000";
+	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 29);
+	sloth_interpret_(x);
+	TEST_ASSERT_EQUAL(3, x->sp);
+	TEST_ASSERT_EQUAL((CELL)(uCELL)0xbff00000, sloth_pop(x));
+	TEST_ASSERT_EQUAL((CELL)(uCELL)0x80000000, sloth_pop(x));
+	TEST_ASSERT_EQUAL((CELL)(uCELL)0xffffffff, sloth_pop(x));
+#endif
 }
 
 void test_interpret_number_literals_compile_mode(void) {
