@@ -48,7 +48,7 @@ int main(int argc, char**argv) {
 	}
 
 	if (argc == 1) {
-		sloth_repl(x);
+		sloth_run(x);
 	} else if (is_test) {
 		/* Standard tests */
 		ior = sloth_include(x, ROOT_PATH "forth2012-test-suite/src/runtests.fth");

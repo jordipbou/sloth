@@ -54,6 +54,7 @@
 #ifdef WINDOWS
 #include <direct.h>
 #include <libloaderapi.h>
+#include <io.h>
 #endif
 
 /* ----------------------------------------------------- */
@@ -684,5 +685,6 @@ void sloth_evaluate(X* x, char* s);
 /* -- Helper REPL -------------------------------------- */
 
 void sloth_repl(X* x);
+void sloth_run(X* x);
 
 #endif
