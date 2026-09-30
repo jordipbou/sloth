@@ -10,8 +10,28 @@
 #define ROOT_PATH "../../"
 #endif
 
+/* KEY used in --test so the interactive tests (e.g. ACCEPT) never */
+/* touch the console. It returns EOF, exactly like reading /dev/null */
+/* on Linux. Without this, on Windows the default KEY uses _getch, */
+/* which reads the console directly and blocks even with stdin */
+/* redirected, so the suite would hang. It must be installed before */
+/* sloth_bootstrap, which is what registers KEY. */
+static void sloth_test_key_(X* x) {
+	sloth_push(x, -1);
+}
+
 int main(int argc, char**argv) {
-	X* x = sloth_new();
+	X* x;
+	int ior;
+	int is_test;
+	CELL errors = 0;
+
+	is_test = (argc > 1 && (strcmp(argv[1], "--test") == 0
+					|| strcmp(argv[1], "-t") == 0));
+
+	x = sloth_new();
+
+	if (is_test) sloth_set_key(sloth_test_key_);
 
 	sloth_bootstrap(x);
 #ifndef SLOTH_WITHOUT_FILE_WORD_SET
@@ -29,22 +49,27 @@ int main(int argc, char**argv) {
 
 	if (argc == 1) {
 		sloth_repl(x);
-	} else if (strcmp(argv[1], "--test") == 0 
-					|| strcmp(argv[1], "-t") == 0) {
+	} else if (is_test) {
 		/* Standard tests */
-		sloth_include(x, ROOT_PATH "forth2012-test-suite/src/runtests.fth");
+		ior = sloth_include(x, ROOT_PATH "forth2012-test-suite/src/runtests.fth");
+		if (ior) errors++;
 
 		#ifndef SLOTH_WITHOUT_FLOATING_POINT
-		
+
 		/* Floating point tests */
-		sloth_include(x, ROOT_PATH "forth2012-test-suite/src/fp/runfptests.fth");
+		ior = sloth_include(x, ROOT_PATH "forth2012-test-suite/src/fp/runfptests.fth");
+		if (ior) errors++;
 
 		#endif
+
+		/* Sentinel read by platforms/c/check_forth_tests.cmake. It is */
+		/* only printed when both suites ran to completion. */
+		if (errors == 0) printf("SLOTH-TEST-DONE\n");
 	} else {
 		sloth_include(x, argv[1]);
 	}
 
 	sloth_free(x);
 
-	return 0;
+	return errors != 0;
 }

@@ -1857,8 +1857,11 @@ public class SlothTest {
 		assertNotEquals(0, sep);
 		int dirlen = sep + 1;
 
-		// Reserve a string big enough for this tests
-		sloth.user_set(Sloth.PATH_START, sloth.fromString("                                                  "));
+		// Reserve a buffer big enough for the paths. The temp path
+		// can be long on Windows, so size it from the path itself.
+		StringBuilder spaces = new StringBuilder();
+		for (int i = 0; i < tmppath.length() + 64; i++) spaces.append(' ');
+		sloth.user_set(Sloth.PATH_START, sloth.fromString(spaces.toString()));
 		sloth.user_set(Sloth.PATH_END, sloth.user_get(Sloth.PATH_START));
 
 		// I push the filename only first to be used by the

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.17)
 project(sloth-repl LANGUAGES C)
 
+enable_testing()
+
 # Apply strict C90 only to sloth's own targets:
 function(sloth_strict_c target)
   set_target_properties(${target} PROPERTIES
@@ -144,6 +146,16 @@ add_custom_command(TARGET sloth POST_BUILD
 	COMMENT "Copying 4th/ next to the sloth executable (release only)"
 )
 
+# The Forth 2012 suite is also read from next to the executable
+# in non-Debug builds (Debug reads it straight from the source
+# tree via ROOT_PATH), so `ctest` finds it in both configs.
+add_custom_command(TARGET sloth POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,echo,copy_directory>
+	$<$<NOT:$<CONFIG:Debug>>:${CMAKE_CURRENT_SOURCE_DIR}/../../forth2012-test-suite>
+		$<$<NOT:$<CONFIG:Debug>>:$<TARGET_FILE_DIR:sloth>/forth2012-test-suite>
+	COMMENT "Copying forth2012-test-suite/ next to the sloth executable (release only)"
+)
+
 if(DEFINED SLOTH_WITHOUT_FLOATING_POINT)
 	target_compile_definitions(
 		sloth PRIVATE SLOTH_WITHOUT_FLOATING_POINT)
@@ -184,3 +196,32 @@ sloth_strict_c(sloth)
 sloth_strict_c(sloth_lib)
 sloth_strict_c(sloth_memory_word_set)
 sloth_strict_c(sloth_file_word_set)
+
+# -- CTest -------------------------------------------------
+# Single entry point for all C tests, on Linux and Windows:
+#   ctest --test-dir build -C <config> --output-on-failure
+# The Forth suite runs next to the executable so relative paths
+# resolve in every config.
+
+add_test(NAME sloth_unit COMMAND test_sloth)
+
+if(NOT DEFINED SLOTH_WITHOUT_FLOATING_POINT)
+	add_test(NAME sloth_unit_fp COMMAND test_sloth_fp)
+endif()
+
+# The Forth suite writes binary data, so it is checked by a small
+# CMake script that counts the reported failures (see the script for
+# the baseline). Without the FP word set only the ACCEPT failure
+# remains.
+if(DEFINED SLOTH_WITHOUT_FLOATING_POINT)
+	set(SLOTH_FORTH_BASELINE 1)
+else()
+	set(SLOTH_FORTH_BASELINE 2)
+endif()
+
+add_test(NAME sloth_forth
+	COMMAND ${CMAKE_COMMAND}
+		-DSLOTH=$<TARGET_FILE:sloth>
+		-DWORKDIR=$<TARGET_FILE_DIR:sloth>
+		-DBASELINE=${SLOTH_FORTH_BASELINE}
+		-P ${CMAKE_CURRENT_SOURCE_DIR}/check_forth_tests.cmake)

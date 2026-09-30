@@ -1101,19 +1101,20 @@ public class Sloth {
 				remember = true;
 			} catch (IOException e) {
 				f = null;
-				// Trying as relative to root path. Opening a
-				// file from the root path must not change
-				// pathstart or pathend as everytime a file is
-				// opened it can be checked against root.
+				// Trying as relative to root path. The candidate is
+				// built as a Java string instead of in the path
+				// buffer: the path region is measured in chars and
+				// suCHAR is 2, so on Windows root + name can be
+				// longer than the region and would not fit.
+				// Opening from the root must not change pathstart
+				// or pathend as every time a file is opened it can
+				// be checked against root.
 				int root_len = user_get(ROOT_PATH_LENGTH);
-				if (!in_region || pathend + (root_len + l + 1)*suCHAR <= path_end) {
-					write_path(pathend,
-						toString(to_abs(PATHS, u), root_len) + name);
-					try {
-						f = new RandomAccessFile(toString(pathend, root_len + l), "r");
-					} catch (IOException e2) {
-						f = null;
-					}
+				try {
+					f = new RandomAccessFile(
+						toString(to_abs(PATHS, u), root_len) + name, "r");
+				} catch (IOException e2) {
+					f = null;
 				}
 			}
 		}

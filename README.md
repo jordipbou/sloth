@@ -239,6 +239,33 @@ cmake -S platforms/c -B build -G "Ninja Multi-Config" \
 
 ## Testing
 
-- C unit tests: `test_sloth` and `test_sloth_fp`.
-- ANS Forth suite: `sloth --test` runs `forth2012-test-suite/src/runtests.fth` (and the
-  floating-point suite).
+There is one entry point per OS. Both run every suite and report a single
+pass/fail at the end:
+
+- Linux: `./run-tests.sh`
+- Windows (from WSL): `./run-tests-windows.sh`
+
+They run, in order, the C unit tests and the Forth 2012 suite through CTest,
+then the Java JUnit tests and the Forth 2012 suite through Gradle. `run-tests.sh`
+needs `java` on `PATH` (or `JAVA_HOME`); without it the Java tests are skipped
+and the run fails.
+
+The C tests can also be run directly with CTest:
+
+```sh
+cmake -S platforms/c -B build -G "Ninja Multi-Config"
+cmake --build build --config Debug
+ctest --test-dir build -C Debug --output-on-failure
+```
+
+`ctest` registers `sloth_unit`, `sloth_unit_fp` and `sloth_forth`. The last one
+runs `sloth --test` (the Forth 2012 suite and the floating point suite) and
+checks the reported failures against a baseline (2 for the default build: the
+interactive Core ACCEPT test and the `-0.4999E FROUND` difference). The baseline
+checker is `platforms/c/check_forth_tests.cmake`.
+
+### Known failures
+
+- The Windows C suite reports 18 extra failures in `fpio-test.4th` because the
+  number parser uses `strtol` (`long` is 32-bit on Windows). Tracked in
+  `~/hub/org/proj.sloth.org`, "Correct failures in FP tests in Windows".
