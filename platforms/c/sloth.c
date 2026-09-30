@@ -963,13 +963,17 @@ void sloth_refill_(X* x) {
 		break;
 #ifndef SLOTH_NO_FILES
 	default:
-		/* File position is stored to go back to it when */
-		/* exiting of nesting includes */
-		sloth_push(x, source_id);
-		sloth_file_position_(x);
-		sloth_pop(x);
-		sloth_pop(x); /* TODO This is most significant part of the double number, it will normally be 0? */
-		sloth_user_set(x, SLOTH_SOURCE_POS, sloth_pop(x));
+		if ((FILE*)source_id != stdin) {
+			/* File position is stored to go back to it when */
+			/* exiting of nesting includes */
+			sloth_push(x, source_id);
+			sloth_file_position_(x);
+			sloth_pop(x);
+			sloth_pop(x); /* TODO This is most significant part of the double number, it will normally be 0? */
+			sloth_user_set(x, SLOTH_SOURCE_POS, sloth_pop(x));
+		} else {
+			sloth_user_set(x, SLOTH_SOURCE_POS, 0);
+		}
 
 		/* REFILL can only be called after INCLUDE/INCLUDED */
 		/* that means that the line buffer of _included_ will */
@@ -1016,7 +1020,8 @@ void sloth_restore_input_(X* x) {
 	sloth_user_set(x, SLOTH_SOURCE_ID, sloth_pop(x));
 	sloth_user_set(x, SLOTH_SOURCE_POS, sloth_pop(x));
 #ifndef SLOTH_NO_FILES
-	if (sloth_user_get(x, SLOTH_SOURCE_ID) > 0) {
+	if (sloth_user_get(x, SLOTH_SOURCE_ID) > 0
+	 && (FILE*)sloth_user_get(x, SLOTH_SOURCE_ID) != stdin) {
 		fseek(
 			(FILE*)sloth_user_get(x, SLOTH_SOURCE_ID),
 			sloth_user_get(x, SLOTH_SOURCE_POS),
@@ -1153,39 +1158,42 @@ void sloth__add_to_included_files_list(X* x, char* a, int l) {
 /* It first tries to open it as an absolute path/current */
 /* directory. If its not possible to open it, it reuses the */
 /* last path from the previous opened file. */
+void sloth__interpret_stream(X* x, FILE* f) {
+	char linebuf[1024];
+	CELL e, linenumber = 0;
+	sloth_user_set(x, SLOTH_SOURCE_ID, (CELL)f);
+
+	sloth_user_set(x, SLOTH_IBUF, (CELL)linebuf);
+	sloth_user_set(x, SLOTH_IPOS, 0);
+	sloth_user_set(x, SLOTH_ILEN, 1024);
+
+	do {
+		sloth_refill_(x);
+		if (!sloth_pop(x)) break;
+		e = sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
+		if (e != 0) {
+			printf("File: %s\n", (char*)sloth_user_get(x, SLOTH_PATH_START));
+			#ifdef WINDOWS
+				printf("Line (%lld): %s\n", linenumber, linebuf);	
+			#else
+				printf("Line (%ld): %s\n", linenumber, linebuf);	
+			#endif
+			sloth_throw(x, e);
+		}
+		linenumber++;
+	} while(1);
+}
+
 void sloth_included_(X* x) {
 	FILE *f;
-	char linebuf[1024];
-	CELL e;
 	size_t l = (size_t)sloth_pop(x);
 	char* a = (char*)sloth_pop(x);
 	sloth__save_input_and_path(x);
 
 	if ((f = sloth__open_included_file(x, a, l))) {
-		CELL linenumber = 0;
 		sloth__add_to_included_files_list(x, a, l);
 
-		sloth_user_set(x, SLOTH_SOURCE_ID, (CELL)f);
-
-		sloth_user_set(x, SLOTH_IBUF, (CELL)linebuf);
-		sloth_user_set(x, SLOTH_IPOS, 0);
-		sloth_user_set(x, SLOTH_ILEN, 1024);
-
-		do {
-			sloth_refill_(x);
-			if (!sloth_pop(x)) break;
-			e = sloth_catch(x, sloth_user_get(x, SLOTH_INTERPRET));
-			if (e != 0) {
-				printf("File: %s\n", (char*)sloth_user_get(x, SLOTH_PATH_START));
-				#ifdef WINDOWS
-					printf("Line (%lld): %s\n", linenumber, linebuf);	
-				#else
-					printf("Line (%ld): %s\n", linenumber, linebuf);	
-				#endif
-				sloth_throw(x, e);
-			}
-			linenumber++;
-		} while(1);
+		sloth__interpret_stream(x, f);
 
 		fclose(f);
 	}
@@ -1195,6 +1203,18 @@ void sloth_included_(X* x) {
 	if (!f) {
 		sloth_throw(x, -38);
 	}
+}
+
+int sloth_stdin_is_tty(void) {
+#ifdef WINDOWS
+	return _isatty(_fileno(stdin));
+#else
+	return isatty(STDIN_FILENO);
+#endif
+}
+
+void sloth_interpret_stdin(X* x) {
+	sloth__interpret_stream(x, stdin);
 }
 #endif
 
@@ -2613,6 +2633,13 @@ void sloth_repl(X* x) {
 	sloth_user_set(x, SLOTH_IPOS, 0);
 	sloth_user_set(x, SLOTH_ILEN, 80);
 	sloth_eval(x, sloth_get_xt(x, sloth_find_word(x, "QUIT")));
+}
+
+void sloth_run(X* x) {
+#ifndef SLOTH_NO_FILES
+	if (!sloth_stdin_is_tty()) { sloth_interpret_stdin(x); return; }
+#endif
+	sloth_repl(x);
 }
 
 
