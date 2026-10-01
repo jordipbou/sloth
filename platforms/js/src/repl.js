@@ -4,6 +4,7 @@ import { Sloth, STATE } from './sloth.js';
 import { nodeHost } from './host.js';
 import * as File from './file.js';
 import * as Memory from './memory.js';
+import * as Float from './float.js';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url)).replace(/\/$/, '');
 
@@ -12,6 +13,7 @@ function makeVm() {
   x.bootstrap();
   File.bootstrap(x);
   Memory.bootstrap(x);
+  Float.bootstrap(x);
   x.set_root_path(ROOT);
   if (x.include('ans.4th')) {
     process.stderr.write('Fatal error: ans.4th can not be included.\n');

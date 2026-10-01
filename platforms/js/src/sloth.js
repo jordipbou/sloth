@@ -103,7 +103,7 @@ function parse_int(str, base) {
   return neg ? -v : v;
 }
 
-function parse_float(str) {
+export function parse_float(str) {
   let i = 0;
   let digits = 0;
   const n = str.length;
