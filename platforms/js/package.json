@@ -1,0 +1,10 @@
+{
+  "name": "sloth-js",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "JavaScript platform for the Sloth Forth engine",
+  "scripts": {
+    "test": "node --test"
+  }
+}
