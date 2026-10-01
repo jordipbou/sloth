@@ -143,7 +143,7 @@ FORTH-WORDLIST SET-CURRENT
 
 ?: BUFFER: CREATE ALLOT ; \ ( u "<spaces>name" -- ; -- a-addr ) 
 
-?: VALUE CREATE , DOES> @ ; \ ( x "<spaces>name" -- ) 
+?: VALUE CREATE 1 , , DOES> 1 CELLS + @ ; \ ( x "<spaces>name" -- ) 
 
 \ -- Control structures -----------------------------------
 
@@ -389,12 +389,12 @@ FORTH-WORDLIST SET-CURRENT
 \ but they are somehow needed for numeric output of the
 \ core wordset.
 ?: D+ ( d1|ud1 d2|ud2 -- d3|ud3 )
-?\		>R >R SWAP R> DUP >R + DUP R> U< ROT + R> + 
+?\		>R >R SWAP R> DUP >R + DUP R> U< NEGATE ROT + R> + 
 ?\ ;
-?: D- ( d1 d2 -- d3 ) NEGATE D+ ;
 ?: DNEGATE ( d1 -- d2 ) 
 ?\		INVERT SWAP INVERT 1 DUP ROT + DUP ROT U< NEGATE ROT + 
 ?\ ;
+?: D- ( d1 d2 -- d3 ) DNEGATE D+ ;
 ?: DABS ( d -- ud ) DUP 0< IF DNEGATE THEN ;
 
 ?: M+ ( d1|ud1 n -- d2|ud2 ) S>D D+ ;
@@ -481,16 +481,25 @@ FORTH-WORDLIST SET-CURRENT
 ?: >BODY ( xt -- a-addr ) 4 CELLS + ;
 
 ?: DEFER ( "<spaces>name" -- ) ( EX: i*x -- j*x )
-?\		CREATE 0 , DOES> @ EXECUTE ;
+?\		CREATE 1 , 0 , DOES> CELL+ @ EXECUTE ;
+
+\ TODO (TO!) must not be implemented if TO is 
+\ already implemented.
+\ Store into a VALUE/2VALUE/DEFER body. The first cell 
+\ is the number of cells to store: 1 for VALUE/DEFER, 
+\ 2 for 2VALUE.
+: (TO!) ( x1 [x2] a-addr -- ) 
+	DUP @ 2 = IF CELL+ 2! ELSE CELL+ ! THEN 
+;
 
 ?: TO
 ?\ ( i*x "<spaces>name" -- )
 ?\ ( C: "<spaces>name" -- )
 ?\		' >BODY
 ?\		STATE @ IF 
-?\			POSTPONE LITERAL POSTPONE !
+?\			POSTPONE LITERAL POSTPONE (TO!)
 ?\		ELSE 
-?\			!
+?\			(TO!)
 ?\		THEN
 ?\ ; IMMEDIATE
 
@@ -504,9 +513,9 @@ FORTH-WORDLIST SET-CURRENT
 ?\		THEN
 ?\	; IMMEDIATE
 
-?: DEFER@	( xt1 -- xt2 ) >BODY @ ;
+?: DEFER@	( xt1 -- xt2 ) >BODY CELL+ @ ;
 
-?: DEFER!	( xt2 xt1 -- ) >BODY ! ;
+?: DEFER!	( xt2 xt1 -- ) >BODY CELL+ ! ;
 
 ?: ACTION-OF 
 ?\ ( "<spaces>name" -- xt ) 
