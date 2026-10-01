@@ -671,7 +671,11 @@ FORTH-WORDLIST SET-CURRENT
 ?: BLANK ( c-addr u -- ) BL FILL ;
 
 \ Implementation from ANS Forth standard comment
-?: TYPE ( c-addr u -- ) 0 ?DO COUNT EMIT LOOP DROP ;
+?: TYPE ( c-addr u -- ) 
+?\		DUP 0> IF 
+?\			0 ?DO COUNT EMIT LOOP DROP
+?\		ELSE DROP DROP
+?\		THEN ;
 
 \ TODO Change these to be immediate and write the value on compile
 ?: (RETURN-KEY) ( -- n ) -2 (ENVIRONMENT) ;
