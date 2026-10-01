@@ -1,15 +1,15 @@
 package io.github.jordipbou.Sloth;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 
 public class REPL {
-	/* Failures that cannot be checked automatically: the Core ACCEPT */
-	/* test (ACCEPT is a stub in Sloth). The Java FP suite passes the */
-	/* -0.4999E FROUND case that C counts, so the baseline is 1. */
-	static final int FAILURES_ALLOWED = 1;
+	/* No failures are allowed: the Java FP suite passes the */
+	/* -0.4999E FROUND case that C counts, and the Core ACCEPT test */
+	/* runs non-interactively because KEY returns (RETURN-KEY) when */
+	/* no console is attached. */
+	static final int FAILURES_ALLOWED = 0;
 
 	private static int count(String text, String needle) {
 		int n = 0, i = 0;
@@ -37,13 +37,6 @@ public class REPL {
 		if (args.length == 0) {
 			x.repl();
 		} else if (args.length == 1 && args[0].equals("--test")) {
-			/* The interactive tests (e.g. ACCEPT) read KEY, which */
-			/* reads System.in. Give it an empty stream so read() */
-			/* returns EOF and the suite never blocks on a terminal. */
-			/* Redefining the KEY word is not enough: ACCEPT was */
-			/* already compiled against the original KEY. */
-			System.setIn(new ByteArrayInputStream(new byte[0]));
-
 			/* The Forth suite has no reliable error counter for the */
 			/* FP tests, so the failures are counted from the output. */
 			PrintStream real = System.out;

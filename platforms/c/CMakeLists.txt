@@ -211,12 +211,11 @@ endif()
 
 # The Forth suite writes binary data, so it is checked by a small
 # CMake script that counts the reported failures (see the script for
-# the baseline). Without the FP word set only the ACCEPT failure
-# remains.
+# the baseline). Without the FP word set there are no failures left.
 if(DEFINED SLOTH_WITHOUT_FLOATING_POINT)
-	set(SLOTH_FORTH_BASELINE 1)
+	set(SLOTH_FORTH_BASELINE 0)
 else()
-	set(SLOTH_FORTH_BASELINE 2)
+	set(SLOTH_FORTH_BASELINE 1)
 endif()
 
 add_test(NAME sloth_forth

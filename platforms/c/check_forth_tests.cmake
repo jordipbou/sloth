@@ -1,7 +1,7 @@
 # Runs the Sloth Forth 2012 and floating point suites and checks the
 # number of reported failures against BASELINE. Invoked by CTest:
 #
-#   cmake -DSLOTH=<exe> [-DWORKDIR=<dir>] [-DBASELINE=2] \
+#   cmake -DSLOTH=<exe> [-DWORKDIR=<dir>] [-DBASELINE=1] \
 #         -P check_forth_tests.cmake
 #
 # The suite writes binary data (the ACCEPT test prints its raw input
@@ -9,15 +9,16 @@
 # counted as byte patterns. This avoids NUL truncation and needs no
 # external tools, so it works the same on Linux and Windows.
 #
-# Baseline 2 = the two failures that cannot be checked automatically:
-#   - Core ACCEPT test (ACCEPT is a stub in Sloth).
-#   - -0.4999E FROUND in the FP suite (differs from the reference).
+# Baseline 1 = the -0.4999E FROUND difference in the FP suite (it
+# differs from the reference). The interactive Core ACCEPT test runs
+# with a non-TTY stdin (INPUT_FILE below), so its KEY returns the
+# return key without touching the console and the test passes.
 
 if(NOT DEFINED SLOTH)
 	message(FATAL_ERROR "SLOTH (path to the sloth executable) is required")
 endif()
 if(NOT DEFINED BASELINE)
-	set(BASELINE 2)
+	set(BASELINE 1)
 endif()
 if(NOT DEFINED WORKDIR)
 	get_filename_component(WORKDIR "${SLOTH}" DIRECTORY)
@@ -25,9 +26,16 @@ endif()
 
 set(out "${WORKDIR}/sloth-forth-tests.out")
 
+# A non-TTY stdin so the interactive Core ACCEPT test does not block on
+# the console (e.g. when run-tests.sh is launched from a terminal); the
+# non-TTY KEY then returns the return key and ACCEPT terminates.
+set(empty "${WORKDIR}/sloth-forth-tests.in")
+file(WRITE "${empty}" "")
+
 execute_process(
 	COMMAND "${SLOTH}" --test
 	WORKING_DIRECTORY "${WORKDIR}"
+	INPUT_FILE "${empty}"
 	OUTPUT_FILE "${out}"
 	ERROR_QUIET
 	RESULT_VARIABLE rc)

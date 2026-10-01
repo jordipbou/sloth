@@ -260,12 +260,15 @@ ctest --test-dir build -C Debug --output-on-failure
 
 `ctest` registers `sloth_unit`, `sloth_unit_fp` and `sloth_forth`. The last one
 runs `sloth --test` (the Forth 2012 suite and the floating point suite) and
-checks the reported failures against a baseline (2 for the default build: the
-interactive Core ACCEPT test and the `-0.4999E FROUND` difference). The baseline
-checker is `platforms/c/check_forth_tests.cmake`.
+checks the reported failures against a baseline: `1` for the default build (the
+`-0.4999E FROUND` difference) and `0` without the floating point word set. The
+interactive Core ACCEPT test is run with a non-TTY stdin by
+`platforms/c/check_forth_tests.cmake`, so its `KEY` returns the return key and
+the test passes without touching the console. The baseline checker is
+`platforms/c/check_forth_tests.cmake`.
 
 ### Known failures
 
-- The Windows C suite reports 18 extra failures in `fpio-test.4th` because the
-  number parser uses `strtol` (`long` is 32-bit on Windows). Tracked in
-  `~/hub/org/proj.sloth.org`, "Correct failures in FP tests in Windows".
+- `-0.4999E FROUND` differs from the reference suite on the C implementation; it
+  is counted in the `sloth_forth` baseline. The Java implementation passes it, so
+  its `--test` baseline is `0`.

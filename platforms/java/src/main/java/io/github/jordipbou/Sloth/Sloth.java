@@ -69,6 +69,10 @@ public class Sloth {
 
 	private int selfObject = 0;
 
+	// KEY reads the console only when one is attached; without a
+	// console (piped input, Gradle, tests) it returns (RETURN-KEY).
+	protected boolean non_tty;
+
 	public static final int STACK_OVERFLOW = -3;
 	public static final int STACK_UNDERFLOW = -4;
 	public static final int RETURN_STACK_OVERFLOW = -5;
@@ -140,6 +144,7 @@ public class Sloth {
 	public Sloth() { this(524288, 1024, 1024); }
 	public Sloth(int dsize, int usize) { this(dsize, usize, 1024); }
 	public Sloth(int dsize, int usize, int osize) {
+		non_tty = (System.console() == null);
 		s = new int[STACK_SIZE];
 		sp = 0;
 		r = new int[RETURN_STACK_SIZE];
@@ -1428,6 +1433,7 @@ public class Sloth {
 
 	void _emit_() { System.out.printf("%c", (char)pop()); }
 	void _key_() { 
+		if (non_tty) { push(KEY_ENTER); return; }
 		try { push(System.in.read()); } 
 		catch(IOException e) { e.printStackTrace(); }
 	}

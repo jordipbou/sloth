@@ -10,16 +10,6 @@
 #define ROOT_PATH "../../"
 #endif
 
-/* KEY used in --test so the interactive tests (e.g. ACCEPT) never */
-/* touch the console. It returns EOF, exactly like reading /dev/null */
-/* on Linux. Without this, on Windows the default KEY uses _getch, */
-/* which reads the console directly and blocks even with stdin */
-/* redirected, so the suite would hang. It must be installed before */
-/* sloth_bootstrap, which is what registers KEY. */
-static void sloth_test_key_(X* x) {
-	sloth_push(x, -1);
-}
-
 int main(int argc, char**argv) {
 	X* x;
 	int ior;
@@ -30,8 +20,6 @@ int main(int argc, char**argv) {
 					|| strcmp(argv[1], "-t") == 0));
 
 	x = sloth_new();
-
-	if (is_test) sloth_set_key(sloth_test_key_);
 
 	sloth_bootstrap(x);
 #ifndef SLOTH_WITHOUT_FILE_WORD_SET

@@ -809,18 +809,23 @@ sloth_default_key_(X* x) {
 	sloth_push(x, getch());
 }
 
-/* TODO: Should this be part of the context instead of globals? */
-static F sloth_emit_ = sloth_default_emit_;
-static F sloth_key_ = sloth_default_key_;
+void 
+sloth_emit_(X* x) {
+	x->emit(x);
+}
+void
+sloth_key_(X* x) {
+	x->key(x);
+}
 
 void 
-sloth_set_emit(F fn) { 
-	sloth_emit_ = fn ? fn : sloth_default_emit_;
+sloth_set_emit(X* x, F fn) { 
+	x->emit = fn ? fn : sloth_default_emit_;
 }
 
 void
-sloth_set_key(F fn) {
-	sloth_key_ = fn ? fn : sloth_default_key_;
+sloth_set_key(X* x, F fn) {
+	x->key = fn ? fn : sloth_default_key_;
 }
 
 /* -- */
@@ -1537,6 +1542,14 @@ void sloth_interpret_(X* x) {
 
 /* -- Environment queries ------------------------------ */
 
+#if defined(_WIN64) || defined(WIN32) || defined(_WIN32)
+#define RETURN_KEY 13
+#define BACKSPACE_KEY 8
+#else
+#define RETURN_KEY 10
+#define BACKSPACE_KEY 127
+#endif
+
 void sloth_environment_(X* x) {
 	CELL q;
 	if (!sloth__check_data_stack(x, 1, 0)) return;
@@ -1596,18 +1609,10 @@ void sloth_environment_(X* x) {
 		#endif
 		break;
 	case -2: /* RETURN KEY */
-		#if defined(_WIN64) || defined(WIN32) || defined(_WIN32)
-			sloth_push(x, 13);
-		#else
-			sloth_push(x, 10);
-		#endif
+		sloth_push(x, RETURN_KEY);
 		break;
 	case -3: /* BACKSPACE KEY */
-		#if defined(_WIN64) || defined(WIN32) || defined(_WIN32)
-			sloth_push(x, 8);
-		#else
-			sloth_push(x, 127);
-		#endif
+		sloth_push(x, BACKSPACE_KEY);
 	}
 }
 
@@ -2476,6 +2481,10 @@ void sloth_bootstrap(X* x) {
 
 /* -- Context initialization and destruction ----------- */
 
+#ifndef SLOTH_NO_FILES
+static void sloth__nontty_key(X* x);
+#endif
+
 void sloth__init(X* x, CELL d, CELL dz, CELL u, CELL uz) { 
 	x->sp = 0; 
 	x->rp = 0; 
@@ -2489,6 +2498,13 @@ void sloth__init(X* x, CELL d, CELL dz, CELL u, CELL uz) {
 	x->uz = uz;
 
 	x->jmpbuf_idx = -1;
+
+#ifndef SLOTH_NO_FILES
+	x->key = sloth_stdin_is_tty() ? sloth_default_key_ : sloth__nontty_key;
+#else
+	x->key = sloth_default_key_;
+#endif
+	x->emit = sloth_default_emit_;
 
 	/* Initialize HERE */
 	*((CELL*)(x->d + 0*sCELL)) = x->d + 3*sCELL;
@@ -2679,9 +2695,19 @@ void sloth_repl(X* x) {
 	sloth_eval(x, sloth_get_xt(x, sloth_find_word(x, "QUIT")));
 }
 
+#ifndef SLOTH_NO_FILES
+static void
+sloth__nontty_key(X* x) {
+	sloth_push(x, RETURN_KEY);
+}
+#endif
+
 void sloth_run(X* x) {
 #ifndef SLOTH_NO_FILES
-	if (!sloth_stdin_is_tty()) { sloth_interpret_stdin(x); return; }
+	if (!sloth_stdin_is_tty()) { 
+		sloth_interpret_stdin(x); 
+		return; 
+	}
 #endif
 	sloth_repl(x);
 }

@@ -157,6 +157,10 @@ typedef struct sloth_VM {
 	jmp_buf jmpbuf[8];
 	int jmpbuf_idx;
 
+	/* KEY and EMIT implementations */
+	F key;
+	F emit;
+
 	/* Pointer to array of primitives */
 	sloth_P *p;
 } X;
@@ -480,8 +484,11 @@ void sloth_bye_(X* x);
 void sloth_default_emit_(X* x);
 void sloth_default_key_(X* x);
 
-void sloth_set_emit(F fn);
-void sloth_set_key(F fn);
+void sloth_emit_(X* x);
+void sloth_key_(X* x);
+
+void sloth_set_emit(X* x, F fn);
+void sloth_set_key(X* x, F fn);
 
 void sloth_source_(X* x);
 void sloth_word_(X* x);

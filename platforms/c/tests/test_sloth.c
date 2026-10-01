@@ -41,8 +41,8 @@ void setUp(void) {
 	/* Create a VM with 64 primitive slots and 32767 bytes */
 	/* of dictionary. */
 	x = sloth_create(256, 32767, 1024);
-	sloth_set_emit(custom_emit_);
-	sloth_set_key(custom_key_);
+	sloth_set_emit(x, custom_emit_);
+	sloth_set_key(x, custom_key_);
 }
 
 void tearDown(void) {
