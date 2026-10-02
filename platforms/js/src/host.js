@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { isatty } from 'node:tty';
 
 export function encode(s) {
   return new TextEncoder().encode(s);
@@ -67,7 +68,7 @@ export const nodeHost = {
   decode,
   cwd: () => process.cwd(),
   os: () => process.platform,
-  isTTY: () => process.stdin.isTTY === true,
+  isTTY: () => isatty(0),
   write(bytes) {
     process.stdout.write(Buffer.from(bytes));
   },
@@ -79,8 +80,12 @@ export const nodeHost = {
   },
   readByte() {
     const b = Buffer.allocUnsafe(1);
-    const n = fs.readSync(0, b, 0, 1, null);
-    return n === 0 ? -1 : b[0];
+    try {
+      const n = fs.readSync(0, b, 0, 1, null);
+      return n === 0 ? -1 : b[0];
+    } catch {
+      return -1;
+    }
   },
   openRead(path) {
     try {

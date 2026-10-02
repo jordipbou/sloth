@@ -77,6 +77,13 @@ test('EMIT writes bytes', () => {
   assert.equal(cap.text(), 'AB');
 });
 
+test('KEY returns the return key at EOF', () => {
+  const host = { ...nodeHost, isTTY: () => true, readByte: () => -1 };
+  const x = newVm(host);
+  x.evaluate('KEY');
+  assert.equal(x.pop(), x.KEY_ENTER);
+});
+
 test('loads ans.4th and runs words', () => {
   const cap = captureHost();
   const x = new Sloth(524288, 1024, 1024, cap.host);

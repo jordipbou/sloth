@@ -925,7 +925,8 @@ export class Sloth {
       this.push(this.KEY_ENTER);
       return;
     }
-    this.push(this.host.readByte());
+    const b = this.host.readByte();
+    this.push(b < 0 ? this.KEY_ENTER : b);
   }
 
   _and_() {
