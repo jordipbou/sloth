@@ -19,7 +19,7 @@ It’s built on the idea that **Forth itself** — simple, extensible, and close
 - `4th/` — Forth sources (`ans.4th`, `tools.4th`, ...). Most of Sloth is written here.
 - `platforms/c/` — C implementation (C89).
 - `platforms/java/` — Java implementation.
-- `platforms/js/` — JavaScript implementation (planned; see `~/hub/org/proj.sloth.org`).
+- `platforms/js/` — JavaScript implementation (ESM, no dependencies; see `~/hub/org/proj.sloth.org`).
 
 ---
 
@@ -237,6 +237,25 @@ cmake -S platforms/c -B build -G "Ninja Multi-Config" \
 
 [CMake]: https://cmake.org/
 
+## Running the JavaScript implementation
+
+There is no build step: the sources are ESM with no dependencies and run on
+Node. `ROOT` is resolved from the module URL, so it can run from any directory.
+
+```sh
+node platforms/js/src/repl.js               # interactive REPL
+node platforms/js/src/repl.js script.4th    # run a file
+node platforms/js/src/repl.js --test        # Forth 2012 suite, baseline 0
+```
+
+The unit tests use the built-in Node test runner and must run from
+`platforms/js`:
+
+```sh
+cd platforms/js
+node --test
+```
+
 ## Testing
 
 There is one entry point per OS. Both run every suite and report a single
@@ -246,9 +265,14 @@ pass/fail at the end:
 - Windows (from WSL): `./run-tests-windows.sh`
 
 They run, in order, the C unit tests and the Forth 2012 suite through CTest,
-then the Java JUnit tests and the Forth 2012 suite through Gradle. `run-tests.sh`
-needs `java` on `PATH` (or `JAVA_HOME`); without it the Java tests are skipped
-and the run fails.
+then the Java JUnit tests and the Forth 2012 suite through Gradle, then the
+JavaScript unit tests and Forth 2012 suite through `node --test` and
+`node platforms/js/src/repl.js --test`. `run-tests.sh` needs `java` on `PATH`
+(or `JAVA_HOME`); without it the Java tests are skipped and the run fails. It
+needs `node` on `PATH`, and without it the JavaScript tests are skipped. When
+the Debug C binary is present, `run-tests.sh` also runs a differential check:
+`platforms/js/test/differential.4th` must print identical output on the C and
+JavaScript engines.
 
 The C tests can also be run directly with CTest:
 
@@ -270,5 +294,6 @@ the test passes without touching the console. The baseline checker is
 ### Known failures
 
 - `-0.4999E FROUND` differs from the reference suite on the C implementation; it
-  is counted in the `sloth_forth` baseline. The Java implementation passes it, so
-  its `--test` baseline is `0`.
+  is counted in the `sloth_forth` baseline. The Java and JavaScript
+  implementations round half to even and pass it, so their `--test` baselines
+  are `0`.

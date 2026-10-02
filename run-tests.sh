@@ -28,9 +28,24 @@ if command -v java >/dev/null 2>&1; then
 	if [ -x ./gradlew ]; then g=./gradlew; else g="sh gradlew"; fi
 	$g test || fail=1
 	$g run --args=--test || fail=1
+	cd "$here"
 else
 	echo "java not found on PATH; skipping Java tests" >&2
 	fail=1
+fi
+
+echo "== JavaScript =="
+if command -v node >/dev/null 2>&1; then
+	(cd platforms/js && node --test) || fail=1
+	if [ -x build/Debug/sloth ]; then
+		./build/Debug/sloth platforms/js/test/differential.4th > build/js-differential-c.out
+		node platforms/js/src/repl.js platforms/js/test/differential.4th > build/js-differential-js.out
+		diff -u build/js-differential-c.out build/js-differential-js.out || fail=1
+	else
+		echo "C Debug binary not found; skipping the JavaScript differential check" >&2
+	fi
+else
+	echo "node not found on PATH; skipping JavaScript tests" >&2
 fi
 
 if [ "$fail" -ne 0 ]; then

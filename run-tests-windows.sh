@@ -37,6 +37,15 @@ else
 	echo "java not found on the Windows PATH; skipping Java tests" >&2
 fi
 
+echo "== JavaScript =="
+# The C-vs-JavaScript differential check lives in run-tests.sh: it needs
+# the Linux Debug binary, and line endings differ between the OSes.
+if command -v node >/dev/null 2>&1; then
+	(cd platforms/js && node --test) || fail=1
+else
+	echo "node not found on PATH; skipping JavaScript tests" >&2
+fi
+
 if [ "$fail" -ne 0 ]; then
 	echo "Some tests failed."
 	exit 1
