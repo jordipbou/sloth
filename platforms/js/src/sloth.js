@@ -925,7 +925,8 @@ export class Sloth {
       this.push(this.KEY_ENTER);
       return;
     }
-    const b = this.host.readByte();
+    let b = this.host.readByte();
+    if (b === 13 && this.KEY_ENTER !== 13) b = this.KEY_ENTER;
     this.push(b < 0 ? this.KEY_ENTER : b);
   }
 
@@ -1663,6 +1664,26 @@ export class Sloth {
     this.push(this.host.encode(f).length);
     this._catch(this.get_xt(this.find_word('INCLUDED')));
     return this.pop();
+  }
+
+  repl() {
+    const idx = this.putByteBuffer(new Uint8Array(1024 * suCHAR));
+    const previbuf = this.user_get(IBUF);
+    const previpos = this.user_get(IPOS);
+    const previlen = this.user_get(ILEN);
+    const prevsourceid = this.user_get(SOURCE_ID);
+    this.user_set(IBUF, this.to_abs(0, idx));
+    this.user_set(IPOS, 0);
+    this.user_set(ILEN, 80);
+    try {
+      this.eval(this.get_xt(this.find_word('QUIT')));
+    } finally {
+      this.user_set(SOURCE_ID, prevsourceid);
+      this.user_set(IBUF, previbuf);
+      this.user_set(IPOS, previpos);
+      this.user_set(ILEN, previlen);
+      this.removeByteBuffer(idx);
+    }
   }
 
   set_root_path(path) {

@@ -9,6 +9,10 @@ export function decode(b) {
   return new TextDecoder().decode(b);
 }
 
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 export class NodeFile {
   constructor(fd) {
     this.fd = fd;
@@ -78,13 +82,27 @@ export const nodeHost = {
   writeError(s) {
     process.stderr.write(s);
   },
+  setRawMode(on) {
+    if (!isatty(0)) return;
+    try {
+      process.stdin.setRawMode(on);
+    } catch {
+      /* stdin is not a tty stream */
+    }
+  },
   readByte() {
     const b = Buffer.allocUnsafe(1);
-    try {
-      const n = fs.readSync(0, b, 0, 1, null);
-      return n === 0 ? -1 : b[0];
-    } catch {
-      return -1;
+    for (;;) {
+      try {
+        const n = fs.readSync(0, b, 0, 1, null);
+        return n === 0 ? -1 : b[0];
+      } catch (e) {
+        if (e.code === 'EAGAIN' || e.code === 'EWOULDBLOCK') {
+          sleep(5);
+          continue;
+        }
+        return -1;
+      }
     }
   },
   openRead(path) {

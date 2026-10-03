@@ -84,6 +84,43 @@ test('KEY returns the return key at EOF', () => {
   assert.equal(x.pop(), x.KEY_ENTER);
 });
 
+test('KEY maps CR to the return key', () => {
+  const host = { ...nodeHost, isTTY: () => true, readByte: () => 13 };
+  const x = newVm(host);
+  x.evaluate('KEY');
+  assert.equal(x.pop(), x.KEY_ENTER);
+});
+
+test('repl() reads a line through KEY and interprets it via QUIT', () => {
+  const out = [];
+  const input = Buffer.from('1 2 + .\r');
+  let i = 0;
+  class Stop extends Error {}
+  const host = {
+    ...nodeHost,
+    isTTY: () => true,
+    readByte: () => {
+      if (i >= input.length) throw new Stop();
+      return input[i++];
+    },
+    write: (b) => {
+      for (const v of b) out.push(v);
+    },
+    writeString: (s) => {
+      for (const ch of Buffer.from(s)) out.push(ch);
+    },
+    writeError: () => {},
+    exit: () => {},
+  };
+  const x = new Sloth(524288, 1024, 1024, host);
+  x.bootstrap();
+  File.bootstrap(x);
+  x.set_root_path(ROOT);
+  assert.equal(x.include('ans.4th'), 0);
+  assert.throws(() => x.repl(), Stop);
+  assert.equal(Buffer.from(out).toString('latin1').includes('3 '), true);
+});
+
 test('loads ans.4th and runs words', () => {
   const cap = captureHost();
   const x = new Sloth(524288, 1024, 1024, cap.host);
