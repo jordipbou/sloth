@@ -55,25 +55,23 @@ export const COMPILER_NESTING = -29;
 export const FLOAT_STACK_OVERFLOW = -44;
 export const FLOAT_STACK_UNDERFLOW = -45;
 
-const defaultHost = {
-  encode: (s) => new TextEncoder().encode(s),
-  decode: (b) => new TextDecoder().decode(b),
-  cwd: () => '.',
-  os: () => 'linux',
-  isTTY: () => false,
-  write: () => {},
-  writeString: () => {},
-  writeError: () => {},
-  readByte: () => -1,
-  openRead: () => null,
-  openMode: () => null,
-  openReadWrite: () => null,
-  openWrite: () => null,
-  exists: () => false,
-  remove: () => false,
-  rename: () => false,
-  exit: () => {},
-};
+const HOST_METHODS = [
+  'encode',
+  'decode',
+  'cwd',
+  'os',
+  'isTTY',
+  'write',
+  'writeString',
+  'writeError',
+  'readByte',
+  'exit',
+  'openRead',
+  'openMode',
+  'exists',
+  'remove',
+  'rename',
+];
 
 function is_digit(c) {
   return c >= 48 && c <= 57;
@@ -143,7 +141,14 @@ export class SlothError extends Error {
 }
 
 export class Sloth {
-  constructor(dsize = 524288, usize = 1024, osize = 1024, host = defaultHost) {
+  constructor(dsize = 524288, usize = 1024, osize = 1024, host) {
+    if (host === null || typeof host !== 'object') {
+      throw new TypeError('Sloth: a host is required');
+    }
+    const missing = HOST_METHODS.filter((m) => typeof host[m] !== 'function');
+    if (missing.length > 0) {
+      throw new TypeError('Sloth: host is missing methods: ' + missing.join(', '));
+    }
     this.host = host;
     this.s = new Int32Array(STACK_SIZE);
     this.sp = 0;
