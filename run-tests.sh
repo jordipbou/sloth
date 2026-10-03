@@ -2,6 +2,8 @@
 # Runs every Sloth test on Linux: the C unit tests and Forth 2012
 # suite (through CTest) and the Java JUnit tests and Forth 2012 suite.
 # It runs every suite even if one fails and reports at the end.
+# Set SLOTH_TEST_BASH=1 to also run the (slow) bash kernel self-tests
+# and the C-vs-bash differential check.
 # See README.md "Testing".
 
 set -u
@@ -46,6 +48,24 @@ if command -v node >/dev/null 2>&1; then
 	fi
 else
 	echo "node not found on PATH; skipping JavaScript tests" >&2
+fi
+
+echo "== Bash =="
+if [ "${SLOTH_TEST_BASH:-0}" = "1" ]; then
+	if command -v bash >/dev/null 2>&1; then
+		bash platforms/bash/sloth.bash --test || fail=1
+		if [ -x build/Debug/sloth ]; then
+			./build/Debug/sloth platforms/js/test/differential.4th > build/bash-differential-c.out
+			bash platforms/bash/sloth.bash platforms/js/test/differential.4th > build/bash-differential-sh.out
+			diff -u build/bash-differential-c.out build/bash-differential-sh.out || fail=1
+		else
+			echo "C Debug binary not found; skipping the bash differential check" >&2
+		fi
+	else
+		echo "bash not found on PATH; skipping bash tests" >&2
+	fi
+else
+	echo "SLOTH_TEST_BASH not set; skipping the (slow) bash tests" >&2
 fi
 
 if [ "$fail" -ne 0 ]; then

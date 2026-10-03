@@ -20,6 +20,7 @@ It’s built on the idea that **Forth itself** — simple, extensible, and close
 - `platforms/c/` — C implementation (C89).
 - `platforms/java/` — Java implementation.
 - `platforms/js/` — JavaScript implementation (ESM, no dependencies; see `~/hub/org/proj.sloth.org`).
+- `platforms/bash/` — self-contained bash implementation with no build step (see `platforms/bash/README.md`).
 
 ---
 
@@ -31,7 +32,7 @@ It’s built on the idea that **Forth itself** — simple, extensible, and close
 - **Performance:** Words can be implemented on the host for performance-critical sections without the need to modify sloth code.
 - **Embeddable:** Can be used as a scripting language in other applications.  
 - **Minimal native implementation:** Most of the system is implemented in Forth itself, allowing easy porting to other platforms.  
-- **Cross-language / cross-platform:** Sloth aims to run on as many platforms and programming languages as possible. Right now there are a C implementation and a Java implementation.
+- **Cross-language / cross-platform:** Sloth aims to run on as many platforms and programming languages as possible. Right now there are C, Java, JavaScript and bash implementations.
 - **Native compilation for constrained hosts:** platforms that only offer a high-level engine (e.g. a JavaScript engine on a smartwatch) run the same Forth/DODO code compiled to native host functions, so reuse does not cost performance.
 - **Easily hackable:** Every part of Sloth should be simple enough for one developer to understand and modify for specific use cases.
 
@@ -256,6 +257,27 @@ cd platforms/js
 node --test
 ```
 
+## Running the bash implementation
+
+`platforms/bash/sloth.bash` is an implementation with no build step and no
+dependency beyond bash (4+) for the core kernel and the MEMORY word set (only
+bash builtins). The FLOAT word set additionally needs `awk` for arithmetic, and
+the FILE word set needs common `stat`/`rm`/`mv`/`dd`/`od` tools. It is meant as a
+fallback when no compiled binary or other interpreter is available, for example
+when bootstrapping a system.
+
+```sh
+bash platforms/bash/sloth.bash                # interactive REPL
+bash platforms/bash/sloth.bash program.4th    # run a file
+bash platforms/bash/sloth.bash --test         # kernel self-tests (fast)
+```
+
+It boots `4th/ans.4th` unchanged, so all normal Forth words are available. Set
+`SLOTH_ROOT` to the repository root if `4th/` is not found next to the script.
+Booting `ans.4th` takes tens of seconds because the whole system is interpreted
+by bash; usage, status and known gaps are documented in
+`platforms/bash/README.md`.
+
 ## Testing
 
 There is one entry point per OS. Both run every suite and report a single
@@ -272,7 +294,9 @@ JavaScript unit tests and Forth 2012 suite through `node --test` and
 needs `node` on `PATH`, and without it the JavaScript tests are skipped. When
 the Debug C binary is present, `run-tests.sh` also runs a differential check:
 `platforms/js/test/differential.4th` must print identical output on the C and
-JavaScript engines.
+JavaScript engines. Set `SLOTH_TEST_BASH=1` to additionally run the bash kernel
+self-tests and the C-vs-bash differential check; this is off by default because
+booting `ans.4th` in bash takes tens of seconds.
 
 The C tests can also be run directly with CTest:
 
