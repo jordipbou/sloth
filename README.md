@@ -1,40 +1,28 @@
-# Sloth — Universal Forth Engine
-
-**Portable, multi-language virtual machine and ANS Forth implementation for that virtual machine for desktops, mobile, embedded and scripting.**
-
----
-
-**Sloth** is a portable, multi-language, cross-platform Forth system.
+# Sloth — multi-language, cross-platform virtual machine and ANS Forth implementation.
 
 It provides the minimal foundation needed to bootstrap **ANS Forth** and test it in any environment — desktop, mobile, or embedded.
 
 It’s built on the idea that **Forth itself** — simple, extensible, and close to the machine — should be available anywhere. And not just across **platforms**, but also across **languages**. That’s why **Sloth** is also designed to be **embedded as a scripting language** within other applications.
 
-**ANS Forth** also serves as a **common virtual machine and high-level assembler**, enabling the creation of higher-level languages that remain portable, lightweight, and consistent.
+---
+
+## Key Features
+
+- **Cross-language / cross-platform:** C, Java, JavaScript and bash implementations.
+- **Simple VM:** Dual-stack, linear memory virtual machine that can be understood by one programmer.
+- **Minimal native implementation:** Most of the system is implemented in Forth itself, allowing easy porting to other platforms.  
+- **Embeddable:** Can be used as a scripting language and is designed to allow easy interoperation between host and Forth.
+- **Performance:** Words can be implemented on the host for performance-critical sections without the need to modify sloth code.
 
 ---
 
 ## Layout
 
 - `4th/` — Forth sources (`ans.4th`, `tools.4th`, ...). Most of Sloth is written here.
-- `platforms/c/` — C implementation (C89).
-- `platforms/java/` — Java implementation.
-- `platforms/js/` — JavaScript implementation (ESM, no dependencies; see `~/hub/org/proj.sloth.org`).
+- `platforms/c/` — C implementation (C89) for MCUs, desktop, server and as a C/C++ scripting language.
+- `platforms/java/` — Java implementation for Android, WearOS and as a Java scripting language.
+- `platforms/js/` — JavaScript implementation for web, server and embedded JS interpreters.
 - `platforms/bash/` — self-contained bash implementation with no build step (see `platforms/bash/README.md`).
-
----
-
-## Key Features
-
-- **Based on Forth:** Utilizes Forth’s dual-stack, linear memory virtual machine for efficient computation from microcontrollers to large computers.  
-- **Interactive programming:** Designed for interactive use, allowing immediate feedback and iteration.  
-- **Extensible:** Easy to extend with additional backends and functionalities.  
-- **Performance:** Words can be implemented on the host for performance-critical sections without the need to modify sloth code.
-- **Embeddable:** Can be used as a scripting language in other applications.  
-- **Minimal native implementation:** Most of the system is implemented in Forth itself, allowing easy porting to other platforms.  
-- **Cross-language / cross-platform:** Sloth aims to run on as many platforms and programming languages as possible. Right now there are C, Java, JavaScript and bash implementations.
-- **Native compilation for constrained hosts:** platforms that only offer a high-level engine (e.g. a JavaScript engine on a smartwatch) run the same Forth/DODO code compiled to native host functions, so reuse does not cost performance.
-- **Easily hackable:** Every part of Sloth should be simple enough for one developer to understand and modify for specific use cases.
 
 ---
 
@@ -58,7 +46,7 @@ Forth is the only language that fulfills all four.
 
 ## Memory Model
 
-Continuous address space in all the implementations. C uses real native pointers and direct memory access. Java implementation uses memory "blocks" and addresses have two parts, one to index the block and another as the address inside the block.
+Continuous address space in all the implementations. C uses real native pointers and direct memory access. Java/JavaScript/bash implementation use memory "blocks" and addresses have two parts, one to index the block and another as the address inside the block.
 
 ---
 
