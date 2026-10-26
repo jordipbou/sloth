@@ -1,18 +1,10 @@
-# Host/VM interaction API
+# Platforms
 
-Sloth is designed to allow easy interoperation between host and Sloth.
+Each platform implements the Sloth VM and loads the Forth sources from `4th/` unchanged. Build, run and test instructions live in the platform's own README:
 
-## Stack API
+- [C](c/README.md) — portable C89 for MCUs, desktop, server and as a C/C++ scripting language.
+- [Java](java/README.md) — for Android, WearOS and as a Java scripting language.
+- [JavaScript](js/README.md) — for web, server and embedded JS interpreters.
+- [bash](bash/README.md) — self-contained implementation with no build step, experimental and slow.
 
-push(v) -> pushes a value to the stack
-pop() -> pops a value from the stack
-pick(a) -> picks the value at TOP - a
-place(a, v) -> places a value v at TOP - a
-
-rpush(v) -> pushes an address to the return stack
-rpop() -> pops an address from the return stack
-
-## Execution API
-
-eval(q) -> executes quotation/primitive q inside the VM
-do([...]) -> executes host functions chained
+The [host/VM interaction API](host-api.md) describes the interface a platform implements to run Sloth and to interoperate with the host.
