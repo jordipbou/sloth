@@ -22,7 +22,9 @@ Sloth is three layers:
 2. **Bootstrap** — the native words that turn the VM into a minimal Forth: the outer interpreter, the compiler and defining words, word lookup, and the rest of the kernel. It is written against the VM and gives the Forth layer a language to build on.
 3. **Forth** — `4th/`: control structures, loops, strings, tools and everything else up to full ANS Forth, written only with the words the bootstrap provides.
 
-The C, Java, JavaScript and bash implementations are VM-plus-bootstrap pairs. The Forth layer is common to all of them: it stays fixed while a VM and its bootstrap are swapped, compared and simplified. The seam is `ans.4th`, plus late-bound hooks such as `(INTERPRET)` and `ACCEPT`.
+`4th/` is the most important layer: it defines the system, while the VM and bootstrap exist to run it. Those two are designed to be easily ported between languages while working almost the same everywhere. Porting is not the only option, though: `ans.4th` can also be shared by genuinely different VM/bootstrap implementations.
+
+The C, Java, JavaScript and bash trees are VM-plus-bootstrap pairs. The Forth layer is common to all of them: it stays fixed while a VM and its bootstrap are swapped, compared and simplified. The seam is `ans.4th`, plus late-bound hooks such as `(INTERPRET)` and `ACCEPT`.
 
 The goal is to find the simplest and fastest VM and bootstrap while keeping the Forth layer common, and to let each platform be the best host it can be without forking the language.
 
