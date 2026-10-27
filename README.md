@@ -4,27 +4,39 @@ It provides a minimal foundation to bootstrap **ANS Forth** and test it in as ma
 
 It’s built on the idea that **Forth itself** — simple, extensible, and close to the machine (real or virtual) — should be available across **platforms** and **languages**. That’s why **Sloth** is also designed to be **embedded as a scripting language** within other applications.
 
----
-
-## Key Features
+## Key features
 
 - **Cross-language / cross-platform:** portable C89, Java, JavaScript and bash implementations.
-- **Simple VM:** Dual-stack, linear memory virtual machine that can be understood by one programmer.
-- **Minimal native implementation:** Most of the system is implemented in Forth itself, allowing easy porting to other platforms.  
+- **Simple VM:** Dual-stack, linear memory, sign-tagged token threading virtual machine that can be understood by one programmer.
+- **Minimal native implementation:** Only the VM and bootstrap are native; everything above them is Forth, shared by every platform.  
 - **Embeddable:** Can be used as a scripting language and is designed to allow easy interoperation between host and Forth.
 - **Performance:** Words can be implemented on the host for performance-critical sections without the need to modify sloth code.
 
 ---
 
+## Layers
+
+Sloth is three layers:
+
+1. **VM** — the machine: two stacks (plus a float stack), one linear dictionary, sign-tagged token threading, calls, returns and exceptions. It has no parser and no compiler; it only fetches tokens and calls primitives.
+2. **Bootstrap** — the native words that turn the VM into a minimal Forth: the outer interpreter, the compiler and defining words, word lookup, and the rest of the kernel. It is written against the VM and gives the Forth layer a language to build on.
+3. **Forth** — `4th/`: control structures, loops, strings, tools and everything else up to full ANS Forth, written only with the words the bootstrap provides.
+
+The C, Java, JavaScript and bash implementations are VM-plus-bootstrap pairs. The Forth layer is common to all of them: it stays fixed while a VM and its bootstrap are swapped, compared and simplified. The seam is `ans.4th`, plus late-bound hooks such as `(INTERPRET)` and `ACCEPT`.
+
+The goal is to find the simplest and fastest VM and bootstrap while keeping the Forth layer common, and to let each platform be the best host it can be without forking the language.
+
+---
+
 ## Layout
 
-- `4th/` — Forth sources (`ans.4th`, `tools.4th`, ...). Most of Sloth is written here.
-- [`platforms/c/`](platforms/c/README.md) — C implementation (C89) for MCUs, desktop, server and as a C/C++ scripting language.
-- [`platforms/java/`](platforms/java/README.md) — Java implementation for Android, WearOS and as a Java scripting language.
-- [`platforms/js/`](platforms/js/README.md) — JavaScript implementation for web, server and embedded JS interpreters.
-- [`platforms/bash/`](platforms/bash/README.md) — self-contained bash implementation with no build step -experimental, slow-.
+- `4th/` — the common Forth layer (`ans.4th`, `tools.4th`, ...), shared by every platform.
+- [`platforms/c/`](platforms/c/README.md) — C89 VM and bootstrap for MCUs, desktop, server and as a C/C++ scripting language.
+- [`platforms/java/`](platforms/java/README.md) — Java VM and bootstrap for Android, WearOS and as a Java scripting language.
+- [`platforms/js/`](platforms/js/README.md) — JavaScript VM and bootstrap for web, server and embedded JS interpreters.
+- [`platforms/bash/`](platforms/bash/README.md) — self-contained bash VM and bootstrap with no build step -experimental, slow-.
 
-The [host/VM interaction API](platforms/host-api.md) describes the interface each platform implements.
+The [host/VM interaction API](platforms/host-api.md) describes the interface each VM and bootstrap implements.
 
 ---
 
