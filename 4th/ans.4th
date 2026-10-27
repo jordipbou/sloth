@@ -1891,7 +1891,6 @@ FORTH-WORDLIST SET-CURRENT
 \	
 \	[THEN]
 
-INCLUDE debug.4th
 INCLUDE tools.4th
 INCLUDE strings.4th
 INCLUDE locals.4th

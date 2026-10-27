@@ -116,7 +116,7 @@
 	\ PLATFORM DEPENDENT
 	\ SEE fails to print quotations (and lots of other things)
 	
-	REQUIRE DEBUG.4TH
+	INCLUDE debug.4th 
 	
 	: SEE ( "<spaces>name" -- )
 	 	BL WORD DUP FIND \ caddr xt flag
