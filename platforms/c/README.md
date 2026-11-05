@@ -174,6 +174,24 @@ cmake -S platforms/c -B build -G "Ninja Multi-Config" \
     -DSLOTH_WITHOUT_FLOATING_POINT=ON
 ```
 
+### Dictionary size
+
+`sloth_new()` allocates the Forth dictionary. Its default is 524288 bytes
+(512 KiB). A program that keeps a large amount of data in the dictionary - for
+example an interpreter with a dictionary-resident heap - can set
+`SLOTH_DICTIONARY_SIZE` (in bytes) at configure time:
+
+```sh
+cmake -S platforms/c -B build -G "Ninja Multi-Config" \
+    -DSLOTH_DICTIONARY_SIZE=16777216
+```
+
+The value is compiled into `sloth_new()`. The C API `sloth_create(psize, dsize,
+usize)` still lets an embedder choose the size explicitly, and a project that
+adds Sloth as a CMake subproject can set the `SLOTH_DICTIONARY_SIZE` cache
+variable before `FetchContent_MakeAvailable`. Leave it unset to keep the 512 KiB
+default.
+
 [CMake]: https://cmake.org/
 
 ## Testing

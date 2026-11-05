@@ -2543,7 +2543,12 @@ X* sloth_create(int psize, int dsize, int usize) {
 	return x;
 }
 
-X* sloth_new(void) { return sloth_create(512, 524288, 1024); }
+/* Set by CMake's SLOTH_DICTIONARY_SIZE option; see platforms/c/README.md. */
+#ifndef SLOTH_DICTIONARY_SIZE
+#define SLOTH_DICTIONARY_SIZE 524288
+#endif
+
+X* sloth_new(void) { return sloth_create(512, SLOTH_DICTIONARY_SIZE, 1024); }
 
 void sloth_free(X* x) {
 	free((void*)x->u);

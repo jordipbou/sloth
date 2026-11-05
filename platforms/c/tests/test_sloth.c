@@ -22,6 +22,10 @@
 #include "sloth.h"
 #include "unity.h"
 
+#ifndef SLOTH_DICTIONARY_SIZE
+#define SLOTH_DICTIONARY_SIZE 524288
+#endif
+
 /* Size of the continuous path region between SLOTH_PATHS and */
 /* SLOTH_INCLUDED_FILES. */
 #define SLOTH_PATHS_SIZE (SLOTH_INCLUDED_FILES - SLOTH_PATHS)
@@ -69,7 +73,7 @@ void test_new(void) {
 	X* x2 = sloth_new();
 	TEST_ASSERT_NOT_NULL(x2);
 	TEST_ASSERT_EQUAL(512, x2->p->pz);
-	TEST_ASSERT_EQUAL(524288, x2->dz);
+	TEST_ASSERT_EQUAL(SLOTH_DICTIONARY_SIZE, x2->dz);
 	TEST_ASSERT_EQUAL(1024, x2->uz);
 	sloth_free(x2);
 }

@@ -19,7 +19,7 @@ F key, emit;         /* host-overridable I/O primitives   */
 sloth_P *p;          /* { capacity, used, fn-pointer[] }  */
 ```
 
-`CELL` is `intptr_t`, so tokens/addresses are 64/32/16-bit depending on target (`sloth.h:82-113`). Defaults are 64 cells per stack, overrideable by macros. `sloth_new()` is `sloth_create(512, 524288, 1024)`: 512 primitive slots, 512 KiB dictionary, 1 KiB user area (`sloth.c:2546`).
+`CELL` is `intptr_t`, so tokens/addresses are 64/32/16-bit depending on target (`sloth.h:82-113`). Defaults are 64 cells per stack, overrideable by macros. `sloth_new()` is `sloth_create(512, SLOTH_DICTIONARY_SIZE, 1024)`: 512 primitive slots, a dictionary whose default is 512 KiB, 1 KiB user area (`sloth.c:2546`). `SLOTH_DICTIONARY_SIZE` is a CMake cache option (default 524288) that projects embedding Sloth can raise without changing the stack or primitive sizes; the explicit `sloth_create` argument still overrides it for one VM.
 
 There is no global state: every primitive takes `X*`, so several VMs can coexist in one process. `ip = -1` is the "not executing" sentinel (`sloth.c:2488-2492`).
 

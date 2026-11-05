@@ -70,6 +70,13 @@ if(UNIX)
     target_link_libraries(unity m)
 endif()
 
+# Default dictionary size for sloth_new(), in bytes. Projects that
+# keep data in the Forth dictionary can raise it; the default keeps
+# the existing 512 KiB behavior for every other user.
+set(SLOTH_DICTIONARY_SIZE 524288 CACHE STRING
+	"Default Sloth dictionary size in bytes (sloth_new)")
+add_compile_definitions(SLOTH_DICTIONARY_SIZE=${SLOTH_DICTIONARY_SIZE})
+
 add_library(sloth_lib STATIC sloth.c)
 target_include_directories(
 	sloth_lib
