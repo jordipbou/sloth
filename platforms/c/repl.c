@@ -5,6 +5,10 @@
 #ifndef SLOTH_WITHOUT_MEMORY_WORD_SET
 	#include "memory.h"
 #endif
+#ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
+	#include "facility.h"
+	#include "cpnbi.h"
+#endif
 
 #ifndef ROOT_PATH
 #define ROOT_PATH "../../"
@@ -19,9 +23,16 @@ int main(int argc, char**argv) {
 	is_test = (argc > 1 && (strcmp(argv[1], "--test") == 0
 					|| strcmp(argv[1], "-t") == 0));
 
+#ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
+	cpnbi_init();
+#endif
+
 	x = sloth_new();
 
 	sloth_bootstrap(x);
+#ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
+	sloth_bootstrap_facility_word_set(x);
+#endif
 #ifndef SLOTH_WITHOUT_FILE_WORD_SET
 	sloth_bootstrap_file_word_set(x);
 #endif

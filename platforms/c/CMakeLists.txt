@@ -125,6 +125,21 @@ if(NOT DEFINED SLOTH_WITHOUT_MEMORY_WORD_SET)
 	target_link_libraries(sloth_lib sloth_memory_word_set)
 endif()
 
+if(NOT DEFINED SLOTH_WITHOUT_FACILITY_WORD_SET)
+	add_library(sloth_facility_word_set STATIC facility.c cpnbi.c)
+	target_include_directories(
+		sloth_facility_word_set
+		PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
+					 $<INSTALL_INTERFACE:>)
+	set_target_properties(
+		sloth_facility_word_set
+		PROPERTIES C_STANDARD 90
+							 C_STANDARD_REQUIRED ON
+							 C_EXTENSIONS OFF)
+
+	target_link_libraries(sloth_lib sloth_facility_word_set)
+endif()
+
 # terminal SLOTH REPL
 
 add_executable(sloth repl.c)
@@ -178,6 +193,11 @@ if(DEFINED SLOTH_WITHOUT_MEMORY_WORD_SET)
 		sloth PRIVATE SLOTH_WITHOUT_MEMORY_WORD_SET)
 endif()
 
+if(DEFINED SLOTH_WITHOUT_FACILITY_WORD_SET)
+	target_compile_definitions(
+		sloth PRIVATE SLOTH_WITHOUT_FACILITY_WORD_SET)
+endif()
+
 target_link_libraries(sloth sloth_lib)
 
 # Unit tests
@@ -203,6 +223,7 @@ sloth_strict_c(sloth)
 sloth_strict_c(sloth_lib)
 sloth_strict_c(sloth_memory_word_set)
 sloth_strict_c(sloth_file_word_set)
+sloth_strict_c(sloth_facility_word_set)
 
 # -- CTest -------------------------------------------------
 # Single entry point for all C tests, on Linux and Windows:
