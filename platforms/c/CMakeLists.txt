@@ -70,6 +70,19 @@ if(UNIX)
     target_link_libraries(unity m)
 endif()
 
+# CPNBI provides non-blocking console input. Its demo and test
+# suite are not part of Sloth's build.
+set(CPNBI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(CPNBI_BUILD_DEMO OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+	cpnbi
+	GIT_REPOSITORY https://github.com/jordipbou/cpnbi.git
+	GIT_TAG a24d2b4af30fca6e3b58f83758d50f20c0b8b23d
+)
+
+FetchContent_MakeAvailable(cpnbi)
+
 # Default dictionary size for sloth_new(), in bytes. Projects that
 # keep data in the Forth dictionary can raise it; the default keeps
 # the existing 512 KiB behavior for every other user.
@@ -126,7 +139,7 @@ if(NOT DEFINED SLOTH_WITHOUT_MEMORY_WORD_SET)
 endif()
 
 if(NOT DEFINED SLOTH_WITHOUT_FACILITY_WORD_SET)
-	add_library(sloth_facility_word_set STATIC facility.c cpnbi.c)
+	add_library(sloth_facility_word_set STATIC facility.c)
 	target_include_directories(
 		sloth_facility_word_set
 		PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
@@ -137,6 +150,7 @@ if(NOT DEFINED SLOTH_WITHOUT_FACILITY_WORD_SET)
 							 C_STANDARD_REQUIRED ON
 							 C_EXTENSIONS OFF)
 
+	target_link_libraries(sloth_facility_word_set PUBLIC cpnbi_lib)
 	target_link_libraries(sloth_lib sloth_facility_word_set)
 endif()
 

@@ -37,7 +37,7 @@ void sleep_ms(int milliseconds) { /* cross-platform sleep */
 /* == Facility words =================================== */
 
 void sloth_key_question_(X* x) {
-	sloth_push(x, cpnbi_is_char_available() == 1 ? -1 : 0);
+	sloth_push(x, cpnbi_is_byte_available() == 1 ? -1 : 0);
 }
 
 void sloth_page_(X* x) {
@@ -54,9 +54,10 @@ void sloth_e_key_(X* x) {
 }
 
 void sloth_e_key_to_char_(X* x) {
-	int e = sloth_pop(x);
-	if (e >= 32 && e <= 126) {
-		sloth_push(x, e);
+	int32_t e = sloth_pop(x);
+	int32_t key = cpnbi_event_key(e);
+	if (!cpnbi_event_is_special(e) && key >= 32 && key <= 126) {
+		sloth_push(x, key);
 		sloth_push(x, -1);
 	} else {
 		sloth_push(x, e);
@@ -78,9 +79,9 @@ void sloth_emit_question_(X* x) {
 	sloth_push(x, 1);
 }
 
-void sloth_k_alt_mask_(X* x) { sloth_push(x, CPNBI_MOD_ALT); }
-void sloth_k_ctrl_mask_(X* x) { sloth_push(x, CPNBI_MOD_CTRL); }
-void sloth_k_shift_mask_(X* x) { sloth_push(x, CPNBI_MOD_SHIFT); }
+void sloth_k_alt_mask_(X* x) { sloth_push(x, CPNBI_MOD_ALT << CPNBI_MOD_OFFSET); }
+void sloth_k_ctrl_mask_(X* x) { sloth_push(x, CPNBI_MOD_CTRL << CPNBI_MOD_OFFSET); }
+void sloth_k_shift_mask_(X* x) { sloth_push(x, CPNBI_MOD_SHIFT << CPNBI_MOD_OFFSET); }
 
 void sloth_k_insert_(X* x) { sloth_push(x, CPNBI_KEY_INSERT); }
 void sloth_k_delete_(X* x) { sloth_push(x, CPNBI_KEY_DELETE); }
