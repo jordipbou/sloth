@@ -1553,11 +1553,32 @@ void test_refill_file(void) {
 
 /* Portable temp file creation code */
 
+/* Portable temp name helper. tmpnam is C89 but unsafe and makes the
+   linker warn; use the OS unique-name API instead. */
+#ifdef _WIN32
+static int make_temp_name(char *pathbuf) {
+	char tmpdir[MAX_PATH];
+	DWORD n = GetTempPathA(MAX_PATH, tmpdir);
+	if (n == 0 || n >= MAX_PATH) return -1;
+	if (GetTempFileNameA(tmpdir, "slt", 0, pathbuf) == 0) return -1;
+	remove(pathbuf); /* GetTempFileName creates the file */
+	return 0;
+}
+#else
+static int make_temp_name(char *pathbuf) {
+	int fd;
+	strcpy(pathbuf, "/tmp/sloth-test-XXXXXX");
+	fd = mkstemp(pathbuf);
+	if (fd < 0) return -1;
+	close(fd);
+	remove(pathbuf);
+	return 0;
+}
+#endif
+
 static int write_temp_file(char *pathbuf, const char *content, size_t len) {
 	FILE *f;
-	/* tmpnam is C89 but not thread-safe — acceptable */
-	/* for single-threaded tests */
-	if (!tmpnam(pathbuf)) return -1;
+	if (make_temp_name(pathbuf)) return -1;
 	f = fopen(pathbuf, "wb");
 	if (!f) return -1;
 	fwrite(content, 1, len, f);
@@ -1580,10 +1601,7 @@ static void join_path(char *buf, const char *dir, const char *name) {
 }
 
 static int make_temp_dir(char *pathbuf) {
-	/* tmpnam is C89 but not thread-safe — acceptable */
-	/* for single-threaded tests */
-	if (!tmpnam(pathbuf)) return -1;
-	remove(pathbuf); /* tmpnam only proposes a name */
+	if (make_temp_name(pathbuf)) return -1;
 	if (sloth_mkdir(pathbuf) != 0) return -1;
 	return 0;
 }
