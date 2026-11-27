@@ -2617,7 +2617,7 @@ void sloth_set_root_path(X* x, char* s) {
 	int l = 0;
 	int cwd_len = 0;
 	CELL cap;
-	if (strlen(s) == 0) {
+	if (s == 0 || strlen(s) == 0) {
 		l = sloth__get_exe_dir(buf, 1024);
 		s = buf;	
 	} else {

@@ -2127,6 +2127,34 @@ void test_set_root_path_places_paths(void) {
 	sloth_rmdir(dir);
 }
 
+/* A NULL root path must use the executable directory, as documented. */
+void test_set_root_path_null_uses_executable_dir(void) {
+	CELL root_len;
+	char *stored;
+
+	sloth_user_set(x, SLOTH_ROOT_PATH_LENGTH, 0);
+	sloth_set_root_path(x, 0);
+
+	root_len = sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH);
+	TEST_ASSERT_TRUE(root_len > 5);
+	stored = (char*)(x->u + SLOTH_PATHS);
+	TEST_ASSERT_EQUAL_STRING_LEN(
+		"/4th/", stored + root_len - 5, 5);
+	TEST_ASSERT_EQUAL(
+		(CELL)(x->u + SLOTH_PATHS + root_len),
+		sloth_user_get(x, SLOTH_PATH_START));
+}
+
+/* sloth_include() must set the root path itself instead of crashing. */
+void test_include_without_root_path(void) {
+	sloth_bootstrap(x);
+
+	TEST_ASSERT_EQUAL(0, sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH));
+	TEST_ASSERT_NOT_EQUAL(
+		0, sloth_include(x, "sloth-no-such-file.4th"));
+	TEST_ASSERT_NOT_EQUAL(0, sloth_user_get(x, SLOTH_ROOT_PATH_LENGTH));
+}
+
 /* INCLUDED must open files read-only, as it only reads them. */
 void test_included_read_only_file(void) {
 	char dir[MAX_PATH];
@@ -2995,6 +3023,8 @@ int main(void) {
 	RUN_TEST(test_open_included_file_root_does_not_update_path);
 	RUN_TEST(test_open_included_file_root_keeps_nonempty_previous_path);
 	RUN_TEST(test_set_root_path_places_paths);
+	RUN_TEST(test_set_root_path_null_uses_executable_dir);
+	RUN_TEST(test_include_without_root_path);
 	RUN_TEST(test_included_read_only_file);
 	RUN_TEST(test_open_included_file_long_name_is_bounded);
 	RUN_TEST(test_set_root_path_long_path_is_bounded);
