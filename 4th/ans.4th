@@ -551,7 +551,7 @@ FORTH-WORDLIST SET-CURRENT
 \ [DEFINED] DO [IF] ... [THEN]
 \ with the limited amount of words that we have.
 
-?: DO POSTPONE [: ['] NOOP ; IMMEDIATE
+?: DO POSTPONE [: OVER (LATESTXT) ! ['] NOOP ; IMMEDIATE
 
 ?\ INTERNAL-WORDLIST SET-CURRENT
 
@@ -620,7 +620,7 @@ FORTH-WORDLIST SET-CURRENT
 ?\ : ?DO ( C: -- do-sys ) ( n1 | u1 n2 | u2 -- ) ( R: -- loop-sys )
 ?\ 		POSTPONE 2DUP POSTPONE =
 ?\ 		POSTPONE IF POSTPONE 2DROP POSTPONE ELSE
-?\ 		POSTPONE [: ['] THEN,
+?\ 		POSTPONE [: OVER (LATESTXT) ! ['] THEN,
 ?\ ; IMMEDIATE
 
 ?\ : LEAVE ( -- )
