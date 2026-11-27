@@ -41,8 +41,11 @@
 
 /* -- getch multiplatform definition and implementation  */
 
-/* TODO Shouldn't CPNBI be used here directly? That's
-	 exactly why it has been created!! */
+/* The core keeps its own getch instead of using CPNBI on purpose:
+   Sloth must build on microcontrollers without a host console
+   library, and the VM/bootstrap must stay free of CPNBI. CPNBI is
+   a dependency of the optional Facility word set only; a host that
+   needs richer input overrides x->key with sloth_set_key(). */
 
 #ifdef WINDOWS
 #include <conio.h>

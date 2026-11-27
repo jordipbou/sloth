@@ -21,10 +21,27 @@ src=$(wslpath -w "$here")
 build='C:/build/sloth'
 jbuild='C:\build\sloth-java'
 
+# Use the sibling CPNBI checkout and the Unity source already fetched
+# by the Linux build, so a Windows configure does not need GitHub.
+# This also avoids Git for Windows HTTPS clones on machines where a
+# system OpenSSL 1.1.0l shadows Git's bundled 1.1.1k: git-remote-https
+# then aborts with STATUS_ENTRYPOINT_NOT_FOUND.
+deps=""
+if [ -d "$here/../cpnbi" ]; then
+	cpnbi_src=$(wslpath -w "$here/../cpnbi")
+	deps="$deps -DFETCHCONTENT_SOURCE_DIR_CPNBI='$cpnbi_src'"
+fi
+if [ -d "$here/build/_deps/unity-src" ]; then
+	unity_src=$(wslpath -w "$here/build/_deps/unity-src")
+	deps="$deps -DFETCHCONTENT_SOURCE_DIR_UNITY='$unity_src'"
+elif [ -d "/mnt/c/build/sloth/_deps/unity-src" ]; then
+	deps="$deps -DFETCHCONTENT_SOURCE_DIR_UNITY='C:/build/sloth/_deps/unity-src'"
+fi
+
 fail=0
 
 echo "== C =="
-powershell.exe -NoProfile -Command "cmake -S '$src/platforms/c' -B $build -G 'Ninja Multi-Config'" || fail=1
+powershell.exe -NoProfile -Command "cmake -S '$src/platforms/c' -B $build -G 'Ninja Multi-Config' $deps" || fail=1
 powershell.exe -NoProfile -Command "cmake --build $build --config Debug" || fail=1
 powershell.exe -NoProfile -Command "cmake --build $build --config Release" || fail=1
 powershell.exe -NoProfile -Command "ctest --test-dir $build -C Debug --output-on-failure" || fail=1

@@ -219,6 +219,11 @@ target_link_libraries(sloth sloth_lib)
 add_executable(test_sloth tests/test_sloth.c sloth.c)
 target_link_libraries(test_sloth sloth_lib unity::framework)
 
+if(DEFINED SLOTH_WITHOUT_FACILITY_WORD_SET)
+	target_compile_definitions(
+		test_sloth PRIVATE SLOTH_WITHOUT_FACILITY_WORD_SET)
+endif()
+
 if(NOT DEFINED SLOTH_WITHOUT_FLOATING_POINT)
 	add_executable(test_sloth_fp tests/test_sloth_fp.c
 															 sloth.c)

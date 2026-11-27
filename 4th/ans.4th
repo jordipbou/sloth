@@ -1261,6 +1261,10 @@ SET-CURRENT
 ?\		'H' EMIT
 ?\ ;
 
+?: PAGE ( -- ) \ clear the screen (RIS)
+?\		27 EMIT 99 EMIT
+?\ ;
+
 \ -- COMPARE from strings wordset (require by ENVIRONMENT?)
 
 \ COMPARE implementation taken from SwapForth

@@ -20,6 +20,9 @@
 #endif
 
 #include "sloth.h"
+#ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
+#include "facility.h"
+#endif
 #include "unity.h"
 
 #ifndef SLOTH_DICTIONARY_SIZE
@@ -2280,6 +2283,108 @@ void test_key_handles_max_uchar(void) {
 	TEST_ASSERT_EQUAL(255, sloth_pop(x));
 }
 
+#ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
+
+typedef struct {
+	void (*prim)(X*);
+	const char *name;
+} FacilityKey;
+
+static const FacilityKey facility_keys[] = {
+	{ sloth_k_up_, "K-UP" },
+	{ sloth_k_down_, "K-DOWN" },
+	{ sloth_k_left_, "K-LEFT" },
+	{ sloth_k_right_, "K-RIGHT" },
+	{ sloth_k_home_, "K-HOME" },
+	{ sloth_k_end_, "K-END" },
+	{ sloth_k_prior_, "K-PRIOR" },
+	{ sloth_k_next_, "K-NEXT" },
+	{ sloth_k_insert_, "K-INSERT" },
+	{ sloth_k_delete_, "K-DELETE" },
+	{ sloth_k_f1_, "K-F1" },
+	{ sloth_k_f2_, "K-F2" },
+	{ sloth_k_f3_, "K-F3" },
+	{ sloth_k_f4_, "K-F4" },
+	{ sloth_k_f5_, "K-F5" },
+	{ sloth_k_f6_, "K-F6" },
+	{ sloth_k_f7_, "K-F7" },
+	{ sloth_k_f8_, "K-F8" },
+	{ sloth_k_f9_, "K-F9" },
+	{ sloth_k_f10_, "K-F10" },
+	{ sloth_k_f11_, "K-F11" },
+	{ sloth_k_f12_, "K-F12" }
+};
+
+#define FACILITY_KEY_COUNT \
+	(sizeof(facility_keys) / sizeof(facility_keys[0]))
+
+static CELL pop_facility_key(void (*prim)(X*)) {
+	prim(x);
+	return sloth_pop(x);
+}
+
+void test_facility_k_constants_are_distinct(void) {
+	size_t i, j;
+	CELL a, b;
+	for (i = 0; i < FACILITY_KEY_COUNT; i++) {
+		a = pop_facility_key(facility_keys[i].prim);
+		for (j = i + 1; j < FACILITY_KEY_COUNT; j++) {
+			b = pop_facility_key(facility_keys[j].prim);
+			TEST_ASSERT_TRUE_MESSAGE(a != b, facility_keys[i].name);
+		}
+	}
+}
+
+void test_facility_e_key_to_f_key_recognises_keys(void) {
+	size_t i;
+	CELL key;
+	for (i = 0; i < FACILITY_KEY_COUNT; i++) {
+		key = pop_facility_key(facility_keys[i].prim);
+		sloth_push(x, key);
+		sloth_e_key_to_f_key_(x);
+		TEST_ASSERT_EQUAL_MESSAGE(-1, sloth_pop(x), facility_keys[i].name);
+		TEST_ASSERT_EQUAL_MESSAGE(key, sloth_pop(x), facility_keys[i].name);
+	}
+}
+
+void test_facility_e_key_to_f_key_preserves_modifiers(void) {
+	CELL f1 = pop_facility_key(sloth_k_f1_);
+	CELL shift = pop_facility_key(sloth_k_shift_mask_);
+	CELL ctrl = pop_facility_key(sloth_k_ctrl_mask_);
+	CELL alt = pop_facility_key(sloth_k_alt_mask_);
+	CELL event = f1 | shift | ctrl | alt;
+	sloth_push(x, event);
+	sloth_e_key_to_f_key_(x);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(event, sloth_pop(x));
+}
+
+void test_facility_e_key_to_f_key_rejects_non_keys(void) {
+	CELL unknown = pop_facility_key(sloth_k_f12_) + 1;
+	sloth_push(x, 'a');
+	sloth_e_key_to_f_key_(x);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL('a', sloth_pop(x));
+	sloth_push(x, unknown);
+	sloth_e_key_to_f_key_(x);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(unknown, sloth_pop(x));
+}
+
+void test_facility_e_key_to_char_(void) {
+	CELL f1 = pop_facility_key(sloth_k_f1_);
+	sloth_push(x, 'a');
+	sloth_e_key_to_char_(x);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+	TEST_ASSERT_EQUAL('a', sloth_pop(x));
+	sloth_push(x, f1);
+	sloth_e_key_to_char_(x);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(f1, sloth_pop(x));
+}
+
+#endif
+
 void test_source_(void) {
 	char *ibuf = "TEST";
 	sloth_user_set(x, SLOTH_IBUF, (CELL)ibuf);
@@ -2899,6 +3004,13 @@ int main(void) {
 	RUN_TEST(test_key_pushes_char_onto_stack);
 	RUN_TEST(test_key_handles_zero);
 	RUN_TEST(test_key_handles_max_uchar);
+#ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
+	RUN_TEST(test_facility_k_constants_are_distinct);
+	RUN_TEST(test_facility_e_key_to_f_key_recognises_keys);
+	RUN_TEST(test_facility_e_key_to_f_key_preserves_modifiers);
+	RUN_TEST(test_facility_e_key_to_f_key_rejects_non_keys);
+	RUN_TEST(test_facility_e_key_to_char_);
+#endif
 	RUN_TEST(test_source_);
 	RUN_TEST(test_word_);
 	/* Defining words */

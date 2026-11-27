@@ -3,7 +3,12 @@
 #include "facility.h"
 #include "cpnbi.h"
 #include <time.h>
-#include <stdio.h>
+
+/* CPNBI backs this word set (repl.c only initializes it). The
+   VM/bootstrap keeps its own minimal getch so Sloth can build on
+   microcontrollers without a host console library. This word set is
+   optional; hosts that do not need it can omit it and with it the
+   CPNBI dependency. */
 
 /* -- Milliseconds multiplatform implementation -------- */
 /* Taken from: https://stackoverflow.com/a/28827188 */
@@ -40,12 +45,7 @@ void sloth_key_question_(X* x) {
 	sloth_push(x, cpnbi_is_byte_available() == 1 ? -1 : 0);
 }
 
-void sloth_page_(X* x) {
-	(void)x;
-	printf("\033\143");
-}
-
-/* == Facility extension words ========================= */
+/* -- Facility extension words ========================= */
 
 /* -- Keyboard input ----------------------------------- */
 
@@ -65,9 +65,24 @@ void sloth_e_key_to_char_(X* x) {
 	}
 }
 
+static int sloth__is_special_key(int32_t key) {
+	if (key >= CPNBI_KEY_UP && key <= CPNBI_KEY_RIGHT) return 1;
+	if (key >= CPNBI_KEY_HOME && key <= CPNBI_KEY_PAGE_DOWN) return 1;
+	if (key >= CPNBI_KEY_F1 && key <= CPNBI_KEY_F12) return 1;
+	return 0;
+}
+
 void sloth_e_key_to_f_key_(X* x) {
-	(void)x;
-	/* Does nothing */
+	int32_t e = sloth_pop(x);
+	int32_t key = cpnbi_event_key(e);
+	int32_t mods = cpnbi_event_mod(e);
+	if (sloth__is_special_key(key)) {
+		sloth_push(x, key | (mods << CPNBI_MOD_OFFSET));
+		sloth_push(x, -1);
+	} else {
+		sloth_push(x, e);
+		sloth_push(x, 0);
+	}
 }
 
 void sloth_e_key_question_(X* x) {
@@ -132,7 +147,6 @@ void sloth_bootstrap_facility_word_set(X* x) {
 	/* == Facility words ================================= */
 
 	sloth_code(x, "KEY?", sloth_primitive(x, &sloth_key_question_));
-	sloth_code(x, "PAGE", sloth_primitive(x, &sloth_page_));
 
 	/* == Facility extension words ======================= */
 
