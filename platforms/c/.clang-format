@@ -1,0 +1,24 @@
+# clang-format for the Sloth C platform, for comparison with .uncrustify.cfg.
+# Derived from the existing style in this directory: tab indentation with
+# tab width 2, K&R braces, X* pointer style, return type on its own line,
+# binary operators broken before, manual comment wrapping.
+# Format: clang-format -i file.c
+BasedOnStyle: LLVM
+IndentWidth: 2
+TabWidth: 2
+UseTab: ForIndentation
+ColumnLimit: 55
+BreakAfterReturnType: All
+PointerAlignment: Left
+BreakBeforeBraces: Attach
+BreakBeforeBinaryOperators: All
+IndentCaseLabels: false
+SpaceAfterCStyleCast: false
+AlignTrailingComments: false
+AlignConsecutiveMacros: Consecutive
+SortIncludes: false
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+ReflowComments: false
