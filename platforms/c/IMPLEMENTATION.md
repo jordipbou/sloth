@@ -170,7 +170,7 @@ Source state is `IBUF`, `>IN`, `(ILEN)`, `(SOURCE-ID)`, `(SOURCE-POS)`. `SOURCE-
 
 `sloth_run` chooses: if stdin is not a TTY, interpret stdin line by line; otherwise run the Forth `QUIT` word (`sloth.c:2691-2715`). `QUIT` (`ans.4th:1426`) empties the return stack, sets `SOURCE-ID` to 0, and loops `REFILL` / `['] INTERPRET CATCH`, printing `OK`, `Compiling`, or the exception number.
 
-`EMIT` and `KEY` are per-VM function pointers, defaulting to `printf` and a `getch` that toggles termios on each key; hosts can replace them (`sloth.c:804-829`).
+`EMIT`, `KEY`, `KEY?`, `EKEY` and `EKEY?` go through the `SlothInput`/`SlothOutput` hooks in `sloth_io.h`. The defaults are `getch` and `printf`; the desktop executable installs a CPNBI input adapter (`repl.c`). `EMIT?` asks the output hook, and CPNBI EOF is mapped to the return key so `ACCEPT` and `QUIT` terminate.
 
 ## 9. Exceptions
 

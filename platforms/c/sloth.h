@@ -19,6 +19,8 @@
 #include<assert.h>
 #include<limits.h> /* for CHAR_BIT */
 
+#include "sloth_io.h"
+
 /* TODO This needs more platforms and ensure works ok */
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 #define WINDOWS
@@ -41,11 +43,11 @@
 
 /* -- getch multiplatform definition and implementation  */
 
-/* The core keeps its own getch instead of using CPNBI on purpose:
-   Sloth must build on microcontrollers without a host console
-   library, and the VM/bootstrap must stay free of CPNBI. CPNBI is
-   a dependency of the optional Facility word set only; a host that
-   needs richer input overrides x->key with sloth_set_key(). */
+/* The default input hook uses the local getch instead of CPNBI on
+   purpose: Sloth must build on microcontrollers without a host console
+   library, and the VM/bootstrap must stay free of CPNBI. CPNBI is used
+   by the desktop Facility adapter only; a host that needs richer input
+   overrides x->input with sloth_set_input(). */
 
 #ifdef WINDOWS
 #include <conio.h>
@@ -160,9 +162,9 @@ typedef struct sloth_VM {
 	jmp_buf jmpbuf[8];
 	int jmpbuf_idx;
 
-	/* KEY and EMIT implementations */
-	F key;
-	F emit;
+	/* KEY/EMIT and Facility input/output implementations */
+	SlothInput input;
+	SlothOutput output;
 
 	/* Pointer to array of primitives */
 	sloth_P *p;
@@ -484,14 +486,11 @@ void sloth_bye_(X* x);
 
 /* -- Input/output and parsing operations -------------- */
 
-void sloth_default_emit_(X* x);
-void sloth_default_key_(X* x);
-
 void sloth_emit_(X* x);
 void sloth_key_(X* x);
 
-void sloth_set_emit(X* x, F fn);
-void sloth_set_key(X* x, F fn);
+void sloth_set_output(X* x, SlothOutput fn);
+void sloth_set_input(X* x, SlothInput fn);
 
 void sloth_source_(X* x);
 void sloth_word_(X* x);

@@ -1,5 +1,9 @@
 #include "sloth.h"
 
+#ifndef SLOTH_NO_FILES
+int sloth_stdin_is_tty(void);
+#endif
+
 /* C89 NaN/Inf detection (IEEE 754 assumed) */
 #define SLOTH_F_NAN()    (0.0 / 0.0)
 #define SLOTH_F_ISNAN(x) ((x) != (x))
@@ -800,32 +804,59 @@ void sloth_bye_(X* x) {
 
 /* -- Input/output and parsing operations -------------- */
 
-void 
-sloth_default_emit_(X* x) {
-	printf("%c", (uCHAR)sloth_pop(x));
+static int
+sloth__default_key_value(X* x) {
+	(void)x;
+#ifndef SLOTH_NO_FILES
+	if (!sloth_stdin_is_tty()) return SLOTH_RETURN_KEY;
+#endif
+	return getch();
 }
-void
-sloth_default_key_(X* x) {
-	sloth_push(x, getch());
+
+static int32_t
+sloth__default_input_(X* x, int op) {
+	switch (op) {
+	case SLOTH_IO_KEY_READ:
+		return sloth__default_key_value(x);
+	case SLOTH_IO_KEY_AVAILABLE:
+		return 1;
+	case SLOTH_IO_EKEY_READ:
+		return sloth__default_key_value(x);
+	case SLOTH_IO_EKEY_AVAILABLE:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+static int32_t
+sloth__default_output_(X* x, int op, uint8_t c) {
+	(void)x;
+	if (op == SLOTH_IO_EMIT_WRITE) {
+		printf("%c", (uCHAR)c);
+		return 0;
+	}
+	if (op == SLOTH_IO_EMIT_AVAILABLE) return 1;
+	return 0;
 }
 
 void 
 sloth_emit_(X* x) {
-	x->emit(x);
+	x->output(x, SLOTH_IO_EMIT_WRITE, (uint8_t)sloth_pop(x));
 }
 void
 sloth_key_(X* x) {
-	x->key(x);
-}
-
-void 
-sloth_set_emit(X* x, F fn) { 
-	x->emit = fn ? fn : sloth_default_emit_;
+	sloth_push(x, (CELL)x->input(x, SLOTH_IO_KEY_READ));
 }
 
 void
-sloth_set_key(X* x, F fn) {
-	x->key = fn ? fn : sloth_default_key_;
+sloth_set_output(X* x, SlothOutput fn) {
+	x->output = fn ? fn : sloth__default_output_;
+}
+
+void
+sloth_set_input(X* x, SlothInput fn) {
+	x->input = fn ? fn : sloth__default_input_;
 }
 
 /* -- */
@@ -1542,14 +1573,6 @@ void sloth_interpret_(X* x) {
 
 /* -- Environment queries ------------------------------ */
 
-#if defined(_WIN64) || defined(WIN32) || defined(_WIN32)
-#define RETURN_KEY 13
-#define BACKSPACE_KEY 8
-#else
-#define RETURN_KEY 10
-#define BACKSPACE_KEY 127
-#endif
-
 void sloth_environment_(X* x) {
 	CELL q;
 	if (!sloth__check_data_stack(x, 1, 0)) return;
@@ -1609,10 +1632,10 @@ void sloth_environment_(X* x) {
 		#endif
 		break;
 	case -2: /* RETURN KEY */
-		sloth_push(x, RETURN_KEY);
+		sloth_push(x, SLOTH_RETURN_KEY);
 		break;
 	case -3: /* BACKSPACE KEY */
-		sloth_push(x, BACKSPACE_KEY);
+		sloth_push(x, SLOTH_BACKSPACE_KEY);
 	}
 }
 
@@ -2481,10 +2504,6 @@ void sloth_bootstrap(X* x) {
 
 /* -- Context initialization and destruction ----------- */
 
-#ifndef SLOTH_NO_FILES
-static void sloth__nontty_key(X* x);
-#endif
-
 void sloth__init(X* x, CELL d, CELL dz, CELL u, CELL uz) { 
 	x->sp = 0; 
 	x->rp = 0; 
@@ -2499,12 +2518,8 @@ void sloth__init(X* x, CELL d, CELL dz, CELL u, CELL uz) {
 
 	x->jmpbuf_idx = -1;
 
-#ifndef SLOTH_NO_FILES
-	x->key = sloth_stdin_is_tty() ? sloth_default_key_ : sloth__nontty_key;
-#else
-	x->key = sloth_default_key_;
-#endif
-	x->emit = sloth_default_emit_;
+	x->input = sloth__default_input_;
+	x->output = sloth__default_output_;
 
 	/* Initialize HERE */
 	*((CELL*)(x->d + 0*sCELL)) = x->d + 3*sCELL;
@@ -2700,13 +2715,6 @@ void sloth_repl(X* x) {
 	sloth_user_set(x, SLOTH_ILEN, 80);
 	sloth_eval(x, sloth_get_xt(x, sloth_find_word(x, "QUIT")));
 }
-
-#ifndef SLOTH_NO_FILES
-static void
-sloth__nontty_key(X* x) {
-	sloth_push(x, RETURN_KEY);
-}
-#endif
 
 void sloth_run(X* x) {
 #ifndef SLOTH_NO_FILES

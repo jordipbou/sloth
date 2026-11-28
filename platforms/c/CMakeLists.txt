@@ -70,18 +70,20 @@ if(UNIX)
     target_link_libraries(unity m)
 endif()
 
-# CPNBI provides non-blocking console input. Its demo and test
-# suite are not part of Sloth's build.
-set(CPNBI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(CPNBI_BUILD_DEMO OFF CACHE BOOL "" FORCE)
+# CPNBI provides non-blocking console input for the desktop Facility
+# adapter. Its demo and test suite are not part of Sloth's build.
+if(NOT DEFINED SLOTH_WITHOUT_FACILITY_WORD_SET)
+	set(CPNBI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+	set(CPNBI_BUILD_DEMO OFF CACHE BOOL "" FORCE)
 
-FetchContent_Declare(
-	cpnbi
-	GIT_REPOSITORY https://github.com/jordipbou/cpnbi.git
-	GIT_TAG a24d2b4af30fca6e3b58f83758d50f20c0b8b23d
-)
+	FetchContent_Declare(
+		cpnbi
+		GIT_REPOSITORY https://github.com/jordipbou/cpnbi.git
+		GIT_TAG a24d2b4af30fca6e3b58f83758d50f20c0b8b23d
+	)
 
-FetchContent_MakeAvailable(cpnbi)
+	FetchContent_MakeAvailable(cpnbi)
+endif()
 
 # Default dictionary size for sloth_new(), in bytes. Projects that
 # keep data in the Forth dictionary can raise it; the default keeps
@@ -150,7 +152,6 @@ if(NOT DEFINED SLOTH_WITHOUT_FACILITY_WORD_SET)
 							 C_STANDARD_REQUIRED ON
 							 C_EXTENSIONS OFF)
 
-	target_link_libraries(sloth_facility_word_set PUBLIC cpnbi_lib)
 	target_link_libraries(sloth_lib sloth_facility_word_set)
 endif()
 
@@ -214,6 +215,10 @@ endif()
 
 target_link_libraries(sloth sloth_lib)
 
+if(NOT DEFINED SLOTH_WITHOUT_FACILITY_WORD_SET)
+	target_link_libraries(sloth cpnbi_lib)
+endif()
+
 # Unit tests
 
 add_executable(test_sloth tests/test_sloth.c sloth.c)
@@ -240,9 +245,15 @@ endif()
 # Apply strict C90 to sloth's targets
 sloth_strict_c(sloth)
 sloth_strict_c(sloth_lib)
-sloth_strict_c(sloth_memory_word_set)
-sloth_strict_c(sloth_file_word_set)
-sloth_strict_c(sloth_facility_word_set)
+if(NOT DEFINED SLOTH_WITHOUT_MEMORY_WORD_SET)
+	sloth_strict_c(sloth_memory_word_set)
+endif()
+if(NOT DEFINED SLOTH_WITHOUT_FILE_WORD_SET)
+	sloth_strict_c(sloth_file_word_set)
+endif()
+if(NOT DEFINED SLOTH_WITHOUT_FACILITY_WORD_SET)
+	sloth_strict_c(sloth_facility_word_set)
+endif()
 
 # -- CTest -------------------------------------------------
 # Single entry point for all C tests, on Linux and Windows:

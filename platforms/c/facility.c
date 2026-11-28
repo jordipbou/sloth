@@ -1,14 +1,11 @@
 #define _POSIX_C_SOURCE 199309L
 
 #include "facility.h"
-#include "cpnbi.h"
 #include <time.h>
 
-/* CPNBI backs this word set (repl.c only initializes it). The
-   VM/bootstrap keeps its own minimal getch so Sloth can build on
-   microcontrollers without a host console library. This word set is
-   optional; hosts that do not need it can omit it and with it the
-   CPNBI dependency. */
+/* The Facility word set is backed by the host input/output hooks. The
+   desktop executable installs a CPNBI adapter; the VM/bootstrap stays
+   free of CPNBI. This word set is optional. */
 
 /* -- Milliseconds multiplatform implementation -------- */
 /* Taken from: https://stackoverflow.com/a/28827188 */
@@ -42,7 +39,7 @@ void sleep_ms(int milliseconds) { /* cross-platform sleep */
 /* == Facility words =================================== */
 
 void sloth_key_question_(X* x) {
-	sloth_push(x, cpnbi_is_byte_available() == 1 ? -1 : 0);
+	sloth_push(x, x->input(x, SLOTH_IO_KEY_AVAILABLE) ? -1 : 0);
 }
 
 /* -- Facility extension words ========================= */
@@ -50,13 +47,13 @@ void sloth_key_question_(X* x) {
 /* -- Keyboard input ----------------------------------- */
 
 void sloth_e_key_(X* x) {
-	sloth_push(x, cpnbi_get_event());
+	sloth_push(x, (CELL)x->input(x, SLOTH_IO_EKEY_READ));
 }
 
 void sloth_e_key_to_char_(X* x) {
-	int32_t e = sloth_pop(x);
-	int32_t key = cpnbi_event_key(e);
-	if (!cpnbi_event_is_special(e) && key >= 32 && key <= 126) {
+	int32_t e = (int32_t)sloth_pop(x);
+	int32_t key = SLOTH_EVENT_KEY(e);
+	if (!SLOTH_EVENT_IS_SPECIAL(e) && key >= 32 && key <= 126) {
 		sloth_push(x, key);
 		sloth_push(x, -1);
 	} else {
@@ -66,18 +63,18 @@ void sloth_e_key_to_char_(X* x) {
 }
 
 static int sloth__is_special_key(int32_t key) {
-	if (key >= CPNBI_KEY_UP && key <= CPNBI_KEY_RIGHT) return 1;
-	if (key >= CPNBI_KEY_HOME && key <= CPNBI_KEY_PAGE_DOWN) return 1;
-	if (key >= CPNBI_KEY_F1 && key <= CPNBI_KEY_F12) return 1;
+	if (key >= SLOTH_KEY_UP && key <= SLOTH_KEY_RIGHT) return 1;
+	if (key >= SLOTH_KEY_HOME && key <= SLOTH_KEY_PAGE_DOWN) return 1;
+	if (key >= SLOTH_KEY_F1 && key <= SLOTH_KEY_F12) return 1;
 	return 0;
 }
 
 void sloth_e_key_to_f_key_(X* x) {
-	int32_t e = sloth_pop(x);
-	int32_t key = cpnbi_event_key(e);
-	int32_t mods = cpnbi_event_mod(e);
+	int32_t e = (int32_t)sloth_pop(x);
+	int32_t key = SLOTH_EVENT_KEY(e);
+	int32_t mods = SLOTH_EVENT_MOD(e);
 	if (sloth__is_special_key(key)) {
-		sloth_push(x, key | (mods << CPNBI_MOD_OFFSET));
+		sloth_push(x, key | (mods << SLOTH_EVENT_MOD_OFFSET));
 		sloth_push(x, -1);
 	} else {
 		sloth_push(x, e);
@@ -86,42 +83,41 @@ void sloth_e_key_to_f_key_(X* x) {
 }
 
 void sloth_e_key_question_(X* x) {
-	sloth_push(x, cpnbi_is_event_available() == 1 ? -1 : 0);
+	sloth_push(x, x->input(x, SLOTH_IO_EKEY_AVAILABLE) ? -1 : 0);
 }
 
 void sloth_emit_question_(X* x) {
-	/* Is there any known case to not set this to 1 here? */
-	sloth_push(x, 1);
+	sloth_push(x, x->output(x, SLOTH_IO_EMIT_AVAILABLE, 0) ? -1 : 0);
 }
 
-void sloth_k_alt_mask_(X* x) { sloth_push(x, CPNBI_MOD_ALT << CPNBI_MOD_OFFSET); }
-void sloth_k_ctrl_mask_(X* x) { sloth_push(x, CPNBI_MOD_CTRL << CPNBI_MOD_OFFSET); }
-void sloth_k_shift_mask_(X* x) { sloth_push(x, CPNBI_MOD_SHIFT << CPNBI_MOD_OFFSET); }
+void sloth_k_alt_mask_(X* x) { sloth_push(x, SLOTH_MOD_ALT << SLOTH_EVENT_MOD_OFFSET); }
+void sloth_k_ctrl_mask_(X* x) { sloth_push(x, SLOTH_MOD_CTRL << SLOTH_EVENT_MOD_OFFSET); }
+void sloth_k_shift_mask_(X* x) { sloth_push(x, SLOTH_MOD_SHIFT << SLOTH_EVENT_MOD_OFFSET); }
 
-void sloth_k_insert_(X* x) { sloth_push(x, CPNBI_KEY_INSERT); }
-void sloth_k_delete_(X* x) { sloth_push(x, CPNBI_KEY_DELETE); }
-void sloth_k_home_(X* x) { sloth_push(x, CPNBI_KEY_HOME); }
-void sloth_k_prior_(X* x) { sloth_push(x, CPNBI_KEY_PAGE_UP); }
-void sloth_k_next_(X* x) { sloth_push(x, CPNBI_KEY_PAGE_DOWN); }
-void sloth_k_end_(X* x) { sloth_push(x, CPNBI_KEY_END); }
+void sloth_k_insert_(X* x) { sloth_push(x, SLOTH_KEY_INSERT); }
+void sloth_k_delete_(X* x) { sloth_push(x, SLOTH_KEY_DELETE); }
+void sloth_k_home_(X* x) { sloth_push(x, SLOTH_KEY_HOME); }
+void sloth_k_prior_(X* x) { sloth_push(x, SLOTH_KEY_PAGE_UP); }
+void sloth_k_next_(X* x) { sloth_push(x, SLOTH_KEY_PAGE_DOWN); }
+void sloth_k_end_(X* x) { sloth_push(x, SLOTH_KEY_END); }
 
-void sloth_k_up_(X* x) { sloth_push(x, CPNBI_KEY_UP); }
-void sloth_k_down_(X* x) { sloth_push(x, CPNBI_KEY_DOWN); }
-void sloth_k_left_(X* x) { sloth_push(x, CPNBI_KEY_LEFT); }
-void sloth_k_right_(X* x) { sloth_push(x, CPNBI_KEY_RIGHT); }
+void sloth_k_up_(X* x) { sloth_push(x, SLOTH_KEY_UP); }
+void sloth_k_down_(X* x) { sloth_push(x, SLOTH_KEY_DOWN); }
+void sloth_k_left_(X* x) { sloth_push(x, SLOTH_KEY_LEFT); }
+void sloth_k_right_(X* x) { sloth_push(x, SLOTH_KEY_RIGHT); }
 
-void sloth_k_f1_(X* x) { sloth_push(x, CPNBI_KEY_F1); }
-void sloth_k_f2_(X* x) { sloth_push(x, CPNBI_KEY_F2); }
-void sloth_k_f3_(X* x) { sloth_push(x, CPNBI_KEY_F3); }
-void sloth_k_f4_(X* x) { sloth_push(x, CPNBI_KEY_F4); }
-void sloth_k_f5_(X* x) { sloth_push(x, CPNBI_KEY_F5); }
-void sloth_k_f6_(X* x) { sloth_push(x, CPNBI_KEY_F6); }
-void sloth_k_f7_(X* x) { sloth_push(x, CPNBI_KEY_F7); }
-void sloth_k_f8_(X* x) { sloth_push(x, CPNBI_KEY_F8); }
-void sloth_k_f9_(X* x) { sloth_push(x, CPNBI_KEY_F9); }
-void sloth_k_f10_(X* x) { sloth_push(x, CPNBI_KEY_F10); }
-void sloth_k_f11_(X* x) { sloth_push(x, CPNBI_KEY_F11); }
-void sloth_k_f12_(X* x) { sloth_push(x, CPNBI_KEY_F12); }
+void sloth_k_f1_(X* x) { sloth_push(x, SLOTH_KEY_F1); }
+void sloth_k_f2_(X* x) { sloth_push(x, SLOTH_KEY_F2); }
+void sloth_k_f3_(X* x) { sloth_push(x, SLOTH_KEY_F3); }
+void sloth_k_f4_(X* x) { sloth_push(x, SLOTH_KEY_F4); }
+void sloth_k_f5_(X* x) { sloth_push(x, SLOTH_KEY_F5); }
+void sloth_k_f6_(X* x) { sloth_push(x, SLOTH_KEY_F6); }
+void sloth_k_f7_(X* x) { sloth_push(x, SLOTH_KEY_F7); }
+void sloth_k_f8_(X* x) { sloth_push(x, SLOTH_KEY_F8); }
+void sloth_k_f9_(X* x) { sloth_push(x, SLOTH_KEY_F9); }
+void sloth_k_f10_(X* x) { sloth_push(x, SLOTH_KEY_F10); }
+void sloth_k_f11_(X* x) { sloth_push(x, SLOTH_KEY_F11); }
+void sloth_k_f12_(X* x) { sloth_push(x, SLOTH_KEY_F12); }
 
 /* -- Time and date ------------------------------------ */
 

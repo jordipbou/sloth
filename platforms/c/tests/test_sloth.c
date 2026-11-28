@@ -33,13 +33,29 @@
 /* SLOTH_INCLUDED_FILES. */
 #define SLOTH_PATHS_SIZE (SLOTH_INCLUDED_FILES - SLOTH_PATHS)
 
-/* Custom EMIT for testing — replaces the default printf one */
+/* Mock input/output hooks for testing */
 char emitted_char = 0;
-void custom_emit_(X* x) { emitted_char = (char)sloth_pop(x); }
-
-/* Custom KEY for testing */
+int emitted_op = -1;
+int32_t output_available = 1;
 int mock_key_char = 0;
-void custom_key_(X* x) { sloth_push(x, mock_key_char); }
+int mock_input_op = -1;
+
+static int32_t mock_output_(X* x, int op, uint8_t c) {
+	(void)x;
+	emitted_op = op;
+	if (op == SLOTH_IO_EMIT_WRITE) {
+		emitted_char = (char)c;
+		return 0;
+	}
+	if (op == SLOTH_IO_EMIT_AVAILABLE) return output_available;
+	return 0;
+}
+
+static int32_t mock_input_(X* x, int op) {
+	(void)x;
+	mock_input_op = op;
+	return mock_key_char;
+}
 
 X* x;
 char ibuf[1024];
@@ -48,8 +64,8 @@ void setUp(void) {
 	/* Create a VM with 64 primitive slots and 32767 bytes */
 	/* of dictionary. */
 	x = sloth_create(256, 32767, 1024);
-	sloth_set_emit(x, custom_emit_);
-	sloth_set_key(x, custom_key_);
+	sloth_set_input(x, mock_input_);
+	sloth_set_output(x, mock_output_);
 }
 
 void tearDown(void) {
@@ -2288,48 +2304,79 @@ void test_set_root_path_at_capacity(void) {
 
 void test_emit(void) {
 	emitted_char = 0;
+	emitted_op = -1;
 	sloth_push(x, 'Z');
-	custom_emit_(x);
+	sloth_emit_(x);
 	TEST_ASSERT_EQUAL(0, x->sp);
-	TEST_ASSERT_EQUAL('Z', emitted_char);
-
-	/* Ensure that our custom emit is being used */
-	sloth_primitive(x, custom_emit_);
-	sloth_push(x, 'Z');
-	sloth__do_prim(x, -1);
-	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(SLOTH_IO_EMIT_WRITE, emitted_op);
 	TEST_ASSERT_EQUAL('Z', emitted_char);
 }
 
 void test_key_pushes_char_onto_stack(void) {
 	mock_key_char = 'Q';
-	custom_key_(x);
+	sloth_key_(x);
 	TEST_ASSERT_EQUAL(1, x->sp);
 	TEST_ASSERT_EQUAL('Q', sloth_pop(x));
 	TEST_ASSERT_EQUAL(0, x->sp);
-
-	/* Ensure that our custom key is being used */
-	mock_key_char = 'Q';
-	sloth_primitive(x, custom_key_);
-	sloth__do_prim(x, -1);
-	TEST_ASSERT_EQUAL(1, x->sp);
-	TEST_ASSERT_EQUAL('Q', sloth_pop(x));
-	TEST_ASSERT_EQUAL(0, x->sp);
+	TEST_ASSERT_EQUAL(SLOTH_IO_KEY_READ, mock_input_op);
 }
 
 void test_key_handles_zero(void) {
 	mock_key_char = 0;
-	custom_key_(x);
+	sloth_key_(x);
 	TEST_ASSERT_EQUAL(0, sloth_pop(x));
 }
 
 void test_key_handles_max_uchar(void) {
 	mock_key_char = 255;
-	custom_key_(x);
+	sloth_key_(x);
 	TEST_ASSERT_EQUAL(255, sloth_pop(x));
 }
 
 #ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
+
+void test_key_question_(void) {
+	mock_key_char = 0;
+	sloth_key_question_(x);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_IO_KEY_AVAILABLE, mock_input_op);
+
+	mock_key_char = 1;
+	sloth_key_question_(x);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_IO_KEY_AVAILABLE, mock_input_op);
+}
+
+void test_e_key_(void) {
+	mock_key_char = SLOTH_KEY_F1;
+	sloth_e_key_(x);
+	TEST_ASSERT_EQUAL(SLOTH_KEY_F1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_IO_EKEY_READ, mock_input_op);
+}
+
+void test_e_key_question_(void) {
+	mock_key_char = 0;
+	sloth_e_key_question_(x);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_IO_EKEY_AVAILABLE, mock_input_op);
+
+	mock_key_char = 1;
+	sloth_e_key_question_(x);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_IO_EKEY_AVAILABLE, mock_input_op);
+}
+
+void test_emit_question_(void) {
+	output_available = 0;
+	sloth_emit_question_(x);
+	TEST_ASSERT_EQUAL(0, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_IO_EMIT_AVAILABLE, emitted_op);
+
+	output_available = 1;
+	sloth_emit_question_(x);
+	TEST_ASSERT_EQUAL(-1, sloth_pop(x));
+	TEST_ASSERT_EQUAL(SLOTH_IO_EMIT_AVAILABLE, emitted_op);
+}
 
 typedef struct {
 	void (*prim)(X*);
@@ -3053,6 +3100,10 @@ int main(void) {
 	RUN_TEST(test_key_handles_zero);
 	RUN_TEST(test_key_handles_max_uchar);
 #ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
+	RUN_TEST(test_key_question_);
+	RUN_TEST(test_e_key_);
+	RUN_TEST(test_e_key_question_);
+	RUN_TEST(test_emit_question_);
 	RUN_TEST(test_facility_k_constants_are_distinct);
 	RUN_TEST(test_facility_e_key_to_f_key_recognises_keys);
 	RUN_TEST(test_facility_e_key_to_f_key_preserves_modifiers);

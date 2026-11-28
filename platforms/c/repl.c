@@ -14,6 +14,29 @@
 #define ROOT_PATH "../../"
 #endif
 
+#ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
+static int32_t
+cpnbi_input_(X* x, int op) {
+	(void)x;
+	switch (op) {
+	case SLOTH_IO_KEY_READ: {
+		int32_t c = cpnbi_get_byte();
+		return c == CPNBI_EOF ? SLOTH_RETURN_KEY : c;
+	}
+	case SLOTH_IO_KEY_AVAILABLE:
+		return cpnbi_is_byte_available();
+	case SLOTH_IO_EKEY_READ: {
+		int32_t e = cpnbi_get_event();
+		return e == CPNBI_EOF ? SLOTH_RETURN_KEY : e;
+	}
+	case SLOTH_IO_EKEY_AVAILABLE:
+		return cpnbi_is_event_available();
+	default:
+		return 0;
+	}
+}
+#endif
+
 int main(int argc, char**argv) {
 	X* x;
 	int ior;
@@ -28,6 +51,10 @@ int main(int argc, char**argv) {
 #endif
 
 	x = sloth_new();
+
+#ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
+	sloth_set_input(x, cpnbi_input_);
+#endif
 
 	sloth_bootstrap(x);
 #ifndef SLOTH_WITHOUT_FACILITY_WORD_SET
